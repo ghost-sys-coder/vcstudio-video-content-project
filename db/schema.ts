@@ -1,4 +1,7 @@
+import { sql } from "drizzle-orm";
 import {
+  check,
+  foreignKey,
   index,
   integer,
   pgEnum,
@@ -23,6 +26,24 @@ export const webhookStatusEnum = pgEnum("webhook_status", [
 
 export const storageObjectKindEnum = pgEnum("storage_object_kind", [
   "workspace_logo",
+]);
+
+export const projectStatusEnum = pgEnum("project_status", [
+  "draft",
+  "planning",
+  "assetGeneration",
+  "review",
+  "readyToRender",
+  "rendering",
+  "completed",
+  "failed",
+  "archived",
+]);
+
+export const projectAspectRatioEnum = pgEnum("project_aspect_ratio", [
+  "16:9",
+  "9:16",
+  "1:1",
 ]);
 
 export const users = pgTable(
@@ -132,6 +153,148 @@ export const storageObjects = pgTable(
   ],
 );
 
+export const projects = pgTable(
+  "projects",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    status: projectStatusEnum("status").notNull().default("draft"),
+    aspectRatio: projectAspectRatioEnum("aspect_ratio").notNull(),
+    width: integer("width").notNull(),
+    height: integer("height").notNull(),
+    framesPerSecond: integer("frames_per_second").notNull(),
+    language: text("language").notNull(),
+    maximumBudgetCents: integer("maximum_budget_cents").notNull(),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("projects_workspace_status_updated_index").on(
+      table.workspaceId,
+      table.status,
+      table.updatedAt,
+    ),
+    index("projects_workspace_created_index").on(
+      table.workspaceId,
+      table.createdAt,
+    ),
+    check("projects_width_positive", sql`${table.width} > 0`),
+    check("projects_height_positive", sql`${table.height} > 0`),
+    check(
+      "projects_fps_valid",
+      sql`${table.framesPerSecond} between 1 and 120`,
+    ),
+    check("projects_budget_nonnegative", sql`${table.maximumBudgetCents} >= 0`),
+  ],
+);
+
+export const projectScriptDrafts = pgTable(
+  "project_script_drafts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    content: text("content").notNull().default(""),
+    revision: integer("revision").notNull().default(0),
+    characterCount: integer("character_count").notNull().default(0),
+    estimatedNarrationDurationSeconds: integer(
+      "estimated_narration_duration_seconds",
+    )
+      .notNull()
+      .default(0),
+    updatedByUserId: uuid("updated_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("project_script_drafts_project_unique").on(table.projectId),
+    index("project_script_drafts_workspace_project_index").on(
+      table.workspaceId,
+      table.projectId,
+    ),
+    check(
+      "project_script_drafts_revision_nonnegative",
+      sql`${table.revision} >= 0`,
+    ),
+    check(
+      "project_script_drafts_character_count_nonnegative",
+      sql`${table.characterCount} >= 0`,
+    ),
+  ],
+);
+
+export const projectScriptVersions = pgTable(
+  "project_script_versions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    versionNumber: integer("version_number").notNull(),
+    content: text("content").notNull(),
+    characterCount: integer("character_count").notNull(),
+    estimatedNarrationDurationSeconds: integer(
+      "estimated_narration_duration_seconds",
+    ).notNull(),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    restoredFromVersionId: uuid("restored_from_version_id"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("project_script_versions_project_number_unique").on(
+      table.projectId,
+      table.versionNumber,
+    ),
+    index("project_script_versions_workspace_project_index").on(
+      table.workspaceId,
+      table.projectId,
+      table.createdAt,
+    ),
+    check(
+      "project_script_versions_number_positive",
+      sql`${table.versionNumber} > 0`,
+    ),
+    check(
+      "project_script_versions_character_count_nonnegative",
+      sql`${table.characterCount} >= 0`,
+    ),
+    foreignKey({
+      columns: [table.restoredFromVersionId],
+      foreignColumns: [table.id],
+      name: "project_script_versions_restored_from_fkey",
+    }).onDelete("set null"),
+  ],
+);
+
 export const clerkWebhookEvents = pgTable(
   "clerk_webhook_events",
   {
@@ -159,3 +322,9 @@ export type Workspace = typeof workspaces.$inferSelect;
 export type WorkspaceMember = typeof workspaceMembers.$inferSelect;
 export type WorkspaceRole = (typeof workspaceRoleEnum.enumValues)[number];
 export type StorageObject = typeof storageObjects.$inferSelect;
+export type Project = typeof projects.$inferSelect;
+export type ProjectStatus = (typeof projectStatusEnum.enumValues)[number];
+export type ProjectAspectRatio =
+  (typeof projectAspectRatioEnum.enumValues)[number];
+export type ProjectScriptDraft = typeof projectScriptDrafts.$inferSelect;
+export type ProjectScriptVersion = typeof projectScriptVersions.$inferSelect;

@@ -15,6 +15,9 @@ This repository is the foundation for an internal production tool that converts 
 - Private Cloudflare R2 workspace-logo uploads with a 5 MB limit and object cleanup on replacement or deletion.
 - Responsive shadcn application sidebar with persistent desktop collapse state and a mobile drawer.
 - Owner-only workspace profile management for workspace names and private logos.
+- Workspace-scoped project creation, pagination, settings, status transitions, and archiving.
+- Optimistically locked script drafts with immutable version history and restore-as-new-version behavior.
+- Route-backed project tabs and a bounded, internally scrollable long-script editor.
 
 ## Architecture
 
@@ -72,15 +75,19 @@ docs/                Bootstrap and phase specifications
 | `R2_REGION`                                       | Server only | Yes         | R2 region (`auto`).                              |
 | `R2_SIGNED_UPLOAD_EXPIRY_SECONDS`                 | Server only | Yes         | Upload URL lifetime, 60–900 seconds.             |
 | `R2_SIGNED_DOWNLOAD_EXPIRY_SECONDS`               | Server only | Yes         | Download URL lifetime, 60–3600 seconds.          |
+| `MAX_SCRIPT_CHARACTERS`                           | Server only | Yes         | Maximum narration script length (`50000`).       |
+| `DEFAULT_PROJECT_BUDGET_CENTS`                    | Server only | Yes         | New-project budget ceiling default (`200`).      |
 
 ## Database setup
 
-`db/schema.ts` defines application users, workspaces, workspace memberships, and Clerk webhook delivery records. Generate migrations with `npm run db:generate` and apply reviewed migrations with `npm run db:migrate`. Migration commands prefer `DATABASE_URL_UNPOOLED` and fall back to `DATABASE_URL` when necessary.
+`db/schema.ts` defines application users, workspaces, memberships, projects, script drafts, immutable script versions, storage metadata, and Clerk webhook delivery records. Generate migrations with `npm run db:generate` and apply reviewed migrations with `npm run db:migrate`. Migration commands prefer `DATABASE_URL_UNPOOLED` and fall back to `DATABASE_URL` when necessary.
 
 Multi-statement writes use atomic Neon HTTP batches because the Drizzle `neon-http` driver does not support interactive callback transactions.
 
 The initial Phase 1 migration is `migrations/20260715131000_tidy_tinkerer/migration.sql`.
 It was applied successfully to the configured development Neon database on 2026-07-15.
+
+The Phase 2 project and script migration is `migrations/20260715162113_warm_misty_knight/migration.sql`. It was applied successfully to the configured development Neon database on 2026-07-15.
 
 ## Clerk setup
 
@@ -127,7 +134,7 @@ Not implemented yet. Remotion, FFmpeg, and FFprobe are planned.
 - `npm test` runs Vitest once.
 - `npm run test:coverage` runs tests with V8 coverage.
 
-Phase 1 tests cover authentication gating, environment validation, workspace role permissions, nonmember rejection, cross-workspace isolation, and Clerk user deletion routing.
+Tests cover authentication gating, environment validation, workspace role permissions, nonmember rejection, cross-workspace isolation, project and budget validation, pagination limits, project status transitions, script statistics, storage keys, upload sequencing, and Clerk user deletion routing.
 
 ## Deployment
 
@@ -150,10 +157,12 @@ Billable AI and rendering operations are not implemented yet. Budget reservation
 - `CLERK_WEBHOOK_SIGNING_SECRET` must be configured before real webhook delivery can succeed.
 - The Phase 1 migration must still be applied separately to future preview and production databases.
 - Full browser end-to-end coverage will be expanded with the bootstrap Playwright foundation.
+- Phase 2 does not perform AI scene analysis, image generation, audio generation, or rendering.
+- Script version history is currently bounded to the latest 50 versions in the editor.
 
 ## Implementation status
 
-Phase 1 authentication, user synchronization, workspace onboarding, and authorization foundations are implemented. Project and generation features remain out of scope.
+Phase 1 authentication and workspace foundations plus Phase 2 project management and script versioning are implemented. AI analysis and generation workflows remain out of scope.
 
 ## Recent major changes
 
@@ -165,3 +174,5 @@ Phase 1 authentication, user synchronization, workspace onboarding, and authoriz
 - 2026-07-15: Added private R2 workspace-logo uploads during onboarding, workspace-scoped object keys, metadata persistence, and bucket cleanup on replacement or deletion.
 - 2026-07-15: Corrected workspace onboarding to use an atomic Neon HTTP batch for workspace and owner-membership creation.
 - 2026-07-15: Added the retractable shadcn application sidebar and owner-only workspace name and logo management.
+- 2026-07-15: Implemented Phase 2 workspace-scoped projects, validated budgets and formats, paginated listing, settings and status transitions, optimistic script drafts, immutable versions, and restore-as-new-version.
+- 2026-07-15: Added shadcn project tabs for Script and Settings plus an internally scrollable long-script editor.

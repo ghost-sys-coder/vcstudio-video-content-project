@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutDashboard, Settings } from "lucide-react";
+import { FolderKanban, LayoutDashboard, Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { WorkspaceMembershipView } from "@/db/repositories/workspaces.repository";
@@ -78,6 +78,16 @@ export function ApplicationSidebar({
                 >
                   <LayoutDashboard />
                   <span>Dashboard</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={pathname.startsWith("/app/projects")}
+                  render={<Link href="/app/projects" />}
+                  tooltip="Projects"
+                >
+                  <FolderKanban />
+                  <span>Projects</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               {canManageSettings ? (

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   parseServerEnvironment,
   storageEnvironmentSchema,
+  projectEnvironmentSchema,
 } from "@/lib/env/server-schema";
 
 const validEnvironment = {
@@ -25,6 +26,15 @@ describe("server environment validation", () => {
         CLERK_WEBHOOK_SIGNING_SECRET: "",
       }),
     ).toThrow();
+  });
+});
+
+describe("project environment validation", () => {
+  it("uses conservative Phase 2 defaults", () => {
+    expect(projectEnvironmentSchema.parse({})).toEqual({
+      MAX_SCRIPT_CHARACTERS: 50000,
+      DEFAULT_PROJECT_BUDGET_CENTS: 200,
+    });
   });
 });
 
