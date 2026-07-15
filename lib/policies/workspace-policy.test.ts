@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   can,
+  canCreateProject,
+  canEditProject,
   canManageWorkspace,
   requireCapability,
 } from "@/lib/policies/workspace-policy";
@@ -12,12 +14,14 @@ describe("workspace policy", () => {
     expect(() => requireCapability("viewer", "mutateWorkspaceData")).toThrow(
       WorkspacePermissionDeniedError,
     );
+    expect(canCreateProject("viewer")).toBe(false);
   });
 
   it("allows editors to mutate workspace data but not manage membership", () => {
     expect(can("editor", "mutateWorkspaceData")).toBe(true);
     expect(can("editor", "manageMembers")).toBe(false);
     expect(canManageWorkspace("editor")).toBe(false);
+    expect(canEditProject("editor")).toBe(true);
   });
 
   it("allows owners to manage membership and workspace settings", () => {

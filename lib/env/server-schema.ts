@@ -31,12 +31,28 @@ export const storageEnvironmentSchema = z.object({
   R2_SIGNED_DOWNLOAD_EXPIRY_SECONDS: z.coerce.number().int().min(60).max(3600),
 });
 
+export const projectEnvironmentSchema = z.object({
+  MAX_SCRIPT_CHARACTERS: z.coerce
+    .number()
+    .int()
+    .min(1000)
+    .max(250000)
+    .default(50000),
+  DEFAULT_PROJECT_BUDGET_CENTS: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(100000)
+    .default(200),
+});
+
 export type ServerEnvironment = z.infer<typeof serverEnvironmentSchema>;
 export type DatabaseEnvironment = z.infer<typeof databaseEnvironmentSchema>;
 export type ClerkWebhookEnvironment = z.infer<
   typeof clerkWebhookEnvironmentSchema
 >;
 export type StorageEnvironment = z.infer<typeof storageEnvironmentSchema>;
+export type ProjectEnvironment = z.infer<typeof projectEnvironmentSchema>;
 
 export function parseServerEnvironment(
   environment: Record<string, string | undefined>,
