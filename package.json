@@ -2,6 +2,13 @@
   "name": "content-creation-tool",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "overrides": {
+    "cookie@<0.7.0": "0.7.2",
+    "ws@8.0.0 - 8.20.1": "8.21.1"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -13,7 +20,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "trigger:dev": "trigger.dev dev",
+    "trigger:deploy": "trigger.dev deploy"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1087.0",
@@ -22,12 +31,16 @@
     "@clerk/nextjs": "^7.5.18",
     "@clerk/ui": "^1.25.3",
     "@neondatabase/serverless": "^1.1.0",
+    "@studio/prompts": "file:packages/prompts",
+    "@trigger.dev/build": "4.5.4",
+    "@trigger.dev/sdk": "4.5.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^1.0.0-rc.4",
     "lucide-react": "^1.24.0",
     "next": "16.2.10",
+    "openai": "^6.47.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "server-only": "^0.0.1",

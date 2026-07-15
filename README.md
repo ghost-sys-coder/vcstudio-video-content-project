@@ -18,6 +18,7 @@ This repository is the foundation for an internal production tool that converts 
 - Workspace-scoped project creation, pagination, settings, status transitions, and archiving.
 - Optimistically locked script drafts with immutable version history and restore-as-new-version behavior.
 - Route-backed project tabs and a bounded, internally scrollable long-script editor.
+- Approved script versions, cost-confirmed Trigger.dev scene analysis, schema-constrained OpenAI output, editable immutable scene versions, and scene approval.
 
 ## Architecture
 
@@ -27,7 +28,7 @@ The repository will move into the full `apps/` and `packages/` monorepo structur
 
 ## Technology stack
 
-Next.js 16, React 19, strict TypeScript, Tailwind CSS, shadcn/ui, Clerk, Neon PostgreSQL, Drizzle ORM, Zod, Vitest, ESLint, and Prettier.
+Next.js 16, React 19, strict TypeScript, Tailwind CSS, shadcn/ui, Clerk, Neon PostgreSQL, Drizzle ORM, Trigger.dev, OpenAI Responses API, Zod, Vitest, ESLint, and Prettier.
 
 ## Repository structure
 
@@ -40,7 +41,11 @@ lib/domain/          Typed application errors
 lib/env/             Environment validation
 lib/policies/        Central workspace authorization rules
 lib/schemas/         External input validation
+lib/openai/          Narrow server-only OpenAI provider implementation
+packages/prompts/    Versioned `@studio/prompts` workspace package
+lib/costs/           Provider estimation and reconciliation calculations
 migrations/          Generated immutable SQL migrations
+trigger/             Durable background tasks and queue configuration
 docs/                Bootstrap and phase specifications
 ```
 
@@ -77,6 +82,17 @@ docs/                Bootstrap and phase specifications
 | `R2_SIGNED_DOWNLOAD_EXPIRY_SECONDS`               | Server only | Yes         | Download URL lifetime, 60–3600 seconds.          |
 | `MAX_SCRIPT_CHARACTERS`                           | Server only | Yes         | Maximum narration script length (`50000`).       |
 | `DEFAULT_PROJECT_BUDGET_CENTS`                    | Server only | Yes         | New-project budget ceiling default (`200`).      |
+| `OPENAI_API_KEY`                                  | Server only | Yes         | Authenticates OpenAI Responses API calls.        |
+| `OPENAI_TEXT_MODEL`                               | Server only | Yes         | Configurable structured scene-analysis model.    |
+| `OPENAI_TEXT_INPUT_COST_PER_MILLION_CENTS`        | Server only | Yes         | Model input price used for cost controls.        |
+| `OPENAI_TEXT_OUTPUT_COST_PER_MILLION_CENTS`       | Server only | Yes         | Model output price used for cost controls.       |
+| `TRIGGER_SECRET_KEY`                              | Server only | Yes         | Authenticates Trigger.dev task submissions.      |
+| `TRIGGER_PROJECT_REF`                             | Server only | Yes         | Identifies the Trigger.dev project.              |
+| `IDEMPOTENCY_HASH_SECRET`                         | Server only | Yes         | HMAC secret for billable-operation identity.     |
+| `REQUEST_FINGERPRINT_SECRET`                      | Server only | Yes         | HMAC secret for prompt request fingerprints.     |
+| `MAX_SCENES_PER_PROJECT`                          | Server only | Yes         | Maximum structured scenes returned per analysis. |
+| `DEFAULT_DAILY_BUDGET_CENTS`                      | Server only | Yes         | Default workspace daily AI budget.               |
+| `DEFAULT_MONTHLY_BUDGET_CENTS`                    | Server only | Yes         | Default workspace monthly AI budget.             |
 
 ## Database setup
 
@@ -88,6 +104,8 @@ The initial Phase 1 migration is `migrations/20260715131000_tidy_tinkerer/migrat
 It was applied successfully to the configured development Neon database on 2026-07-15.
 
 The Phase 2 project and script migration is `migrations/20260715162113_warm_misty_knight/migration.sql`. It was applied successfully to the configured development Neon database on 2026-07-15.
+
+The Phase 3 scene-planning migration is `migrations/20260715204954_rainy_umar/migration.sql`. It was applied successfully to the configured development Neon database on 2026-07-15.
 
 ## Clerk setup
 
@@ -101,7 +119,7 @@ Copy the endpoint signing secret into `CLERK_WEBHOOK_SIGNING_SECRET`. Workspace 
 
 ## Trigger.dev setup
 
-Not implemented yet.
+Phase 3 defines the `scene-analysis` task in the shared `ai-text` queue. Add all Phase 3 server variables to the Trigger.dev environment, run `npm run trigger:dev` alongside Next.js for local task execution, and deploy with `npm run trigger:deploy`. Before invoking OpenAI, the task validates reservation ownership, status, expiry, amount, and prompt fingerprint. It also uses bounded retries, validates idempotency and the approved script version, writes scenes atomically, and reconciles usage reservations.
 
 ## Storage setup
 
@@ -111,7 +129,7 @@ Configure the bucket CORS policy to allow `PUT` from `NEXT_PUBLIC_APP_URL` with 
 
 ## OpenAI setup
 
-Not implemented yet.
+Set `OPENAI_API_KEY`, `OPENAI_TEXT_MODEL`, and the model's input/output price variables. Scene analysis uses the Responses API with Zod-backed structured output. For the configured `gpt-5.6-luna` model, the documented July 2026 rates are represented as `100` input cents and `600` output cents per million tokens. Update both the model and its pricing variables together when changing models.
 
 ## Rendering setup
 
@@ -128,13 +146,15 @@ Not implemented yet. Remotion, FFmpeg, and FFprobe are planned.
 - `npm run typecheck` runs strict TypeScript checking.
 - `npm run db:generate` generates a new Drizzle migration.
 - `npm run db:migrate` applies pending Drizzle migrations.
+- `npm run trigger:dev` runs Trigger.dev tasks locally.
+- `npm run trigger:deploy` deploys Trigger.dev tasks.
 
 ## Testing commands
 
 - `npm test` runs Vitest once.
 - `npm run test:coverage` runs tests with V8 coverage.
 
-Tests cover authentication gating, environment validation, workspace role permissions, nonmember rejection, cross-workspace isolation, project and budget validation, pagination limits, project status transitions, script statistics, storage keys, upload sequencing, and Clerk user deletion routing.
+Tests cover authentication gating, environment validation, workspace role permissions, nonmember rejection, cross-workspace isolation, project and budget validation, pagination limits, project status transitions, script statistics, scene structured output, prompt determinism, idempotency, cost calculations, scene timing, storage keys, upload sequencing, and Clerk user deletion routing.
 
 ## Deployment
 
@@ -148,7 +168,7 @@ Deleted Clerk users are soft-deleted and anonymized locally so workspace ownersh
 
 ## Cost controls
 
-Billable AI and rendering operations are not implemented yet. Budget reservations and usage reconciliation remain required before those providers are enabled.
+Scene analysis estimates cost before confirmation, enforces project plus workspace daily/monthly limits, creates a pending reservation, records provider usage, and reconciles or releases the reservation. Image, audio, and rendering operations remain disabled until they implement the same lifecycle.
 
 ## Current limitations
 
@@ -157,12 +177,14 @@ Billable AI and rendering operations are not implemented yet. Budget reservation
 - `CLERK_WEBHOOK_SIGNING_SECRET` must be configured before real webhook delivery can succeed.
 - The Phase 1 migration must still be applied separately to future preview and production databases.
 - Full browser end-to-end coverage will be expanded with the bootstrap Playwright foundation.
-- Phase 2 does not perform AI scene analysis, image generation, audio generation, or rendering.
+- Image generation, audio generation, subtitles, and rendering are not implemented yet.
 - Script version history is currently bounded to the latest 50 versions in the editor.
+- Trigger.dev must be running locally or deployed before queued scene analyses execute.
+- Safe npm overrides pin vulnerable `ws` and `cookie` transitive dependencies to patched releases. The remaining audit findings are 28 moderate transitive advisories in current Trigger.dev OpenTelemetry, Next.js PostCSS, and Clerk UI dependency chains; npm currently offers only breaking forced remediations.
 
 ## Implementation status
 
-Phase 1 authentication and workspace foundations plus Phase 2 project management and script versioning are implemented. AI analysis and generation workflows remain out of scope.
+Phases 1–3 are implemented through authenticated workspaces, project/script versioning, and durable AI scene planning. Media generation and rendering remain future phases.
 
 ## Recent major changes
 
@@ -176,3 +198,5 @@ Phase 1 authentication and workspace foundations plus Phase 2 project management
 - 2026-07-15: Added the retractable shadcn application sidebar and owner-only workspace name and logo management.
 - 2026-07-15: Implemented Phase 2 workspace-scoped projects, validated budgets and formats, paginated listing, settings and status transitions, optimistic script drafts, immutable versions, and restore-as-new-version.
 - 2026-07-15: Added shadcn project tabs for Script and Settings plus an internally scrollable long-script editor.
+- 2026-07-15: Implemented Phase 3 script approval, OpenAI structured scene analysis, Trigger.dev orchestration, usage reservations, immutable scene editing, scene approvals, and the scene-planning migration.
+- 2026-07-16: Hardened Phase 3 reservation preflight checks, constrained bulk approval to the active scene plan, moved prompts into `@studio/prompts`, fixed repeated form identifiers, expanded regression tests, and removed high-severity dependency advisories with safe overrides.
