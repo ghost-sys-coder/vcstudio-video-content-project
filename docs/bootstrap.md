@@ -509,7 +509,7 @@ Implement validation for the following variables.
 ```dotenv
 NODE_ENV=development
 NEXT_PUBLIC_APP_URL=http://localhost:3000
-APP_NAME=AI Video Studio
+APP_NAME=VCStudio
 LOG_LEVEL=info
 ```
 
