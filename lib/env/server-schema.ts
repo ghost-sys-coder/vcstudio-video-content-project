@@ -46,6 +46,47 @@ export const projectEnvironmentSchema = z.object({
     .default(200),
 });
 
+export const sceneAnalysisEnvironmentSchema = z.object({
+  OPENAI_API_KEY: z.string().min(1, "OPENAI_API_KEY is required"),
+  OPENAI_TEXT_MODEL: z.string().min(1, "OPENAI_TEXT_MODEL is required"),
+  OPENAI_TEXT_INPUT_COST_PER_MILLION_CENTS: z.coerce.number().int().positive(),
+  OPENAI_TEXT_OUTPUT_COST_PER_MILLION_CENTS: z.coerce.number().int().positive(),
+  OPENAI_REQUEST_TIMEOUT_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(10)
+    .max(600)
+    .default(180),
+  TRIGGER_SECRET_KEY: z.string().min(1, "TRIGGER_SECRET_KEY is required"),
+  TRIGGER_PROJECT_REF: z.string().min(1, "TRIGGER_PROJECT_REF is required"),
+  IDEMPOTENCY_HASH_SECRET: z.string().min(32),
+  REQUEST_FINGERPRINT_SECRET: z.string().min(32),
+  MAX_SCENES_PER_PROJECT: z.coerce.number().int().min(1).max(500).default(200),
+  MIN_SCENE_DURATION_MILLISECONDS: z.coerce
+    .number()
+    .int()
+    .min(250)
+    .default(1000),
+  MAX_SCENE_DURATION_MILLISECONDS: z.coerce
+    .number()
+    .int()
+    .min(1000)
+    .default(60000),
+  MAX_SCENE_ANALYSIS_RETRIES: z.coerce.number().int().min(0).max(3).default(2),
+  GENERATION_RESERVATION_EXPIRY_MINUTES: z.coerce
+    .number()
+    .int()
+    .min(5)
+    .max(1440)
+    .default(30),
+  DEFAULT_DAILY_BUDGET_CENTS: z.coerce.number().int().positive().default(500),
+  DEFAULT_MONTHLY_BUDGET_CENTS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(5000),
+});
+
 export type ServerEnvironment = z.infer<typeof serverEnvironmentSchema>;
 export type DatabaseEnvironment = z.infer<typeof databaseEnvironmentSchema>;
 export type ClerkWebhookEnvironment = z.infer<
@@ -53,6 +94,9 @@ export type ClerkWebhookEnvironment = z.infer<
 >;
 export type StorageEnvironment = z.infer<typeof storageEnvironmentSchema>;
 export type ProjectEnvironment = z.infer<typeof projectEnvironmentSchema>;
+export type SceneAnalysisEnvironment = z.infer<
+  typeof sceneAnalysisEnvironmentSchema
+>;
 
 export function parseServerEnvironment(
   environment: Record<string, string | undefined>,
