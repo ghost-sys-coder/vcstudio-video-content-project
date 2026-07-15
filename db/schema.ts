@@ -301,6 +301,10 @@ export const projectScriptVersions = pgTable(
       onDelete: "restrict",
     }),
     approvedAt: timestamp("approved_at", { withTimezone: true }),
+    deletedByUserId: uuid("deleted_by_user_id").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),

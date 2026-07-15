@@ -1,9 +1,14 @@
 import "server-only";
 
-import { and, eq } from "drizzle-orm";
+import { and, count, eq, isNull } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
-import { projectScriptDrafts, projectScriptVersions } from "@/db/schema";
+import {
+  projectScriptDrafts,
+  projectScriptVersions,
+  sceneAnalysisRuns,
+} from "@/db/schema";
 import { calculateScriptStatistics } from "@/lib/domain/script-statistics";
+import { assertScriptVersionDeletable } from "@/lib/domain/script-version-deletion";
 import {
   findProjectScriptDraft,
   findProjectScriptVersion,
@@ -119,4 +124,44 @@ export async function restoreScriptVersion(input: {
       }),
   ]);
   return { versionId, revision: input.revision + 1 };
+}
+
+export async function deleteScriptVersion(input: {
+  workspaceId: string;
+  projectId: string;
+  versionId: string;
+  userId: string;
+}) {
+  const version = await findProjectScriptVersion(input);
+  if (!version) throw new Error("SCRIPT_VERSION_NOT_FOUND");
+  const [references] = await getDatabase()
+    .select({ value: count() })
+    .from(sceneAnalysisRuns)
+    .where(
+      and(
+        eq(sceneAnalysisRuns.workspaceId, input.workspaceId),
+        eq(sceneAnalysisRuns.projectId, input.projectId),
+        eq(sceneAnalysisRuns.scriptVersionId, input.versionId),
+      ),
+    );
+  assertScriptVersionDeletable({
+    status: version.status,
+    referenceCount: references?.value ?? 0,
+  });
+  const [deleted] = await getDatabase()
+    .update(projectScriptVersions)
+    .set({
+      deletedAt: new Date(),
+      deletedByUserId: input.userId,
+    })
+    .where(
+      and(
+        eq(projectScriptVersions.workspaceId, input.workspaceId),
+        eq(projectScriptVersions.projectId, input.projectId),
+        eq(projectScriptVersions.id, input.versionId),
+        isNull(projectScriptVersions.deletedAt),
+      ),
+    )
+    .returning({ id: projectScriptVersions.id });
+  if (!deleted) throw new Error("SCRIPT_VERSION_NOT_FOUND");
 }

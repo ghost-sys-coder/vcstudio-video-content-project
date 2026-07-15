@@ -16,7 +16,7 @@ This repository is the foundation for an internal production tool that converts 
 - Responsive shadcn application sidebar with persistent desktop collapse state and a mobile drawer.
 - Owner-only workspace profile management for workspace names and private logos.
 - Workspace-scoped project creation, pagination, settings, status transitions, and archiving.
-- Optimistically locked script drafts with immutable version history and restore-as-new-version behavior.
+- Optimistically locked script drafts with immutable version numbering, restore-as-new-version behavior, and audited owner/editor soft deletion of eligible versions.
 - Route-backed project tabs and a bounded, internally scrollable long-script editor.
 - Approved script versions, cost-confirmed Trigger.dev scene analysis, schema-constrained OpenAI output, editable immutable scene versions, and scene approval.
 
@@ -107,6 +107,8 @@ The Phase 2 project and script migration is `migrations/20260715162113_warm_mist
 
 The Phase 3 scene-planning migration is `migrations/20260715204954_rainy_umar/migration.sql`. It was applied successfully to the configured development Neon database on 2026-07-15.
 
+The script-version deletion audit migration is `migrations/20260715222820_absurd_yellowjacket/migration.sql`. It adds soft-deletion actor and timestamp fields to script versions and was applied successfully to the configured development Neon database on 2026-07-16.
+
 ## Clerk setup
 
 Configure Clerk with `/sign-in` and `/sign-up`, then create a webhook endpoint targeting `/api/webhooks/clerk`. Subscribe to:
@@ -164,7 +166,7 @@ Set every required environment variable in the deployment environment. Configure
 
 Clerk authenticates sessions; PostgreSQL authorizes application access. Every protected server resource calls Clerk protection and then resolves the local user. A workspace ID from a cookie or form is only a preference and is never trusted: every workspace operation queries membership by both `userId` and `workspaceId`. Workspace creation and initial ownership are transactional. Webhooks are verified before parsing, deduplicated by Svix delivery ID, and store only safe failure summaries.
 
-Deleted Clerk users are soft-deleted and anonymized locally so workspace ownership and audit relationships remain intact.
+Deleted Clerk users are soft-deleted and anonymized locally so workspace ownership and audit relationships remain intact. Script-version deletion is restricted to owners and editors, scoped by the authenticated workspace, and records the deleting user and timestamp.
 
 ## Cost controls
 
@@ -179,6 +181,7 @@ Scene analysis estimates cost before confirmation, enforces project plus workspa
 - Full browser end-to-end coverage will be expanded with the bootstrap Playwright foundation.
 - Image generation, audio generation, subtitles, and rendering are not implemented yet.
 - Script version history is currently bounded to the latest 50 versions in the editor.
+- Approved script versions and versions referenced by scene analysis are retained and cannot be deleted.
 - Trigger.dev must be running locally or deployed before queued scene analyses execute.
 - Safe npm overrides pin vulnerable `ws` and `cookie` transitive dependencies to patched releases. The remaining audit findings are 28 moderate transitive advisories in current Trigger.dev OpenTelemetry, Next.js PostCSS, and Clerk UI dependency chains; npm currently offers only breaking forced remediations.
 
@@ -200,3 +203,4 @@ Phases 1–3 are implemented through authenticated workspaces, project/script ve
 - 2026-07-15: Added shadcn project tabs for Script and Settings plus an internally scrollable long-script editor.
 - 2026-07-15: Implemented Phase 3 script approval, OpenAI structured scene analysis, Trigger.dev orchestration, usage reservations, immutable scene editing, scene approvals, and the scene-planning migration.
 - 2026-07-16: Hardened Phase 3 reservation preflight checks, constrained bulk approval to the active scene plan, moved prompts into `@studio/prompts`, fixed repeated form identifiers, expanded regression tests, and removed high-severity dependency advisories with safe overrides.
+- 2026-07-16: Added owner/editor script-version deletion with confirmation, workspace-scoped authorization, protected approved and scene-referenced versions, and soft-deletion audit metadata.

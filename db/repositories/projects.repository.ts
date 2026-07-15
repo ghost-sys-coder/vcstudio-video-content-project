@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, count, desc, eq, max } from "drizzle-orm";
+import { and, count, desc, eq, isNull, max } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
 import {
   projectScriptDrafts,
@@ -84,6 +84,7 @@ export async function listProjectScriptVersions(input: {
       and(
         eq(projectScriptVersions.workspaceId, input.workspaceId),
         eq(projectScriptVersions.projectId, input.projectId),
+        isNull(projectScriptVersions.deletedAt),
       ),
     )
     .orderBy(desc(projectScriptVersions.versionNumber))
@@ -103,6 +104,7 @@ export async function findProjectScriptVersion(input: {
         eq(projectScriptVersions.workspaceId, input.workspaceId),
         eq(projectScriptVersions.projectId, input.projectId),
         eq(projectScriptVersions.id, input.versionId),
+        isNull(projectScriptVersions.deletedAt),
       ),
     )
     .limit(1);

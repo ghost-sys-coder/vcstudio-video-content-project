@@ -11,6 +11,7 @@ const workspaceCapabilities = {
     analyzeScenes: true,
     editScenes: true,
     approveScenes: true,
+    deleteScriptVersions: true,
   },
   editor: {
     editWorkspace: true,
@@ -21,6 +22,7 @@ const workspaceCapabilities = {
     analyzeScenes: true,
     editScenes: true,
     approveScenes: true,
+    deleteScriptVersions: true,
   },
   viewer: {
     editWorkspace: false,
@@ -31,6 +33,7 @@ const workspaceCapabilities = {
     analyzeScenes: false,
     editScenes: false,
     approveScenes: false,
+    deleteScriptVersions: false,
   },
 } as const satisfies Record<WorkspaceRole, Record<string, boolean>>;
 

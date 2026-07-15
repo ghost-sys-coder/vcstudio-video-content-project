@@ -1,6 +1,7 @@
 import type { ProjectScriptVersion } from "@/db/schema";
 import { RestoreScriptVersionDialog } from "@/components/projects/RestoreScriptVersionDialog";
 import { ApproveScriptVersionButton } from "@/components/projects/ApproveScriptVersionButton";
+import { DeleteScriptVersionDialog } from "@/components/projects/DeleteScriptVersionDialog";
 
 export function ScriptVersionItem({
   version,
@@ -25,7 +26,7 @@ export function ScriptVersionItem({
           </p>
         </div>
         {canEdit ? (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <ApproveScriptVersionButton
               approved={version.status === "approved"}
               projectId={version.projectId}
@@ -35,6 +36,12 @@ export function ScriptVersionItem({
               onRestored={onRestored}
               projectId={version.projectId}
               revision={revision}
+              versionId={version.id}
+              versionNumber={version.versionNumber}
+            />
+            <DeleteScriptVersionDialog
+              disabled={version.status === "approved"}
+              projectId={version.projectId}
               versionId={version.id}
               versionNumber={version.versionNumber}
             />

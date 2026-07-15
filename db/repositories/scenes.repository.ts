@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
 import {
   projectScriptVersions,
@@ -19,6 +19,7 @@ export async function findApprovedScriptVersion(input: {
     eq(projectScriptVersions.workspaceId, input.workspaceId),
     eq(projectScriptVersions.projectId, input.projectId),
     eq(projectScriptVersions.status, "approved"),
+    isNull(projectScriptVersions.deletedAt),
   ];
   if (input.scriptVersionId)
     conditions.push(eq(projectScriptVersions.id, input.scriptVersionId));

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createProject } from "@/db/commands/create-project.command";
 import {
   createScriptVersion,
+  deleteScriptVersion,
   restoreScriptVersion,
   saveScriptDraft,
 } from "@/db/commands/script-commands";
@@ -17,6 +18,7 @@ import {
   createProjectSchema,
   createScriptContentSchema,
   createScriptVersionSchema,
+  deleteScriptVersionSchema,
   restoreScriptVersionSchema,
   scriptMutationSchema,
   updateProjectSchema,
@@ -188,6 +190,44 @@ export async function restoreScriptVersionAction(
   } catch {
     return {
       error: "The script version could not be restored. Refresh and try again.",
+      success: false,
+    };
+  }
+}
+
+export async function deleteScriptVersionAction(
+  formData: FormData,
+): Promise<ProjectActionState> {
+  const parsed = deleteScriptVersionSchema.safeParse(
+    Object.fromEntries(formData),
+  );
+  if (!parsed.success)
+    return { error: "Invalid version request.", success: false };
+  try {
+    const { context } = await requireProjectMutation(parsed.data.projectId);
+    requireCapability(context.activeMembership.role, "deleteScriptVersions");
+    await deleteScriptVersion({
+      ...parsed.data,
+      workspaceId: context.activeMembership.workspaceId,
+      userId: context.user.id,
+    });
+    revalidatePath(`/app/projects/${parsed.data.projectId}/script`);
+    return { error: null, success: true };
+  } catch (error) {
+    const code = error instanceof Error ? error.message : "";
+    if (code === "SCRIPT_VERSION_APPROVED")
+      return {
+        error:
+          "Approved versions cannot be deleted. Approve another version first.",
+        success: false,
+      };
+    if (code === "SCRIPT_VERSION_REFERENCED")
+      return {
+        error: "This version is used by a scene analysis and must be retained.",
+        success: false,
+      };
+    return {
+      error: "The script version could not be deleted.",
       success: false,
     };
   }

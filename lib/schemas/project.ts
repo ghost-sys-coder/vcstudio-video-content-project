@@ -61,6 +61,11 @@ export const restoreScriptVersionSchema = z.object({
   revision: z.coerce.number().int().min(0),
 });
 
+export const deleteScriptVersionSchema = z.object({
+  projectId: z.uuid(),
+  versionId: z.uuid(),
+});
+
 export function getProjectDimensions(
   aspectRatio: z.infer<typeof projectAspectRatioSchema>,
 ) {
