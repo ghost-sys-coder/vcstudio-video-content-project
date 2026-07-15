@@ -321,7 +321,7 @@ Every server query for a workspace owned entity must scope by both the entity id
 Forbidden:
 
 ```ts
-getProject(projectId)
+getProject(projectId);
 ```
 
 Required:
@@ -330,7 +330,7 @@ Required:
 getProject({
   projectId,
   workspaceId,
-})
+});
 ```
 
 Never trust workspace identifiers, roles, ownership, project identifiers, or user identifiers supplied by the browser.
