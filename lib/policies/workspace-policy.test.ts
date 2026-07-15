@@ -17,6 +17,7 @@ describe("workspace policy", () => {
   it("allows editors to mutate workspace data but not manage membership", () => {
     expect(can("editor", "mutateWorkspaceData")).toBe(true);
     expect(can("editor", "manageMembers")).toBe(false);
+    expect(canManageWorkspace("editor")).toBe(false);
   });
 
   it("allows owners to manage membership and workspace settings", () => {

@@ -13,6 +13,8 @@ This repository is the foundation for an internal production tool that converts 
 - Authenticated application shell, workspace selector, user account menu, dashboard placeholder, and access-denied state.
 - Central `owner`, `editor`, and `viewer` authorization policies.
 - Private Cloudflare R2 workspace-logo uploads with a 5 MB limit and object cleanup on replacement or deletion.
+- Responsive shadcn application sidebar with persistent desktop collapse state and a mobile drawer.
+- Owner-only workspace profile management for workspace names and private logos.
 
 ## Architecture
 
@@ -27,7 +29,7 @@ Next.js 16, React 19, strict TypeScript, Tailwind CSS, shadcn/ui, Clerk, Neon Po
 ## Repository structure
 
 ```text
-app/                 App Router pages, layouts, actions, and webhook route
+app/                 App Router pages, layouts, actions, settings, and route handlers
 components/          One React component per PascalCase file
 db/                  Drizzle schema, client, repositories, queries, and commands
 lib/auth/            Clerk synchronization and workspace context
@@ -98,7 +100,7 @@ Not implemented yet.
 
 Workspace-logo storage uses a private Cloudflare R2 bucket. Objects use workspace-scoped keys such as `workspaces/{workspaceId}/branding/logos/{assetId}.png`; PostgreSQL stores metadata and ownership rather than image bytes or permanent public URLs.
 
-Configure the bucket CORS policy to allow `PUT` from `NEXT_PUBLIC_APP_URL` with the `Content-Type` header. Upload URLs expire according to `R2_SIGNED_UPLOAD_EXPIRY_SECONDS`. Logo uploads accept PNG, JPEG, and WebP files up to 5 MB. Replacing or deleting a logo removes the superseded R2 object.
+Configure the bucket CORS policy to allow `PUT` from `NEXT_PUBLIC_APP_URL` with the `Content-Type` header. Upload URLs expire according to `R2_SIGNED_UPLOAD_EXPIRY_SECONDS`; private logo display uses short-lived signed download URLs. Logo uploads accept PNG, JPEG, and WebP files up to 5 MB. Replacing or deleting a logo removes the superseded R2 object.
 
 ## OpenAI setup
 
@@ -148,7 +150,6 @@ Billable AI and rendering operations are not implemented yet. Budget reservation
 - `CLERK_WEBHOOK_SIGNING_SECRET` must be configured before real webhook delivery can succeed.
 - The Phase 1 migration must still be applied separately to future preview and production databases.
 - Full browser end-to-end coverage will be expanded with the bootstrap Playwright foundation.
-- The workspace settings UI for replacing or deleting a logo is not yet present; the authorized deletion API is available for that future screen.
 
 ## Implementation status
 
@@ -163,3 +164,4 @@ Phase 1 authentication, user synchronization, workspace onboarding, and authoriz
 - 2026-07-15: Applied the supplied VCStudio logo across public, authentication, and application navigation surfaces.
 - 2026-07-15: Added private R2 workspace-logo uploads during onboarding, workspace-scoped object keys, metadata persistence, and bucket cleanup on replacement or deletion.
 - 2026-07-15: Corrected workspace onboarding to use an atomic Neon HTTP batch for workspace and owner-membership creation.
+- 2026-07-15: Added the retractable shadcn application sidebar and owner-only workspace name and logo management.

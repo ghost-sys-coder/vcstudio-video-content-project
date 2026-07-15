@@ -13,3 +13,8 @@ export const createWorkspaceSchema = z.object({
 export const selectWorkspaceSchema = z.object({
   workspaceId: z.uuid(),
 });
+
+export const updateWorkspaceProfileSchema = z.object({
+  workspaceId: z.uuid(),
+  name: workspaceNameSchema,
+});

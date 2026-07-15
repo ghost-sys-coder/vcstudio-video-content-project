@@ -2,6 +2,7 @@ import "server-only";
 
 import {
   DeleteObjectCommand,
+  GetObjectCommand,
   HeadObjectCommand,
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
@@ -44,5 +45,19 @@ export async function deleteWorkspaceLogoObject(objectKey: string) {
       Bucket: environment.R2_BUCKET_NAME,
       Key: objectKey,
     }),
+  );
+}
+
+export async function createWorkspaceLogoDownloadUrl(
+  objectKey: string,
+): Promise<string> {
+  const environment = getStorageEnvironment();
+  return getSignedUrl(
+    getR2Client(),
+    new GetObjectCommand({
+      Bucket: environment.R2_BUCKET_NAME,
+      Key: objectKey,
+    }),
+    { expiresIn: environment.R2_SIGNED_DOWNLOAD_EXPIRY_SECONDS },
   );
 }

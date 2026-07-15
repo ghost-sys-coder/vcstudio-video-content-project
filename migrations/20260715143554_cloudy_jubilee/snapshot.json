@@ -2,34 +2,22 @@
   "version": "8",
   "dialect": "postgres",
   "id": "30796e7a-7517-4d84-aada-09a71d55b228",
-  "prevIds": [
-    "07b2fbf2-853a-4b03-a0df-9662628f2b2e"
-  ],
+  "prevIds": ["07b2fbf2-853a-4b03-a0df-9662628f2b2e"],
   "ddl": [
     {
-      "values": [
-        "workspace_logo"
-      ],
+      "values": ["workspace_logo"],
       "name": "storage_object_kind",
       "entityType": "enums",
       "schema": "public"
     },
     {
-      "values": [
-        "processing",
-        "completed",
-        "failed"
-      ],
+      "values": ["processing", "completed", "failed"],
       "name": "webhook_status",
       "entityType": "enums",
       "schema": "public"
     },
     {
-      "values": [
-        "owner",
-        "editor",
-        "viewer"
-      ],
+      "values": ["owner", "editor", "viewer"],
       "name": "workspace_role",
       "entityType": "enums",
       "schema": "public"
@@ -833,14 +821,10 @@
     },
     {
       "nameExplicit": false,
-      "columns": [
-        "workspace_id"
-      ],
+      "columns": ["workspace_id"],
       "schemaTo": "public",
       "tableTo": "workspaces",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "storage_objects_workspace_id_workspaces_id_fkey",
@@ -850,14 +834,10 @@
     },
     {
       "nameExplicit": false,
-      "columns": [
-        "created_by_user_id"
-      ],
+      "columns": ["created_by_user_id"],
       "schemaTo": "public",
       "tableTo": "users",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "RESTRICT",
       "name": "storage_objects_created_by_user_id_users_id_fkey",
@@ -867,14 +847,10 @@
     },
     {
       "nameExplicit": false,
-      "columns": [
-        "workspace_id"
-      ],
+      "columns": ["workspace_id"],
       "schemaTo": "public",
       "tableTo": "workspaces",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "workspace_members_workspace_id_workspaces_id_fkey",
@@ -884,14 +860,10 @@
     },
     {
       "nameExplicit": false,
-      "columns": [
-        "user_id"
-      ],
+      "columns": ["user_id"],
       "schemaTo": "public",
       "tableTo": "users",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "RESTRICT",
       "name": "workspace_members_user_id_users_id_fkey",
@@ -901,14 +873,10 @@
     },
     {
       "nameExplicit": false,
-      "columns": [
-        "created_by_user_id"
-      ],
+      "columns": ["created_by_user_id"],
       "schemaTo": "public",
       "tableTo": "users",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "RESTRICT",
       "name": "workspaces_created_by_user_id_users_id_fkey",
@@ -917,9 +885,7 @@
       "table": "workspaces"
     },
     {
-      "columns": [
-        "delivery_id"
-      ],
+      "columns": ["delivery_id"],
       "nameExplicit": false,
       "name": "clerk_webhook_events_pkey",
       "schema": "public",
@@ -927,9 +893,7 @@
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "storage_objects_pkey",
       "schema": "public",
@@ -937,9 +901,7 @@
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "users_pkey",
       "schema": "public",
@@ -947,9 +909,7 @@
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "workspace_members_pkey",
       "schema": "public",
@@ -957,9 +917,7 @@
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "workspaces_pkey",
       "schema": "public",

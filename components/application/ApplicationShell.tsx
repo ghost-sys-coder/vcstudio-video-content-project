@@ -1,43 +1,50 @@
-import Link from "next/link";
-import type { ApplicationUser } from "@/db/schema";
 import type { WorkspaceMembershipView } from "@/db/repositories/workspaces.repository";
-import { BrandLogo } from "@/components/brand/BrandLogo";
+import type { ApplicationUser } from "@/db/schema";
+import { ApplicationSidebar } from "@/components/application/ApplicationSidebar";
 import { UserAccountMenu } from "@/components/application/UserAccountMenu";
-import { WorkspaceSelector } from "@/components/application/WorkspaceSelector";
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
 
 export function ApplicationShell({
   activeMembership,
+  canManageSettings,
   children,
+  defaultSidebarOpen,
+  logoUrl,
   memberships,
   user,
 }: {
   activeMembership: WorkspaceMembershipView;
+  canManageSettings: boolean;
   children: React.ReactNode;
+  defaultSidebarOpen: boolean;
+  logoUrl: string | null;
   memberships: WorkspaceMembershipView[];
   user: ApplicationUser;
 }) {
   return (
-    <div className="min-h-screen bg-muted/20">
-      <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-5 sm:px-8">
-          <div className="mr-auto">
-            <Link aria-label="VCStudio dashboard" href="/app">
-              <BrandLogo />
-            </Link>
-            <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-              Production console
+    <SidebarProvider defaultOpen={defaultSidebarOpen}>
+      <ApplicationSidebar
+        activeMembership={activeMembership}
+        canManageSettings={canManageSettings}
+        logoUrl={logoUrl}
+        memberships={memberships}
+      />
+      <SidebarInset>
+        <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur sm:px-6">
+          <SidebarTrigger />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium">
+              {activeMembership.workspaceName}
             </p>
           </div>
-          <WorkspaceSelector
-            activeWorkspaceId={activeMembership.workspaceId}
-            memberships={memberships}
-          />
           <UserAccountMenu displayName={user.displayName} />
-        </div>
-      </header>
-      <main className="mx-auto w-full max-w-7xl px-5 py-8 sm:px-8">
-        {children}
-      </main>
-    </div>
+        </header>
+        <main className="w-full flex-1 px-5 py-8 sm:px-8">{children}</main>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

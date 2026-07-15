@@ -7,9 +7,11 @@ import { createWorkspaceAction } from "@/app/(authenticated)/onboarding/actions"
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
-const MAX_LOGO_BYTES = 5 * 1024 * 1024;
-const SUPPORTED_LOGO_TYPES = ["image/jpeg", "image/png", "image/webp"];
+import {
+  MAX_WORKSPACE_LOGO_BYTES,
+  WORKSPACE_LOGO_CONTENT_TYPES,
+} from "@/lib/schemas/workspace-logo";
+import { uploadWorkspaceLogo } from "@/lib/storage/upload-workspace-logo.client";
 
 export function WorkspaceOnboardingForm() {
   const router = useRouter();
@@ -32,13 +34,13 @@ export function WorkspaceOnboardingForm() {
       setPreviewUrl(null);
       return;
     }
-    if (!SUPPORTED_LOGO_TYPES.includes(file.type)) {
+    if (!WORKSPACE_LOGO_CONTENT_TYPES.some((type) => type === file.type)) {
       setError("Choose a PNG, JPEG, or WebP image.");
       if (fileRef.current) fileRef.current.value = "";
       setPreviewUrl(null);
       return;
     }
-    if (file.size > MAX_LOGO_BYTES) {
+    if (file.size > MAX_WORKSPACE_LOGO_BYTES) {
       setError("The logo must be 5 MB or smaller.");
       if (fileRef.current) fileRef.current.value = "";
       setPreviewUrl(null);
@@ -48,6 +50,9 @@ export function WorkspaceOnboardingForm() {
   }
 
   function submit(formData: FormData) {
+    const logoEntry = formData.get("logo");
+    const file =
+      logoEntry instanceof File && logoEntry.size > 0 ? logoEntry : null;
     setError(null);
     startTransition(async () => {
       const creation = workspaceId
@@ -59,54 +64,21 @@ export function WorkspaceOnboardingForm() {
       }
 
       setWorkspaceId(creation.workspaceId);
-      const file = fileRef.current?.files?.[0];
       if (!file) {
         router.push("/app");
         router.refresh();
         return;
       }
-      if (file.size > MAX_LOGO_BYTES) {
+      if (file.size > MAX_WORKSPACE_LOGO_BYTES) {
         setError("The logo must be 5 MB or smaller.");
         return;
       }
 
       try {
-        const authorization = await fetch(
-          `/api/workspaces/${creation.workspaceId}/logo/upload`,
-          {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({
-              contentType: file.type,
-              fileName: file.name,
-              sizeBytes: file.size,
-            }),
-          },
-        );
-        if (!authorization.ok) throw new Error("authorization failed");
-        const upload = (await authorization.json()) as {
-          objectKey: string;
-          uploadUrl: string;
-        };
-        const uploaded = await fetch(upload.uploadUrl, {
-          method: "PUT",
-          headers: { "content-type": file.type },
-          body: file,
+        await uploadWorkspaceLogo({
+          workspaceId: creation.workspaceId,
+          file,
         });
-        if (!uploaded.ok) throw new Error("upload failed");
-        const completion = await fetch(
-          `/api/workspaces/${creation.workspaceId}/logo/complete`,
-          {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({
-              objectKey: upload.objectKey,
-              contentType: file.type,
-              sizeBytes: file.size,
-            }),
-          },
-        );
-        if (!completion.ok) throw new Error("completion failed");
         router.push("/app");
         router.refresh();
       } catch {

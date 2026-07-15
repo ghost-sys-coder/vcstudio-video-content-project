@@ -10,12 +10,12 @@ export function WorkspaceSelector({
   memberships: WorkspaceMembershipView[];
 }) {
   return (
-    <form action={selectWorkspaceAction} className="flex items-center gap-2">
+    <form action={selectWorkspaceAction} className="space-y-2">
       <label className="sr-only" htmlFor="workspace-selector">
         Active workspace
       </label>
       <select
-        className="h-8 max-w-48 rounded-lg border border-input bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="h-8 w-full rounded-lg border border-input bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
         defaultValue={activeWorkspaceId}
         id="workspace-selector"
         name="workspaceId"
@@ -26,7 +26,7 @@ export function WorkspaceSelector({
           </option>
         ))}
       </select>
-      <Button size="sm" type="submit" variant="outline">
+      <Button className="w-full" size="sm" type="submit" variant="outline">
         Switch
       </Button>
     </form>
