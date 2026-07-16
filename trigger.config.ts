@@ -3,6 +3,10 @@ import { defineConfig } from "@trigger.dev/sdk";
 export default defineConfig({
   project: process.env.TRIGGER_PROJECT_REF ?? "",
   dirs: ["./trigger"],
+  legacyDevProcessCwdBehaviour: false,
+  build: {
+    conditions: ["react-server"],
+  },
   maxDuration: 300,
   retries: {
     enabledInDev: false,

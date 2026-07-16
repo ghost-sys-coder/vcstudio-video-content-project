@@ -131,6 +131,29 @@ export async function markSceneAnalysisRunning(
     .where(eq(sceneAnalysisRuns.id, analysisRunId));
 }
 
+export async function syncSceneAnalysisRunning(input: {
+  analysisRunId: string;
+  workspaceId: string;
+  projectId: string;
+}) {
+  await getDatabase()
+    .update(sceneAnalysisRuns)
+    .set({
+      status: "running",
+      progressPercent: 20,
+      startedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(sceneAnalysisRuns.id, input.analysisRunId),
+        eq(sceneAnalysisRuns.workspaceId, input.workspaceId),
+        eq(sceneAnalysisRuns.projectId, input.projectId),
+        eq(sceneAnalysisRuns.status, "queued"),
+      ),
+    );
+}
+
 export async function completeSceneAnalysis(input: {
   analysisRunId: string;
   workspaceId: string;

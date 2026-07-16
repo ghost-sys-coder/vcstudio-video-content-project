@@ -26,6 +26,11 @@ export const approveScriptVersionSchema = z.object({
 
 export const startSceneAnalysisSchema = approveScriptVersionSchema;
 
+export const reconcileSceneAnalysisSchema = z.object({
+  projectId: z.uuid(),
+  analysisRunId: z.uuid(),
+});
+
 export const updateSceneSchema = sceneContentSchema.extend({
   projectId: z.uuid(),
   sceneId: z.uuid(),

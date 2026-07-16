@@ -6,7 +6,6 @@ import type { sceneAnalysisTask } from "@/trigger/scene-analysis";
 import { findProject } from "@/db/repositories/projects.repository";
 import {
   findApprovedScriptVersion,
-  findSceneAnalysisRun,
   getProjectCommittedCostCents,
   getWorkspaceCommittedCostCents,
 } from "@/db/repositories/scenes.repository";
@@ -16,6 +15,7 @@ import {
   approveScriptVersion,
   attachTriggerRun,
   createSceneAnalysisReservation,
+  failSceneAnalysis,
   updateScene,
 } from "@/db/commands/scene-commands";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
@@ -24,6 +24,7 @@ import {
   approveAllScenesSchema,
   approveSceneSchema,
   approveScriptVersionSchema,
+  reconcileSceneAnalysisSchema,
   startSceneAnalysisSchema,
   updateSceneSchema,
 } from "@/lib/schemas/scene";
@@ -37,6 +38,8 @@ import {
   createRequestFingerprint,
   createSceneAnalysisIdempotencyKey,
 } from "@/lib/domain/idempotency";
+import { resolveSceneAnalysisIdempotency } from "@/lib/workflows/scene-analysis-idempotency";
+import { reconcileSceneAnalysisRun } from "@/lib/trigger/reconcile-scene-analysis";
 
 export type SceneActionState = { success: boolean; error: string | null };
 
@@ -45,15 +48,20 @@ async function requireProjectMutation(
   capability:
     "approveScripts" | "analyzeScenes" | "editScenes" | "approveScenes",
 ) {
+  const { context, project } = await requireProjectAccess(projectId);
+  requireCapability(context.activeMembership.role, capability);
+  if (project.status === "archived") throw new Error("Project not found.");
+  return { context, project };
+}
+
+async function requireProjectAccess(projectId: string) {
   const context = await getAuthenticatedWorkspaceContext();
   if (!context) throw new Error("Workspace context missing.");
-  requireCapability(context.activeMembership.role, capability);
   const project = await findProject({
     workspaceId: context.activeMembership.workspaceId,
     projectId,
   });
-  if (!project || project.status === "archived")
-    throw new Error("Project not found.");
+  if (!project) throw new Error("Project not found.");
   return { context, project };
 }
 
@@ -155,7 +163,7 @@ export async function startSceneAnalysisAction(
         success: false,
         error: "This analysis would exceed the workspace monthly budget.",
       };
-    const idempotencyKey = createSceneAnalysisIdempotencyKey({
+    const initialIdempotencyKey = createSceneAnalysisIdempotencyKey({
       secret: environment.IDEMPOTENCY_HASH_SECRET,
       workspaceId,
       projectId: project.id,
@@ -163,12 +171,14 @@ export async function startSceneAnalysisAction(
       model: environment.OPENAI_TEXT_MODEL,
       promptVersion: SCENE_ANALYSIS_PROMPT_VERSION,
     });
-    const existing = await findSceneAnalysisRun({
+    const idempotency = await resolveSceneAnalysisIdempotency({
       workspaceId,
       projectId: project.id,
-      idempotencyKey,
+      initialIdempotencyKey,
+      secret: environment.IDEMPOTENCY_HASH_SECRET,
     });
-    if (existing) return { success: true, error: null };
+    if (idempotency.action === "reuse") return { success: true, error: null };
+    const idempotencyKey = idempotency.idempotencyKey;
     const analysisRunId = crypto.randomUUID();
     await createSceneAnalysisReservation({
       id: analysisRunId,
@@ -204,8 +214,6 @@ export async function startSceneAnalysisAction(
       );
       await attachTriggerRun({ analysisRunId, triggerRunId: handle.id });
     } catch (error) {
-      const { failSceneAnalysis } =
-        await import("@/db/commands/scene-commands");
       await failSceneAnalysis({
         analysisRunId,
         category: "trigger_error",
@@ -217,6 +225,30 @@ export async function startSceneAnalysisAction(
     return { success: true, error: null };
   } catch {
     return { success: false, error: "Scene analysis could not be started." };
+  }
+}
+
+export async function reconcileSceneAnalysisRunAction(
+  formData: FormData,
+): Promise<SceneActionState> {
+  const parsed = reconcileSceneAnalysisSchema.safeParse(
+    Object.fromEntries(formData),
+  );
+  if (!parsed.success)
+    return { success: false, error: "Invalid analysis run." };
+  try {
+    const { context } = await requireProjectAccess(parsed.data.projectId);
+    await reconcileSceneAnalysisRun({
+      ...parsed.data,
+      workspaceId: context.activeMembership.workspaceId,
+    });
+    revalidatePath(`/app/projects/${parsed.data.projectId}/scenes`);
+    return { success: true, error: null };
+  } catch {
+    return {
+      success: false,
+      error: "The analysis status could not be refreshed.",
+    };
   }
 }
 

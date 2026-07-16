@@ -3,14 +3,29 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { SceneAnalysisRun } from "@/db/schema";
+import { reconcileSceneAnalysisRunAction } from "@/app/(authenticated)/app/projects/[projectId]/scenes/actions";
 
 export function AnalysisProgressPanel({ run }: { run: SceneAnalysisRun }) {
   const router = useRouter();
   useEffect(() => {
     if (!["pending", "queued", "running"].includes(run.status)) return;
-    const timer = window.setInterval(() => router.refresh(), 3000);
-    return () => window.clearInterval(timer);
-  }, [router, run.status]);
+    let cancelled = false;
+    let timer: number | undefined;
+    const reconcile = async () => {
+      const data = new FormData();
+      data.set("projectId", run.projectId);
+      data.set("analysisRunId", run.id);
+      await reconcileSceneAnalysisRunAction(data);
+      if (cancelled) return;
+      router.refresh();
+      timer = window.setTimeout(reconcile, 5000);
+    };
+    timer = window.setTimeout(reconcile, 3000);
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [router, run.id, run.projectId, run.status]);
   return (
     <section aria-live="polite" className="rounded-xl border bg-muted/30 p-4">
       <div className="flex justify-between text-sm">

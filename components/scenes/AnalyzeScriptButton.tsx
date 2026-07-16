@@ -1,8 +1,11 @@
+import type { ButtonHTMLAttributes } from "react";
 import { Button } from "@/components/ui/button";
 
-export function AnalyzeScriptButton({ disabled }: { disabled: boolean }) {
+export function AnalyzeScriptButton(
+  props: ButtonHTMLAttributes<HTMLButtonElement>,
+) {
   return (
-    <Button disabled={disabled} type="submit">
+    <Button {...props} type="button">
       Analyze approved script
     </Button>
   );

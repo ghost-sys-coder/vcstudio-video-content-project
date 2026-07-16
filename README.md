@@ -18,7 +18,7 @@ This repository is the foundation for an internal production tool that converts 
 - Workspace-scoped project creation, pagination, settings, status transitions, and archiving.
 - Optimistically locked script drafts with immutable version numbering, restore-as-new-version behavior, and audited owner/editor soft deletion of eligible versions.
 - Route-backed project tabs and a bounded, internally scrollable long-script editor.
-- Approved script versions, cost-confirmed Trigger.dev scene analysis, schema-constrained OpenAI output, editable immutable scene versions, and scene approval.
+- Approved script versions, cost-confirmed Trigger.dev scene analysis, crashed-run reconciliation and retry, schema-constrained OpenAI output, editable immutable scene versions, and scene approval.
 
 ## Architecture
 
@@ -28,7 +28,7 @@ The repository will move into the full `apps/` and `packages/` monorepo structur
 
 ## Technology stack
 
-Next.js 16, React 19, strict TypeScript, Tailwind CSS, shadcn/ui, Clerk, Neon PostgreSQL, Drizzle ORM, Trigger.dev, OpenAI Responses API, Zod, Vitest, ESLint, and Prettier.
+Next.js 16, React 19, strict TypeScript, Tailwind CSS, shadcn/ui, Clerk, Neon PostgreSQL, Drizzle ORM, Trigger.dev 4.5.4, OpenAI Responses API, Zod, Vitest, ESLint, and Prettier.
 
 ## Repository structure
 
@@ -121,7 +121,7 @@ Copy the endpoint signing secret into `CLERK_WEBHOOK_SIGNING_SECRET`. Workspace 
 
 ## Trigger.dev setup
 
-Phase 3 defines the `scene-analysis` task in the shared `ai-text` queue. Add all Phase 3 server variables to the Trigger.dev environment, run `npm run trigger:dev` alongside Next.js for local task execution, and deploy with `npm run trigger:deploy`. Before invoking OpenAI, the task validates reservation ownership, status, expiry, amount, and prompt fingerprint. It also uses bounded retries, validates idempotency and the approved script version, writes scenes atomically, and reconciles usage reservations.
+Phase 3 defines the `scene-analysis` task in the shared `ai-text` queue. Add all Phase 3 server variables to the Trigger.dev environment, run `npm run trigger:dev` alongside Next.js for local task execution, and deploy with `npm run trigger:deploy`. Before invoking OpenAI, the task validates reservation ownership, status, expiry, amount, and prompt fingerprint. It also uses bounded retries, validates idempotency and the approved script version, writes scenes atomically, and reconciles usage reservations. The web application retrieves active Trigger run status while polling so crashes, cancellations, and system failures release reservations and become retryable application failures instead of remaining queued indefinitely.
 
 ## Storage setup
 
@@ -183,7 +183,7 @@ Scene analysis estimates cost before confirmation, enforces project plus workspa
 - Script version history is currently bounded to the latest 50 versions in the editor.
 - Approved script versions and versions referenced by scene analysis are retained and cannot be deleted.
 - Trigger.dev must be running locally or deployed before queued scene analyses execute.
-- Safe npm overrides pin vulnerable `ws` and `cookie` transitive dependencies to patched releases. The remaining audit findings are 28 moderate transitive advisories in current Trigger.dev OpenTelemetry, Next.js PostCSS, and Clerk UI dependency chains; npm currently offers only breaking forced remediations.
+- Safe npm overrides pin vulnerable `ws` and `cookie` transitive dependencies to patched releases. Production dependencies retain 28 moderate transitive advisories in current Trigger.dev OpenTelemetry, Next.js PostCSS, and Clerk UI dependency chains. The development-only Trigger.dev CLI adds four high `tar` advisories; npm currently offers only breaking forced downgrades rather than compatible remediations.
 
 ## Implementation status
 
@@ -204,3 +204,5 @@ Phases 1–3 are implemented through authenticated workspaces, project/script ve
 - 2026-07-15: Implemented Phase 3 script approval, OpenAI structured scene analysis, Trigger.dev orchestration, usage reservations, immutable scene editing, scene approvals, and the scene-planning migration.
 - 2026-07-16: Hardened Phase 3 reservation preflight checks, constrained bulk approval to the active scene plan, moved prompts into `@studio/prompts`, fixed repeated form identifiers, expanded regression tests, and removed high-severity dependency advisories with safe overrides.
 - 2026-07-16: Added owner/editor script-version deletion with confirmation, workspace-scoped authorization, protected approved and scene-referenced versions, and soft-deletion audit metadata.
+- 2026-07-16: Corrected the scene-analysis trigger button to forward Base UI dialog interaction and accessibility props, allowing the confirmation flow to open and dispatch approved scripts.
+- 2026-07-16: Added Trigger.dev run reconciliation, terminal crash handling, reservation release, deterministic analysis retries, and development-worker build isolation for scene analysis.

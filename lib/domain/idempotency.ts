@@ -24,6 +24,13 @@ export function createSceneAnalysisIdempotencyKey(input: {
   ]);
 }
 
+export function createSceneAnalysisRetryIdempotencyKey(input: {
+  secret: string;
+  failedRunId: string;
+}): string {
+  return hash(input.secret, ["scene-analysis-retry", input.failedRunId]);
+}
+
 export function createRequestFingerprint(
   secret: string,
   prompt: string,
