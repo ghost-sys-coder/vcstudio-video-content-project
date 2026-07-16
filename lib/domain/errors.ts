@@ -25,6 +25,18 @@ export class WorkspacePermissionDeniedError extends Error {
   }
 }
 
+export type BudgetLimitScope =
+  "project" | "workspace_daily" | "workspace_monthly";
+
+export class BudgetExceededError extends Error {
+  readonly code = "BUDGET_EXCEEDED";
+
+  constructor(readonly scope: BudgetLimitScope) {
+    super(`The ${scope.replaceAll("_", " ")} budget would be exceeded.`);
+    this.name = "BudgetExceededError";
+  }
+}
+
 export class ClerkSynchronizationError extends Error {
   readonly code = "CLERK_SYNCHRONIZATION_FAILED";
 

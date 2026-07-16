@@ -13,6 +13,8 @@ const workspaceCapabilities = {
     approveScenes: true,
     deleteScriptVersions: true,
     manageCharacters: true,
+    generateSceneImages: true,
+    reviewSceneImages: true,
   },
   editor: {
     editWorkspace: true,
@@ -25,6 +27,8 @@ const workspaceCapabilities = {
     approveScenes: true,
     deleteScriptVersions: true,
     manageCharacters: true,
+    generateSceneImages: true,
+    reviewSceneImages: true,
   },
   viewer: {
     editWorkspace: false,
@@ -37,6 +41,8 @@ const workspaceCapabilities = {
     approveScenes: false,
     deleteScriptVersions: false,
     manageCharacters: false,
+    generateSceneImages: false,
+    reviewSceneImages: false,
   },
 } as const satisfies Record<WorkspaceRole, Record<string, boolean>>;
 

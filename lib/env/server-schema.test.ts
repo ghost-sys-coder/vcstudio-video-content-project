@@ -4,6 +4,7 @@ import {
   storageEnvironmentSchema,
   projectEnvironmentSchema,
   characterEnvironmentSchema,
+  sceneImageEnvironmentSchema,
 } from "@/lib/env/server-schema";
 
 const validEnvironment = {
@@ -81,5 +82,39 @@ describe("storage environment validation", () => {
         R2_SIGNED_DOWNLOAD_EXPIRY_SECONDS: "300",
       }).R2_SIGNED_UPLOAD_EXPIRY_SECONDS,
     ).toBe(300);
+  });
+});
+
+describe("scene image environment validation", () => {
+  const requiredValues = {
+    OPENAI_API_KEY: "openai-secret",
+    TRIGGER_SECRET_KEY: "trigger-secret",
+    TRIGGER_PROJECT_REF: "proj_test",
+    IDEMPOTENCY_HASH_SECRET: "i".repeat(32),
+    REQUEST_FINGERPRINT_SECRET: "f".repeat(32),
+  };
+
+  it("uses the approved Phase 5 defaults", () => {
+    expect(sceneImageEnvironmentSchema.parse(requiredValues)).toMatchObject({
+      OPENAI_IMAGE_MODEL: "gpt-image-2",
+      OPENAI_IMAGE_DRAFT_QUALITY: "low",
+      OPENAI_IMAGE_FINAL_QUALITY: "medium",
+      OPENAI_IMAGE_OUTPUT_FORMAT: "webp",
+      OPENAI_IMAGE_DRAFT_COMPRESSION: 80,
+      OPENAI_IMAGE_FINAL_COMPRESSION: 90,
+      OPENAI_IMAGE_TEXT_INPUT_COST_PER_MILLION_CENTS: 500,
+      OPENAI_IMAGE_INPUT_COST_PER_MILLION_CENTS: 800,
+      OPENAI_IMAGE_OUTPUT_COST_PER_MILLION_CENTS: 3000,
+      ENABLE_SCENE_IMAGE_GENERATION: true,
+    });
+  });
+
+  it("rejects more references than the provider supports", () => {
+    expect(() =>
+      sceneImageEnvironmentSchema.parse({
+        ...requiredValues,
+        MAX_REFERENCE_ASSETS_PER_GENERATION: "17",
+      }),
+    ).toThrow();
   });
 });

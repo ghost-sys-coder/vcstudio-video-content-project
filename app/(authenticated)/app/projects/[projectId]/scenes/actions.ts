@@ -42,6 +42,7 @@ import {
 } from "@/lib/domain/idempotency";
 import { resolveSceneAnalysisIdempotency } from "@/lib/workflows/scene-analysis-idempotency";
 import { reconcileSceneAnalysisRun } from "@/lib/trigger/reconcile-scene-analysis";
+import { BudgetExceededError } from "@/lib/domain/errors";
 
 export type SceneActionState = { success: boolean; error: string | null };
 
@@ -230,6 +231,12 @@ export async function startSceneAnalysisAction(
       expiresAt: new Date(
         Date.now() + environment.GENERATION_RESERVATION_EXPIRY_MINUTES * 60_000,
       ),
+      budget: {
+        workspaceDailyLimitCents: environment.DEFAULT_DAILY_BUDGET_CENTS,
+        workspaceMonthlyLimitCents: environment.DEFAULT_MONTHLY_BUDGET_CENTS,
+        dailyWindowStart: startOfDay,
+        monthlyWindowStart: startOfMonth,
+      },
     });
     try {
       const handle = await tasks.trigger<typeof sceneAnalysisTask>(
@@ -254,7 +261,19 @@ export async function startSceneAnalysisAction(
     }
     revalidatePath(`/app/projects/${project.id}/scenes`);
     return { success: true, error: null };
-  } catch {
+  } catch (error) {
+    if (error instanceof BudgetExceededError) {
+      const budgetLabel =
+        error.scope === "project"
+          ? "project"
+          : error.scope === "workspace_daily"
+            ? "workspace daily"
+            : "workspace monthly";
+      return {
+        success: false,
+        error: `This analysis would exceed the ${budgetLabel} budget.`,
+      };
+    }
     return { success: false, error: "Scene analysis could not be started." };
   }
 }

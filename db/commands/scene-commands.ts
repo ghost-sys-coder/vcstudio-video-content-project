@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, inArray, ne } from "drizzle-orm";
+import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
 import {
   projectScriptVersions,
@@ -18,6 +18,7 @@ import {
   listCurrentScenes,
 } from "@/db/repositories/scenes.repository";
 import { findProjectScriptVersion } from "@/db/repositories/projects.repository";
+import { BudgetExceededError } from "@/lib/domain/errors";
 
 export async function approveScriptVersion(input: {
   workspaceId: string;
@@ -75,30 +76,135 @@ export async function createSceneAnalysisReservation(input: {
   finalPrompt: string;
   estimatedCostCents: number;
   expiresAt: Date;
+  budget: {
+    workspaceDailyLimitCents: number;
+    workspaceMonthlyLimitCents: number;
+    dailyWindowStart: Date;
+    monthlyWindowStart: Date;
+  };
 }) {
-  await getDatabase().batch([
-    getDatabase().insert(sceneAnalysisRuns).values({
-      id: input.id,
-      workspaceId: input.workspaceId,
-      projectId: input.projectId,
-      scriptVersionId: input.scriptVersionId,
-      requestedByUserId: input.userId,
-      idempotencyKey: input.idempotencyKey,
-      requestFingerprint: input.requestFingerprint,
-      model: input.model,
-      promptVersion: input.promptVersion,
-      finalPrompt: input.finalPrompt,
-      estimatedCostCents: input.estimatedCostCents,
-    }),
-    getDatabase().insert(usageReservations).values({
-      id: input.reservationId,
-      workspaceId: input.workspaceId,
-      projectId: input.projectId,
-      analysisRunId: input.id,
-      reservedCostCents: input.estimatedCostCents,
-      expiresAt: input.expiresAt,
-    }),
-  ]);
+  const limits = [
+    input.estimatedCostCents,
+    input.budget.workspaceDailyLimitCents,
+    input.budget.workspaceMonthlyLimitCents,
+  ];
+  if (limits.some((value) => !Number.isInteger(value) || value < 0))
+    throw new Error("INVALID_SCENE_ANALYSIS_BUDGET");
+  if (
+    Number.isNaN(input.budget.dailyWindowStart.getTime()) ||
+    Number.isNaN(input.budget.monthlyWindowStart.getTime())
+  )
+    throw new Error("INVALID_SCENE_ANALYSIS_BUDGET_WINDOW");
+
+  const result = await getDatabase().execute<{
+    analysis_run_id: string | null;
+    reservation_id: string | null;
+    maximum_budget_cents: number;
+    project_cents: number;
+    daily_cents: number;
+    monthly_cents: number;
+  }>(sql`
+    with budget_lock as materialized (
+      select pg_advisory_xact_lock(hashtextextended(${input.workspaceId}, 0))
+    ),
+    committed as materialized (
+      select
+        coalesce(sum(
+          case when ur.status = 'pending'
+            then ur.reserved_cost_cents
+            else coalesce(ur.actual_cost_cents, 0)
+          end
+        ) filter (where ur.project_id = ${input.projectId}), 0)::int as project_cents,
+        coalesce(sum(
+          case when ur.status = 'pending'
+            then ur.reserved_cost_cents
+            else coalesce(ur.actual_cost_cents, 0)
+          end
+        ) filter (where ur.created_at >= ${input.budget.dailyWindowStart}), 0)::int as daily_cents,
+        coalesce(sum(
+          case when ur.status = 'pending'
+            then ur.reserved_cost_cents
+            else coalesce(ur.actual_cost_cents, 0)
+          end
+        ) filter (where ur.created_at >= ${input.budget.monthlyWindowStart}), 0)::int as monthly_cents
+      from budget_lock
+      left join usage_reservations ur
+        on ur.workspace_id = ${input.workspaceId}
+        and ur.status in ('pending', 'reconciled')
+    ),
+    eligible as materialized (
+      select 1
+      from projects p
+      cross join committed c
+      where p.workspace_id = ${input.workspaceId}
+        and p.id = ${input.projectId}
+        and p.archived_at is null
+        and c.project_cents + ${input.estimatedCostCents} <= p.maximum_budget_cents
+        and c.daily_cents + ${input.estimatedCostCents} <= ${input.budget.workspaceDailyLimitCents}
+        and c.monthly_cents + ${input.estimatedCostCents} <= ${input.budget.workspaceMonthlyLimitCents}
+    ),
+    inserted_run as (
+      insert into scene_analysis_runs (
+        id, workspace_id, project_id, script_version_id,
+        requested_by_user_id, idempotency_key, request_fingerprint,
+        model, prompt_version, final_prompt, estimated_cost_cents
+      )
+      select
+        ${input.id}::uuid,
+        ${input.workspaceId}::uuid,
+        ${input.projectId}::uuid,
+        ${input.scriptVersionId}::uuid,
+        ${input.userId}::uuid,
+        ${input.idempotencyKey},
+        ${input.requestFingerprint},
+        ${input.model},
+        ${input.promptVersion},
+        ${input.finalPrompt},
+        ${input.estimatedCostCents}
+      from eligible
+      returning id
+    ),
+    inserted_reservation as (
+      insert into usage_reservations (
+        id, workspace_id, project_id, operation_type,
+        analysis_run_id, reserved_cost_cents, expires_at
+      )
+      select
+        ${input.reservationId}::uuid,
+        ${input.workspaceId}::uuid,
+        ${input.projectId}::uuid,
+        'scene_analysis'::usage_operation_type,
+        inserted_run.id,
+        ${input.estimatedCostCents},
+        ${input.expiresAt}
+      from inserted_run
+      returning id
+    )
+    select
+      (select id from inserted_run) as analysis_run_id,
+      (select id from inserted_reservation) as reservation_id,
+      p.maximum_budget_cents,
+      c.project_cents,
+      c.daily_cents,
+      c.monthly_cents
+    from projects p
+    cross join committed c
+    where p.workspace_id = ${input.workspaceId}
+      and p.id = ${input.projectId}
+      and p.archived_at is null
+  `);
+
+  const row = result.rows[0];
+  if (!row) throw new Error("PROJECT_NOT_FOUND");
+  if (row.analysis_run_id && row.reservation_id) return;
+  if (row.project_cents + input.estimatedCostCents > row.maximum_budget_cents)
+    throw new BudgetExceededError("project");
+  if (
+    row.daily_cents + input.estimatedCostCents >
+    input.budget.workspaceDailyLimitCents
+  )
+    throw new BudgetExceededError("workspace_daily");
+  throw new BudgetExceededError("workspace_monthly");
 }
 
 export async function attachTriggerRun(input: {
