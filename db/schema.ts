@@ -29,6 +29,34 @@ export const storageObjectKindEnum = pgEnum("storage_object_kind", [
   "workspace_logo",
 ]);
 
+export const characterStatusEnum = pgEnum("character_status", [
+  "draft",
+  "active",
+  "archived",
+]);
+
+export const characterReferenceTypeEnum = pgEnum("character_reference_type", [
+  "master",
+  "front",
+  "threeQuarter",
+  "side",
+  "fullBody",
+  "expression",
+  "outfit",
+  "pose",
+]);
+
+export const characterReferenceSourceEnum = pgEnum(
+  "character_reference_source",
+  ["uploaded", "generated"],
+);
+
+export const characterAuditActionEnum = pgEnum("character_audit_action", [
+  "archived",
+  "referenceDeleted",
+  "referenceReplaced",
+]);
+
 export const projectStatusEnum = pgEnum("project_status", [
   "draft",
   "planning",
@@ -181,6 +209,131 @@ export const storageObjects = pgTable(
       table.kind,
     ),
     index("storage_objects_workspace_index").on(table.workspaceId),
+  ],
+);
+
+export const characters = pgTable(
+  "characters",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    slug: text("slug").notNull(),
+    description: text("description").notNull().default(""),
+    visualIdentity: text("visual_identity").notNull().default(""),
+    bodyProportions: text("body_proportions").notNull().default(""),
+    faceDescription: text("face_description").notNull().default(""),
+    hairDescription: text("hair_description").notNull().default(""),
+    skinToneDescription: text("skin_tone_description").notNull().default(""),
+    defaultOutfitDescription: text("default_outfit_description")
+      .notNull()
+      .default(""),
+    personalityNotes: text("personality_notes").notNull().default(""),
+    continuityRules: text("continuity_rules").notNull().default(""),
+    negativeConstraints: text("negative_constraints").notNull().default(""),
+    status: characterStatusEnum("status").notNull().default("draft"),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("characters_workspace_slug_unique").on(
+      table.workspaceId,
+      table.slug,
+    ),
+    index("characters_workspace_status_updated_index").on(
+      table.workspaceId,
+      table.status,
+      table.updatedAt,
+    ),
+  ],
+);
+
+export const characterReferenceAssets = pgTable(
+  "character_reference_assets",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    characterId: uuid("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "cascade" }),
+    type: characterReferenceTypeEnum("type").notNull(),
+    source: characterReferenceSourceEnum("source")
+      .notNull()
+      .default("uploaded"),
+    objectKey: text("object_key").notNull(),
+    contentType: text("content_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    width: integer("width").notNull(),
+    height: integer("height").notNull(),
+    etag: text("etag"),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("character_reference_assets_object_key_unique").on(
+      table.objectKey,
+    ),
+    uniqueIndex("character_reference_assets_single_view_unique")
+      .on(table.characterId, table.type)
+      .where(
+        sql`${table.type} in ('master', 'front', 'threeQuarter', 'side', 'fullBody')`,
+      ),
+    index("character_reference_assets_workspace_character_index").on(
+      table.workspaceId,
+      table.characterId,
+      table.createdAt,
+    ),
+    check(
+      "character_reference_assets_size_positive",
+      sql`${table.sizeBytes} > 0`,
+    ),
+    check(
+      "character_reference_assets_dimensions_positive",
+      sql`${table.width} > 0 and ${table.height} > 0`,
+    ),
+  ],
+);
+
+export const characterAuditEvents = pgTable(
+  "character_audit_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    characterId: uuid("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "cascade" }),
+    referenceAssetId: uuid("reference_asset_id"),
+    action: characterAuditActionEnum("action").notNull(),
+    actorUserId: uuid("actor_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("character_audit_events_workspace_character_index").on(
+      table.workspaceId,
+      table.characterId,
+      table.createdAt,
+    ),
   ],
 );
 
@@ -498,6 +651,43 @@ export const sceneVersions = pgTable(
   ],
 );
 
+export const sceneVersionCharacters = pgTable(
+  "scene_version_characters",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    sceneVersionId: uuid("scene_version_id")
+      .notNull()
+      .references(() => sceneVersions.id, { onDelete: "cascade" }),
+    characterId: uuid("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    assignedByUserId: uuid("assigned_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("scene_version_characters_version_character_unique").on(
+      table.sceneVersionId,
+      table.characterId,
+    ),
+    index("scene_version_characters_workspace_project_index").on(
+      table.workspaceId,
+      table.projectId,
+      table.sceneVersionId,
+    ),
+    index("scene_version_characters_character_index").on(table.characterId),
+  ],
+);
+
 export const usageReservations = pgTable(
   "usage_reservations",
   {
@@ -563,6 +753,14 @@ export type Workspace = typeof workspaces.$inferSelect;
 export type WorkspaceMember = typeof workspaceMembers.$inferSelect;
 export type WorkspaceRole = (typeof workspaceRoleEnum.enumValues)[number];
 export type StorageObject = typeof storageObjects.$inferSelect;
+export type Character = typeof characters.$inferSelect;
+export type CharacterStatus = (typeof characterStatusEnum.enumValues)[number];
+export type CharacterReferenceAsset =
+  typeof characterReferenceAssets.$inferSelect;
+export type CharacterReferenceType =
+  (typeof characterReferenceTypeEnum.enumValues)[number];
+export type CharacterReferenceSource =
+  (typeof characterReferenceSourceEnum.enumValues)[number];
 export type Project = typeof projects.$inferSelect;
 export type ProjectStatus = (typeof projectStatusEnum.enumValues)[number];
 export type ProjectAspectRatio =

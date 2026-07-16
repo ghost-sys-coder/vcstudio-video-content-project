@@ -31,6 +31,25 @@ export const storageEnvironmentSchema = z.object({
   R2_SIGNED_DOWNLOAD_EXPIRY_SECONDS: z.coerce.number().int().min(60).max(3600),
 });
 
+export const characterEnvironmentSchema = z.object({
+  MAX_CHARACTER_REFERENCE_SIZE_BYTES: z.coerce
+    .number()
+    .int()
+    .min(1024)
+    .max(5 * 1024 * 1024),
+  ALLOWED_IMAGE_MIME_TYPES: z
+    .string()
+    .transform((value) => value.split(",").map((item) => item.trim()))
+    .pipe(z.array(z.enum(["image/png", "image/jpeg", "image/webp"])).min(1)),
+  MIN_REFERENCE_IMAGE_WIDTH: z.coerce.number().int().min(1).max(4096),
+  MIN_REFERENCE_IMAGE_HEIGHT: z.coerce.number().int().min(1).max(4096),
+  MAX_REFERENCE_IMAGE_WIDTH: z.coerce.number().int().min(512).max(16384),
+  MAX_REFERENCE_IMAGE_HEIGHT: z.coerce.number().int().min(512).max(16384),
+  ENABLE_CHARACTER_LIBRARY: z
+    .enum(["true", "false"])
+    .transform((value) => value === "true"),
+});
+
 export const projectEnvironmentSchema = z.object({
   MAX_SCRIPT_CHARACTERS: z.coerce
     .number()
@@ -93,6 +112,7 @@ export type ClerkWebhookEnvironment = z.infer<
   typeof clerkWebhookEnvironmentSchema
 >;
 export type StorageEnvironment = z.infer<typeof storageEnvironmentSchema>;
+export type CharacterEnvironment = z.infer<typeof characterEnvironmentSchema>;
 export type ProjectEnvironment = z.infer<typeof projectEnvironmentSchema>;
 export type SceneAnalysisEnvironment = z.infer<
   typeof sceneAnalysisEnvironmentSchema

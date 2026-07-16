@@ -16,6 +16,7 @@ describe("workspace policy", () => {
     );
     expect(canCreateProject("viewer")).toBe(false);
     expect(can("viewer", "deleteScriptVersions")).toBe(false);
+    expect(can("viewer", "manageCharacters")).toBe(false);
   });
 
   it("allows editors to mutate workspace data but not manage membership", () => {
@@ -24,11 +25,13 @@ describe("workspace policy", () => {
     expect(canManageWorkspace("editor")).toBe(false);
     expect(canEditProject("editor")).toBe(true);
     expect(can("editor", "deleteScriptVersions")).toBe(true);
+    expect(can("editor", "manageCharacters")).toBe(true);
   });
 
   it("allows owners to manage membership and workspace settings", () => {
     expect(can("owner", "manageMembers")).toBe(true);
     expect(canManageWorkspace("owner")).toBe(true);
     expect(can("owner", "deleteScriptVersions")).toBe(true);
+    expect(can("owner", "manageCharacters")).toBe(true);
   });
 });

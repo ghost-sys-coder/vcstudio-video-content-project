@@ -3,6 +3,7 @@ import {
   parseServerEnvironment,
   storageEnvironmentSchema,
   projectEnvironmentSchema,
+  characterEnvironmentSchema,
 } from "@/lib/env/server-schema";
 
 const validEnvironment = {
@@ -24,6 +25,34 @@ describe("server environment validation", () => {
       parseServerEnvironment({
         ...validEnvironment,
         CLERK_WEBHOOK_SIGNING_SECRET: "",
+      }),
+    ).toThrow();
+  });
+});
+
+describe("character environment validation", () => {
+  const values = {
+    MAX_CHARACTER_REFERENCE_SIZE_BYTES: "5242880",
+    ALLOWED_IMAGE_MIME_TYPES: "image/png,image/jpeg,image/webp",
+    MIN_REFERENCE_IMAGE_WIDTH: "512",
+    MIN_REFERENCE_IMAGE_HEIGHT: "512",
+    MAX_REFERENCE_IMAGE_WIDTH: "4096",
+    MAX_REFERENCE_IMAGE_HEIGHT: "4096",
+    ENABLE_CHARACTER_LIBRARY: "true",
+  };
+
+  it("parses Phase 4 upload limits", () => {
+    expect(characterEnvironmentSchema.parse(values)).toMatchObject({
+      MAX_CHARACTER_REFERENCE_SIZE_BYTES: 5242880,
+      ENABLE_CHARACTER_LIBRARY: true,
+    });
+  });
+
+  it("rejects character references larger than five megabytes", () => {
+    expect(() =>
+      characterEnvironmentSchema.parse({
+        ...values,
+        MAX_CHARACTER_REFERENCE_SIZE_BYTES: String(5 * 1024 * 1024 + 1),
       }),
     ).toThrow();
   });

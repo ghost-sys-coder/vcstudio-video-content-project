@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  createCharacterReferenceObjectKey,
+  isCharacterReferenceObjectKey,
   createWorkspaceLogoObjectKey,
   isWorkspaceLogoObjectKey,
 } from "@/lib/storage/object-key";
@@ -27,6 +29,49 @@ describe("workspace logo object keys", () => {
       isWorkspaceLogoObjectKey({
         workspaceId,
         objectKey: `workspaces/${workspaceId}/branding/logos/../secret.png`,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("character reference object keys", () => {
+  const characterId = "00000000-0000-4000-8000-000000000010";
+
+  it("creates a scoped key with reference type", () => {
+    const key = createCharacterReferenceObjectKey({
+      workspaceId,
+      characterId,
+      referenceType: "threeQuarter",
+      contentType: "image/jpeg",
+    });
+    expect(key).toMatch(
+      /\/characters\/00000000-0000-4000-8000-000000000010\/references\/threeQuarter\/[0-9a-f-]+\.jpg$/,
+    );
+    expect(
+      isCharacterReferenceObjectKey({
+        workspaceId,
+        characterId,
+        referenceType: "threeQuarter",
+        objectKey: key,
+      }),
+    ).toBe(true);
+  });
+
+  it("rejects cross-character and traversal keys", () => {
+    expect(
+      isCharacterReferenceObjectKey({
+        workspaceId,
+        characterId,
+        referenceType: "master",
+        objectKey: `workspaces/${workspaceId}/characters/other/references/master/file.png`,
+      }),
+    ).toBe(false);
+    expect(
+      isCharacterReferenceObjectKey({
+        workspaceId,
+        characterId,
+        referenceType: "master",
+        objectKey: `workspaces/${workspaceId}/characters/${characterId}/references/master/../file.png`,
       }),
     ).toBe(false);
   });

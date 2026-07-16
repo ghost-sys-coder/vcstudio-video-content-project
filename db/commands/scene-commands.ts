@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
 import {
   projectScriptVersions,
@@ -8,6 +8,7 @@ import {
   sceneAnalysisRuns,
   scenes,
   sceneVersions,
+  sceneVersionCharacters,
   usageReservations,
 } from "@/db/schema";
 import type { SceneContent, SceneAnalysisOutput } from "@/lib/schemas/scene";
@@ -316,8 +317,39 @@ export async function updateScene(
         ),
       ),
   );
+  const previousAssignments = await getDatabase()
+    .select()
+    .from(sceneVersionCharacters)
+    .where(
+      and(
+        eq(sceneVersionCharacters.workspaceId, input.workspaceId),
+        eq(sceneVersionCharacters.projectId, input.projectId),
+        inArray(
+          sceneVersionCharacters.sceneVersionId,
+          currentRows.slice(targetIndex).map((row) => row.version.id),
+        ),
+      ),
+    );
+  const copiedAssignments = affected.flatMap((version, index) =>
+    previousAssignments
+      .filter(
+        (assignment) =>
+          assignment.sceneVersionId ===
+          currentRows[targetIndex + index]?.version.id,
+      )
+      .map((assignment) => ({
+        workspaceId: input.workspaceId,
+        projectId: input.projectId,
+        sceneVersionId: version.id,
+        characterId: assignment.characterId,
+        assignedByUserId: input.userId,
+      })),
+  );
   await getDatabase().batch([
     getDatabase().insert(sceneVersions).values(affected),
+    ...(copiedAssignments.length
+      ? [getDatabase().insert(sceneVersionCharacters).values(copiedAssignments)]
+      : []),
     ...updates,
   ]);
 }

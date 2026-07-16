@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { tasks } from "@trigger.dev/sdk";
+import { assignSceneCharacters } from "@/db/commands/character-commands";
+import { assignSceneCharactersSchema } from "@/lib/schemas/character";
 import type { sceneAnalysisTask } from "@/trigger/scene-analysis";
 import { findProject } from "@/db/repositories/projects.repository";
 import {
@@ -52,6 +54,35 @@ async function requireProjectMutation(
   requireCapability(context.activeMembership.role, capability);
   if (project.status === "archived") throw new Error("Project not found.");
   return { context, project };
+}
+
+export async function assignSceneCharactersAction(
+  formData: FormData,
+): Promise<SceneActionState> {
+  const parsed = assignSceneCharactersSchema.safeParse({
+    ...Object.fromEntries(formData),
+    characterIds: formData.getAll("characterIds"),
+  });
+  if (!parsed.success)
+    return { success: false, error: "Invalid character assignment." };
+  try {
+    const { context } = await requireProjectMutation(
+      parsed.data.projectId,
+      "editScenes",
+    );
+    await assignSceneCharacters({
+      ...parsed.data,
+      workspaceId: context.activeMembership.workspaceId,
+      userId: context.user.id,
+    });
+    revalidatePath(`/app/projects/${parsed.data.projectId}/scenes`);
+    return { success: true, error: null };
+  } catch {
+    return {
+      success: false,
+      error: "The scene characters could not be assigned.",
+    };
+  }
 }
 
 async function requireProjectAccess(projectId: string) {

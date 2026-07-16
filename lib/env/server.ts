@@ -6,11 +6,13 @@ import {
   storageEnvironmentSchema,
   projectEnvironmentSchema,
   sceneAnalysisEnvironmentSchema,
+  characterEnvironmentSchema,
   type ClerkWebhookEnvironment,
   type DatabaseEnvironment,
   type StorageEnvironment,
   type ProjectEnvironment,
   type SceneAnalysisEnvironment,
+  type CharacterEnvironment,
 } from "@/lib/env/server-schema";
 
 let databaseEnvironment: DatabaseEnvironment | null = null;
@@ -18,6 +20,7 @@ let clerkWebhookEnvironment: ClerkWebhookEnvironment | null = null;
 let storageEnvironment: StorageEnvironment | null = null;
 let projectEnvironment: ProjectEnvironment | null = null;
 let sceneAnalysisEnvironment: SceneAnalysisEnvironment | null = null;
+let characterEnvironment: CharacterEnvironment | null = null;
 
 export function getDatabaseEnvironment(): DatabaseEnvironment {
   databaseEnvironment ??= databaseEnvironmentSchema.parse(process.env);
@@ -44,4 +47,9 @@ export function getSceneAnalysisEnvironment(): SceneAnalysisEnvironment {
     process.env,
   );
   return sceneAnalysisEnvironment;
+}
+
+export function getCharacterEnvironment(): CharacterEnvironment {
+  characterEnvironment ??= characterEnvironmentSchema.parse(process.env);
+  return characterEnvironment;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Scene, SceneVersion } from "@/db/schema";
+import type { Character, Scene, SceneVersion } from "@/db/schema";
 import { SceneCard } from "@/components/scenes/SceneCard";
 import { SceneNavigator } from "@/components/scenes/SceneNavigator";
 import { SceneWorkspaceHeader } from "@/components/scenes/SceneWorkspaceHeader";
@@ -16,10 +16,16 @@ export function SceneList({
   rows,
   canEdit,
   initialSceneNumber,
+  availableCharacters,
 }: {
-  rows: Array<{ scene: Scene; version: SceneVersion }>;
+  rows: Array<{
+    scene: Scene;
+    version: SceneVersion;
+    assignedCharacters: Character[];
+  }>;
   canEdit: boolean;
   initialSceneNumber: number | null;
+  availableCharacters: Character[];
 }) {
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(() =>
     findInitialSceneId(rows, initialSceneNumber),
@@ -171,6 +177,8 @@ export function SceneList({
           }}
           scene={selectedRow.scene}
           version={selectedRow.version}
+          assignedCharacters={selectedRow.assignedCharacters}
+          availableCharacters={availableCharacters}
         />
       </div>
     </div>

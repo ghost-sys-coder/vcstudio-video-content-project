@@ -20,6 +20,7 @@ This repository is the foundation for an internal production tool that converts 
 - Route-backed project tabs and a bounded, internally scrollable long-script editor.
 - Approved script versions, cost-confirmed Trigger.dev scene analysis, crashed-run reconciliation and retry, schema-constrained OpenAI output, editable immutable scene versions, and scene approval.
 - Searchable two-pane scene navigation with URL-addressable selection, status filtering, approval progress, and unsaved-change protection.
+- Workspace-scoped character profiles, private validated R2 reference galleries, archival, and immutable scene-version character assignments.
 
 ## Architecture
 
@@ -29,7 +30,7 @@ The repository will move into the full `apps/` and `packages/` monorepo structur
 
 ## Technology stack
 
-Next.js 16, React 19, strict TypeScript, Tailwind CSS, shadcn/ui, Clerk, Neon PostgreSQL, Drizzle ORM, Trigger.dev 4.5.4, OpenAI Responses API, Zod, Vitest, ESLint, and Prettier.
+Next.js 16, React 19, strict TypeScript, Tailwind CSS, shadcn/ui, Clerk, Neon PostgreSQL, Drizzle ORM, Trigger.dev 4.5.4, OpenAI Responses API, Cloudflare R2, Sharp, Zod, Vitest, ESLint, and Prettier.
 
 ## Repository structure
 
@@ -81,6 +82,13 @@ docs/                Bootstrap and phase specifications
 | `R2_REGION`                                       | Server only | Yes         | R2 region (`auto`).                              |
 | `R2_SIGNED_UPLOAD_EXPIRY_SECONDS`                 | Server only | Yes         | Upload URL lifetime, 60–900 seconds.             |
 | `R2_SIGNED_DOWNLOAD_EXPIRY_SECONDS`               | Server only | Yes         | Download URL lifetime, 60–3600 seconds.          |
+| `MAX_CHARACTER_REFERENCE_SIZE_BYTES`              | Server only | Yes         | Maximum character reference size (`5242880`).    |
+| `ALLOWED_IMAGE_MIME_TYPES`                        | Server only | Yes         | Allowed character image MIME types.              |
+| `MIN_REFERENCE_IMAGE_WIDTH`                       | Server only | Yes         | Minimum character reference width (`512`).       |
+| `MIN_REFERENCE_IMAGE_HEIGHT`                      | Server only | Yes         | Minimum character reference height (`512`).      |
+| `MAX_REFERENCE_IMAGE_WIDTH`                       | Server only | Yes         | Maximum character reference width (`4096`).      |
+| `MAX_REFERENCE_IMAGE_HEIGHT`                      | Server only | Yes         | Maximum character reference height (`4096`).     |
+| `ENABLE_CHARACTER_LIBRARY`                        | Server only | Yes         | Enables the Phase 4 character library.           |
 | `MAX_SCRIPT_CHARACTERS`                           | Server only | Yes         | Maximum narration script length (`50000`).       |
 | `DEFAULT_PROJECT_BUDGET_CENTS`                    | Server only | Yes         | New-project budget ceiling default (`200`).      |
 | `OPENAI_API_KEY`                                  | Server only | Yes         | Authenticates OpenAI Responses API calls.        |
@@ -110,6 +118,8 @@ The Phase 3 scene-planning migration is `migrations/20260715204954_rainy_umar/mi
 
 The script-version deletion audit migration is `migrations/20260715222820_absurd_yellowjacket/migration.sql`. It adds soft-deletion actor and timestamp fields to script versions and was applied successfully to the configured development Neon database on 2026-07-16.
 
+The Phase 4 character-library migration is `migrations/20260716185811_bumpy_thunderbolts/migration.sql`. It adds workspace characters, private reference metadata, destructive-operation audit records, and scene-version character assignments. It was applied successfully to the configured development Neon database on 2026-07-16.
+
 ## Clerk setup
 
 Configure Clerk with `/sign-in` and `/sign-up`, then create a webhook endpoint targeting `/api/webhooks/clerk`. Subscribe to:
@@ -127,6 +137,8 @@ Phase 3 defines the `scene-analysis` task in the shared `ai-text` queue. Add all
 ## Storage setup
 
 Workspace-logo storage uses a private Cloudflare R2 bucket. Objects use workspace-scoped keys such as `workspaces/{workspaceId}/branding/logos/{assetId}.png`; PostgreSQL stores metadata and ownership rather than image bytes or permanent public URLs.
+
+Character references use keys such as `workspaces/{workspaceId}/characters/{characterId}/references/{referenceType}/{assetId}.webp`. Completion downloads the private object and uses Sharp to verify its real format and dimensions before persisting metadata. Core identity views replace their prior object; expression, outfit, and pose references allow multiple images. Deleting or replacing a reference removes its R2 object.
 
 Configure the bucket CORS policy to allow `PUT` from `NEXT_PUBLIC_APP_URL` with the `Content-Type` header. Upload URLs expire according to `R2_SIGNED_UPLOAD_EXPIRY_SECONDS`; private logo display uses short-lived signed download URLs. Logo uploads accept PNG, JPEG, and WebP files up to 5 MB. Replacing or deleting a logo removes the superseded R2 object.
 
@@ -157,7 +169,7 @@ Not implemented yet. Remotion, FFmpeg, and FFprobe are planned.
 - `npm test` runs Vitest once.
 - `npm run test:coverage` runs tests with V8 coverage.
 
-Tests cover authentication gating, environment validation, workspace role permissions, nonmember rejection, cross-workspace isolation, project and budget validation, pagination limits, project status transitions, script statistics, scene structured output, prompt determinism, idempotency, cost calculations, scene timing, storage keys, upload sequencing, and Clerk user deletion routing.
+Tests cover authentication gating, environment validation, workspace role permissions, nonmember rejection, cross-workspace isolation, project and budget validation, pagination limits, project status transitions, script statistics, scene structured output, prompt determinism, idempotency, cost calculations, scene timing, character slugs and archival behavior, reference dimensions and storage keys, upload sequencing, and Clerk user deletion routing.
 
 ## Deployment
 
@@ -180,15 +192,15 @@ Scene analysis estimates cost before confirmation, enforces project plus workspa
 - `CLERK_WEBHOOK_SIGNING_SECRET` must be configured before real webhook delivery can succeed.
 - The Phase 1 migration must still be applied separately to future preview and production databases.
 - Full browser end-to-end coverage will be expanded with the bootstrap Playwright foundation.
-- Image generation, audio generation, subtitles, and rendering are not implemented yet.
+- Image generation, audio generation, subtitles, and rendering are not implemented yet. Phase 5 will snapshot the exact character reference asset identifiers used by each image generation.
 - Script version history is currently bounded to the latest 50 versions in the editor.
 - Approved script versions and versions referenced by scene analysis are retained and cannot be deleted.
 - Trigger.dev must be running locally or deployed before queued scene analyses execute.
-- Safe npm overrides pin vulnerable `ws` and `cookie` transitive dependencies to patched releases. Production dependencies retain 28 moderate transitive advisories in current Trigger.dev OpenTelemetry, Next.js PostCSS, and Clerk UI dependency chains. The development-only Trigger.dev CLI adds four high `tar` advisories; npm currently offers only breaking forced downgrades rather than compatible remediations.
+- Safe npm overrides pin vulnerable `ws` and `cookie` transitive dependencies to patched releases. The dependency tree currently retains 32 moderate transitive advisories in Trigger.dev OpenTelemetry/esbuild, Next.js PostCSS, and Clerk UI dependency chains. The development-only Trigger.dev CLI adds four high `tar` advisories; npm currently offers only breaking forced downgrades rather than compatible remediations.
 
 ## Implementation status
 
-Phases 1–3 are implemented through authenticated workspaces, project/script versioning, and durable AI scene planning. Media generation and rendering remain future phases.
+Phases 1–4 are implemented through authenticated workspaces, project/script versioning, durable AI scene planning, and workspace character consistency references. Media generation and rendering remain future phases.
 
 ## Recent major changes
 
@@ -208,3 +220,4 @@ Phases 1–3 are implemented through authenticated workspaces, project/script ve
 - 2026-07-16: Corrected the scene-analysis trigger button to forward Base UI dialog interaction and accessibility props, allowing the confirmation flow to open and dispatch approved scripts.
 - 2026-07-16: Added Trigger.dev run reconciliation, terminal crash handling, reservation release, deterministic analysis retries, and development-worker build isolation for scene analysis.
 - 2026-07-16: Replaced the full scene-card list with a responsive two-pane scene workspace featuring search, status filters, previous/next navigation, URL selection, and unsaved-change protection.
+- 2026-07-16: Implemented Phase 4 workspace characters, private user-uploaded and dimension-validated R2 references, archive auditing, and scene-version character assignments.
