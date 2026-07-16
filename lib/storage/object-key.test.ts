@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   createCharacterReferenceObjectKey,
+  createSceneImageObjectKey,
   isCharacterReferenceObjectKey,
+  isSceneImageObjectKey,
   createWorkspaceLogoObjectKey,
   isWorkspaceLogoObjectKey,
 } from "@/lib/storage/object-key";
@@ -29,6 +31,43 @@ describe("workspace logo object keys", () => {
       isWorkspaceLogoObjectKey({
         workspaceId,
         objectKey: `workspaces/${workspaceId}/branding/logos/../secret.png`,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("scene image object keys", () => {
+  const input: Parameters<typeof createSceneImageObjectKey>[0] = {
+    workspaceId,
+    projectId: "00000000-0000-4000-8000-000000000020",
+    sceneId: "00000000-0000-4000-8000-000000000021",
+    sceneVersionId: "00000000-0000-4000-8000-000000000022",
+    generationId: "00000000-0000-4000-8000-000000000023",
+    outputFormat: "webp",
+  };
+
+  it("creates a deterministic workspace and scene-version scoped key", () => {
+    const objectKey = createSceneImageObjectKey(input);
+    expect(objectKey).toBe(
+      `workspaces/${workspaceId}/projects/${input.projectId}/scenes/${input.sceneId}/versions/${input.sceneVersionId}/images/${input.generationId}.webp`,
+    );
+    expect(isSceneImageObjectKey({ ...input, objectKey })).toBe(true);
+  });
+
+  it("rejects a key from another workspace or generation", () => {
+    const objectKey = createSceneImageObjectKey(input);
+    expect(
+      isSceneImageObjectKey({
+        ...input,
+        workspaceId: "00000000-0000-4000-8000-000000000099",
+        objectKey,
+      }),
+    ).toBe(false);
+    expect(
+      isSceneImageObjectKey({
+        ...input,
+        generationId: "00000000-0000-4000-8000-000000000098",
+        objectKey,
       }),
     ).toBe(false);
   });

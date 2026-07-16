@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   check,
   foreignKey,
   index,
@@ -101,6 +102,51 @@ export const sceneAnalysisStatusEnum = pgEnum("scene_analysis_status", [
 
 export const usageReservationStatusEnum = pgEnum("usage_reservation_status", [
   "pending",
+  "reconciled",
+  "released",
+]);
+
+export const imageGenerationStatusEnum = pgEnum("image_generation_status", [
+  "pending",
+  "queued",
+  "running",
+  "succeeded",
+  "failed",
+  "cancelled",
+]);
+
+export const imageReviewStatusEnum = pgEnum("image_review_status", [
+  "pending",
+  "approved",
+  "rejected",
+]);
+
+export const imageQualityEnum = pgEnum("image_quality", [
+  "low",
+  "medium",
+  "high",
+]);
+
+export const imageOutputFormatEnum = pgEnum("image_output_format", [
+  "webp",
+  "png",
+  "jpeg",
+]);
+
+export const providerRequestStatusEnum = pgEnum("provider_request_status", [
+  "pending",
+  "running",
+  "succeeded",
+  "failed",
+]);
+
+export const usageOperationTypeEnum = pgEnum("usage_operation_type", [
+  "scene_analysis",
+  "scene_image_generation",
+]);
+
+export const usageEventTypeEnum = pgEnum("usage_event_type", [
+  "reserved",
   "reconciled",
   "released",
 ]);
@@ -245,6 +291,10 @@ export const characters = pgTable(
       .notNull(),
   },
   (table) => [
+    uniqueIndex("characters_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
     uniqueIndex("characters_workspace_slug_unique").on(
       table.workspaceId,
       table.slug,
@@ -285,6 +335,11 @@ export const characterReferenceAssets = pgTable(
       .notNull(),
   },
   (table) => [
+    uniqueIndex("character_reference_assets_id_character_workspace_unique").on(
+      table.id,
+      table.characterId,
+      table.workspaceId,
+    ),
     uniqueIndex("character_reference_assets_object_key_unique").on(
       table.objectKey,
     ),
@@ -365,6 +420,7 @@ export const projects = pgTable(
       .notNull(),
   },
   (table) => [
+    uniqueIndex("projects_id_workspace_unique").on(table.id, table.workspaceId),
     index("projects_workspace_status_updated_index").on(
       table.workspaceId,
       table.status,
@@ -579,6 +635,11 @@ export const scenes = pgTable(
       .notNull(),
   },
   (table) => [
+    uniqueIndex("scenes_id_project_workspace_unique").on(
+      table.id,
+      table.projectId,
+      table.workspaceId,
+    ),
     uniqueIndex("scenes_analysis_number_unique").on(
       table.analysisRunId,
       table.sceneNumber,
@@ -631,6 +692,12 @@ export const sceneVersions = pgTable(
       .notNull(),
   },
   (table) => [
+    uniqueIndex("scene_versions_id_scene_project_workspace_unique").on(
+      table.id,
+      table.sceneId,
+      table.projectId,
+      table.workspaceId,
+    ),
     uniqueIndex("scene_versions_scene_number_unique").on(
       table.sceneId,
       table.versionNumber,
@@ -688,6 +755,412 @@ export const sceneVersionCharacters = pgTable(
   ],
 );
 
+export const stylePresets = pgTable(
+  "style_presets",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    isDefault: boolean("is_default").notNull().default(false),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("style_presets_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    uniqueIndex("style_presets_workspace_slug_unique").on(
+      table.workspaceId,
+      table.slug,
+    ),
+    uniqueIndex("style_presets_workspace_default_unique")
+      .on(table.workspaceId)
+      .where(sql`${table.isDefault} = true and ${table.archivedAt} is null`),
+    index("style_presets_workspace_archived_index").on(
+      table.workspaceId,
+      table.archivedAt,
+      table.createdAt,
+    ),
+  ],
+);
+
+export const stylePresetVersions = pgTable(
+  "style_preset_versions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    stylePresetId: uuid("style_preset_id").notNull(),
+    version: integer("version").notNull(),
+    name: text("name").notNull(),
+    description: text("description").notNull(),
+    positivePrompt: text("positive_prompt").notNull(),
+    negativePrompt: text("negative_prompt").notNull(),
+    defaultAspectRatio: projectAspectRatioEnum("default_aspect_ratio")
+      .notNull()
+      .default("16:9"),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("style_preset_versions_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    uniqueIndex("style_preset_versions_preset_version_unique").on(
+      table.stylePresetId,
+      table.version,
+    ),
+    index("style_preset_versions_workspace_preset_index").on(
+      table.workspaceId,
+      table.stylePresetId,
+      table.version,
+    ),
+    check("style_preset_versions_version_positive", sql`${table.version} > 0`),
+    foreignKey({
+      columns: [table.stylePresetId, table.workspaceId],
+      foreignColumns: [stylePresets.id, stylePresets.workspaceId],
+      name: "style_preset_versions_tenant_preset_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
+export const promptTemplateVersions = pgTable(
+  "prompt_template_versions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    templateKey: text("template_key").notNull(),
+    version: text("version").notNull(),
+    sourceHash: text("source_hash").notNull(),
+    templateSource: text("template_source").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("prompt_template_versions_key_version_unique").on(
+      table.templateKey,
+      table.version,
+    ),
+  ],
+);
+
+export const sceneImageGenerations = pgTable(
+  "scene_image_generations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").notNull(),
+    sceneId: uuid("scene_id").notNull(),
+    sceneVersionId: uuid("scene_version_id").notNull(),
+    stylePresetVersionId: uuid("style_preset_version_id").notNull(),
+    promptTemplateVersionId: uuid("prompt_template_version_id")
+      .notNull()
+      .references(() => promptTemplateVersions.id, { onDelete: "restrict" }),
+    generationVersion: integer("generation_version").notNull(),
+    requestNonce: uuid("request_nonce").notNull(),
+    status: imageGenerationStatusEnum("status").notNull().default("pending"),
+    reviewStatus: imageReviewStatusEnum("review_status")
+      .notNull()
+      .default("pending"),
+    triggerRunId: text("trigger_run_id"),
+    idempotencyKey: text("idempotency_key").notNull(),
+    requestFingerprint: text("request_fingerprint").notNull(),
+    model: text("model").notNull(),
+    quality: imageQualityEnum("quality").notNull(),
+    size: text("size").notNull(),
+    outputFormat: imageOutputFormatEnum("output_format").notNull(),
+    outputCompression: integer("output_compression").notNull(),
+    background: text("background").notNull().default("opaque"),
+    inputFidelity: text("input_fidelity"),
+    promptTemplateVersion: text("prompt_template_version").notNull(),
+    stylePresetVersion: integer("style_preset_version").notNull(),
+    finalPrompt: text("final_prompt").notNull(),
+    estimatedCostCents: integer("estimated_cost_cents").notNull(),
+    actualCostCents: integer("actual_cost_cents"),
+    progressPercent: integer("progress_percent").notNull().default(0),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    assetObjectKey: text("asset_object_key"),
+    assetContentType: text("asset_content_type"),
+    assetSizeBytes: integer("asset_size_bytes"),
+    assetWidth: integer("asset_width"),
+    assetHeight: integer("asset_height"),
+    assetEtag: text("asset_etag"),
+    errorCategory: text("error_category"),
+    safeErrorMessage: text("safe_error_message"),
+    requestedByUserId: uuid("requested_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    reviewedByUserId: uuid("reviewed_by_user_id").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("scene_image_generations_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    uniqueIndex("scene_image_generations_id_project_workspace_unique").on(
+      table.id,
+      table.projectId,
+      table.workspaceId,
+    ),
+    uniqueIndex("scene_image_generations_idempotency_unique").on(
+      table.idempotencyKey,
+    ),
+    uniqueIndex("scene_image_generations_version_unique").on(
+      table.sceneVersionId,
+      table.generationVersion,
+    ),
+    uniqueIndex("scene_image_generations_workspace_request_nonce_unique").on(
+      table.workspaceId,
+      table.requestNonce,
+    ),
+    uniqueIndex("scene_image_generations_approved_scene_version_unique")
+      .on(table.sceneVersionId)
+      .where(sql`${table.reviewStatus} = 'approved'`),
+    index("scene_image_generations_workspace_project_scene_index").on(
+      table.workspaceId,
+      table.projectId,
+      table.sceneId,
+      table.createdAt,
+    ),
+    index("scene_image_generations_status_index").on(
+      table.workspaceId,
+      table.status,
+      table.updatedAt,
+    ),
+    index("scene_image_generations_style_preset_version_index").on(
+      table.stylePresetVersionId,
+    ),
+    check(
+      "scene_image_generations_version_positive",
+      sql`${table.generationVersion} > 0`,
+    ),
+    check(
+      "scene_image_generations_cost_nonnegative",
+      sql`${table.estimatedCostCents} >= 0 and (${table.actualCostCents} is null or ${table.actualCostCents} >= 0)`,
+    ),
+    check(
+      "scene_image_generations_progress_range",
+      sql`${table.progressPercent} between 0 and 100`,
+    ),
+    check(
+      "scene_image_generations_compression_range",
+      sql`${table.outputCompression} between 1 and 100`,
+    ),
+    check(
+      "scene_image_generations_background_supported",
+      sql`${table.background} in ('opaque', 'auto')`,
+    ),
+    check(
+      "scene_image_generations_size_supported",
+      sql`${table.size} in ('1536x1024', '1024x1536', '1024x1024')`,
+    ),
+    check(
+      "scene_image_generations_approved_succeeded",
+      sql`${table.reviewStatus} <> 'approved' or ${table.status} = 'succeeded'`,
+    ),
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [projects.id, projects.workspaceId],
+      name: "scene_image_generations_tenant_project_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.sceneId, table.projectId, table.workspaceId],
+      foreignColumns: [scenes.id, scenes.projectId, scenes.workspaceId],
+      name: "scene_image_generations_tenant_scene_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [
+        table.sceneVersionId,
+        table.sceneId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        sceneVersions.id,
+        sceneVersions.sceneId,
+        sceneVersions.projectId,
+        sceneVersions.workspaceId,
+      ],
+      name: "scene_image_generations_tenant_version_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.stylePresetVersionId, table.workspaceId],
+      foreignColumns: [stylePresetVersions.id, stylePresetVersions.workspaceId],
+      name: "scene_image_generations_tenant_style_fkey",
+    }).onDelete("restrict"),
+  ],
+);
+
+export const generationReferenceAssets = pgTable(
+  "generation_reference_assets",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    generationId: uuid("generation_id").notNull(),
+    referenceAssetId: uuid("reference_asset_id").references(
+      () => characterReferenceAssets.id,
+      { onDelete: "set null" },
+    ),
+    referenceAssetIdSnapshot: uuid("reference_asset_id_snapshot").notNull(),
+    characterId: uuid("character_id").notNull(),
+    objectKeySnapshot: text("object_key_snapshot").notNull(),
+    contentTypeSnapshot: text("content_type_snapshot").notNull(),
+    etagSnapshot: text("etag_snapshot").notNull(),
+    referenceTypeSnapshot: characterReferenceTypeEnum(
+      "reference_type_snapshot",
+    ).notNull(),
+    position: integer("position").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("generation_reference_assets_generation_reference_unique").on(
+      table.generationId,
+      table.referenceAssetIdSnapshot,
+    ),
+    uniqueIndex("generation_reference_assets_generation_position_unique").on(
+      table.generationId,
+      table.position,
+    ),
+    index("generation_reference_assets_workspace_generation_index").on(
+      table.workspaceId,
+      table.generationId,
+    ),
+    index("generation_reference_assets_reference_index").on(
+      table.referenceAssetId,
+    ),
+    index("generation_reference_assets_character_index").on(table.characterId),
+    check(
+      "generation_reference_assets_position_positive",
+      sql`${table.position} >= 0`,
+    ),
+    check(
+      "generation_reference_assets_live_snapshot_match",
+      sql`${table.referenceAssetId} is null or ${table.referenceAssetId} = ${table.referenceAssetIdSnapshot}`,
+    ),
+    foreignKey({
+      columns: [table.generationId, table.workspaceId],
+      foreignColumns: [
+        sceneImageGenerations.id,
+        sceneImageGenerations.workspaceId,
+      ],
+      name: "generation_reference_assets_tenant_generation_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.characterId, table.workspaceId],
+      foreignColumns: [characters.id, characters.workspaceId],
+      name: "generation_reference_assets_tenant_character_fkey",
+    }).onDelete("restrict"),
+  ],
+);
+
+export const providerRequests = pgTable(
+  "provider_requests",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    generationId: uuid("generation_id").notNull(),
+    provider: text("provider").notNull(),
+    model: text("model").notNull(),
+    status: providerRequestStatusEnum("status").notNull().default("pending"),
+    providerRequestId: text("provider_request_id"),
+    idempotencyKey: text("idempotency_key").notNull(),
+    attemptNumber: integer("attempt_number").notNull(),
+    textInputUnits: integer("text_input_units"),
+    imageInputUnits: integer("image_input_units"),
+    outputUnits: integer("output_units"),
+    estimatedCostCents: integer("estimated_cost_cents").notNull(),
+    actualCostCents: integer("actual_cost_cents"),
+    errorCode: text("error_code"),
+    safeErrorMessage: text("safe_error_message"),
+    safeMetadata: jsonb("safe_metadata")
+      .$type<Record<string, string | number | boolean | null>>()
+      .notNull()
+      .default({}),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("provider_requests_generation_attempt_unique").on(
+      table.generationId,
+      table.attemptNumber,
+    ),
+    uniqueIndex("provider_requests_idempotency_unique").on(
+      table.idempotencyKey,
+    ),
+    index("provider_requests_workspace_status_index").on(
+      table.workspaceId,
+      table.status,
+      table.createdAt,
+    ),
+    check(
+      "provider_requests_units_nonnegative",
+      sql`(${table.textInputUnits} is null or ${table.textInputUnits} >= 0) and (${table.imageInputUnits} is null or ${table.imageInputUnits} >= 0) and (${table.outputUnits} is null or ${table.outputUnits} >= 0)`,
+    ),
+    check(
+      "provider_requests_attempt_positive",
+      sql`${table.attemptNumber} > 0`,
+    ),
+    check(
+      "provider_requests_cost_nonnegative",
+      sql`${table.estimatedCostCents} >= 0 and (${table.actualCostCents} is null or ${table.actualCostCents} >= 0)`,
+    ),
+    foreignKey({
+      columns: [table.generationId, table.projectId, table.workspaceId],
+      foreignColumns: [
+        sceneImageGenerations.id,
+        sceneImageGenerations.projectId,
+        sceneImageGenerations.workspaceId,
+      ],
+      name: "provider_requests_tenant_generation_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
 export const usageReservations = pgTable(
   "usage_reservations",
   {
@@ -698,9 +1171,14 @@ export const usageReservations = pgTable(
     projectId: uuid("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
-    analysisRunId: uuid("analysis_run_id")
+    operationType: usageOperationTypeEnum("operation_type")
       .notNull()
-      .references(() => sceneAnalysisRuns.id, { onDelete: "cascade" }),
+      .default("scene_analysis"),
+    analysisRunId: uuid("analysis_run_id").references(
+      () => sceneAnalysisRuns.id,
+      { onDelete: "cascade" },
+    ),
+    imageGenerationId: uuid("image_generation_id"),
     status: usageReservationStatusEnum("status").notNull().default("pending"),
     reservedCostCents: integer("reserved_cost_cents").notNull(),
     actualCostCents: integer("actual_cost_cents"),
@@ -713,16 +1191,100 @@ export const usageReservations = pgTable(
       .notNull(),
   },
   (table) => [
-    uniqueIndex("usage_reservations_analysis_unique").on(table.analysisRunId),
+    uniqueIndex("usage_reservations_id_operation_project_workspace_unique").on(
+      table.id,
+      table.operationType,
+      table.projectId,
+      table.workspaceId,
+    ),
+    uniqueIndex("usage_reservations_analysis_unique")
+      .on(table.analysisRunId)
+      .where(sql`${table.analysisRunId} is not null`),
+    uniqueIndex("usage_reservations_image_generation_unique")
+      .on(table.imageGenerationId)
+      .where(sql`${table.imageGenerationId} is not null`),
     index("usage_reservations_workspace_project_status_index").on(
       table.workspaceId,
       table.projectId,
       table.status,
     ),
+    index("usage_reservations_status_expires_index").on(
+      table.status,
+      table.expiresAt,
+    ),
     check(
       "usage_reservations_cost_nonnegative",
-      sql`${table.reservedCostCents} >= 0`,
+      sql`${table.reservedCostCents} >= 0 and (${table.actualCostCents} is null or ${table.actualCostCents} >= 0)`,
     ),
+    check(
+      "usage_reservations_single_operation",
+      sql`(${table.operationType} = 'scene_analysis' and ${table.analysisRunId} is not null and ${table.imageGenerationId} is null) or (${table.operationType} = 'scene_image_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is not null)`,
+    ),
+    foreignKey({
+      columns: [table.imageGenerationId, table.projectId, table.workspaceId],
+      foreignColumns: [
+        sceneImageGenerations.id,
+        sceneImageGenerations.projectId,
+        sceneImageGenerations.workspaceId,
+      ],
+      name: "usage_reservations_tenant_generation_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
+export const usageEvents = pgTable(
+  "usage_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    reservationId: uuid("reservation_id").notNull(),
+    operationType: usageOperationTypeEnum("operation_type").notNull(),
+    eventType: usageEventTypeEnum("event_type").notNull(),
+    estimatedCostCents: integer("estimated_cost_cents").notNull(),
+    actualCostCents: integer("actual_cost_cents"),
+    safeMetadata: jsonb("safe_metadata")
+      .$type<Record<string, string | number | boolean | null>>()
+      .notNull()
+      .default({}),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("usage_events_reservation_event_unique").on(
+      table.reservationId,
+      table.eventType,
+    ),
+    index("usage_events_workspace_project_created_index").on(
+      table.workspaceId,
+      table.projectId,
+      table.createdAt,
+    ),
+    index("usage_events_reservation_index").on(table.reservationId),
+    check(
+      "usage_events_cost_nonnegative",
+      sql`${table.estimatedCostCents} >= 0 and (${table.actualCostCents} is null or ${table.actualCostCents} >= 0)`,
+    ),
+    foreignKey({
+      columns: [
+        table.reservationId,
+        table.operationType,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        usageReservations.id,
+        usageReservations.operationType,
+        usageReservations.projectId,
+        usageReservations.workspaceId,
+      ],
+      name: "usage_events_tenant_reservation_fkey",
+    }).onDelete("cascade"),
   ],
 );
 
@@ -771,3 +1333,16 @@ export type SceneAnalysisRun = typeof sceneAnalysisRuns.$inferSelect;
 export type Scene = typeof scenes.$inferSelect;
 export type SceneVersion = typeof sceneVersions.$inferSelect;
 export type SceneStatus = (typeof sceneStatusEnum.enumValues)[number];
+export type StylePreset = typeof stylePresets.$inferSelect;
+export type StylePresetVersion = typeof stylePresetVersions.$inferSelect;
+export type PromptTemplateVersion = typeof promptTemplateVersions.$inferSelect;
+export type SceneImageGeneration = typeof sceneImageGenerations.$inferSelect;
+export type ImageGenerationStatus =
+  (typeof imageGenerationStatusEnum.enumValues)[number];
+export type ImageReviewStatus =
+  (typeof imageReviewStatusEnum.enumValues)[number];
+export type GenerationReferenceAsset =
+  typeof generationReferenceAssets.$inferSelect;
+export type ProviderRequest = typeof providerRequests.$inferSelect;
+export type UsageReservation = typeof usageReservations.$inferSelect;
+export type UsageEvent = typeof usageEvents.$inferSelect;

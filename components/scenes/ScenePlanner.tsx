@@ -19,6 +19,9 @@ export function ScenePlanner({
   canEdit,
   initialSceneNumber,
   availableCharacters,
+  projectAspectRatio,
+  canGenerateImages,
+  canReviewImages,
 }: {
   projectId: string;
   approvedVersion: ProjectScriptVersion | null;
@@ -32,6 +35,9 @@ export function ScenePlanner({
   canEdit: boolean;
   initialSceneNumber: number | null;
   availableCharacters: Character[];
+  projectAspectRatio: "16:9" | "9:16" | "1:1";
+  canGenerateImages: boolean;
+  canReviewImages: boolean;
 }) {
   const active = latestRun
     ? ["pending", "queued", "running"].includes(latestRun.status)
@@ -56,6 +62,9 @@ export function ScenePlanner({
         initialSceneNumber={initialSceneNumber}
         rows={rows}
         availableCharacters={availableCharacters}
+        projectAspectRatio={projectAspectRatio}
+        canGenerateImages={canGenerateImages}
+        canReviewImages={canReviewImages}
       />
     </div>
   );

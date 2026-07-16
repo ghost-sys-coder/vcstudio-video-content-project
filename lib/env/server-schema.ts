@@ -106,6 +106,127 @@ export const sceneAnalysisEnvironmentSchema = z.object({
     .default(5000),
 });
 
+export const sceneImageEnvironmentSchema = z.object({
+  OPENAI_API_KEY: z.string().min(1, "OPENAI_API_KEY is required"),
+  OPENAI_IMAGE_MODEL: z.string().min(1).default("gpt-image-2"),
+  OPENAI_IMAGE_DRAFT_QUALITY: z.enum(["low"]).default("low"),
+  OPENAI_IMAGE_FINAL_QUALITY: z.enum(["medium"]).default("medium"),
+  OPENAI_IMAGE_OUTPUT_FORMAT: z.enum(["webp", "png", "jpeg"]).default("webp"),
+  OPENAI_IMAGE_DRAFT_COMPRESSION: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .default(80),
+  OPENAI_IMAGE_FINAL_COMPRESSION: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .default(90),
+  OPENAI_IMAGE_BACKGROUND: z.enum(["opaque", "auto"]).default("opaque"),
+  OPENAI_IMAGE_TEXT_INPUT_COST_PER_MILLION_CENTS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(500),
+  OPENAI_IMAGE_INPUT_COST_PER_MILLION_CENTS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(800),
+  OPENAI_IMAGE_OUTPUT_COST_PER_MILLION_CENTS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(3000),
+  OPENAI_IMAGE_LOW_SQUARE_ESTIMATE_CENTS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(2),
+  OPENAI_IMAGE_LOW_RECTANGULAR_ESTIMATE_CENTS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(2),
+  OPENAI_IMAGE_MEDIUM_SQUARE_ESTIMATE_CENTS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(6),
+  OPENAI_IMAGE_MEDIUM_RECTANGULAR_ESTIMATE_CENTS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(7),
+  OPENAI_IMAGE_HIGH_SQUARE_ESTIMATE_CENTS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(20),
+  OPENAI_IMAGE_HIGH_RECTANGULAR_ESTIMATE_CENTS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(25),
+  OPENAI_IMAGE_REFERENCE_RESERVE_CENTS_PER_ASSET: z.coerce
+    .number()
+    .int()
+    .nonnegative()
+    .default(1),
+  OPENAI_REQUEST_TIMEOUT_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(10)
+    .max(600)
+    .default(180),
+  TRIGGER_SECRET_KEY: z.string().min(1, "TRIGGER_SECRET_KEY is required"),
+  TRIGGER_PROJECT_REF: z.string().min(1, "TRIGGER_PROJECT_REF is required"),
+  IDEMPOTENCY_HASH_SECRET: z.string().min(32),
+  REQUEST_FINGERPRINT_SECRET: z.string().min(32),
+  MAX_IMAGE_GENERATION_RETRIES: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(2)
+    .default(1),
+  MAX_REFERENCE_ASSETS_PER_GENERATION: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(16)
+    .default(8),
+  MAX_REFERENCE_BYTES_PER_GENERATION: z.coerce
+    .number()
+    .int()
+    .min(1024)
+    .max(50 * 1024 * 1024)
+    .default(20 * 1024 * 1024),
+  MAX_IMAGE_GENERATIONS_PER_SCENE_VERSION: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .default(50),
+  GENERATION_RESERVATION_EXPIRY_MINUTES: z.coerce
+    .number()
+    .int()
+    .min(5)
+    .max(1440)
+    .default(30),
+  DEFAULT_DAILY_BUDGET_CENTS: z.coerce.number().int().positive().default(500),
+  DEFAULT_MONTHLY_BUDGET_CENTS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(5000),
+  ENABLE_SCENE_IMAGE_GENERATION: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((value) => value === "true"),
+});
+
 export type ServerEnvironment = z.infer<typeof serverEnvironmentSchema>;
 export type DatabaseEnvironment = z.infer<typeof databaseEnvironmentSchema>;
 export type ClerkWebhookEnvironment = z.infer<
@@ -117,6 +238,7 @@ export type ProjectEnvironment = z.infer<typeof projectEnvironmentSchema>;
 export type SceneAnalysisEnvironment = z.infer<
   typeof sceneAnalysisEnvironmentSchema
 >;
+export type SceneImageEnvironment = z.infer<typeof sceneImageEnvironmentSchema>;
 
 export function parseServerEnvironment(
   environment: Record<string, string | undefined>,

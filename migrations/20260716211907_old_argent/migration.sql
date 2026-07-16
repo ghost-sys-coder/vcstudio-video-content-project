@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "usage_events_reservation_event_unique" ON "usage_events" ("reservation_id","event_type");

@@ -31,6 +31,44 @@ export function createSceneAnalysisRetryIdempotencyKey(input: {
   return hash(input.secret, ["scene-analysis-retry", input.failedRunId]);
 }
 
+export function createSceneImageIdempotencyKey(input: {
+  secret: string;
+  workspaceId: string;
+  projectId: string;
+  sceneVersionId: string;
+  promptTemplateVersion: string;
+  stylePresetVersion: string;
+  generationVersion: number;
+  model: string;
+  quality: string;
+  size: string;
+  outputFormat: string;
+  outputCompression: number;
+  background: string;
+  referenceAssetIds: string[];
+}): string {
+  if (!Number.isInteger(input.generationVersion) || input.generationVersion < 1)
+    throw new RangeError("Generation version must be a positive integer.");
+
+  const orderedReferenceAssetIds = [...input.referenceAssetIds].sort();
+  return hash(input.secret, [
+    input.workspaceId,
+    input.projectId,
+    input.sceneVersionId,
+    "scene-image-generation",
+    input.promptTemplateVersion,
+    input.stylePresetVersion,
+    String(input.generationVersion),
+    input.model,
+    input.quality,
+    input.size,
+    input.outputFormat,
+    String(input.outputCompression),
+    input.background,
+    ...orderedReferenceAssetIds,
+  ]);
+}
+
 export function createRequestFingerprint(
   secret: string,
   prompt: string,

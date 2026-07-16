@@ -1,7 +1,7 @@
 type Reservation = {
   workspaceId: string;
   projectId: string;
-  analysisRunId: string;
+  analysisRunId: string | null;
   status: "pending" | "reconciled" | "released";
   reservedCostCents: number;
   expiresAt: Date;

@@ -7,7 +7,7 @@ import {
   listCurrentScenes,
 } from "@/db/repositories/scenes.repository";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
-import { canEditProject } from "@/lib/policies/workspace-policy";
+import { can, canEditProject } from "@/lib/policies/workspace-policy";
 import { getSceneAnalysisEnvironment } from "@/lib/env/server";
 import { renderSceneAnalysisPrompt } from "@studio/prompts";
 import { estimateSceneAnalysisCost } from "@/lib/costs/scene-analysis-cost";
@@ -87,6 +87,15 @@ export default async function ProjectScenesPage({
       projectId={project.id}
       rows={rowsWithCharacters}
       availableCharacters={availableCharacters}
+      projectAspectRatio={project.aspectRatio}
+      canGenerateImages={
+        can(context.activeMembership.role, "generateSceneImages") &&
+        project.status !== "archived"
+      }
+      canReviewImages={
+        can(context.activeMembership.role, "reviewSceneImages") &&
+        project.status !== "archived"
+      }
     />
   );
 }
