@@ -3,6 +3,7 @@ import type {
   Scene,
   SceneAnalysisRun,
   SceneVersion,
+  Character,
 } from "@/db/schema";
 import { ScenePlannerHeader } from "@/components/scenes/ScenePlannerHeader";
 import { AnalysisProgressPanel } from "@/components/scenes/AnalysisProgressPanel";
@@ -17,14 +18,20 @@ export function ScenePlanner({
   estimatedCostCents,
   canEdit,
   initialSceneNumber,
+  availableCharacters,
 }: {
   projectId: string;
   approvedVersion: ProjectScriptVersion | null;
   latestRun: SceneAnalysisRun | null;
-  rows: Array<{ scene: Scene; version: SceneVersion }>;
+  rows: Array<{
+    scene: Scene;
+    version: SceneVersion;
+    assignedCharacters: Character[];
+  }>;
   estimatedCostCents: number;
   canEdit: boolean;
   initialSceneNumber: number | null;
+  availableCharacters: Character[];
 }) {
   const active = latestRun
     ? ["pending", "queued", "running"].includes(latestRun.status)
@@ -48,6 +55,7 @@ export function ScenePlanner({
         canEdit={canEdit}
         initialSceneNumber={initialSceneNumber}
         rows={rows}
+        availableCharacters={availableCharacters}
       />
     </div>
   );

@@ -1,19 +1,24 @@
-import type { Scene, SceneVersion } from "@/db/schema";
+import type { Character, Scene, SceneVersion } from "@/db/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SceneStatusBadge } from "@/components/scenes/SceneStatusBadge";
 import { SceneEditor } from "@/components/scenes/SceneEditor";
 import { ApproveSceneButton } from "@/components/scenes/ApproveSceneButton";
+import { SceneCharacterList } from "@/components/scenes/SceneCharacterList";
 
 export function SceneCard({
   scene,
   version,
   canEdit,
   onDirtyChange,
+  assignedCharacters,
+  availableCharacters,
 }: {
   scene: Scene;
   version: SceneVersion;
   canEdit: boolean;
   onDirtyChange?: (dirty: boolean) => void;
+  assignedCharacters: Character[];
+  availableCharacters: Character[];
 }) {
   return (
     <Card>
@@ -29,6 +34,14 @@ export function SceneCard({
         </p>
       </CardHeader>
       <CardContent className="space-y-5">
+        <SceneCharacterList
+          assignedCharacters={assignedCharacters}
+          availableCharacters={availableCharacters}
+          canEdit={canEdit}
+          projectId={scene.projectId}
+          sceneId={scene.id}
+          sceneVersionId={version.id}
+        />
         <SceneEditor
           canEdit={canEdit}
           key={`${scene.id}-${scene.currentVersion}`}

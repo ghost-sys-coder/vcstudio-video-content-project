@@ -11,6 +11,10 @@ import { canEditProject } from "@/lib/policies/workspace-policy";
 import { getSceneAnalysisEnvironment } from "@/lib/env/server";
 import { renderSceneAnalysisPrompt } from "@studio/prompts";
 import { estimateSceneAnalysisCost } from "@/lib/costs/scene-analysis-cost";
+import {
+  listCharacters,
+  listSceneVersionCharacters,
+} from "@/db/repositories/characters.repository";
 
 export default async function ProjectScenesPage({
   params,
@@ -39,6 +43,19 @@ export default async function ProjectScenesPage({
     listCurrentScenes(scope),
   ]);
   if (!project) notFound();
+  const [availableCharacters, assignments] = await Promise.all([
+    listCharacters({ workspaceId: scope.workspaceId, status: "active" }),
+    listSceneVersionCharacters({
+      ...scope,
+      sceneVersionIds: rows.map((row) => row.version.id),
+    }),
+  ]);
+  const rowsWithCharacters = rows.map((row) => ({
+    ...row,
+    assignedCharacters: assignments
+      .filter((item) => item.assignment.sceneVersionId === row.version.id)
+      .map((item) => item.character),
+  }));
   const environment = getSceneAnalysisEnvironment();
   const prompt = approvedVersion
     ? renderSceneAnalysisPrompt({
@@ -68,7 +85,8 @@ export default async function ProjectScenesPage({
       latestRun={latestRun}
       initialSceneNumber={initialSceneNumber}
       projectId={project.id}
-      rows={rows}
+      rows={rowsWithCharacters}
+      availableCharacters={availableCharacters}
     />
   );
 }
