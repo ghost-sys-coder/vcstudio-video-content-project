@@ -24,6 +24,10 @@ export const characterFormSchema = z.object({
   status: z.enum(characterStatusEnum.enumValues).exclude(["archived"]),
 });
 
+export const characterImportSchema = characterFormSchema.strict();
+
+export type CharacterFormValues = z.infer<typeof characterFormSchema>;
+
 export const updateCharacterSchema = characterFormSchema.extend({
   characterId: z.uuid(),
 });

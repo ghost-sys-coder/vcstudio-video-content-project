@@ -2,14 +2,25 @@ import { describe, expect, it } from "vitest";
 import {
   assignSceneCharactersSchema,
   characterFormSchema,
+  characterImportSchema,
   createCharacterReferenceUploadSchema,
 } from "@/lib/schemas/character";
+import { characterJsonSample } from "@/lib/domain/character-json";
 
 describe("character schemas", () => {
   it("rejects archived status from editable forms", () => {
     expect(
       characterFormSchema.safeParse({ name: "Ada", status: "archived" })
         .success,
+    ).toBe(false);
+  });
+
+  it("rejects unknown character import properties", () => {
+    expect(
+      characterImportSchema.safeParse({
+        ...characterJsonSample,
+        unexpectedProperty: true,
+      }).success,
     ).toBe(false);
   });
 

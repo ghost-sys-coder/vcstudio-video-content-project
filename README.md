@@ -21,6 +21,7 @@ This repository is the foundation for an internal production tool that converts 
 - Approved script versions, cost-confirmed Trigger.dev scene analysis, crashed-run reconciliation and retry, schema-constrained OpenAI output, editable immutable scene versions, and scene approval.
 - Searchable two-pane scene navigation with URL-addressable selection, status filtering, approval progress, and unsaved-change protection.
 - Workspace-scoped character profiles, private validated R2 reference galleries, archival, and immutable scene-version character assignments.
+- Validated character JSON import from pasted content, local files, or a built-in sample.
 
 ## Architecture
 
@@ -221,3 +222,4 @@ Phases 1–4 are implemented through authenticated workspaces, project/script ve
 - 2026-07-16: Added Trigger.dev run reconciliation, terminal crash handling, reservation release, deterministic analysis retries, and development-worker build isolation for scene analysis.
 - 2026-07-16: Replaced the full scene-card list with a responsive two-pane scene workspace featuring search, status filters, previous/next navigation, URL selection, and unsaved-change protection.
 - 2026-07-16: Implemented Phase 4 workspace characters, private user-uploaded and dimension-validated R2 references, archive auditing, and scene-version character assignments.
+- 2026-07-16: Added strict character JSON import with local-file support and a one-click sample for quickly populating character forms.

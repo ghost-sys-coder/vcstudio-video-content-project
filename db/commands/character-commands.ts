@@ -82,6 +82,7 @@ export async function updateCharacter(
       ),
     )
     .returning();
+  if (!updated) throw new Error("CHARACTER_UPDATE_FAILED");
   return updated;
 }
 

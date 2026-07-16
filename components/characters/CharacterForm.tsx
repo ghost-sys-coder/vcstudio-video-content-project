@@ -1,15 +1,18 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { Character } from "@/db/schema";
 import {
   createCharacterAction,
   updateCharacterAction,
 } from "@/app/(authenticated)/app/characters/actions";
 import { Button } from "@/components/ui/button";
+import { CharacterJsonLoader } from "@/components/characters/CharacterJsonLoader";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import type { CharacterFormValues } from "@/lib/schemas/character";
 
 const fields = [
   ["description", "Description"],
@@ -33,21 +36,55 @@ export function CharacterForm({
   onSuccess?: () => void;
   readOnly?: boolean;
 }) {
+  const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   return (
     <form
+      ref={formRef}
       action={(formData) =>
         startTransition(async () => {
+          setError(null);
+          setSuccess(null);
           const result = character
             ? await updateCharacterAction(formData)
             : await createCharacterAction(formData);
           setError(result.error);
-          if (result.success) onSuccess?.();
+          if (result.success) {
+            setSuccess(character ? "Character saved successfully." : null);
+            router.refresh();
+            onSuccess?.();
+          }
         })
       }
       className="space-y-5"
     >
+      {readOnly ? null : (
+        <div className="flex justify-end">
+          <CharacterJsonLoader
+            onLoad={(values: CharacterFormValues) => {
+              const form = formRef.current;
+              if (!form) return;
+              for (const [name, value] of Object.entries(values)) {
+                const field = form.elements.namedItem(name);
+                if (
+                  field instanceof HTMLInputElement ||
+                  field instanceof HTMLTextAreaElement ||
+                  field instanceof HTMLSelectElement
+                ) {
+                  field.value = value;
+                }
+              }
+              setError(null);
+              setSuccess(
+                "Character JSON loaded. Review the details, then save.",
+              );
+            }}
+          />
+        </div>
+      )}
       {character ? (
         <input name="characterId" type="hidden" value={character.id} />
       ) : null}
@@ -96,6 +133,14 @@ export function CharacterForm({
       {error ? (
         <p className="text-sm text-destructive" role="alert">
           {error}
+        </p>
+      ) : null}
+      {success ? (
+        <p
+          className="text-sm text-emerald-700 dark:text-emerald-400"
+          role="status"
+        >
+          {success}
         </p>
       ) : null}
       {readOnly ? null : (
