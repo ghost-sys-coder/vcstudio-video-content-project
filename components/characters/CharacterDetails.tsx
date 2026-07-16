@@ -3,7 +3,7 @@ import { ArchiveCharacterDialog } from "@/components/characters/ArchiveCharacter
 import { CharacterForm } from "@/components/characters/CharacterForm";
 import { CharacterReferenceGallery } from "@/components/characters/CharacterReferenceGallery";
 import { CharacterReferenceUploader } from "@/components/characters/CharacterReferenceUploader";
-import { Badge } from "@/components/ui/badge";
+import { CharacterStatusBadge } from "@/components/characters/CharacterStatusBadge";
 
 export function CharacterDetails({
   character,
@@ -21,7 +21,7 @@ export function CharacterDetails({
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-semibold">{character.name}</h1>
-            <Badge variant="secondary">{character.status}</Badge>
+            <CharacterStatusBadge status={character.status} />
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
             Workspace character identity and consistency profile.

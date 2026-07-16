@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Character } from "@/db/schema";
-import { Badge } from "@/components/ui/badge";
+import { CharacterStatusBadge } from "@/components/characters/CharacterStatusBadge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function CharacterCard({ character }: { character: Character }) {
@@ -10,11 +10,7 @@ export function CharacterCard({ character }: { character: Character }) {
         <CardHeader>
           <div className="flex items-center justify-between gap-3">
             <CardTitle>{character.name}</CardTitle>
-            <Badge
-              variant={character.status === "active" ? "default" : "secondary"}
-            >
-              {character.status}
-            </Badge>
+            <CharacterStatusBadge status={character.status} />
           </div>
         </CardHeader>
         <CardContent>
