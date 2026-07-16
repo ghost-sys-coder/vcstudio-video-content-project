@@ -8,10 +8,12 @@ export function SceneCard({
   scene,
   version,
   canEdit,
+  onDirtyChange,
 }: {
   scene: Scene;
   version: SceneVersion;
   canEdit: boolean;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   return (
     <Card>
@@ -27,7 +29,13 @@ export function SceneCard({
         </p>
       </CardHeader>
       <CardContent className="space-y-5">
-        <SceneEditor canEdit={canEdit} scene={scene} version={version} />
+        <SceneEditor
+          canEdit={canEdit}
+          key={`${scene.id}-${scene.currentVersion}`}
+          onDirtyChange={onDirtyChange}
+          scene={scene}
+          version={version}
+        />
         <ApproveSceneButton
           approved={scene.status === "approved"}
           disabled={!canEdit}

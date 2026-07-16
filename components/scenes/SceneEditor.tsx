@@ -17,10 +17,12 @@ export function SceneEditor({
   scene,
   version,
   canEdit,
+  onDirtyChange,
 }: {
   scene: Scene;
   version: SceneVersion;
   canEdit: boolean;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
@@ -30,9 +32,11 @@ export function SceneEditor({
         startTransition(async () => {
           const result = await updateSceneAction(data);
           setMessage(result.error ?? "Scene saved as a new version.");
+          if (result.success) onDirtyChange?.(false);
         })
       }
       className="space-y-4"
+      onChange={() => onDirtyChange?.(true)}
     >
       <input name="projectId" type="hidden" value={scene.projectId} />
       <input name="sceneId" type="hidden" value={scene.id} />

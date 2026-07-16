@@ -14,12 +14,20 @@ import { estimateSceneAnalysisCost } from "@/lib/costs/scene-analysis-cost";
 
 export default async function ProjectScenesPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ projectId: string }>;
+  searchParams: Promise<{ scene?: string }>;
 }) {
   const context = await getAuthenticatedWorkspaceContext();
   if (!context) return null;
   const { projectId } = await params;
+  const { scene: sceneParam } = await searchParams;
+  const parsedSceneNumber = Number(sceneParam);
+  const initialSceneNumber =
+    Number.isInteger(parsedSceneNumber) && parsedSceneNumber > 0
+      ? parsedSceneNumber
+      : null;
   const scope = {
     workspaceId: context.activeMembership.workspaceId,
     projectId,
@@ -58,6 +66,7 @@ export default async function ProjectScenesPage({
       }
       estimatedCostCents={estimate}
       latestRun={latestRun}
+      initialSceneNumber={initialSceneNumber}
       projectId={project.id}
       rows={rows}
     />

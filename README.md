@@ -19,6 +19,7 @@ This repository is the foundation for an internal production tool that converts 
 - Optimistically locked script drafts with immutable version numbering, restore-as-new-version behavior, and audited owner/editor soft deletion of eligible versions.
 - Route-backed project tabs and a bounded, internally scrollable long-script editor.
 - Approved script versions, cost-confirmed Trigger.dev scene analysis, crashed-run reconciliation and retry, schema-constrained OpenAI output, editable immutable scene versions, and scene approval.
+- Searchable two-pane scene navigation with URL-addressable selection, status filtering, approval progress, and unsaved-change protection.
 
 ## Architecture
 
@@ -206,3 +207,4 @@ Phases 1–3 are implemented through authenticated workspaces, project/script ve
 - 2026-07-16: Added owner/editor script-version deletion with confirmation, workspace-scoped authorization, protected approved and scene-referenced versions, and soft-deletion audit metadata.
 - 2026-07-16: Corrected the scene-analysis trigger button to forward Base UI dialog interaction and accessibility props, allowing the confirmation flow to open and dispatch approved scripts.
 - 2026-07-16: Added Trigger.dev run reconciliation, terminal crash handling, reservation release, deterministic analysis retries, and development-worker build isolation for scene analysis.
+- 2026-07-16: Replaced the full scene-card list with a responsive two-pane scene workspace featuring search, status filters, previous/next navigation, URL selection, and unsaved-change protection.

@@ -16,6 +16,7 @@ export function ScenePlanner({
   rows,
   estimatedCostCents,
   canEdit,
+  initialSceneNumber,
 }: {
   projectId: string;
   approvedVersion: ProjectScriptVersion | null;
@@ -23,6 +24,7 @@ export function ScenePlanner({
   rows: Array<{ scene: Scene; version: SceneVersion }>;
   estimatedCostCents: number;
   canEdit: boolean;
+  initialSceneNumber: number | null;
 }) {
   const active = latestRun
     ? ["pending", "queued", "running"].includes(latestRun.status)
@@ -42,7 +44,11 @@ export function ScenePlanner({
       {latestRun?.status === "failed" ? (
         <SceneAnalysisErrorState run={latestRun} />
       ) : null}
-      <SceneList canEdit={canEdit} rows={rows} />
+      <SceneList
+        canEdit={canEdit}
+        initialSceneNumber={initialSceneNumber}
+        rows={rows}
+      />
     </div>
   );
 }
