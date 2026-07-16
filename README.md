@@ -141,7 +141,7 @@ Workspace-logo storage uses a private Cloudflare R2 bucket. Objects use workspac
 
 Character references use keys such as `workspaces/{workspaceId}/characters/{characterId}/references/{referenceType}/{assetId}.webp`. Completion downloads the private object and uses Sharp to verify its real format and dimensions before persisting metadata. Core identity views replace their prior object; expression, outfit, and pose references allow multiple images. Deleting or replacing a reference removes its R2 object.
 
-Configure the bucket CORS policy to allow `PUT` from `NEXT_PUBLIC_APP_URL` with the `Content-Type` header. Upload URLs expire according to `R2_SIGNED_UPLOAD_EXPIRY_SECONDS`; private logo display uses short-lived signed download URLs. Logo uploads accept PNG, JPEG, and WebP files up to 5 MB. Replacing or deleting a logo removes the superseded R2 object.
+Configure the bucket CORS policy to allow `PUT` from every browser origin that uploads directly to R2, including `http://localhost:3000` and the stable production origin `https://vcstudio.vercel.app`, with the `Content-Type` header. Deployment-specific preview URLs must be added explicitly before uploads will work from previews. Upload URLs expire according to `R2_SIGNED_UPLOAD_EXPIRY_SECONDS`; private logo display uses short-lived signed download URLs. Logo uploads accept PNG, JPEG, and WebP files up to 5 MB. Replacing or deleting a logo removes the superseded R2 object.
 
 ## OpenAI setup
 
@@ -223,3 +223,4 @@ Phases 1–4 are implemented through authenticated workspaces, project/script ve
 - 2026-07-16: Replaced the full scene-card list with a responsive two-pane scene workspace featuring search, status filters, previous/next navigation, URL selection, and unsaved-change protection.
 - 2026-07-16: Implemented Phase 4 workspace characters, private user-uploaded and dimension-validated R2 references, archive auditing, and scene-version character assignments.
 - 2026-07-16: Added strict character JSON import with local-file support and a one-click sample for quickly populating character forms.
+- 2026-07-16: Enabled production browser uploads in the R2 CORS policy and added stage-specific character-reference upload diagnostics.

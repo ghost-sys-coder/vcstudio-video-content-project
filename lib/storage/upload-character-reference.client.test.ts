@@ -41,4 +41,58 @@ describe("character reference client upload", () => {
       "/api/workspaces/workspace/characters/character/references/complete",
     );
   });
+
+  it("identifies a browser-to-storage CORS or network failure", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            objectKey: "reference.png",
+            uploadUrl: "https://storage.example/upload",
+          }),
+          { status: 200 },
+        ),
+      )
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      uploadCharacterReference({
+        workspaceId: "workspace",
+        characterId: "character",
+        type: "master",
+        file: new File(["reference"], "reference.png", {
+          type: "image/png",
+        }),
+      }),
+    ).rejects.toThrow("bucket CORS policy");
+  });
+
+  it("reports the status returned by storage", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            objectKey: "reference.png",
+            uploadUrl: "https://storage.example/upload",
+          }),
+          { status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 403 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      uploadCharacterReference({
+        workspaceId: "workspace",
+        characterId: "character",
+        type: "master",
+        file: new File(["reference"], "reference.png", {
+          type: "image/png",
+        }),
+      }),
+    ).rejects.toThrow("HTTP 403");
+  });
 });

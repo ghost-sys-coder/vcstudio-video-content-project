@@ -25,12 +25,22 @@ export async function uploadCharacterReference(input: {
     objectKey: string;
     uploadUrl: string;
   };
-  const uploaded = await fetch(upload.uploadUrl, {
-    method: "PUT",
-    headers: { "content-type": input.file.type },
-    body: input.file,
-  });
-  if (!uploaded.ok) throw new Error("Reference upload failed.");
+  let uploaded: Response;
+  try {
+    uploaded = await fetch(upload.uploadUrl, {
+      method: "PUT",
+      headers: { "content-type": input.file.type },
+      body: input.file,
+    });
+  } catch {
+    throw new Error(
+      "The storage service blocked the upload. Verify that this site is allowed by the bucket CORS policy.",
+    );
+  }
+  if (!uploaded.ok)
+    throw new Error(
+      `The storage service rejected the upload (HTTP ${uploaded.status}).`,
+    );
   const completion = await fetch(`${base}/complete`, {
     method: "POST",
     headers: { "content-type": "application/json" },

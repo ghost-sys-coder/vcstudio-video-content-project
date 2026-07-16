@@ -65,6 +65,10 @@ export async function POST(
       );
     return NextResponse.json({ referenceId: saved.referenceId });
   } catch (error) {
+    console.error(
+      "Character reference upload finalization failed:",
+      error instanceof Error ? error.message : "Unknown server error.",
+    );
     if (uncommittedObjectKey)
       await deleteCharacterReferenceObject(uncommittedObjectKey).catch(
         () => undefined,

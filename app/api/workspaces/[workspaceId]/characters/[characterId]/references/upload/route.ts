@@ -45,7 +45,11 @@ export async function POST(
       sizeBytes: parsed.data.sizeBytes,
     });
     return NextResponse.json({ objectKey, uploadUrl });
-  } catch {
+  } catch (error) {
+    console.error(
+      "Character reference upload authorization failed:",
+      error instanceof Error ? error.message : "Unknown server error.",
+    );
     return NextResponse.json(
       { error: "Reference upload is unavailable." },
       { status: 403 },
