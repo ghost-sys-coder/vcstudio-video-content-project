@@ -24,6 +24,7 @@ export default async function ProjectsPage({
       page={result.page}
       pageCount={result.pageCount}
       projects={result.items}
+      total={result.total}
     />
   );
 }

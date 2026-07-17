@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node --input-type=module -e ' *)",
+      "Bash(node --env-file=.env --input-type=module -e ' *)",
+      "Bash(npx prettier *)",
+      "Bash(echo \"=== ESLINT EXIT: $? ===\")",
+      "Bash(node --input-type=module -e \"import * as L from 'lucide-react'; for \\(const n of ['CalendarClockIcon','WalletIcon','ImageIcon','LayersIcon','PlusIcon']\\) console.log\\(n, L[n]?'ok':'MISSING'\\);\")"
+    ]
+  }
+}

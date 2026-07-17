@@ -1,5 +1,5 @@
 import { CharacterLibrary } from "@/components/characters/CharacterLibrary";
-import { listCharacters } from "@/db/repositories/characters.repository";
+import { listCharactersWithReferenceCounts } from "@/db/repositories/characters.repository";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import { can } from "@/lib/policies/workspace-policy";
 import { notFound } from "next/navigation";
@@ -9,7 +9,7 @@ export default async function CharactersPage() {
   if (!getCharacterEnvironment().ENABLE_CHARACTER_LIBRARY) notFound();
   const context = await getAuthenticatedWorkspaceContext();
   if (!context) return null;
-  const characters = await listCharacters({
+  const characters = await listCharactersWithReferenceCounts({
     workspaceId: context.activeMembership.workspaceId,
   });
   return (

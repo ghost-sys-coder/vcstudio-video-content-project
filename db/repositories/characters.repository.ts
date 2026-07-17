@@ -1,13 +1,16 @@
 import "server-only";
 
-import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
 import {
   characterReferenceAssets,
   characters,
   sceneVersionCharacters,
+  type Character,
   type CharacterStatus,
 } from "@/db/schema";
+
+export type CharacterListItem = Character & { referenceCount: number };
 
 export async function listCharacters(input: {
   workspaceId: string;
@@ -23,6 +26,35 @@ export async function listCharacters(input: {
     .where(and(...conditions))
     .orderBy(asc(characters.name))
     .limit(500);
+}
+
+export async function listCharactersWithReferenceCounts(input: {
+  workspaceId: string;
+  excludeArchived?: boolean;
+}): Promise<CharacterListItem[]> {
+  const conditions = [eq(characters.workspaceId, input.workspaceId)];
+  if (input.excludeArchived) conditions.push(ne(characters.status, "archived"));
+  const rows = await getDatabase()
+    .select({
+      character: characters,
+      referenceCount: sql<number>`cast(count(${characterReferenceAssets.id}) as int)`,
+    })
+    .from(characters)
+    .leftJoin(
+      characterReferenceAssets,
+      and(
+        eq(characterReferenceAssets.characterId, characters.id),
+        eq(characterReferenceAssets.workspaceId, characters.workspaceId),
+      ),
+    )
+    .where(and(...conditions))
+    .groupBy(characters.id)
+    .orderBy(asc(characters.name))
+    .limit(500);
+  return rows.map((row) => ({
+    ...row.character,
+    referenceCount: Number(row.referenceCount),
+  }));
 }
 
 export async function findCharacter(input: {

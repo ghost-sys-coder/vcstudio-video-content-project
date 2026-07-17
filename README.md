@@ -10,7 +10,7 @@ This repository is the foundation for an internal production tool that converts 
 - Lazy Clerk user synchronization into PostgreSQL.
 - Signed, idempotent Clerk user lifecycle webhook processing.
 - First-workspace onboarding with transactional owner membership creation.
-- Authenticated application shell, workspace selector, user account menu, dashboard placeholder, and access-denied state.
+- Authenticated application shell, workspace selector, user account menu, a data-driven workspace dashboard, and access-denied state.
 - Central `owner`, `editor`, and `viewer` authorization policies.
 - Private Cloudflare R2 workspace-logo uploads with a 5 MB limit and object cleanup on replacement or deletion.
 - Responsive shadcn application sidebar with persistent desktop collapse state and a mobile drawer.
@@ -252,6 +252,8 @@ Phases 1–5 are implemented through authenticated workspaces, project/script ve
 
 ## Recent major changes
 
+- 2026-07-17: Redesigned the projects and character library cards and page layouts — consistent eyebrow/title/count headers, ring-styled cards with footers (project budget and updated date; per-character reference counts and initials avatars), a new workspace-scoped `listCharactersWithReferenceCounts` query, a shared `formatShortDate` helper, iconified empty states, and button-styled project pagination that only renders when multiple pages exist.
+- 2026-07-17: Replaced the static dashboard placeholder with a data-driven workspace overview — workspace-scoped aggregate statistics (non-archived projects and active count, character library size, succeeded scene images and those awaiting review, and month-to-date image spend) queried through a new `dashboard.repository`, redesigned stat cards, and a recent-projects panel.
 - 2026-07-16: Hardened Phase 5 persistence with database-enforced tenant relationships, indexed scheduled reconciliation and reference paths, snapshotted provider background configuration, nonnegative provider costs, an append-only usage ledger that still permits parent-driven cleanup, and passing opt-in PostgreSQL invariant coverage.
 - 2026-07-16: Added Phase 5 immutable image prompts and style versions, GPT Image generation/editing with exact reference snapshots, private R2 assets, atomic cost reservations and reconciliation, Trigger.dev execution and recovery, generation history, and one-at-a-time scene-version approval.
 - 2026-07-15: Linked the project to Clerk, added auth pages and account controls, and applied Clerk's shadcn theme.
