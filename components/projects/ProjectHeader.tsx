@@ -16,9 +16,11 @@ export function ProjectHeader({
   const router = useRouter();
   const activeTab = pathname.endsWith("/settings")
     ? "settings"
-    : pathname.endsWith("/scenes")
-      ? "scenes"
-      : "script";
+    : pathname.endsWith("/storyboard")
+      ? "storyboard"
+      : pathname.endsWith("/scenes")
+        ? "scenes"
+        : "script";
 
   return (
     <Tabs
@@ -35,6 +37,7 @@ export function ProjectHeader({
         <TabsList className="mt-5" variant="line">
           <TabsTrigger value="script">Script</TabsTrigger>
           <TabsTrigger value="scenes">Scenes</TabsTrigger>
+          <TabsTrigger value="storyboard">Storyboard</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
       </header>

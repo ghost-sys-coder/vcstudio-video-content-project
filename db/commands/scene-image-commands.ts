@@ -122,6 +122,7 @@ export async function createSceneImageGenerationReservation(input: {
   finalPrompt: string;
   estimatedCostCents: number;
   requestedByUserId: string;
+  batchId?: string | null;
   expiresAt: Date;
   budget: {
     workspaceDailyLimitCents: number;
@@ -326,7 +327,7 @@ export async function createSceneImageGenerationReservation(input: {
           request_fingerprint, model, quality, size, output_format,
           output_compression, background, input_fidelity, prompt_template_version,
           style_preset_version, final_prompt, estimated_cost_cents,
-          requested_by_user_id
+          requested_by_user_id, batch_id
         )
         select
           ${input.generationId}::uuid,
@@ -351,7 +352,8 @@ export async function createSceneImageGenerationReservation(input: {
           ${input.stylePresetVersion},
           ${input.finalPrompt},
           ${input.estimatedCostCents},
-          ${input.requestedByUserId}::uuid
+          ${input.requestedByUserId}::uuid,
+          ${input.batchId ?? null}::uuid
         from eligible
         returning id
       ),
@@ -1283,6 +1285,120 @@ export async function failSceneImageGeneration(input: {
   if (current?.status === "succeeded")
     throw new Error("SCENE_IMAGE_GENERATION_ALREADY_SUCCEEDED");
   throw new Error("SCENE_IMAGE_FAILURE_CONFLICT");
+}
+
+/**
+ * Cancels a not-yet-billed scene image generation and releases its reservation.
+ * Only pending/queued generations with no active or billed provider request can
+ * be cancelled; running provider calls are left to complete and reconcile so no
+ * paid work is silently discarded.
+ */
+export async function cancelSceneImageGeneration(input: {
+  workspaceId: string;
+  projectId: string;
+  generationId: string;
+}): Promise<{ cancelled: boolean }> {
+  const generation = await findSceneImageGeneration(input);
+  if (!generation) throw new Error("SCENE_IMAGE_GENERATION_NOT_FOUND");
+  if (generation.status === "cancelled") return { cancelled: false };
+  if (
+    generation.status === "succeeded" ||
+    generation.status === "failed" ||
+    generation.status === "running"
+  )
+    return { cancelled: false };
+
+  const reservation = await findSceneImageReservation(input);
+  if (!reservation || reservation.status !== "pending")
+    return { cancelled: false };
+
+  const eventMetadata = JSON.stringify({
+    generationId: input.generationId,
+    category: "bulk_cancelled",
+  });
+  const eventId = createUsageEventId(reservation.id, "released");
+
+  const result = await getDatabase().execute<{ id: string }>(sql`
+    with eligible as materialized (
+      select generation.id
+      from scene_image_generations generation
+      inner join usage_reservations reservation
+        on reservation.workspace_id = generation.workspace_id
+        and reservation.project_id = generation.project_id
+        and reservation.operation_type = 'scene_image_generation'
+        and reservation.image_generation_id = generation.id
+      where generation.workspace_id = ${input.workspaceId}
+        and generation.project_id = ${input.projectId}
+        and generation.id = ${input.generationId}
+        and generation.status in ('pending', 'queued')
+        and reservation.status = 'pending'
+        and not exists (
+          select 1
+          from provider_requests provider_request
+          where provider_request.workspace_id = generation.workspace_id
+            and provider_request.project_id = generation.project_id
+            and provider_request.generation_id = generation.id
+            and (
+              provider_request.status in ('pending', 'running', 'succeeded')
+              or coalesce(provider_request.actual_cost_cents, 0) > 0
+            )
+        )
+      for update of generation, reservation
+    ),
+    transitioned_generation as (
+      update scene_image_generations generation
+      set
+        status = 'cancelled'::image_generation_status,
+        actual_cost_cents = 0,
+        progress_percent = 100,
+        error_category = 'bulk_cancelled',
+        safe_error_message = 'This generation was cancelled before it started.',
+        completed_at = now(),
+        updated_at = now()
+      from eligible
+      where generation.id = eligible.id
+        and generation.status in ('pending', 'queued')
+      returning generation.id
+    ),
+    transitioned_reservation as (
+      update usage_reservations reservation
+      set
+        status = 'released'::usage_reservation_status,
+        actual_cost_cents = 0,
+        updated_at = now()
+      from transitioned_generation
+      where reservation.workspace_id = ${input.workspaceId}
+        and reservation.project_id = ${input.projectId}
+        and reservation.operation_type = 'scene_image_generation'
+        and reservation.image_generation_id = transitioned_generation.id
+        and reservation.status = 'pending'
+      returning reservation.id, reservation.reserved_cost_cents
+    ),
+    inserted_event as (
+      insert into usage_events (
+        id, workspace_id, project_id, reservation_id, operation_type,
+        event_type, estimated_cost_cents, actual_cost_cents, safe_metadata
+      )
+      select
+        ${eventId}::uuid,
+        ${input.workspaceId}::uuid,
+        ${input.projectId}::uuid,
+        transitioned_reservation.id,
+        'scene_image_generation'::usage_operation_type,
+        'released'::usage_event_type,
+        transitioned_reservation.reserved_cost_cents,
+        0,
+        ${eventMetadata}::jsonb
+      from transitioned_reservation
+      returning id
+    )
+    select transitioned_generation.id
+    from transitioned_generation
+    inner join transitioned_reservation on true
+    inner join inserted_event on true
+  `);
+
+  return { cancelled: result.rows.length === 1 };
 }
 
 export async function approveSceneImageGeneration(input: {

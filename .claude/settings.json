@@ -5,7 +5,11 @@
       "Bash(node --env-file=.env --input-type=module -e ' *)",
       "Bash(npx prettier *)",
       "Bash(echo \"=== ESLINT EXIT: $? ===\")",
-      "Bash(node --input-type=module -e \"import * as L from 'lucide-react'; for \\(const n of ['CalendarClockIcon','WalletIcon','ImageIcon','LayersIcon','PlusIcon']\\) console.log\\(n, L[n]?'ok':'MISSING'\\);\")"
+      "Bash(node --input-type=module -e \"import * as L from 'lucide-react'; for \\(const n of ['CalendarClockIcon','WalletIcon','ImageIcon','LayersIcon','PlusIcon']\\) console.log\\(n, L[n]?'ok':'MISSING'\\);\")",
+      "Bash(npm run *)",
+      "Bash(npx vitest *)",
+      "Bash(awk 'NR>=785 && NR<=800' node_modules/@trigger.dev/core/dist/commonjs/v3/types/tasks.d.ts)",
+      "Bash(awk 'NR>=326 && NR<=340' node_modules/@trigger.dev/core/dist/commonjs/v3/types/tasks.d.ts)"
     ]
   }
 }

@@ -88,6 +88,25 @@ export function estimateSceneImageCost(input: {
   };
 }
 
+/**
+ * A lightweight batch estimate for the bulk confirmation dialog. It uses the
+ * per-image output cost (the dominant term) so the client can estimate a
+ * selection without building each scene's prompt. The authoritative per-scene
+ * estimate is still computed server-side when each reservation is created.
+ */
+export function estimateBulkSceneImageCostCents(input: {
+  sceneCount: number;
+  quality: SceneImageQuality;
+  size: SceneImageApiSize;
+  outputCostMatrix: SceneImageOutputCostMatrix;
+}): number {
+  if (!Number.isInteger(input.sceneCount) || input.sceneCount < 0)
+    throw new RangeError("Scene count must be a nonnegative integer.");
+  const perSceneCents = input.outputCostMatrix[input.quality][input.size];
+  assertNonnegativeFinite(perSceneCents, "Output cost");
+  return input.sceneCount * perSceneCents;
+}
+
 export function calculateActualSceneImageCostCents(input: {
   usage: ImageGenerationUsage;
   rates: ImageGenerationTokenRates;
