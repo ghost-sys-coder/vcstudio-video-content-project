@@ -10,7 +10,6 @@ function scene(
 ): StoryboardSceneView {
   return {
     sceneId: `scene-${overrides.sceneNumber}`,
-    sceneNumber: overrides.sceneNumber,
     sceneStatus: "approved",
     sceneVersionId: `version-${overrides.sceneNumber}`,
     narrationText: "Narration.",

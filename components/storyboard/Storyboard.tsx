@@ -11,6 +11,7 @@ import {
 } from "@/app/(authenticated)/app/projects/[projectId]/storyboard/actions";
 import { BulkGenerationProgress } from "@/components/storyboard/BulkGenerationProgress";
 import { StoryboardEmptyState } from "@/components/storyboard/StoryboardEmptyState";
+import { StoryboardIntro } from "@/components/storyboard/StoryboardIntro";
 import { StoryboardGrid } from "@/components/storyboard/StoryboardGrid";
 import { StoryboardToolbar } from "@/components/storyboard/StoryboardToolbar";
 import { isActiveImageGenerationStatus } from "@/lib/domain/bulk-scene-image";
@@ -192,7 +193,20 @@ export function Storyboard({
       return result;
     }, [data.latestBatch, projectId, refresh]);
 
-  if (data.scenes.length === 0) return <StoryboardEmptyState />;
+  const intro = (
+    <StoryboardIntro
+      canGenerate={canGenerate && data.configuration.enabled}
+      generationEnabled={data.configuration.enabled}
+    />
+  );
+
+  if (data.scenes.length === 0)
+    return (
+      <div className="space-y-5">
+        {intro}
+        <StoryboardEmptyState />
+      </div>
+    );
 
   const selectableSelected = [...selected].filter((sceneId) =>
     data.scenes.some(
@@ -204,6 +218,8 @@ export function Storyboard({
 
   return (
     <div className="space-y-5">
+      {intro}
+
       {data.latestBatch ? (
         <BulkGenerationProgress
           batch={data.latestBatch}
