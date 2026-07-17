@@ -1,0 +1,25 @@
+# Local dependencies and generated builds
+
+node_modules/
+.next/
+.trigger/
+coverage/
+.vercel/
+*.tsbuildinfo
+
+## Secrets and local configuration
+
+.env*
+!.env.example
+.clerk/
+
+### Agent/session files
+
+.agents/
+.codex/
+memory.md
+
+#### Development-only evidence and documentation
+
+public/snapshots/
+docs/
