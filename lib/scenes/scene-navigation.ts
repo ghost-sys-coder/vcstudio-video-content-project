@@ -1,8 +1,10 @@
 import type { Scene, SceneStatus, SceneVersion } from "@/db/schema";
+import type { SceneImageIndicator } from "@/lib/scenes/scene-image-indicator";
 
 export type SceneNavigationRow = {
   scene: Scene;
   version: SceneVersion;
+  imageIndicator?: SceneImageIndicator;
 };
 
 export type SceneStatusFilter = "all" | SceneStatus;

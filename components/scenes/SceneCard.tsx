@@ -1,5 +1,7 @@
 import type { Character, Scene, SceneVersion } from "@/db/schema";
+import type { SceneImageIndicator } from "@/lib/scenes/scene-image-indicator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SceneImageIndicatorBadge } from "@/components/scenes/SceneImageIndicatorBadge";
 import { SceneStatusBadge } from "@/components/scenes/SceneStatusBadge";
 import { SceneEditor } from "@/components/scenes/SceneEditor";
 import { ApproveSceneButton } from "@/components/scenes/ApproveSceneButton";
@@ -17,6 +19,7 @@ export function SceneCard({
   projectAspectRatio,
   canGenerateImages,
   canReviewImages,
+  imageIndicator,
 }: {
   scene: Scene;
   version: SceneVersion;
@@ -27,6 +30,7 @@ export function SceneCard({
   projectAspectRatio: "16:9" | "9:16" | "1:1";
   canGenerateImages: boolean;
   canReviewImages: boolean;
+  imageIndicator?: SceneImageIndicator;
 }) {
   return (
     <Card>
@@ -45,7 +49,12 @@ export function SceneCard({
         <Tabs defaultValue="details">
           <TabsList aria-label="Scene workspace" variant="line">
             <TabsTrigger value="details">Scene details</TabsTrigger>
-            <TabsTrigger value="images">Images</TabsTrigger>
+            <TabsTrigger className="gap-1.5" value="images">
+              Images
+              {imageIndicator ? (
+                <SceneImageIndicatorBadge indicator={imageIndicator} />
+              ) : null}
+            </TabsTrigger>
           </TabsList>
           <TabsContent className="space-y-5 pt-4" keepMounted value="details">
             <SceneCharacterList

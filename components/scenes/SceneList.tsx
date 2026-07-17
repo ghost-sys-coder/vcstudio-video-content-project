@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Character, Scene, SceneVersion } from "@/db/schema";
+import type { SceneImageIndicator } from "@/lib/scenes/scene-image-indicator";
 import { SceneCard } from "@/components/scenes/SceneCard";
 import { SceneNavigator } from "@/components/scenes/SceneNavigator";
 import { SceneWorkspaceHeader } from "@/components/scenes/SceneWorkspaceHeader";
@@ -25,6 +26,7 @@ export function SceneList({
     scene: Scene;
     version: SceneVersion;
     assignedCharacters: Character[];
+    imageIndicator: SceneImageIndicator;
   }>;
   canEdit: boolean;
   initialSceneNumber: number | null;
@@ -188,6 +190,7 @@ export function SceneList({
           projectAspectRatio={projectAspectRatio}
           canGenerateImages={canGenerateImages}
           canReviewImages={canReviewImages}
+          imageIndicator={selectedRow.imageIndicator}
         />
       </div>
     </div>

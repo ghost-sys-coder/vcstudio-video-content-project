@@ -9,7 +9,8 @@
       "Bash(npm run *)",
       "Bash(npx vitest *)",
       "Bash(awk 'NR>=785 && NR<=800' node_modules/@trigger.dev/core/dist/commonjs/v3/types/tasks.d.ts)",
-      "Bash(awk 'NR>=326 && NR<=340' node_modules/@trigger.dev/core/dist/commonjs/v3/types/tasks.d.ts)"
+      "Bash(awk 'NR>=326 && NR<=340' node_modules/@trigger.dev/core/dist/commonjs/v3/types/tasks.d.ts)",
+      "Bash(node --input-type=module -e \"import * as L from 'lucide-react'; for \\(const n of ['AlertTriangleIcon','CheckCircle2Icon','ImageIcon','Loader2Icon']\\) console.log\\(n, L[n]?'ok':'MISSING'\\);\")"
     ]
   }
 }

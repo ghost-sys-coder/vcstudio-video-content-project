@@ -5,6 +5,7 @@ import type {
   SceneVersion,
   Character,
 } from "@/db/schema";
+import type { SceneImageIndicator } from "@/lib/scenes/scene-image-indicator";
 import { ScenePlannerHeader } from "@/components/scenes/ScenePlannerHeader";
 import { AnalysisProgressPanel } from "@/components/scenes/AnalysisProgressPanel";
 import { SceneAnalysisErrorState } from "@/components/scenes/SceneAnalysisErrorState";
@@ -30,6 +31,7 @@ export function ScenePlanner({
     scene: Scene;
     version: SceneVersion;
     assignedCharacters: Character[];
+    imageIndicator: SceneImageIndicator;
   }>;
   estimatedCostCents: number;
   canEdit: boolean;

@@ -1,5 +1,6 @@
 import type { SceneNavigationRow } from "@/lib/scenes/scene-navigation";
 import { Button } from "@/components/ui/button";
+import { SceneImageIndicatorBadge } from "@/components/scenes/SceneImageIndicatorBadge";
 import { SceneStatusBadge } from "@/components/scenes/SceneStatusBadge";
 import { cn } from "@/lib/utils";
 
@@ -36,7 +37,12 @@ export function SceneNavigatorItem({
       <span className="min-w-0 flex-1 space-y-1.5">
         <span className="flex items-center justify-between gap-2">
           <span className="font-medium">Scene {row.scene.sceneNumber}</span>
-          <SceneStatusBadge status={row.scene.status} />
+          <span className="flex items-center gap-1">
+            {row.imageIndicator ? (
+              <SceneImageIndicatorBadge indicator={row.imageIndicator} />
+            ) : null}
+            <SceneStatusBadge status={row.scene.status} />
+          </span>
         </span>
         <span className="line-clamp-2 block text-xs leading-5 text-muted-foreground">
           {row.version.narrationText}

@@ -15,6 +15,8 @@ import {
   listCharacters,
   listSceneVersionCharacters,
 } from "@/db/repositories/characters.repository";
+import { listSceneImageGenerationsForSceneVersions } from "@/db/repositories/scene-images.repository";
+import { buildSceneImageIndicatorMap } from "@/lib/scenes/scene-image-indicator";
 
 export default async function ProjectScenesPage({
   params,
@@ -43,18 +45,27 @@ export default async function ProjectScenesPage({
     listCurrentScenes(scope),
   ]);
   if (!project) notFound();
-  const [availableCharacters, assignments] = await Promise.all([
-    listCharacters({ workspaceId: scope.workspaceId, status: "active" }),
-    listSceneVersionCharacters({
-      ...scope,
-      sceneVersionIds: rows.map((row) => row.version.id),
-    }),
-  ]);
+  const [availableCharacters, assignments, imageGenerations] =
+    await Promise.all([
+      listCharacters({ workspaceId: scope.workspaceId, status: "active" }),
+      listSceneVersionCharacters({
+        ...scope,
+        sceneVersionIds: rows.map((row) => row.version.id),
+      }),
+      listSceneImageGenerationsForSceneVersions({
+        ...scope,
+        sceneVersionIds: rows.map((row) => row.version.id),
+      }),
+    ]);
+  const imageIndicatorBySceneId = buildSceneImageIndicatorMap(imageGenerations);
   const rowsWithCharacters = rows.map((row) => ({
     ...row,
     assignedCharacters: assignments
       .filter((item) => item.assignment.sceneVersionId === row.version.id)
       .map((item) => item.character),
+    imageIndicator: imageIndicatorBySceneId.get(row.scene.id) ?? {
+      state: "none" as const,
+    },
   }));
   const environment = getSceneAnalysisEnvironment();
   const prompt = approvedVersion
