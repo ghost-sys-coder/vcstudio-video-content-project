@@ -24,6 +24,7 @@ This repository is the foundation for an internal production tool that converts 
 - Validated character JSON import from pasted content, local files, or a built-in sample.
 - Versioned scene-image prompts and workspace style presets, cost-confirmed single-scene GPT Image generation, exact character-reference snapshots, private R2 assets, review history, and atomic per-scene-version approval.
 - Draft (`low`), final (`medium`), and explicit high-quality image modes using only the supported landscape, portrait, and square OpenAI sizes; Remotion will crop or fit these assets to final video dimensions in a later phase.
+- Storyboard grid with controlled bulk image generation: per-scene selection and status filtering, a confirmation dialog showing scene count, estimated cost, and remaining budget, a live batch-progress panel (queued/running/succeeded/failed/cancelled with actual cost), per-scene regenerate/retry, bulk and per-scene approval, and cancellation of not-yet-billed queued generations.
 
 ## Architecture
 
@@ -122,7 +123,8 @@ docs/                Bootstrap and phase specifications
 | `MAX_REFERENCE_ASSETS_PER_GENERATION`             | Server only | Yes         | Application reference limit, maximum `16`.                        |
 | `MAX_REFERENCE_BYTES_PER_GENERATION`              | Server only | Yes         | Aggregate downloaded reference-byte ceiling.                      |
 | `MAX_IMAGE_GENERATIONS_PER_SCENE_VERSION`         | Server only | Yes         | Per-version generation and returned-history cap.                  |
-| `ENABLE_SCENE_IMAGE_GENERATION`                   | Server only | Yes         | Phase 5 generation feature switch.                                |
+| `MAX_IMAGES_PER_BATCH`                            | Server only | Yes         | Maximum scenes per Phase 6 bulk storyboard batch.                 |
+| `ENABLE_SCENE_IMAGE_GENERATION`                   | Server only | Yes         | Phase 5/6 generation feature switch.                              |
 | `TRIGGER_SECRET_KEY`                              | Server only | Yes         | Authenticates Trigger.dev task submissions.                       |
 | `TRIGGER_PROJECT_REF`                             | Server only | Yes         | Identifies the Trigger.dev project.                               |
 | `IDEMPOTENCY_HASH_SECRET`                         | Server only | Yes         | HMAC secret for billable-operation identity.                      |
@@ -248,10 +250,11 @@ Scene analysis and scene-image generation show a conservative estimate before co
 
 ## Implementation status
 
-Phases 1–5 are implemented through authenticated workspaces, project/script versioning, durable AI scene planning, workspace character consistency references, and cost-controlled single-scene image generation and review. Audio, subtitles, and rendering remain future phases.
+Phases 1–6 are implemented through authenticated workspaces, project/script versioning, durable AI scene planning, workspace character consistency references, cost-controlled single-scene image generation and review, and the storyboard with controlled bulk image generation. Audio, subtitles, and rendering remain future phases.
 
 ## Recent major changes
 
+- 2026-07-17: Implemented Phase 6 storyboard and controlled bulk image generation — a new `scene_image_batches` table and nullable `batch_id` on generations (live-derived aggregate counts, no mutable counters), a `MAX_IMAGES_PER_BATCH` limit added to all environment files, a bulk orchestrator that reserves each eligible scene through the proven Phase 5 machinery and dispatches them with a single Trigger.dev `tasks.batchTrigger` (respecting the image-generation queue concurrency), idempotent duplicate-submission handling, cancellation that releases only not-yet-billed reservations, a `/app/projects/[id]/storyboard` route and tab, a polling storyboard API, sixteen one-per-file storyboard components, and unit plus opt-in PostgreSQL batch invariant tests.
 - 2026-07-17: Redesigned the projects and character library cards and page layouts — consistent eyebrow/title/count headers, ring-styled cards with footers (project budget and updated date; per-character reference counts and initials avatars), a new workspace-scoped `listCharactersWithReferenceCounts` query, a shared `formatShortDate` helper, iconified empty states, and button-styled project pagination that only renders when multiple pages exist.
 - 2026-07-17: Replaced the static dashboard placeholder with a data-driven workspace overview — workspace-scoped aggregate statistics (non-archived projects and active count, character library size, succeeded scene images and those awaiting review, and month-to-date image spend) queried through a new `dashboard.repository`, redesigned stat cards, and a recent-projects panel.
 - 2026-07-16: Hardened Phase 5 persistence with database-enforced tenant relationships, indexed scheduled reconciliation and reference paths, snapshotted provider background configuration, nonnegative provider costs, an append-only usage ledger that still permits parent-driven cleanup, and passing opt-in PostgreSQL invariant coverage.

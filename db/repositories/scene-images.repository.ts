@@ -594,6 +594,50 @@ export async function findSceneImageGenerationWorkflowContext(input: {
   };
 }
 
+const MAX_STORYBOARD_GENERATION_RESULTS = 4_000;
+
+export async function listSceneImageGenerationsForSceneVersions(input: {
+  workspaceId: string;
+  projectId: string;
+  sceneVersionIds: string[];
+}) {
+  const sceneVersionIds = [...new Set(input.sceneVersionIds)].slice(
+    0,
+    MAX_LIST_LIMIT * 2,
+  );
+  if (!sceneVersionIds.length) return [];
+
+  return getDatabase()
+    .select({
+      id: sceneImageGenerations.id,
+      sceneId: sceneImageGenerations.sceneId,
+      sceneVersionId: sceneImageGenerations.sceneVersionId,
+      batchId: sceneImageGenerations.batchId,
+      generationVersion: sceneImageGenerations.generationVersion,
+      status: sceneImageGenerations.status,
+      reviewStatus: sceneImageGenerations.reviewStatus,
+      assetObjectKey: sceneImageGenerations.assetObjectKey,
+      estimatedCostCents: sceneImageGenerations.estimatedCostCents,
+      actualCostCents: sceneImageGenerations.actualCostCents,
+      progressPercent: sceneImageGenerations.progressPercent,
+      safeErrorMessage: sceneImageGenerations.safeErrorMessage,
+      createdAt: sceneImageGenerations.createdAt,
+    })
+    .from(sceneImageGenerations)
+    .where(
+      and(
+        eq(sceneImageGenerations.workspaceId, input.workspaceId),
+        eq(sceneImageGenerations.projectId, input.projectId),
+        inArray(sceneImageGenerations.sceneVersionId, sceneVersionIds),
+      ),
+    )
+    .orderBy(
+      asc(sceneImageGenerations.sceneId),
+      desc(sceneImageGenerations.generationVersion),
+    )
+    .limit(MAX_STORYBOARD_GENERATION_RESULTS);
+}
+
 export async function listExpiredActiveSceneImageGenerations(input: {
   now: Date;
   limit?: number;

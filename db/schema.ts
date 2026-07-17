@@ -133,6 +133,12 @@ export const imageOutputFormatEnum = pgEnum("image_output_format", [
   "jpeg",
 ]);
 
+export const sceneImageBatchStatusEnum = pgEnum("scene_image_batch_status", [
+  "pending",
+  "processing",
+  "cancelled",
+]);
+
 export const providerRequestStatusEnum = pgEnum("provider_request_status", [
   "pending",
   "running",
@@ -861,6 +867,77 @@ export const promptTemplateVersions = pgTable(
   ],
 );
 
+export const sceneImageBatches = pgTable(
+  "scene_image_batches",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").notNull(),
+    status: sceneImageBatchStatusEnum("status").notNull().default("pending"),
+    requestNonce: uuid("request_nonce").notNull(),
+    stylePresetVersionId: uuid("style_preset_version_id").notNull(),
+    quality: imageQualityEnum("quality").notNull(),
+    size: text("size").notNull(),
+    requestedSceneCount: integer("requested_scene_count").notNull(),
+    reservedSceneCount: integer("reserved_scene_count").notNull().default(0),
+    estimatedCostCents: integer("estimated_cost_cents").notNull(),
+    requestedByUserId: uuid("requested_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    dispatchedAt: timestamp("dispatched_at", { withTimezone: true }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("scene_image_batches_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    uniqueIndex("scene_image_batches_workspace_request_nonce_unique").on(
+      table.workspaceId,
+      table.requestNonce,
+    ),
+    index("scene_image_batches_workspace_project_index").on(
+      table.workspaceId,
+      table.projectId,
+      table.createdAt,
+    ),
+    check(
+      "scene_image_batches_scene_count_positive",
+      sql`${table.requestedSceneCount} > 0`,
+    ),
+    check(
+      "scene_image_batches_reserved_count_nonnegative",
+      sql`${table.reservedSceneCount} >= 0`,
+    ),
+    check(
+      "scene_image_batches_estimated_cost_nonnegative",
+      sql`${table.estimatedCostCents} >= 0`,
+    ),
+    check(
+      "scene_image_batches_size_supported",
+      sql`${table.size} in ('1536x1024', '1024x1536', '1024x1024')`,
+    ),
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [projects.id, projects.workspaceId],
+      name: "scene_image_batches_tenant_project_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.stylePresetVersionId, table.workspaceId],
+      foreignColumns: [stylePresetVersions.id, stylePresetVersions.workspaceId],
+      name: "scene_image_batches_tenant_style_fkey",
+    }).onDelete("restrict"),
+  ],
+);
+
 export const sceneImageGenerations = pgTable(
   "scene_image_generations",
   {
@@ -881,6 +958,7 @@ export const sceneImageGenerations = pgTable(
     reviewStatus: imageReviewStatusEnum("review_status")
       .notNull()
       .default("pending"),
+    batchId: uuid("batch_id"),
     triggerRunId: text("trigger_run_id"),
     idempotencyKey: text("idempotency_key").notNull(),
     requestFingerprint: text("request_fingerprint").notNull(),
@@ -1018,6 +1096,15 @@ export const sceneImageGenerations = pgTable(
       foreignColumns: [stylePresetVersions.id, stylePresetVersions.workspaceId],
       name: "scene_image_generations_tenant_style_fkey",
     }).onDelete("restrict"),
+    index("scene_image_generations_batch_index").on(
+      table.workspaceId,
+      table.batchId,
+    ),
+    foreignKey({
+      columns: [table.batchId, table.workspaceId],
+      foreignColumns: [sceneImageBatches.id, sceneImageBatches.workspaceId],
+      name: "scene_image_generations_tenant_batch_fkey",
+    }).onDelete("set null"),
   ],
 );
 
@@ -1337,6 +1424,9 @@ export type StylePreset = typeof stylePresets.$inferSelect;
 export type StylePresetVersion = typeof stylePresetVersions.$inferSelect;
 export type PromptTemplateVersion = typeof promptTemplateVersions.$inferSelect;
 export type SceneImageGeneration = typeof sceneImageGenerations.$inferSelect;
+export type SceneImageBatch = typeof sceneImageBatches.$inferSelect;
+export type SceneImageBatchStatus =
+  (typeof sceneImageBatchStatusEnum.enumValues)[number];
 export type ImageGenerationStatus =
   (typeof imageGenerationStatusEnum.enumValues)[number];
 export type ImageReviewStatus =

@@ -209,6 +209,7 @@ export const sceneImageEnvironmentSchema = z.object({
     .min(1)
     .max(100)
     .default(50),
+  MAX_IMAGES_PER_BATCH: z.coerce.number().int().min(1).max(100).default(25),
   GENERATION_RESERVATION_EXPIRY_MINUTES: z.coerce
     .number()
     .int()
