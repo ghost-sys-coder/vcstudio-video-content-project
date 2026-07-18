@@ -62,7 +62,7 @@ export const projectEnvironmentSchema = z.object({
     .int()
     .min(0)
     .max(100000)
-    .default(200),
+    .default(500),
 });
 
 export const sceneAnalysisEnvironmentSchema = z.object({
@@ -349,11 +349,13 @@ export const renderEnvironmentSchema = z.object({
   // Cost model for compute-time rendering. There is no per-render provider
   // invoice, so the estimate is derived from output duration at a configured
   // per-minute rate and reconciled to the same figure once the render lands.
+  // Rendering is compute-only, so this rate is deliberately modest relative to
+  // the genuinely-billable image/audio operations that draw on the same budget.
   VIDEO_RENDER_COST_PER_MINUTE_CENTS: z.coerce
     .number()
     .int()
     .positive()
-    .default(30),
+    .default(5),
   VIDEO_RENDER_MINIMUM_ESTIMATE_CENTS: z.coerce
     .number()
     .int()

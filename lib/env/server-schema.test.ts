@@ -63,7 +63,7 @@ describe("project environment validation", () => {
   it("uses conservative Phase 2 defaults", () => {
     expect(projectEnvironmentSchema.parse({})).toEqual({
       MAX_SCRIPT_CHARACTERS: 50000,
-      DEFAULT_PROJECT_BUDGET_CENTS: 200,
+      DEFAULT_PROJECT_BUDGET_CENTS: 500,
     });
   });
 });
