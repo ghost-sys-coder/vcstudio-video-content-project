@@ -228,6 +228,88 @@ export const sceneImageEnvironmentSchema = z.object({
     .transform((value) => value === "true"),
 });
 
+export const sceneAudioEnvironmentSchema = z.object({
+  OPENAI_API_KEY: z.string().min(1, "OPENAI_API_KEY is required"),
+  OPENAI_TTS_MODEL: z.string().min(1).default("gpt-4o-mini-tts"),
+  OPENAI_TTS_VOICE: z.string().min(1).default("alloy"),
+  OPENAI_TTS_FORMAT: z
+    .enum(["mp3", "opus", "aac", "flac", "wav", "pcm"])
+    .default("mp3"),
+  OPENAI_TTS_SPEED_SCALED_PERCENT: z.coerce
+    .number()
+    .int()
+    .min(25)
+    .max(400)
+    .default(100),
+  OPENAI_TTS_COST_PER_MILLION_CHARACTERS_CENTS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(1500),
+  OPENAI_TTS_MINIMUM_ESTIMATE_CENTS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(1),
+  OPENAI_REQUEST_TIMEOUT_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(10)
+    .max(600)
+    .default(180),
+  TRIGGER_SECRET_KEY: z.string().min(1, "TRIGGER_SECRET_KEY is required"),
+  TRIGGER_PROJECT_REF: z.string().min(1, "TRIGGER_PROJECT_REF is required"),
+  IDEMPOTENCY_HASH_SECRET: z.string().min(32),
+  REQUEST_FINGERPRINT_SECRET: z.string().min(32),
+  MAX_AUDIO_GENERATION_RETRIES: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(2)
+    .default(1),
+  MAX_AUDIO_GENERATIONS_PER_SCENE_VERSION: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .default(50),
+  MAX_SCENES_PER_AUDIO_BATCH: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .default(25),
+  MAX_NARRATION_CHARACTERS: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(100_000)
+    .default(4000),
+  AUDIO_SCENE_PADDING_MILLISECONDS: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(10_000)
+    .default(250),
+  GENERATION_RESERVATION_EXPIRY_MINUTES: z.coerce
+    .number()
+    .int()
+    .min(5)
+    .max(1440)
+    .default(30),
+  DEFAULT_DAILY_BUDGET_CENTS: z.coerce.number().int().positive().default(500),
+  DEFAULT_MONTHLY_BUDGET_CENTS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(5000),
+  FFPROBE_PATH: z.string().min(1).default("ffprobe"),
+  ENABLE_SCENE_AUDIO_GENERATION: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((value) => value === "true"),
+});
+
 export type ServerEnvironment = z.infer<typeof serverEnvironmentSchema>;
 export type DatabaseEnvironment = z.infer<typeof databaseEnvironmentSchema>;
 export type ClerkWebhookEnvironment = z.infer<
@@ -240,6 +322,7 @@ export type SceneAnalysisEnvironment = z.infer<
   typeof sceneAnalysisEnvironmentSchema
 >;
 export type SceneImageEnvironment = z.infer<typeof sceneImageEnvironmentSchema>;
+export type SceneAudioEnvironment = z.infer<typeof sceneAudioEnvironmentSchema>;
 
 export function parseServerEnvironment(
   environment: Record<string, string | undefined>,

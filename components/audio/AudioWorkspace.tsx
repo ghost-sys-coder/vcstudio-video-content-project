@@ -1,0 +1,229 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  approveSceneAudioAction,
+  createVoicePresetAction,
+  rejectSceneAudioAction,
+  startSceneAudioGenerationAction,
+} from "@/app/(authenticated)/app/projects/[projectId]/audio/actions";
+import { Button } from "@/components/ui/button";
+import { AudioGenerationProgress } from "@/components/audio/AudioGenerationProgress";
+import { BulkGenerateAudioButton } from "@/components/audio/BulkGenerateAudioButton";
+import { SceneAudioList } from "@/components/audio/SceneAudioList";
+import { VoicePresetSelector } from "@/components/audio/VoicePresetSelector";
+import type {
+  AudioGenerateInput,
+  AudioWorkspaceView,
+  SceneAudioActionResult,
+} from "@/lib/audio/audio-view";
+import { audioWorkspaceResponseSchema } from "@/lib/schemas/audio-response";
+
+const POLL_INTERVAL_MS = 4_000;
+
+export function AudioWorkspace({
+  projectId,
+  initialData,
+  canGenerate,
+  canReview,
+  canManageVoicePresets,
+}: {
+  projectId: string;
+  initialData: AudioWorkspaceView;
+  canGenerate: boolean;
+  canReview: boolean;
+  canManageVoicePresets: boolean;
+}) {
+  const [data, setData] = useState<AudioWorkspaceView>(initialData);
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const [voicePresetId, setVoicePresetId] = useState<string>(
+    () =>
+      initialData.voicePresets.find((preset) => preset.isDefault)?.id ??
+      initialData.voicePresets[0]?.id ??
+      "",
+  );
+  const refreshing = useRef(false);
+
+  const refresh = useCallback(async () => {
+    if (refreshing.current) return;
+    refreshing.current = true;
+    try {
+      const response = await fetch(`/api/projects/${projectId}/audio`, {
+        cache: "no-store",
+      });
+      const payload: unknown = await response.json();
+      const parsed = audioWorkspaceResponseSchema.safeParse(payload);
+      if (response.ok && parsed.success && parsed.data.success) {
+        const nextData = parsed.data.data;
+        setData(nextData);
+        setVoicePresetId((current) =>
+          nextData.voicePresets.some((preset) => preset.id === current)
+            ? current
+            : (nextData.voicePresets.find((preset) => preset.isDefault)?.id ??
+              nextData.voicePresets[0]?.id ??
+              ""),
+        );
+      }
+    } finally {
+      refreshing.current = false;
+    }
+  }, [projectId]);
+
+  const hasActiveWork = useMemo(
+    () =>
+      data.progress.pending + data.progress.queued + data.progress.running > 0,
+    [data.progress],
+  );
+
+  useEffect(() => {
+    if (!hasActiveWork) return;
+    const timer = setInterval(() => {
+      if (!document.hidden) void refresh();
+    }, POLL_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [hasActiveWork, refresh]);
+
+  const eligibleScenes = useMemo(
+    () => data.scenes.filter((scene) => scene.eligibility === "eligible"),
+    [data.scenes],
+  );
+
+  const selectionScenes = useMemo(() => {
+    const selectable = data.scenes.filter(
+      (scene) =>
+        selected.has(scene.sceneId) &&
+        (scene.eligibility === "eligible" ||
+          scene.eligibility === "hasApprovedAudio"),
+    );
+    return selectable.length > 0 ? selectable : eligibleScenes;
+  }, [data.scenes, eligibleScenes, selected]);
+
+  const selectedVoicePreset =
+    data.voicePresets.find((preset) => preset.id === voicePresetId) ??
+    data.voicePresets[0] ??
+    null;
+
+  const toggleSelect = useCallback((sceneId: string, checked: boolean) => {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (checked) next.add(sceneId);
+      else next.delete(sceneId);
+      return next;
+    });
+  }, []);
+
+  const handleGenerate = useCallback(
+    async (input: AudioGenerateInput): Promise<SceneAudioActionResult> => {
+      const formData = new FormData();
+      formData.set("projectId", projectId);
+      formData.set("voicePresetId", input.voicePresetId);
+      formData.set("requestNonce", crypto.randomUUID());
+      input.sceneIds.forEach((id) => formData.append("sceneIds", id));
+      const result = await startSceneAudioGenerationAction(formData);
+      if (result.success) {
+        setSelected(new Set());
+        await refresh();
+      }
+      return result;
+    },
+    [projectId, refresh],
+  );
+
+  const runReview = useCallback(
+    async (
+      action: (formData: FormData) => Promise<SceneAudioActionResult>,
+      generationId: string,
+    ): Promise<SceneAudioActionResult> => {
+      const formData = new FormData();
+      formData.set("projectId", projectId);
+      formData.set("generationId", generationId);
+      const result = await action(formData);
+      if (result.success) await refresh();
+      return result;
+    },
+    [projectId, refresh],
+  );
+
+  const handleCreatePreset = useCallback(
+    async (formData: FormData): Promise<SceneAudioActionResult> => {
+      formData.set("projectId", projectId);
+      const result = await createVoicePresetAction(formData);
+      if (result.success) await refresh();
+      return result;
+    },
+    [projectId, refresh],
+  );
+
+  if (data.scenes.length === 0)
+    return (
+      <div className="rounded-xl border border-dashed p-12 text-center">
+        <h2 className="font-semibold">No scenes to voice yet</h2>
+        <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+          Approve a script version and run scene analysis, then approve scenes
+          to generate their narration audio and build the project timeline here.
+        </p>
+      </div>
+    );
+
+  return (
+    <div className="space-y-5">
+      <AudioGenerationProgress
+        progress={data.progress}
+        timeline={data.timeline}
+      />
+
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <VoicePresetSelector
+          canManage={canManageVoicePresets}
+          defaultModel={selectedVoicePreset?.model ?? "gpt-4o-mini-tts"}
+          onCreatePreset={handleCreatePreset}
+          onSelect={setVoicePresetId}
+          selectedVoicePresetId={voicePresetId}
+          voicePresets={data.voicePresets}
+        />
+        {canGenerate && data.configuration.enabled && selectedVoicePreset ? (
+          <div className="flex items-center gap-2">
+            {selected.size > 0 ? (
+              <Button
+                onClick={() => setSelected(new Set())}
+                size="sm"
+                type="button"
+                variant="ghost"
+              >
+                Clear
+              </Button>
+            ) : null}
+            <BulkGenerateAudioButton
+              availableBudgetCents={data.availableBudgetCents}
+              configuration={data.configuration}
+              disabled={selectionScenes.length === 0}
+              onGenerate={handleGenerate}
+              scenes={selectionScenes}
+              voicePresetId={voicePresetId}
+              voicePresetName={selectedVoicePreset.name}
+            />
+          </div>
+        ) : null}
+      </div>
+
+      <SceneAudioList
+        availableBudgetCents={data.availableBudgetCents}
+        canGenerate={canGenerate && data.configuration.enabled}
+        canReview={canReview}
+        configuration={data.configuration}
+        onApprove={(generationId) =>
+          runReview(approveSceneAudioAction, generationId)
+        }
+        onGenerate={handleGenerate}
+        onReject={(generationId) =>
+          runReview(rejectSceneAudioAction, generationId)
+        }
+        onToggleSelect={toggleSelect}
+        scenes={data.scenes}
+        selectedSceneIds={selected}
+        voicePresetId={voicePresetId}
+        voicePresetName={selectedVoicePreset?.name ?? ""}
+      />
+    </div>
+  );
+}
