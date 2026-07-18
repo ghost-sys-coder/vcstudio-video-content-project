@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   approveSceneAudioAction,
+  cancelSceneAudioAction,
   createVoicePresetAction,
   rejectSceneAudioAction,
   startSceneAudioGenerationAction,
@@ -213,6 +214,9 @@ export function AudioWorkspace({
         configuration={data.configuration}
         onApprove={(generationId) =>
           runReview(approveSceneAudioAction, generationId)
+        }
+        onCancel={(generationId) =>
+          runReview(cancelSceneAudioAction, generationId)
         }
         onGenerate={handleGenerate}
         onReject={(generationId) =>

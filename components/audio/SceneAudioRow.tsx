@@ -3,6 +3,7 @@
 import { GenerateSceneAudioButton } from "@/components/audio/GenerateSceneAudioButton";
 import { RegenerateSceneAudioDialog } from "@/components/audio/RegenerateSceneAudioDialog";
 import { ApproveSceneAudioButton } from "@/components/audio/ApproveSceneAudioButton";
+import { CancelSceneAudioButton } from "@/components/audio/CancelSceneAudioButton";
 import { AudioDurationDisplay } from "@/components/audio/AudioDurationDisplay";
 import { AudioErrorState } from "@/components/audio/AudioErrorState";
 import { SceneAudioPlayer } from "@/components/audio/SceneAudioPlayer";
@@ -35,6 +36,7 @@ export function SceneAudioRow({
   onGenerate,
   onApprove,
   onReject,
+  onCancel,
 }: {
   scene: AudioSceneView;
   selected: boolean;
@@ -48,6 +50,7 @@ export function SceneAudioRow({
   onGenerate: AudioGenerateHandler;
   onApprove: AudioReviewHandler;
   onReject: AudioReviewHandler;
+  onCancel: AudioReviewHandler;
 }) {
   const selectable =
     scene.eligibility === "eligible" ||
@@ -60,6 +63,10 @@ export function SceneAudioRow({
     scene.latestStatus === "pending" ||
     scene.latestStatus === "queued" ||
     scene.latestStatus === "running";
+  // Only not-yet-started generations can be safely cancelled; a running
+  // provider call is left to finish and reconcile.
+  const cancellable =
+    scene.latestStatus === "pending" || scene.latestStatus === "queued";
 
   return (
     <article
@@ -130,6 +137,12 @@ export function SceneAudioRow({
             onApprove={onApprove}
             onReject={onReject}
             reviewStatus={scene.latestReviewStatus ?? "pending"}
+          />
+        ) : null}
+        {canGenerate && cancellable && scene.latestGenerationId ? (
+          <CancelSceneAudioButton
+            generationId={scene.latestGenerationId}
+            onCancel={onCancel}
           />
         ) : null}
         {canGenerate && !inProgress ? (

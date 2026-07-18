@@ -21,6 +21,7 @@ export function SceneAudioList({
   onGenerate,
   onApprove,
   onReject,
+  onCancel,
 }: {
   scenes: AudioSceneView[];
   selectedSceneIds: ReadonlySet<string>;
@@ -34,6 +35,7 @@ export function SceneAudioList({
   onGenerate: AudioGenerateHandler;
   onApprove: AudioReviewHandler;
   onReject: AudioReviewHandler;
+  onCancel: AudioReviewHandler;
 }) {
   return (
     <div className="space-y-3">
@@ -45,6 +47,7 @@ export function SceneAudioList({
           configuration={configuration}
           key={scene.sceneId}
           onApprove={onApprove}
+          onCancel={onCancel}
           onGenerate={onGenerate}
           onReject={onReject}
           onToggleSelect={onToggleSelect}
