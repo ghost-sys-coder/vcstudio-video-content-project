@@ -9,6 +9,7 @@ import {
   startSceneAudioGenerationAction,
 } from "@/app/(authenticated)/app/projects/[projectId]/audio/actions";
 import { Button } from "@/components/ui/button";
+import { ApproveSelectedAudioButton } from "@/components/audio/ApproveSelectedAudioButton";
 import { AudioGenerationProgress } from "@/components/audio/AudioGenerationProgress";
 import { BulkGenerateAudioButton } from "@/components/audio/BulkGenerateAudioButton";
 import { SceneAudioList } from "@/components/audio/SceneAudioList";
@@ -99,6 +100,20 @@ export function AudioWorkspace({
     return selectable.length > 0 ? selectable : eligibleScenes;
   }, [data.scenes, eligibleScenes, selected]);
 
+  const approvableGenerationIds = useMemo(
+    () =>
+      data.scenes
+        .filter(
+          (scene) =>
+            selected.has(scene.sceneId) &&
+            scene.latestStatus === "succeeded" &&
+            scene.latestReviewStatus === "pending" &&
+            scene.latestGenerationId !== null,
+        )
+        .map((scene) => scene.latestGenerationId as string),
+    [data.scenes, selected],
+  );
+
   const selectedVoicePreset =
     data.voicePresets.find((preset) => preset.id === voicePresetId) ??
     data.voicePresets[0] ??
@@ -145,6 +160,21 @@ export function AudioWorkspace({
     [projectId, refresh],
   );
 
+  const handleApproveSelected =
+    useCallback(async (): Promise<SceneAudioActionResult> => {
+      let failure: string | null = null;
+      for (const generationId of approvableGenerationIds) {
+        const formData = new FormData();
+        formData.set("projectId", projectId);
+        formData.set("generationId", generationId);
+        const result = await approveSceneAudioAction(formData);
+        if (!result.success) failure = result.error;
+      }
+      setSelected(new Set());
+      await refresh();
+      return { success: failure === null, error: failure };
+    }, [approvableGenerationIds, projectId, refresh]);
+
   const handleCreatePreset = useCallback(
     async (formData: FormData): Promise<SceneAudioActionResult> => {
       formData.set("projectId", projectId);
@@ -182,18 +212,25 @@ export function AudioWorkspace({
           selectedVoicePresetId={voicePresetId}
           voicePresets={data.voicePresets}
         />
-        {canGenerate && data.configuration.enabled && selectedVoicePreset ? (
-          <div className="flex items-center gap-2">
-            {selected.size > 0 ? (
-              <Button
-                onClick={() => setSelected(new Set())}
-                size="sm"
-                type="button"
-                variant="ghost"
-              >
-                Clear
-              </Button>
-            ) : null}
+        <div className="flex items-center gap-2">
+          {selected.size > 0 ? (
+            <Button
+              onClick={() => setSelected(new Set())}
+              size="sm"
+              type="button"
+              variant="ghost"
+            >
+              Clear
+            </Button>
+          ) : null}
+          {canReview ? (
+            <ApproveSelectedAudioButton
+              count={approvableGenerationIds.length}
+              disabled={approvableGenerationIds.length === 0}
+              onApproveSelected={handleApproveSelected}
+            />
+          ) : null}
+          {canGenerate && data.configuration.enabled && selectedVoicePreset ? (
             <BulkGenerateAudioButton
               availableBudgetCents={data.availableBudgetCents}
               configuration={data.configuration}
@@ -203,8 +240,8 @@ export function AudioWorkspace({
               voicePresetId={voicePresetId}
               voicePresetName={selectedVoicePreset.name}
             />
-          </div>
-        ) : null}
+          ) : null}
+        </div>
       </div>
 
       <SceneAudioList
