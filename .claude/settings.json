@@ -12,7 +12,14 @@
       "Bash(awk 'NR>=326 && NR<=340' node_modules/@trigger.dev/core/dist/commonjs/v3/types/tasks.d.ts)",
       "Bash(node --input-type=module -e \"import * as L from 'lucide-react'; for \\(const n of ['AlertTriangleIcon','CheckCircle2Icon','ImageIcon','Loader2Icon']\\) console.log\\(n, L[n]?'ok':'MISSING'\\);\")",
       "Bash(sed -n '/# Phase 7/,$p' .env.vercel)",
-      "Bash(sed -n '/# Phase 7/,$p' .env.trigger.dev)"
+      "Bash(sed -n '/# Phase 7/,$p' .env.trigger.dev)",
+      "PowerShell(npx tsc --noEmit)",
+      "PowerShell(if \\($?\\) { \"TSC_OK\" })",
+      "PowerShell(npx vitest run lib/subtitles/subtitle-segment-groups.test.ts 2>&1)",
+      "PowerShell(npx eslint components/subtitles/SubtitleSegmentList.tsx components/subtitles/SubtitleSceneGroup.tsx lib/subtitles/subtitle-segment-groups.ts lib/subtitles/subtitle-segment-groups.test.ts)",
+      "PowerShell(if \\($?\\) { \"ESLINT_OK\" })",
+      "PowerShell(npx prettier --write components/subtitles/SubtitleSegmentList.tsx components/subtitles/SubtitleSceneGroup.tsx lib/subtitles/subtitle-segment-groups.ts lib/subtitles/subtitle-segment-groups.test.ts)",
+      "PowerShell(npm run build 2>&1 | Select-Object -Last 25; \"BUILD_EXIT=$LASTEXITCODE\")"
     ]
   }
 }
