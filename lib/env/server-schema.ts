@@ -378,6 +378,16 @@ export const renderEnvironmentSchema = z.object({
     .int()
     .positive()
     .default(5000),
+  // Lifetime of the signed asset URLs handed to the in-browser preview player.
+  // A full-length preview can play for many minutes and be replayed, so these
+  // must outlive the whole session; the download/render paths keep their own
+  // short-lived URLs. Signed in the web runtime, so this is a Vercel-side value.
+  VIDEO_PREVIEW_URL_EXPIRY_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(900)
+    .max(3600)
+    .default(3600),
   // Worker-only rendering controls. They carry defaults so the web runtime,
   // which never renders, still parses cleanly without them configured.
   VIDEO_RENDER_CONCURRENCY: z.coerce.number().int().min(1).max(4).default(1),
@@ -388,7 +398,12 @@ export const renderEnvironmentSchema = z.object({
     .max(7200)
     .default(1800),
   VIDEO_RENDER_CRF: z.coerce.number().int().min(1).max(51).default(18),
-  VIDEO_RENDER_JPEG_QUALITY: z.coerce.number().int().min(1).max(100).default(80),
+  VIDEO_RENDER_JPEG_QUALITY: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .default(80),
   REMOTION_CHROMIUM_EXECUTABLE: z.string().min(1).optional(),
   VIDEO_WATERMARK_ENABLED: z
     .enum(["true", "false"])

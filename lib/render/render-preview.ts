@@ -43,7 +43,13 @@ export async function loadRenderPreview(input: {
     scene.image.objectKey,
     scene.audio.objectKey,
   ]);
-  const assetUrls = await createRenderAssetDownloadUrls(objectKeys);
+  // Sign for the whole preview session: a full-length preview can play and be
+  // replayed for minutes, and the rolling preloader fetches later scenes on
+  // demand, so a short-lived URL would expire mid-session and stall playback.
+  const assetUrls = await createRenderAssetDownloadUrls(
+    objectKeys,
+    environment.VIDEO_PREVIEW_URL_EXPIRY_SECONDS,
+  );
 
   const compositionInput = parseVideoCompositionInput(
     buildVideoCompositionInput({

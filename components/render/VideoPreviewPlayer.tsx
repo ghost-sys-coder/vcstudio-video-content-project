@@ -1,13 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Player } from "@remotion/player";
 import { Loader2Icon } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  VideoComposition,
-  type VideoCompositionProps,
-} from "@/remotion/VideoComposition";
+import { PreviewStage } from "@/components/render/PreviewStage";
+import type { VideoCompositionProps } from "@/remotion/VideoComposition";
 import { videoCompositionInputSchema } from "@/lib/render/render-composition-input";
 
 type PreviewState =
@@ -17,10 +13,11 @@ type PreviewState =
   | { status: "error" };
 
 /**
- * Live in-browser Remotion preview. It fetches the same composition props the
- * render uses (with signed asset URLs) and plays them through the Remotion
- * Player. Rendering is deferred to the client because the Player is not
- * server-renderable.
+ * Live in-browser Remotion preview. It fetches the composition props the render
+ * uses (with long-lived signed asset URLs) and, once ready, hands them to
+ * {@link PreviewStage}, which owns the Player, the rolling asset preloader, and
+ * playback gating. Rendering is deferred to the client because the Player is
+ * not server-renderable.
  */
 export function VideoPreviewPlayer({
   projectId,
@@ -30,7 +27,6 @@ export function VideoPreviewPlayer({
   refreshToken: number;
 }) {
   const [state, setState] = useState<PreviewState>({ status: "loading" });
-  const [showSafeAreaGuides, setShowSafeAreaGuides] = useState(false);
 
   const fetchPreview = useCallback(async (): Promise<PreviewState> => {
     try {
@@ -111,31 +107,12 @@ export function VideoPreviewPlayer({
       </div>
     );
 
-  return (
-    <div className="space-y-2">
-      <div className="overflow-hidden rounded-xl border bg-black">
-        <Player
-          component={VideoComposition}
-          compositionHeight={state.props.height}
-          compositionWidth={state.props.width}
-          controls
-          durationInFrames={state.props.durationInFrames}
-          fps={state.props.framesPerSecond}
-          inputProps={{ ...state.props, showSafeAreaGuides }}
-          loop
-          style={{ width: "100%" }}
-        />
-      </div>
-      <div className="flex justify-end">
-        <Button
-          onClick={() => setShowSafeAreaGuides((value) => !value)}
-          size="sm"
-          type="button"
-          variant="ghost"
-        >
-          {showSafeAreaGuides ? "Hide safe area" : "Show safe area"}
-        </Button>
-      </div>
-    </div>
-  );
+  // Key the stage on the preview identity (scene set + freshly signed first
+  // asset) so a refreshed preview remounts, re-gating playback and re-priming
+  // the preloader from scratch.
+  const previewKey = `${state.props.scenes.length}:${state.props.durationInFrames}:${
+    state.props.scenes[0]?.sceneId ?? ""
+  }:${state.props.scenes[0]?.imageUrl ?? ""}`;
+
+  return <PreviewStage key={previewKey} props={state.props} />;
 }

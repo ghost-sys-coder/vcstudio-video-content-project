@@ -37,7 +37,7 @@ export function VideoScene({
           motion={scene.cameraMotion}
           durationInFrames={visibleDurationFrames}
         >
-          <SceneImage src={scene.imageUrl} />
+          <SceneImage src={scene.imageUrl} sceneId={scene.sceneId} />
         </CameraMotion>
       </SceneTransition>
 

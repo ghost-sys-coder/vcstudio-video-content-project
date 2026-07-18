@@ -1,9 +1,17 @@
-import { AbsoluteFill, Sequence } from "remotion";
+import { AbsoluteFill, Sequence, useVideoConfig } from "remotion";
 import { SafeAreaGuides } from "@/remotion/SafeAreaGuides";
 import { VideoBackground } from "@/remotion/VideoBackground";
 import { VideoScene } from "@/remotion/VideoScene";
 import { Watermark } from "@/remotion/Watermark";
 import type { VideoCompositionInput } from "@/lib/render/video-composition-data";
+
+/**
+ * How far ahead of its start each scene is premounted. This mounts (and starts
+ * loading/decoding) the incoming scene before its fade begins, so both the
+ * outgoing and incoming scenes exist during the transition overlap and the cut
+ * never lands on an undecoded still.
+ */
+const PREMOUNT_SECONDS = 1.5;
 
 /**
  * `showSafeAreaGuides` is a preview-only flag; it is never set on the validated
@@ -27,6 +35,9 @@ export function VideoComposition({
   captionStyle,
   showSafeAreaGuides = false,
 }: VideoCompositionProps) {
+  const { fps } = useVideoConfig();
+  const premountFrames = Math.round(fps * PREMOUNT_SECONDS);
+
   return (
     <AbsoluteFill>
       <VideoBackground />
@@ -46,6 +57,7 @@ export function VideoComposition({
             key={scene.sceneId}
             from={scene.startFrame}
             durationInFrames={visibleDurationFrames}
+            premountFor={index === 0 ? 0 : premountFrames}
             name={`Scene ${scene.sceneNumber}`}
           >
             <VideoScene

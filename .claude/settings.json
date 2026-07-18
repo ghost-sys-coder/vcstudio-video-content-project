@@ -38,7 +38,13 @@
       "PowerShell(npx prettier --write README.md 2>&1)",
       "PowerShell(\"---FULL PRETTIER CHECK ON NEW---\")",
       "PowerShell(npx eslint 2>&1)",
-      "PowerShell(npx prettier --check . 2>&1)"
+      "PowerShell(npx prettier --check . 2>&1)",
+      "Bash(node -e \"const r=require\\('remotion'\\); console.log\\('prefetch:', typeof r.prefetch\\); console.log\\('useBufferState:', typeof r.useBufferState\\); console.log\\('cancelRender:', typeof r.cancelRender\\); console.log\\('Img:', typeof r.Img\\); console.log\\('version:', require\\('remotion/package.json'\\).version\\);\")",
+      "Bash(node -e \"const p=require\\('@remotion/player'\\); console.log\\('player keys:', Object.keys\\(p\\)\\);\")",
+      "Bash(xargs grep -lE \"pauseWhenBuffering\")",
+      "Bash(xargs grep -l \"export declare const prefetch\\\\|prefetch:\")",
+      "Bash(xargs grep -A20 \"prefetch\")",
+      "Bash(xargs sed -n '1,40p')"
     ]
   }
 }

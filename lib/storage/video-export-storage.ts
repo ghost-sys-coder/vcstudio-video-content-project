@@ -112,15 +112,22 @@ export async function createVideoExportDownloadUrl(
 }
 
 /**
- * Signs short-lived download URLs for the scene assets the renderer must fetch.
- * Keys are grouped by asset so the composition-input builder can resolve each
- * scene's image and audio independently.
+ * Signs download URLs for the scene assets a consumer must fetch. Keys are
+ * grouped by asset so the composition-input builder can resolve each scene's
+ * image and audio independently.
+ *
+ * `expiresInSeconds` overrides the default download lifetime. The render worker
+ * and export download keep the short default, but the in-browser preview passes
+ * a long lifetime so a multi-minute session never fetches an expired URL.
  */
 export async function createRenderAssetDownloadUrls(
   objectKeys: readonly string[],
+  expiresInSeconds?: number,
 ): Promise<Record<string, string>> {
   const environment = getStorageEnvironment();
   const client = getR2Client();
+  const expiresIn =
+    expiresInSeconds ?? environment.R2_SIGNED_DOWNLOAD_EXPIRY_SECONDS;
   const unique = [...new Set(objectKeys)];
   const entries = await Promise.all(
     unique.map(async (objectKey) => {
@@ -130,7 +137,7 @@ export async function createRenderAssetDownloadUrls(
           Bucket: environment.R2_BUCKET_NAME,
           Key: objectKey,
         }),
-        { expiresIn: environment.R2_SIGNED_DOWNLOAD_EXPIRY_SECONDS },
+        { expiresIn },
       );
       return [objectKey, url] as const;
     }),
