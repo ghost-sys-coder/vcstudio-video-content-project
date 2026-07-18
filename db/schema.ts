@@ -17,6 +17,7 @@ import type {
   CaptionStyleData,
   SubtitleSegmentTextOverrides,
 } from "@/lib/subtitles/caption-style-data";
+import type { RenderTimelineSnapshot } from "@/lib/render/render-timeline-snapshot";
 
 export const workspaceRoleEnum = pgEnum("workspace_role", [
   "owner",
@@ -172,6 +173,15 @@ export const subtitleGranularityEnum = pgEnum("subtitle_granularity", [
   "sentence",
 ]);
 
+export const renderStatusEnum = pgEnum("render_status", [
+  "pending",
+  "queued",
+  "running",
+  "succeeded",
+  "failed",
+  "cancelled",
+]);
+
 export const providerRequestStatusEnum = pgEnum("provider_request_status", [
   "pending",
   "running",
@@ -183,6 +193,7 @@ export const usageOperationTypeEnum = pgEnum("usage_operation_type", [
   "scene_analysis",
   "scene_image_generation",
   "scene_audio_generation",
+  "video_render",
 ]);
 
 export const usageEventTypeEnum = pgEnum("usage_event_type", [
@@ -1483,6 +1494,117 @@ export const sceneAudioGenerations = pgTable(
   ],
 );
 
+export const videoRenders = pgTable(
+  "video_renders",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").notNull(),
+    requestNonce: uuid("request_nonce").notNull(),
+    status: renderStatusEnum("status").notNull().default("pending"),
+    triggerRunId: text("trigger_run_id"),
+    idempotencyKey: text("idempotency_key").notNull(),
+    requestFingerprint: text("request_fingerprint").notNull(),
+    preset: text("preset").notNull(),
+    aspectRatio: projectAspectRatioEnum("aspect_ratio").notNull(),
+    width: integer("width").notNull(),
+    height: integer("height").notNull(),
+    framesPerSecond: integer("frames_per_second").notNull(),
+    includeCaptions: boolean("include_captions").notNull().default(true),
+    includeWatermark: boolean("include_watermark").notNull().default(false),
+    sceneCount: integer("scene_count").notNull(),
+    captionCount: integer("caption_count").notNull().default(0),
+    durationMilliseconds: integer("duration_milliseconds").notNull(),
+    totalFrames: integer("total_frames").notNull(),
+    timelineSnapshot: jsonb("timeline_snapshot")
+      .$type<RenderTimelineSnapshot>()
+      .notNull(),
+    estimatedCostCents: integer("estimated_cost_cents").notNull(),
+    actualCostCents: integer("actual_cost_cents"),
+    progressPercent: integer("progress_percent").notNull().default(0),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    providerRequestId: text("provider_request_id"),
+    assetObjectKey: text("asset_object_key"),
+    assetContentType: text("asset_content_type"),
+    assetSizeBytes: integer("asset_size_bytes"),
+    assetEtag: text("asset_etag"),
+    outputDurationMilliseconds: integer("output_duration_milliseconds"),
+    errorCategory: text("error_category"),
+    safeErrorMessage: text("safe_error_message"),
+    requestedByUserId: uuid("requested_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("video_renders_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    uniqueIndex("video_renders_id_project_workspace_unique").on(
+      table.id,
+      table.projectId,
+      table.workspaceId,
+    ),
+    uniqueIndex("video_renders_idempotency_unique").on(table.idempotencyKey),
+    uniqueIndex("video_renders_workspace_request_nonce_unique").on(
+      table.workspaceId,
+      table.requestNonce,
+    ),
+    index("video_renders_workspace_project_index").on(
+      table.workspaceId,
+      table.projectId,
+      table.createdAt,
+    ),
+    index("video_renders_status_index").on(
+      table.workspaceId,
+      table.status,
+      table.updatedAt,
+    ),
+    check("video_renders_width_positive", sql`${table.width} > 0`),
+    check("video_renders_height_positive", sql`${table.height} > 0`),
+    check(
+      "video_renders_fps_valid",
+      sql`${table.framesPerSecond} between 1 and 120`,
+    ),
+    check("video_renders_scene_count_positive", sql`${table.sceneCount} > 0`),
+    check(
+      "video_renders_caption_count_nonnegative",
+      sql`${table.captionCount} >= 0`,
+    ),
+    check(
+      "video_renders_duration_positive",
+      sql`${table.durationMilliseconds} > 0 and ${table.totalFrames} > 0`,
+    ),
+    check(
+      "video_renders_cost_nonnegative",
+      sql`${table.estimatedCostCents} >= 0 and (${table.actualCostCents} is null or ${table.actualCostCents} >= 0)`,
+    ),
+    check(
+      "video_renders_progress_range",
+      sql`${table.progressPercent} between 0 and 100`,
+    ),
+    check(
+      "video_renders_output_duration_nonnegative",
+      sql`${table.outputDurationMilliseconds} is null or ${table.outputDurationMilliseconds} >= 0`,
+    ),
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [projects.id, projects.workspaceId],
+      name: "video_renders_tenant_project_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
 export const usageReservations = pgTable(
   "usage_reservations",
   {
@@ -1502,6 +1624,7 @@ export const usageReservations = pgTable(
     ),
     imageGenerationId: uuid("image_generation_id"),
     audioGenerationId: uuid("audio_generation_id"),
+    videoRenderId: uuid("video_render_id"),
     status: usageReservationStatusEnum("status").notNull().default("pending"),
     reservedCostCents: integer("reserved_cost_cents").notNull(),
     actualCostCents: integer("actual_cost_cents"),
@@ -1529,6 +1652,9 @@ export const usageReservations = pgTable(
     uniqueIndex("usage_reservations_audio_generation_unique")
       .on(table.audioGenerationId)
       .where(sql`${table.audioGenerationId} is not null`),
+    uniqueIndex("usage_reservations_video_render_unique")
+      .on(table.videoRenderId)
+      .where(sql`${table.videoRenderId} is not null`),
     index("usage_reservations_workspace_project_status_index").on(
       table.workspaceId,
       table.projectId,
@@ -1544,7 +1670,7 @@ export const usageReservations = pgTable(
     ),
     check(
       "usage_reservations_single_operation",
-      sql`(${table.operationType}::text = 'scene_analysis' and ${table.analysisRunId} is not null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null) or (${table.operationType}::text = 'scene_image_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is not null and ${table.audioGenerationId} is null) or (${table.operationType}::text = 'scene_audio_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is not null)`,
+      sql`(${table.operationType}::text = 'scene_analysis' and ${table.analysisRunId} is not null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null) or (${table.operationType}::text = 'scene_image_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is not null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null) or (${table.operationType}::text = 'scene_audio_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is not null and ${table.videoRenderId} is null) or (${table.operationType}::text = 'video_render' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is not null)`,
     ),
     foreignKey({
       columns: [table.imageGenerationId, table.projectId, table.workspaceId],
@@ -1563,6 +1689,15 @@ export const usageReservations = pgTable(
         sceneAudioGenerations.workspaceId,
       ],
       name: "usage_reservations_tenant_audio_generation_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.videoRenderId, table.projectId, table.workspaceId],
+      foreignColumns: [
+        videoRenders.id,
+        videoRenders.projectId,
+        videoRenders.workspaceId,
+      ],
+      name: "usage_reservations_tenant_video_render_fkey",
     }).onDelete("cascade"),
   ],
 );
@@ -1736,3 +1871,5 @@ export type ProjectSubtitleSettings =
   typeof projectSubtitleSettings.$inferSelect;
 export type SubtitleGranularityValue =
   (typeof subtitleGranularityEnum.enumValues)[number];
+export type VideoRender = typeof videoRenders.$inferSelect;
+export type RenderStatus = (typeof renderStatusEnum.enumValues)[number];

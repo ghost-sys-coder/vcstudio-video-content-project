@@ -97,6 +97,33 @@ export function createSceneAudioIdempotencyKey(input: {
   ]);
 }
 
+export function createVideoRenderIdempotencyKey(input: {
+  secret: string;
+  workspaceId: string;
+  projectId: string;
+  preset: string;
+  width: number;
+  height: number;
+  framesPerSecond: number;
+  includeCaptions: boolean;
+  includeWatermark: boolean;
+  /** Hash of the frozen timeline snapshot (assets, timing, captions). */
+  timelineFingerprint: string;
+}): string {
+  return hash(input.secret, [
+    input.workspaceId,
+    input.projectId,
+    "video-render",
+    input.preset,
+    String(input.width),
+    String(input.height),
+    String(input.framesPerSecond),
+    input.includeCaptions ? "captions" : "no-captions",
+    input.includeWatermark ? "watermark" : "no-watermark",
+    input.timelineFingerprint,
+  ]);
+}
+
 export function createRequestFingerprint(
   secret: string,
   prompt: string,

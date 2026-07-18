@@ -40,4 +40,13 @@ describe("workspace policy", () => {
     expect(can("owner", "generateSceneImages")).toBe(true);
     expect(can("owner", "reviewSceneImages")).toBe(true);
   });
+
+  it("gates video rendering to owners and editors only", () => {
+    expect(can("owner", "renderVideo")).toBe(true);
+    expect(can("editor", "renderVideo")).toBe(true);
+    expect(can("viewer", "renderVideo")).toBe(false);
+    expect(() => requireCapability("viewer", "renderVideo")).toThrow(
+      WorkspacePermissionDeniedError,
+    );
+  });
 });

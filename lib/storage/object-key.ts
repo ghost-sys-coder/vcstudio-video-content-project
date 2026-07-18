@@ -47,6 +47,26 @@ export function isWorkspaceLogoObjectKey(input: {
   return input.objectKey.startsWith(prefix) && !input.objectKey.includes("..");
 }
 
+export function createVideoExportObjectKey(input: {
+  workspaceId: string;
+  projectId: string;
+  renderId: string;
+}): string {
+  return `workspaces/${input.workspaceId}/projects/${input.projectId}/renders/${input.renderId}.mp4`;
+}
+
+export function isVideoExportObjectKey(input: {
+  workspaceId: string;
+  projectId: string;
+  renderId: string;
+  objectKey: string;
+}): boolean {
+  return (
+    input.objectKey === createVideoExportObjectKey(input) &&
+    !input.objectKey.includes("..")
+  );
+}
+
 export function createSceneImageObjectKey(input: {
   workspaceId: string;
   projectId: string;

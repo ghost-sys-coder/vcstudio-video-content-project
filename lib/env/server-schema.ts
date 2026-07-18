@@ -341,6 +341,66 @@ export const subtitleEnvironmentSchema = z.object({
     .transform((value) => value === "true"),
 });
 
+export const renderEnvironmentSchema = z.object({
+  TRIGGER_SECRET_KEY: z.string().min(1, "TRIGGER_SECRET_KEY is required"),
+  TRIGGER_PROJECT_REF: z.string().min(1, "TRIGGER_PROJECT_REF is required"),
+  IDEMPOTENCY_HASH_SECRET: z.string().min(32),
+  REQUEST_FINGERPRINT_SECRET: z.string().min(32),
+  // Cost model for compute-time rendering. There is no per-render provider
+  // invoice, so the estimate is derived from output duration at a configured
+  // per-minute rate and reconciled to the same figure once the render lands.
+  VIDEO_RENDER_COST_PER_MINUTE_CENTS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(30),
+  VIDEO_RENDER_MINIMUM_ESTIMATE_CENTS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(5),
+  MAX_RENDER_DURATION_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(7200)
+    .default(900),
+  MAX_RENDER_ATTEMPTS: z.coerce.number().int().min(0).max(3).default(2),
+  VIDEO_RENDER_RESERVATION_EXPIRY_MINUTES: z.coerce
+    .number()
+    .int()
+    .min(5)
+    .max(1440)
+    .default(60),
+  DEFAULT_DAILY_BUDGET_CENTS: z.coerce.number().int().positive().default(500),
+  DEFAULT_MONTHLY_BUDGET_CENTS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(5000),
+  // Worker-only rendering controls. They carry defaults so the web runtime,
+  // which never renders, still parses cleanly without them configured.
+  VIDEO_RENDER_CONCURRENCY: z.coerce.number().int().min(1).max(4).default(1),
+  VIDEO_RENDER_TIMEOUT_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(30)
+    .max(7200)
+    .default(1800),
+  VIDEO_RENDER_CRF: z.coerce.number().int().min(1).max(51).default(18),
+  VIDEO_RENDER_JPEG_QUALITY: z.coerce.number().int().min(1).max(100).default(80),
+  REMOTION_CHROMIUM_EXECUTABLE: z.string().min(1).optional(),
+  VIDEO_WATERMARK_ENABLED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
+  VIDEO_WATERMARK_TEXT: z.string().default(""),
+  ENABLE_VIDEO_RENDERING: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((value) => value === "true"),
+});
+
 export type ServerEnvironment = z.infer<typeof serverEnvironmentSchema>;
 export type DatabaseEnvironment = z.infer<typeof databaseEnvironmentSchema>;
 export type ClerkWebhookEnvironment = z.infer<
@@ -355,6 +415,7 @@ export type SceneAnalysisEnvironment = z.infer<
 export type SceneImageEnvironment = z.infer<typeof sceneImageEnvironmentSchema>;
 export type SceneAudioEnvironment = z.infer<typeof sceneAudioEnvironmentSchema>;
 export type SubtitleEnvironment = z.infer<typeof subtitleEnvironmentSchema>;
+export type RenderEnvironment = z.infer<typeof renderEnvironmentSchema>;
 
 export function parseServerEnvironment(
   environment: Record<string, string | undefined>,

@@ -19,7 +19,26 @@
       "PowerShell(npx eslint components/subtitles/SubtitleSegmentList.tsx components/subtitles/SubtitleSceneGroup.tsx lib/subtitles/subtitle-segment-groups.ts lib/subtitles/subtitle-segment-groups.test.ts)",
       "PowerShell(if \\($?\\) { \"ESLINT_OK\" })",
       "PowerShell(npx prettier --write components/subtitles/SubtitleSegmentList.tsx components/subtitles/SubtitleSceneGroup.tsx lib/subtitles/subtitle-segment-groups.ts lib/subtitles/subtitle-segment-groups.test.ts)",
-      "PowerShell(npm run build 2>&1 | Select-Object -Last 25; \"BUILD_EXIT=$LASTEXITCODE\")"
+      "PowerShell(npm run build 2>&1 | Select-Object -Last 25; \"BUILD_EXIT=$LASTEXITCODE\")",
+      "PowerShell(npm view remotion version)",
+      "PowerShell(npm view remotion peerDependencies --json)",
+      "PowerShell(npm install remotion@4.0.491 @remotion/bundler@4.0.491 @remotion/renderer@4.0.491 @remotion/player@4.0.491 --save-exact 2>&1 | Select-Object -Last 15; \"INSTALL_EXIT=$LASTEXITCODE\")",
+      "PowerShell(npm run db:generate 2>&1)",
+      "PowerShell(npm run db:migrate 2>&1 | Select-Object -Last 15; \"MIGRATE_EXIT=$LASTEXITCODE\")",
+      "PowerShell(npx vitest run lib/render 2>&1)",
+      "PowerShell(npx tsc --noEmit 2>&1)",
+      "PowerShell(\"---TSC---\")",
+      "Bash(node -e \"const c=require\\('@trigger.dev/build/extensions/core'\\); console.log\\(Object.keys\\(c\\).sort\\(\\).join\\('\\\\n'\\)\\)\")",
+      "PowerShell(\"---TESTS---\")",
+      "PowerShell(npx vitest run 2>&1)",
+      "PowerShell(npx eslint lib/render remotion trigger/video-render.ts trigger/reconcile-video-render.ts components/render db/commands/video-render-commands.ts db/repositories/video-render.repository.ts \"app/\\(authenticated\\)/app/projects/[projectId]/render\" \"app/api/projects/[projectId]/renders\" lib/storage/video-export-storage.ts lib/format/duration.ts 2>&1)",
+      "PowerShell(npx eslint lib/render remotion trigger/video-render.ts trigger/reconcile-video-render.ts components/render db/commands/video-render-commands.ts db/repositories/video-render.repository.ts \"app/\\(authenticated\\)/app/projects/[projectId]/render\" \"app/api/projects/[projectId]/renders\" lib/storage/video-export-storage.ts lib/format/duration.ts lib/schemas/render.ts lib/schemas/render-response.ts lib/policies/workspace-policy.ts db/schema.ts lib/env/server-schema.ts lib/env/server.ts 2>&1)",
+      "PowerShell($env:RUN_DATABASE_INTEGRATION_TESTS=\"true\"; npx vitest run db/integration/video-render-postgres.integration.test.ts 2>&1 | Select-Object -Last 30; $env:RUN_DATABASE_INTEGRATION_TESTS=\"\")",
+      "PowerShell(npm run build 2>&1 | Select-Object -Last 40; \"BUILD_EXIT=$LASTEXITCODE\")",
+      "PowerShell(npx prettier --write README.md 2>&1)",
+      "PowerShell(\"---FULL PRETTIER CHECK ON NEW---\")",
+      "PowerShell(npx eslint 2>&1)",
+      "PowerShell(npx prettier --check . 2>&1)"
     ]
   }
 }

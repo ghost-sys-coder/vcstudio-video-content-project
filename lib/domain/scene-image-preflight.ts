@@ -15,7 +15,8 @@ type SceneImageReservation = {
   operationType:
     | "scene_analysis"
     | "scene_image_generation"
-    | "scene_audio_generation";
+    | "scene_audio_generation"
+    | "video_render";
   imageGenerationId: string | null;
   status: "pending" | "reconciled" | "released";
   reservedCostCents: number;

@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   createCharacterReferenceObjectKey,
   createSceneImageObjectKey,
+  createVideoExportObjectKey,
   isCharacterReferenceObjectKey,
   isSceneImageObjectKey,
+  isVideoExportObjectKey,
   createWorkspaceLogoObjectKey,
   isWorkspaceLogoObjectKey,
 } from "@/lib/storage/object-key";
@@ -67,6 +69,40 @@ describe("scene image object keys", () => {
       isSceneImageObjectKey({
         ...input,
         generationId: "00000000-0000-4000-8000-000000000098",
+        objectKey,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("video export object keys", () => {
+  const input = {
+    workspaceId,
+    projectId: "00000000-0000-4000-8000-000000000030",
+    renderId: "00000000-0000-4000-8000-000000000031",
+  };
+
+  it("creates a deterministic workspace and project scoped mp4 key", () => {
+    const objectKey = createVideoExportObjectKey(input);
+    expect(objectKey).toBe(
+      `workspaces/${workspaceId}/projects/${input.projectId}/renders/${input.renderId}.mp4`,
+    );
+    expect(isVideoExportObjectKey({ ...input, objectKey })).toBe(true);
+  });
+
+  it("rejects a key from another workspace, project, or render", () => {
+    const objectKey = createVideoExportObjectKey(input);
+    expect(
+      isVideoExportObjectKey({
+        ...input,
+        workspaceId: "00000000-0000-4000-8000-000000000099",
+        objectKey,
+      }),
+    ).toBe(false);
+    expect(
+      isVideoExportObjectKey({
+        ...input,
+        renderId: "00000000-0000-4000-8000-000000000098",
         objectKey,
       }),
     ).toBe(false);

@@ -9,6 +9,7 @@ import {
   sceneImageEnvironmentSchema,
   sceneAudioEnvironmentSchema,
   subtitleEnvironmentSchema,
+  renderEnvironmentSchema,
   characterEnvironmentSchema,
   type ClerkWebhookEnvironment,
   type DatabaseEnvironment,
@@ -18,6 +19,7 @@ import {
   type SceneImageEnvironment,
   type SceneAudioEnvironment,
   type SubtitleEnvironment,
+  type RenderEnvironment,
   type CharacterEnvironment,
 } from "@/lib/env/server-schema";
 
@@ -29,6 +31,7 @@ let sceneAnalysisEnvironment: SceneAnalysisEnvironment | null = null;
 let sceneImageEnvironment: SceneImageEnvironment | null = null;
 let sceneAudioEnvironment: SceneAudioEnvironment | null = null;
 let subtitleEnvironment: SubtitleEnvironment | null = null;
+let renderEnvironment: RenderEnvironment | null = null;
 let characterEnvironment: CharacterEnvironment | null = null;
 
 export function getDatabaseEnvironment(): DatabaseEnvironment {
@@ -71,6 +74,11 @@ export function getSceneAudioEnvironment(): SceneAudioEnvironment {
 export function getSubtitleEnvironment(): SubtitleEnvironment {
   subtitleEnvironment ??= subtitleEnvironmentSchema.parse(process.env);
   return subtitleEnvironment;
+}
+
+export function getRenderEnvironment(): RenderEnvironment {
+  renderEnvironment ??= renderEnvironmentSchema.parse(process.env);
+  return renderEnvironment;
 }
 
 export function getCharacterEnvironment(): CharacterEnvironment {

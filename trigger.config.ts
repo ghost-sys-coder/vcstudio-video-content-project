@@ -1,5 +1,29 @@
 import { defineConfig } from "@trigger.dev/sdk";
-import { ffmpeg } from "@trigger.dev/build/extensions/core";
+import {
+  additionalFiles,
+  aptGet,
+  ffmpeg,
+} from "@trigger.dev/build/extensions/core";
+
+// System libraries the headless Chromium that Remotion drives needs on the
+// Debian-based deploy image. Adjust for the current base image if the render
+// worker fails to launch a browser.
+const REMOTION_CHROMIUM_PACKAGES = [
+  "libnss3",
+  "libdbus-1-3",
+  "libatk1.0-0",
+  "libgbm-dev",
+  "libasound2",
+  "libxrandr2",
+  "libxkbcommon-dev",
+  "libxfixes3",
+  "libxcomposite1",
+  "libxdamage1",
+  "libatk-bridge2.0-0",
+  "libpango-1.0-0",
+  "libcairo2",
+  "libcups2",
+];
 
 export default defineConfig({
   project: process.env.TRIGGER_PROJECT_REF ?? "",
@@ -7,9 +31,24 @@ export default defineConfig({
   legacyDevProcessCwdBehaviour: false,
   build: {
     conditions: ["react-server"],
-    // Provisions ffmpeg/ffprobe in the deployed image so Phase 7 audio
-    // duration inspection works in production.
-    extensions: [ffmpeg()],
+    extensions: [
+      // Provisions ffmpeg/ffprobe for Phase 7 audio inspection and Phase 9
+      // video muxing.
+      ffmpeg(),
+      // Phase 9: the Remotion server renderer bundles the composition at run
+      // time, so the raw source tree must ship with the worker, and headless
+      // Chromium needs its system libraries installed.
+      additionalFiles({
+        files: [
+          "remotion/**",
+          "lib/**",
+          "db/**",
+          "tsconfig.json",
+          "next.config.ts",
+        ],
+      }),
+      aptGet({ packages: REMOTION_CHROMIUM_PACKAGES }),
+    ],
   },
   maxDuration: 300,
   retries: {
