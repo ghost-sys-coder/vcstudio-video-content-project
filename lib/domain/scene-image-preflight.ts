@@ -12,7 +12,10 @@ type SceneImageGeneration = {
 type SceneImageReservation = {
   workspaceId: string;
   projectId: string;
-  operationType: "scene_analysis" | "scene_image_generation";
+  operationType:
+    | "scene_analysis"
+    | "scene_image_generation"
+    | "scene_audio_generation";
   imageGenerationId: string | null;
   status: "pending" | "reconciled" | "released";
   reservedCostCents: number;

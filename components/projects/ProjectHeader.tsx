@@ -18,9 +18,11 @@ export function ProjectHeader({
     ? "settings"
     : pathname.endsWith("/storyboard")
       ? "storyboard"
-      : pathname.endsWith("/scenes")
-        ? "scenes"
-        : "script";
+      : pathname.endsWith("/audio")
+        ? "audio"
+        : pathname.endsWith("/scenes")
+          ? "scenes"
+          : "script";
 
   return (
     <Tabs
@@ -38,6 +40,7 @@ export function ProjectHeader({
           <TabsTrigger value="script">Script</TabsTrigger>
           <TabsTrigger value="scenes">Scenes</TabsTrigger>
           <TabsTrigger value="storyboard">Storyboard</TabsTrigger>
+          <TabsTrigger value="audio">Audio</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
       </header>

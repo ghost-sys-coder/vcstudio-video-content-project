@@ -69,6 +69,34 @@ export function createSceneImageIdempotencyKey(input: {
   ]);
 }
 
+export function createSceneAudioIdempotencyKey(input: {
+  secret: string;
+  workspaceId: string;
+  projectId: string;
+  sceneVersionId: string;
+  voicePresetId: string;
+  generationVersion: number;
+  model: string;
+  voice: string;
+  format: string;
+  speedScaledPercent: number;
+}): string {
+  if (!Number.isInteger(input.generationVersion) || input.generationVersion < 1)
+    throw new RangeError("Generation version must be a positive integer.");
+  return hash(input.secret, [
+    input.workspaceId,
+    input.projectId,
+    input.sceneVersionId,
+    "scene-audio-generation",
+    input.voicePresetId,
+    String(input.generationVersion),
+    input.model,
+    input.voice,
+    input.format,
+    String(input.speedScaledPercent),
+  ]);
+}
+
 export function createRequestFingerprint(
   secret: string,
   prompt: string,

@@ -15,6 +15,9 @@ const workspaceCapabilities = {
     manageCharacters: true,
     generateSceneImages: true,
     reviewSceneImages: true,
+    generateSceneAudio: true,
+    reviewSceneAudio: true,
+    manageVoicePresets: true,
   },
   editor: {
     editWorkspace: true,
@@ -29,6 +32,9 @@ const workspaceCapabilities = {
     manageCharacters: true,
     generateSceneImages: true,
     reviewSceneImages: true,
+    generateSceneAudio: true,
+    reviewSceneAudio: true,
+    manageVoicePresets: true,
   },
   viewer: {
     editWorkspace: false,
@@ -43,6 +49,9 @@ const workspaceCapabilities = {
     manageCharacters: false,
     generateSceneImages: false,
     reviewSceneImages: false,
+    generateSceneAudio: false,
+    reviewSceneAudio: false,
+    manageVoicePresets: false,
   },
 } as const satisfies Record<WorkspaceRole, Record<string, boolean>>;
 

@@ -139,6 +139,30 @@ export const sceneImageBatchStatusEnum = pgEnum("scene_image_batch_status", [
   "cancelled",
 ]);
 
+export const audioGenerationStatusEnum = pgEnum("audio_generation_status", [
+  "pending",
+  "queued",
+  "running",
+  "succeeded",
+  "failed",
+  "cancelled",
+]);
+
+export const audioReviewStatusEnum = pgEnum("audio_review_status", [
+  "pending",
+  "approved",
+  "rejected",
+]);
+
+export const audioOutputFormatEnum = pgEnum("audio_output_format", [
+  "mp3",
+  "opus",
+  "aac",
+  "flac",
+  "wav",
+  "pcm",
+]);
+
 export const providerRequestStatusEnum = pgEnum("provider_request_status", [
   "pending",
   "running",
@@ -149,6 +173,7 @@ export const providerRequestStatusEnum = pgEnum("provider_request_status", [
 export const usageOperationTypeEnum = pgEnum("usage_operation_type", [
   "scene_analysis",
   "scene_image_generation",
+  "scene_audio_generation",
 ]);
 
 export const usageEventTypeEnum = pgEnum("usage_event_type", [
@@ -1248,6 +1273,207 @@ export const providerRequests = pgTable(
   ],
 );
 
+export const voicePresets = pgTable(
+  "voice_presets",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    slug: text("slug").notNull(),
+    provider: text("provider").notNull().default("openai"),
+    model: text("model").notNull(),
+    voice: text("voice").notNull(),
+    instructions: text("instructions").notNull().default(""),
+    speedScaledPercent: integer("speed_scaled_percent").notNull().default(100),
+    format: audioOutputFormatEnum("format").notNull().default("mp3"),
+    sampleRate: integer("sample_rate"),
+    isDefault: boolean("is_default").notNull().default(false),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("voice_presets_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    uniqueIndex("voice_presets_workspace_slug_unique").on(
+      table.workspaceId,
+      table.slug,
+    ),
+    uniqueIndex("voice_presets_workspace_default_unique")
+      .on(table.workspaceId)
+      .where(sql`${table.isDefault} = true and ${table.archivedAt} is null`),
+    index("voice_presets_workspace_index").on(table.workspaceId, table.name),
+    check(
+      "voice_presets_speed_range",
+      sql`${table.speedScaledPercent} between 25 and 400`,
+    ),
+  ],
+);
+
+export const sceneAudioGenerations = pgTable(
+  "scene_audio_generations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").notNull(),
+    sceneId: uuid("scene_id").notNull(),
+    sceneVersionId: uuid("scene_version_id").notNull(),
+    voicePresetId: uuid("voice_preset_id").notNull(),
+    generationVersion: integer("generation_version").notNull(),
+    requestNonce: uuid("request_nonce").notNull(),
+    status: audioGenerationStatusEnum("status").notNull().default("pending"),
+    reviewStatus: audioReviewStatusEnum("review_status")
+      .notNull()
+      .default("pending"),
+    triggerRunId: text("trigger_run_id"),
+    idempotencyKey: text("idempotency_key").notNull(),
+    requestFingerprint: text("request_fingerprint").notNull(),
+    provider: text("provider").notNull(),
+    model: text("model").notNull(),
+    voice: text("voice").notNull(),
+    format: audioOutputFormatEnum("format").notNull(),
+    speedScaledPercent: integer("speed_scaled_percent").notNull(),
+    instructions: text("instructions").notNull().default(""),
+    sampleRate: integer("sample_rate"),
+    inputText: text("input_text").notNull(),
+    inputCharacterCount: integer("input_character_count").notNull(),
+    estimatedCostCents: integer("estimated_cost_cents").notNull(),
+    actualCostCents: integer("actual_cost_cents"),
+    progressPercent: integer("progress_percent").notNull().default(0),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    providerRequestId: text("provider_request_id"),
+    assetObjectKey: text("asset_object_key"),
+    assetContentType: text("asset_content_type"),
+    assetSizeBytes: integer("asset_size_bytes"),
+    assetEtag: text("asset_etag"),
+    durationMilliseconds: integer("duration_milliseconds"),
+    errorCategory: text("error_category"),
+    safeErrorMessage: text("safe_error_message"),
+    requestedByUserId: uuid("requested_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    reviewedByUserId: uuid("reviewed_by_user_id").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("scene_audio_generations_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    uniqueIndex("scene_audio_generations_id_project_workspace_unique").on(
+      table.id,
+      table.projectId,
+      table.workspaceId,
+    ),
+    uniqueIndex("scene_audio_generations_idempotency_unique").on(
+      table.idempotencyKey,
+    ),
+    uniqueIndex("scene_audio_generations_version_unique").on(
+      table.sceneVersionId,
+      table.generationVersion,
+    ),
+    uniqueIndex("scene_audio_generations_workspace_request_nonce_unique").on(
+      table.workspaceId,
+      table.requestNonce,
+    ),
+    uniqueIndex("scene_audio_generations_approved_scene_version_unique")
+      .on(table.sceneVersionId)
+      .where(sql`${table.reviewStatus} = 'approved'`),
+    index("scene_audio_generations_workspace_project_scene_index").on(
+      table.workspaceId,
+      table.projectId,
+      table.sceneId,
+      table.createdAt,
+    ),
+    index("scene_audio_generations_status_index").on(
+      table.workspaceId,
+      table.status,
+      table.updatedAt,
+    ),
+    check(
+      "scene_audio_generations_version_positive",
+      sql`${table.generationVersion} > 0`,
+    ),
+    check(
+      "scene_audio_generations_cost_nonnegative",
+      sql`${table.estimatedCostCents} >= 0 and (${table.actualCostCents} is null or ${table.actualCostCents} >= 0)`,
+    ),
+    check(
+      "scene_audio_generations_progress_range",
+      sql`${table.progressPercent} between 0 and 100`,
+    ),
+    check(
+      "scene_audio_generations_speed_range",
+      sql`${table.speedScaledPercent} between 25 and 400`,
+    ),
+    check(
+      "scene_audio_generations_duration_nonnegative",
+      sql`${table.durationMilliseconds} is null or ${table.durationMilliseconds} >= 0`,
+    ),
+    check(
+      "scene_audio_generations_input_characters_positive",
+      sql`${table.inputCharacterCount} > 0`,
+    ),
+    check(
+      "scene_audio_generations_approved_succeeded",
+      sql`${table.reviewStatus} <> 'approved' or ${table.status} = 'succeeded'`,
+    ),
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [projects.id, projects.workspaceId],
+      name: "scene_audio_generations_tenant_project_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.sceneId, table.projectId, table.workspaceId],
+      foreignColumns: [scenes.id, scenes.projectId, scenes.workspaceId],
+      name: "scene_audio_generations_tenant_scene_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [
+        table.sceneVersionId,
+        table.sceneId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        sceneVersions.id,
+        sceneVersions.sceneId,
+        sceneVersions.projectId,
+        sceneVersions.workspaceId,
+      ],
+      name: "scene_audio_generations_tenant_version_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.voicePresetId, table.workspaceId],
+      foreignColumns: [voicePresets.id, voicePresets.workspaceId],
+      name: "scene_audio_generations_tenant_voice_fkey",
+    }).onDelete("restrict"),
+  ],
+);
+
 export const usageReservations = pgTable(
   "usage_reservations",
   {
@@ -1266,6 +1492,7 @@ export const usageReservations = pgTable(
       { onDelete: "cascade" },
     ),
     imageGenerationId: uuid("image_generation_id"),
+    audioGenerationId: uuid("audio_generation_id"),
     status: usageReservationStatusEnum("status").notNull().default("pending"),
     reservedCostCents: integer("reserved_cost_cents").notNull(),
     actualCostCents: integer("actual_cost_cents"),
@@ -1290,6 +1517,9 @@ export const usageReservations = pgTable(
     uniqueIndex("usage_reservations_image_generation_unique")
       .on(table.imageGenerationId)
       .where(sql`${table.imageGenerationId} is not null`),
+    uniqueIndex("usage_reservations_audio_generation_unique")
+      .on(table.audioGenerationId)
+      .where(sql`${table.audioGenerationId} is not null`),
     index("usage_reservations_workspace_project_status_index").on(
       table.workspaceId,
       table.projectId,
@@ -1305,7 +1535,7 @@ export const usageReservations = pgTable(
     ),
     check(
       "usage_reservations_single_operation",
-      sql`(${table.operationType} = 'scene_analysis' and ${table.analysisRunId} is not null and ${table.imageGenerationId} is null) or (${table.operationType} = 'scene_image_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is not null)`,
+      sql`(${table.operationType}::text = 'scene_analysis' and ${table.analysisRunId} is not null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null) or (${table.operationType}::text = 'scene_image_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is not null and ${table.audioGenerationId} is null) or (${table.operationType}::text = 'scene_audio_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is not null)`,
     ),
     foreignKey({
       columns: [table.imageGenerationId, table.projectId, table.workspaceId],
@@ -1315,6 +1545,15 @@ export const usageReservations = pgTable(
         sceneImageGenerations.workspaceId,
       ],
       name: "usage_reservations_tenant_generation_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.audioGenerationId, table.projectId, table.workspaceId],
+      foreignColumns: [
+        sceneAudioGenerations.id,
+        sceneAudioGenerations.projectId,
+        sceneAudioGenerations.workspaceId,
+      ],
+      name: "usage_reservations_tenant_audio_generation_fkey",
     }).onDelete("cascade"),
   ],
 );
@@ -1427,6 +1666,14 @@ export type SceneImageGeneration = typeof sceneImageGenerations.$inferSelect;
 export type SceneImageBatch = typeof sceneImageBatches.$inferSelect;
 export type SceneImageBatchStatus =
   (typeof sceneImageBatchStatusEnum.enumValues)[number];
+export type VoicePreset = typeof voicePresets.$inferSelect;
+export type SceneAudioGeneration = typeof sceneAudioGenerations.$inferSelect;
+export type AudioGenerationStatus =
+  (typeof audioGenerationStatusEnum.enumValues)[number];
+export type AudioReviewStatus =
+  (typeof audioReviewStatusEnum.enumValues)[number];
+export type AudioOutputFormat =
+  (typeof audioOutputFormatEnum.enumValues)[number];
 export type ImageGenerationStatus =
   (typeof imageGenerationStatusEnum.enumValues)[number];
 export type ImageReviewStatus =
