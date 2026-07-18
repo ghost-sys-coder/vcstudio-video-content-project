@@ -26,6 +26,7 @@ This repository is the foundation for an internal production tool that converts 
 - Draft (`low`), final (`medium`), and explicit high-quality image modes using only the supported landscape, portrait, and square OpenAI sizes; Remotion will crop or fit these assets to final video dimensions in a later phase.
 - Storyboard grid with controlled bulk image generation: per-scene selection and status filtering, a confirmation dialog showing scene count, estimated cost, and remaining budget, a live batch-progress panel (queued/running/succeeded/failed/cancelled with actual cost), per-scene regenerate/retry, bulk and per-scene approval, and cancellation of not-yet-billed queued generations.
 - Per-scene narration audio (OpenAI text-to-speech) with workspace voice presets, single and bulk generation, cost confirmation and budget enforcement, audio playback and review/approval, FFprobe-measured durations, and a deterministic project timeline (ordered scenes, configured padding, millisecond and frame boundaries without cumulative drift).
+- Deterministic subtitles and a typed video timeline contract: captions are derived from each scene's approved narration audio (scene- or sentence-level segments, timing distributed across the measured audio duration by character proportion — never fabricated word timestamps), with editable per-cue text overrides, a configurable caption style (font, size, colors, position, safe margin, casing) and live preview, SRT and WebVTT export, Remotion caption input, and a `VideoTimeline` builder that assembles approved image + audio + captions + camera motion + transition per scene, rejects construction when any approved asset is missing, and returns an actionable per-scene validation report.
 
 ## Architecture
 
@@ -49,6 +50,8 @@ lib/env/             Environment validation
 lib/policies/        Central workspace authorization rules
 lib/schemas/         External input validation
 lib/openai/          Narrow server-only OpenAI provider implementation
+lib/subtitles/       Pure subtitle segmentation, track assembly, and SRT/WebVTT/Remotion serializers
+lib/timeline/        Deterministic scene and video timeline builders
 packages/prompts/    Versioned `@studio/prompts` workspace package
 lib/costs/           Provider estimation and reconciliation calculations
 migrations/          Generated immutable SQL migrations
@@ -66,85 +69,90 @@ docs/                Bootstrap and phase specifications
 
 ## Environment variables
 
-| Variable                                          | Visibility  | Required    | Purpose                                                            |
-| ------------------------------------------------- | ----------- | ----------- | ------------------------------------------------------------------ |
-| `APP_NAME`                                        | Server only | Yes         | Human-readable application name (`VCStudio`).                      |
-| `NEXT_PUBLIC_APP_URL`                             | Browser     | Yes         | Canonical web application URL.                                     |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`               | Browser     | Yes         | Identifies the Clerk application.                                  |
-| `CLERK_SECRET_KEY`                                | Server only | Yes         | Authenticates server-side Clerk operations.                        |
-| `CLERK_WEBHOOK_SIGNING_SECRET`                    | Server only | Yes         | Verifies Clerk webhook signatures.                                 |
-| `NEXT_PUBLIC_CLERK_SIGN_IN_URL`                   | Browser     | Yes         | Clerk sign-in route.                                               |
-| `NEXT_PUBLIC_CLERK_SIGN_UP_URL`                   | Browser     | Yes         | Clerk sign-up route.                                               |
-| `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL` | Browser     | Yes         | Post-sign-in destination.                                          |
-| `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL` | Browser     | Yes         | Post-sign-up destination.                                          |
-| `DATABASE_URL`                                    | Server only | Yes         | Pooled Neon URL used by application requests.                      |
-| `DATABASE_URL_UNPOOLED`                           | Server only | Recommended | Direct Neon URL preferred by migration commands.                   |
-| `RUN_DATABASE_INTEGRATION_TESTS`                  | Test only   | No          | Enables mutating integration tests against development Neon only.  |
-| `NODE_ENV`                                        | Server only | Automatic   | Runtime mode; defaults to `development`.                           |
-| `R2_ACCOUNT_ID`                                   | Server only | Yes         | Cloudflare account owning the R2 bucket.                           |
-| `R2_ACCESS_KEY_ID`                                | Server only | Yes         | R2 S3 API access key.                                              |
-| `R2_SECRET_ACCESS_KEY`                            | Server only | Yes         | R2 S3 API secret key.                                              |
-| `R2_BUCKET_NAME`                                  | Server only | Yes         | Private media bucket name.                                         |
-| `R2_ENDPOINT`                                     | Server only | Yes         | Account-specific R2 S3 endpoint.                                   |
-| `R2_REGION`                                       | Server only | Yes         | R2 region (`auto`).                                                |
-| `R2_SIGNED_UPLOAD_EXPIRY_SECONDS`                 | Server only | Yes         | Upload URL lifetime, 60–900 seconds.                               |
-| `R2_SIGNED_DOWNLOAD_EXPIRY_SECONDS`               | Server only | Yes         | Download URL lifetime, 60–3600 seconds.                            |
-| `MAX_CHARACTER_REFERENCE_SIZE_BYTES`              | Server only | Yes         | Maximum character reference size (`5242880`).                      |
-| `ALLOWED_IMAGE_MIME_TYPES`                        | Server only | Yes         | Allowed character image MIME types.                                |
-| `MIN_REFERENCE_IMAGE_WIDTH`                       | Server only | Yes         | Minimum character reference width (`512`).                         |
-| `MIN_REFERENCE_IMAGE_HEIGHT`                      | Server only | Yes         | Minimum character reference height (`512`).                        |
-| `MAX_REFERENCE_IMAGE_WIDTH`                       | Server only | Yes         | Maximum character reference width (`4096`).                        |
-| `MAX_REFERENCE_IMAGE_HEIGHT`                      | Server only | Yes         | Maximum character reference height (`4096`).                       |
-| `ENABLE_CHARACTER_LIBRARY`                        | Server only | Yes         | Enables the Phase 4 character library.                             |
-| `MAX_SCRIPT_CHARACTERS`                           | Server only | Yes         | Maximum narration script length (`50000`).                         |
-| `DEFAULT_PROJECT_BUDGET_CENTS`                    | Server only | Yes         | New-project budget ceiling default (`200`).                        |
-| `OPENAI_API_KEY`                                  | Server only | Yes         | Authenticates OpenAI Responses API calls.                          |
-| `OPENAI_TEXT_MODEL`                               | Server only | Yes         | Configurable structured scene-analysis model.                      |
-| `OPENAI_TEXT_INPUT_COST_PER_MILLION_CENTS`        | Server only | Yes         | Model input price used for cost controls.                          |
-| `OPENAI_TEXT_OUTPUT_COST_PER_MILLION_CENTS`       | Server only | Yes         | Model output price used for cost controls.                         |
-| `OPENAI_REQUEST_TIMEOUT_SECONDS`                  | Server only | Yes         | Shared OpenAI request timeout (`180`).                             |
-| `OPENAI_IMAGE_MODEL`                              | Server only | Yes         | Image model alias or dated snapshot (`gpt-image-2`).               |
-| `OPENAI_IMAGE_DRAFT_QUALITY`                      | Server only | Yes         | Draft quality; Phase 5 requires `low`.                             |
-| `OPENAI_IMAGE_FINAL_QUALITY`                      | Server only | Yes         | Final quality; Phase 5 requires `medium`.                          |
-| `OPENAI_IMAGE_OUTPUT_FORMAT`                      | Server only | Yes         | Generated image format (`webp` by default).                        |
-| `OPENAI_IMAGE_DRAFT_COMPRESSION`                  | Server only | Yes         | Draft WebP/JPEG compression (`80`).                                |
-| `OPENAI_IMAGE_FINAL_COMPRESSION`                  | Server only | Yes         | Final WebP/JPEG compression (`90`).                                |
-| `OPENAI_IMAGE_BACKGROUND`                         | Server only | Yes         | Opaque or automatic image background.                              |
-| `OPENAI_IMAGE_TEXT_INPUT_COST_PER_MILLION_CENTS`  | Server only | Yes         | Image-model text-input price (`500`).                              |
-| `OPENAI_IMAGE_INPUT_COST_PER_MILLION_CENTS`       | Server only | Yes         | Image-reference input price (`800`).                               |
-| `OPENAI_IMAGE_OUTPUT_COST_PER_MILLION_CENTS`      | Server only | Yes         | Generated-image output price (`3000`).                             |
-| `OPENAI_IMAGE_LOW_SQUARE_ESTIMATE_CENTS`          | Server only | Yes         | Conservative low-quality square reservation.                       |
-| `OPENAI_IMAGE_LOW_RECTANGULAR_ESTIMATE_CENTS`     | Server only | Yes         | Conservative low-quality rectangular reservation.                  |
-| `OPENAI_IMAGE_MEDIUM_SQUARE_ESTIMATE_CENTS`       | Server only | Yes         | Conservative medium square reservation.                            |
-| `OPENAI_IMAGE_MEDIUM_RECTANGULAR_ESTIMATE_CENTS`  | Server only | Yes         | Conservative medium rectangular reservation.                       |
-| `OPENAI_IMAGE_HIGH_SQUARE_ESTIMATE_CENTS`         | Server only | Yes         | Conservative high-quality square reservation.                      |
-| `OPENAI_IMAGE_HIGH_RECTANGULAR_ESTIMATE_CENTS`    | Server only | Yes         | Conservative high-quality rectangular reservation.                 |
-| `OPENAI_IMAGE_REFERENCE_RESERVE_CENTS_PER_ASSET`  | Server only | Yes         | Extra reservation per selected reference.                          |
-| `MAX_IMAGE_GENERATION_RETRIES`                    | Server only | Yes         | Maximum bounded billable retries (`1`).                            |
-| `MAX_REFERENCE_ASSETS_PER_GENERATION`             | Server only | Yes         | Application reference limit, maximum `16`.                         |
-| `MAX_REFERENCE_BYTES_PER_GENERATION`              | Server only | Yes         | Aggregate downloaded reference-byte ceiling.                       |
-| `MAX_IMAGE_GENERATIONS_PER_SCENE_VERSION`         | Server only | Yes         | Per-version generation and returned-history cap.                   |
-| `MAX_IMAGES_PER_BATCH`                            | Server only | Yes         | Maximum scenes per Phase 6 bulk storyboard batch.                  |
-| `ENABLE_SCENE_IMAGE_GENERATION`                   | Server only | Yes         | Phase 5/6 generation feature switch.                               |
-| `OPENAI_TTS_MODEL`                                | Server only | Yes         | Phase 7 text-to-speech model (default `gpt-4o-mini-tts`).          |
-| `OPENAI_TTS_VOICE`                                | Server only | Yes         | Default narration voice for new voice presets.                     |
-| `OPENAI_TTS_FORMAT`                               | Server only | Yes         | Default audio container (`mp3`/`opus`/`aac`/`flac`/`wav`/`pcm`).   |
-| `OPENAI_TTS_COST_PER_MILLION_CHARACTERS_CENTS`    | Server only | Yes         | Character-based TTS pricing used for estimates and reconciliation. |
-| `MAX_SCENES_PER_AUDIO_BATCH`                      | Server only | Yes         | Maximum scenes per Phase 7 audio generation request.               |
-| `AUDIO_SCENE_PADDING_MILLISECONDS`                | Server only | Yes         | Padding inserted between scenes in the computed timeline.          |
-| `FFPROBE_PATH`                                    | Server only | Yes         | ffprobe binary used to measure narration audio duration.           |
-| `ENABLE_SCENE_AUDIO_GENERATION`                   | Server only | Yes         | Phase 7 audio generation feature switch.                           |
-| `TRIGGER_SECRET_KEY`                              | Server only | Yes         | Authenticates Trigger.dev task submissions.                        |
-| `TRIGGER_PROJECT_REF`                             | Server only | Yes         | Identifies the Trigger.dev project.                                |
-| `IDEMPOTENCY_HASH_SECRET`                         | Server only | Yes         | HMAC secret for billable-operation identity.                       |
-| `REQUEST_FINGERPRINT_SECRET`                      | Server only | Yes         | HMAC secret for prompt request fingerprints.                       |
-| `MAX_SCENES_PER_PROJECT`                          | Server only | Yes         | Maximum structured scenes returned per analysis.                   |
-| `MIN_SCENE_DURATION_MILLISECONDS`                 | Server only | Yes         | Minimum generated scene duration.                                  |
-| `MAX_SCENE_DURATION_MILLISECONDS`                 | Server only | Yes         | Maximum generated scene duration.                                  |
-| `MAX_SCENE_ANALYSIS_RETRIES`                      | Server only | Yes         | Maximum bounded text-analysis retries.                             |
-| `GENERATION_RESERVATION_EXPIRY_MINUTES`           | Server only | Yes         | Pending AI reservation lifetime (`30`).                            |
-| `DEFAULT_DAILY_BUDGET_CENTS`                      | Server only | Yes         | Default workspace daily AI budget.                                 |
-| `DEFAULT_MONTHLY_BUDGET_CENTS`                    | Server only | Yes         | Default workspace monthly AI budget.                               |
+| Variable                                            | Visibility  | Required    | Purpose                                                            |
+| --------------------------------------------------- | ----------- | ----------- | ------------------------------------------------------------------ |
+| `APP_NAME`                                          | Server only | Yes         | Human-readable application name (`VCStudio`).                      |
+| `NEXT_PUBLIC_APP_URL`                               | Browser     | Yes         | Canonical web application URL.                                     |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`                 | Browser     | Yes         | Identifies the Clerk application.                                  |
+| `CLERK_SECRET_KEY`                                  | Server only | Yes         | Authenticates server-side Clerk operations.                        |
+| `CLERK_WEBHOOK_SIGNING_SECRET`                      | Server only | Yes         | Verifies Clerk webhook signatures.                                 |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_URL`                     | Browser     | Yes         | Clerk sign-in route.                                               |
+| `NEXT_PUBLIC_CLERK_SIGN_UP_URL`                     | Browser     | Yes         | Clerk sign-up route.                                               |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL`   | Browser     | Yes         | Post-sign-in destination.                                          |
+| `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL`   | Browser     | Yes         | Post-sign-up destination.                                          |
+| `DATABASE_URL`                                      | Server only | Yes         | Pooled Neon URL used by application requests.                      |
+| `DATABASE_URL_UNPOOLED`                             | Server only | Recommended | Direct Neon URL preferred by migration commands.                   |
+| `RUN_DATABASE_INTEGRATION_TESTS`                    | Test only   | No          | Enables mutating integration tests against development Neon only.  |
+| `NODE_ENV`                                          | Server only | Automatic   | Runtime mode; defaults to `development`.                           |
+| `R2_ACCOUNT_ID`                                     | Server only | Yes         | Cloudflare account owning the R2 bucket.                           |
+| `R2_ACCESS_KEY_ID`                                  | Server only | Yes         | R2 S3 API access key.                                              |
+| `R2_SECRET_ACCESS_KEY`                              | Server only | Yes         | R2 S3 API secret key.                                              |
+| `R2_BUCKET_NAME`                                    | Server only | Yes         | Private media bucket name.                                         |
+| `R2_ENDPOINT`                                       | Server only | Yes         | Account-specific R2 S3 endpoint.                                   |
+| `R2_REGION`                                         | Server only | Yes         | R2 region (`auto`).                                                |
+| `R2_SIGNED_UPLOAD_EXPIRY_SECONDS`                   | Server only | Yes         | Upload URL lifetime, 60–900 seconds.                               |
+| `R2_SIGNED_DOWNLOAD_EXPIRY_SECONDS`                 | Server only | Yes         | Download URL lifetime, 60–3600 seconds.                            |
+| `MAX_CHARACTER_REFERENCE_SIZE_BYTES`                | Server only | Yes         | Maximum character reference size (`5242880`).                      |
+| `ALLOWED_IMAGE_MIME_TYPES`                          | Server only | Yes         | Allowed character image MIME types.                                |
+| `MIN_REFERENCE_IMAGE_WIDTH`                         | Server only | Yes         | Minimum character reference width (`512`).                         |
+| `MIN_REFERENCE_IMAGE_HEIGHT`                        | Server only | Yes         | Minimum character reference height (`512`).                        |
+| `MAX_REFERENCE_IMAGE_WIDTH`                         | Server only | Yes         | Maximum character reference width (`4096`).                        |
+| `MAX_REFERENCE_IMAGE_HEIGHT`                        | Server only | Yes         | Maximum character reference height (`4096`).                       |
+| `ENABLE_CHARACTER_LIBRARY`                          | Server only | Yes         | Enables the Phase 4 character library.                             |
+| `MAX_SCRIPT_CHARACTERS`                             | Server only | Yes         | Maximum narration script length (`50000`).                         |
+| `DEFAULT_PROJECT_BUDGET_CENTS`                      | Server only | Yes         | New-project budget ceiling default (`200`).                        |
+| `OPENAI_API_KEY`                                    | Server only | Yes         | Authenticates OpenAI Responses API calls.                          |
+| `OPENAI_TEXT_MODEL`                                 | Server only | Yes         | Configurable structured scene-analysis model.                      |
+| `OPENAI_TEXT_INPUT_COST_PER_MILLION_CENTS`          | Server only | Yes         | Model input price used for cost controls.                          |
+| `OPENAI_TEXT_OUTPUT_COST_PER_MILLION_CENTS`         | Server only | Yes         | Model output price used for cost controls.                         |
+| `OPENAI_REQUEST_TIMEOUT_SECONDS`                    | Server only | Yes         | Shared OpenAI request timeout (`180`).                             |
+| `OPENAI_IMAGE_MODEL`                                | Server only | Yes         | Image model alias or dated snapshot (`gpt-image-2`).               |
+| `OPENAI_IMAGE_DRAFT_QUALITY`                        | Server only | Yes         | Draft quality; Phase 5 requires `low`.                             |
+| `OPENAI_IMAGE_FINAL_QUALITY`                        | Server only | Yes         | Final quality; Phase 5 requires `medium`.                          |
+| `OPENAI_IMAGE_OUTPUT_FORMAT`                        | Server only | Yes         | Generated image format (`webp` by default).                        |
+| `OPENAI_IMAGE_DRAFT_COMPRESSION`                    | Server only | Yes         | Draft WebP/JPEG compression (`80`).                                |
+| `OPENAI_IMAGE_FINAL_COMPRESSION`                    | Server only | Yes         | Final WebP/JPEG compression (`90`).                                |
+| `OPENAI_IMAGE_BACKGROUND`                           | Server only | Yes         | Opaque or automatic image background.                              |
+| `OPENAI_IMAGE_TEXT_INPUT_COST_PER_MILLION_CENTS`    | Server only | Yes         | Image-model text-input price (`500`).                              |
+| `OPENAI_IMAGE_INPUT_COST_PER_MILLION_CENTS`         | Server only | Yes         | Image-reference input price (`800`).                               |
+| `OPENAI_IMAGE_OUTPUT_COST_PER_MILLION_CENTS`        | Server only | Yes         | Generated-image output price (`3000`).                             |
+| `OPENAI_IMAGE_LOW_SQUARE_ESTIMATE_CENTS`            | Server only | Yes         | Conservative low-quality square reservation.                       |
+| `OPENAI_IMAGE_LOW_RECTANGULAR_ESTIMATE_CENTS`       | Server only | Yes         | Conservative low-quality rectangular reservation.                  |
+| `OPENAI_IMAGE_MEDIUM_SQUARE_ESTIMATE_CENTS`         | Server only | Yes         | Conservative medium square reservation.                            |
+| `OPENAI_IMAGE_MEDIUM_RECTANGULAR_ESTIMATE_CENTS`    | Server only | Yes         | Conservative medium rectangular reservation.                       |
+| `OPENAI_IMAGE_HIGH_SQUARE_ESTIMATE_CENTS`           | Server only | Yes         | Conservative high-quality square reservation.                      |
+| `OPENAI_IMAGE_HIGH_RECTANGULAR_ESTIMATE_CENTS`      | Server only | Yes         | Conservative high-quality rectangular reservation.                 |
+| `OPENAI_IMAGE_REFERENCE_RESERVE_CENTS_PER_ASSET`    | Server only | Yes         | Extra reservation per selected reference.                          |
+| `MAX_IMAGE_GENERATION_RETRIES`                      | Server only | Yes         | Maximum bounded billable retries (`1`).                            |
+| `MAX_REFERENCE_ASSETS_PER_GENERATION`               | Server only | Yes         | Application reference limit, maximum `16`.                         |
+| `MAX_REFERENCE_BYTES_PER_GENERATION`                | Server only | Yes         | Aggregate downloaded reference-byte ceiling.                       |
+| `MAX_IMAGE_GENERATIONS_PER_SCENE_VERSION`           | Server only | Yes         | Per-version generation and returned-history cap.                   |
+| `MAX_IMAGES_PER_BATCH`                              | Server only | Yes         | Maximum scenes per Phase 6 bulk storyboard batch.                  |
+| `ENABLE_SCENE_IMAGE_GENERATION`                     | Server only | Yes         | Phase 5/6 generation feature switch.                               |
+| `OPENAI_TTS_MODEL`                                  | Server only | Yes         | Phase 7 text-to-speech model (default `gpt-4o-mini-tts`).          |
+| `OPENAI_TTS_VOICE`                                  | Server only | Yes         | Default narration voice for new voice presets.                     |
+| `OPENAI_TTS_FORMAT`                                 | Server only | Yes         | Default audio container (`mp3`/`opus`/`aac`/`flac`/`wav`/`pcm`).   |
+| `OPENAI_TTS_COST_PER_MILLION_CHARACTERS_CENTS`      | Server only | Yes         | Character-based TTS pricing used for estimates and reconciliation. |
+| `MAX_SCENES_PER_AUDIO_BATCH`                        | Server only | Yes         | Maximum scenes per Phase 7 audio generation request.               |
+| `AUDIO_SCENE_PADDING_MILLISECONDS`                  | Server only | Yes         | Padding inserted between scenes in the computed timeline.          |
+| `FFPROBE_PATH`                                      | Server only | Yes         | ffprobe binary used to measure narration audio duration.           |
+| `ENABLE_SCENE_AUDIO_GENERATION`                     | Server only | Yes         | Phase 7 audio generation feature switch.                           |
+| `SUBTITLE_MAX_LINE_CHARACTERS`                      | Server only | Yes         | Default caption wrap length for new caption styles (`42`).         |
+| `SUBTITLE_MIN_SEGMENT_DURATION_MILLISECONDS`        | Server only | Yes         | Minimum caption duration; shorter segments merge (`700`).          |
+| `SUBTITLE_MAX_SEGMENT_DURATION_MILLISECONDS`        | Server only | Yes         | Advisory ceiling flagging long captions in review (`7000`).        |
+| `SUBTITLE_DURATION_MISMATCH_TOLERANCE_MILLISECONDS` | Server only | Yes         | Audio-vs-estimate gap that raises a timeline warning (`1500`).     |
+| `ENABLE_SUBTITLES`                                  | Server only | Yes         | Phase 8 subtitle feature switch.                                   |
+| `TRIGGER_SECRET_KEY`                                | Server only | Yes         | Authenticates Trigger.dev task submissions.                        |
+| `TRIGGER_PROJECT_REF`                               | Server only | Yes         | Identifies the Trigger.dev project.                                |
+| `IDEMPOTENCY_HASH_SECRET`                           | Server only | Yes         | HMAC secret for billable-operation identity.                       |
+| `REQUEST_FINGERPRINT_SECRET`                        | Server only | Yes         | HMAC secret for prompt request fingerprints.                       |
+| `MAX_SCENES_PER_PROJECT`                            | Server only | Yes         | Maximum structured scenes returned per analysis.                   |
+| `MIN_SCENE_DURATION_MILLISECONDS`                   | Server only | Yes         | Minimum generated scene duration.                                  |
+| `MAX_SCENE_DURATION_MILLISECONDS`                   | Server only | Yes         | Maximum generated scene duration.                                  |
+| `MAX_SCENE_ANALYSIS_RETRIES`                        | Server only | Yes         | Maximum bounded text-analysis retries.                             |
+| `GENERATION_RESERVATION_EXPIRY_MINUTES`             | Server only | Yes         | Pending AI reservation lifetime (`30`).                            |
+| `DEFAULT_DAILY_BUDGET_CENTS`                        | Server only | Yes         | Default workspace daily AI budget.                                 |
+| `DEFAULT_MONTHLY_BUDGET_CENTS`                      | Server only | Yes         | Default workspace monthly AI budget.                               |
 
 ## Database setup
 
@@ -162,6 +170,8 @@ The Phase 3 scene-planning migration is `migrations/20260715204954_rainy_umar/mi
 The script-version deletion audit migration is `migrations/20260715222820_absurd_yellowjacket/migration.sql`. It adds soft-deletion actor and timestamp fields to script versions and was applied successfully to the configured development Neon database on 2026-07-16.
 
 The Phase 4 character-library migration is `migrations/20260716185811_bumpy_thunderbolts/migration.sql`. It adds workspace characters, private reference metadata, destructive-operation audit records, and scene-version character assignments. It was applied successfully to the configured development Neon database on 2026-07-16.
+
+The Phase 8 subtitle migration is `migrations/20260718124356_heavy_hellcat/migration.sql`. It adds the `project_subtitle_settings` table (one workspace-scoped row per project holding the caption granularity, the validated caption-style JSONB, and per-cue text overrides) and the `subtitle_granularity` enum. It was applied successfully to the configured development Neon database on 2026-07-18.
 
 The Phase 5 image-generation migrations are `migrations/20260716210756_dark_logan/migration.sql`, `migrations/20260716211907_old_argent/migration.sql`, and `migrations/20260716222105_amused_spirit/migration.sql`. They add immutable style and prompt versions, scene image generations, exact selected-reference snapshots, per-attempt provider records, generalized usage reservations/events, the initial stick-figure financial-education preset, prompt/style immutability guards, idempotent usage-event indexing, composite tenant-integrity constraints, reconciliation indexes, and append-only ledger protection. All three were applied successfully to the configured development Neon database on 2026-07-16.
 
@@ -222,13 +232,13 @@ Not implemented yet. Remotion, FFmpeg, and FFprobe are planned.
 - `$env:RUN_DATABASE_INTEGRATION_TESTS="true"; npm test -- --run db/integration/scene-image-postgres.integration.test.ts; Remove-Item Env:RUN_DATABASE_INTEGRATION_TESTS` runs the opt-in Phase 5 PostgreSQL invariant suite from PowerShell.
 - `RUN_DATABASE_INTEGRATION_TESTS=true npm test -- --run db/integration/scene-image-postgres.integration.test.ts` runs the same suite from a POSIX shell.
 
-Tests cover authentication gating, environment validation, workspace role permissions, nonmember rejection, cross-workspace isolation, project and budget validation, pagination limits, project status transitions, script statistics, scene structured output, prompt determinism and versioning, image-reference ordering and isolation, idempotency, cost estimation and reconciliation, budget reservation, retry limits, provider failure classification, R2 upload and recovery keys, scene timing, character slugs and archival behavior, reference dimensions and storage keys, upload sequencing, Clerk user deletion routing, and opt-in concurrent PostgreSQL checks for Phase 5 terminal state, approval, and tenant invariants.
+Tests cover authentication gating, environment validation, workspace role permissions, nonmember rejection, cross-workspace isolation, project and budget validation, pagination limits, project status transitions, script statistics, scene structured output, prompt determinism and versioning, image-reference ordering and isolation, idempotency, cost estimation and reconciliation, budget reservation, retry limits, provider failure classification, R2 upload and recovery keys, scene timing, character slugs and archival behavior, reference dimensions and storage keys, upload sequencing, Clerk user deletion routing, subtitle segmentation and caption-style validation, SRT/WebVTT generation, subtitle segment overlap prevention, deterministic video timeline output with missing-asset validation, duration-mismatch detection and frame-count calculation, and opt-in concurrent PostgreSQL checks for Phase 5 terminal state, approval, and tenant invariants.
 
 The database integration suite is skipped by default. Run it only against a development Neon database after applying reviewed migrations. Each run creates UUID-isolated fixtures and removes them through their workspace parent cascade; it never calls OpenAI, R2, or Trigger.dev.
 
 ## Deployment
 
-Set every required environment variable in the deployment environment. The Phase 5 OpenAI image, R2, budget, fingerprint, reservation, and retry variables must be present in both Vercel and Trigger.dev because the web application creates reservations while the worker executes and reconciles them. Configure a production Clerk webhook endpoint separately from development, apply migrations before promoting dependent application code, and deploy the Trigger.dev task with `npm run trigger:deploy`.
+Set every required environment variable in the deployment environment. The Phase 5 OpenAI image, R2, budget, fingerprint, reservation, and retry variables must be present in both Vercel and Trigger.dev because the web application creates reservations while the worker executes and reconciles them. The Phase 8 subtitle variables are Vercel-only: subtitles are derived entirely in the web runtime, so they are added to `.env.vercel` (and `.env`/`.env.example`) but intentionally omitted from `.env.trigger.dev`. Configure a production Clerk webhook endpoint separately from development, apply migrations before promoting dependent application code, and deploy the Trigger.dev task with `npm run trigger:deploy`.
 
 ## Security model
 
@@ -249,7 +259,8 @@ Scene analysis and scene-image generation show a conservative estimate before co
 - `CLERK_WEBHOOK_SIGNING_SECRET` must be configured before real webhook delivery can succeed.
 - The Phase 1 migration must still be applied separately to future preview and production databases.
 - Full browser end-to-end coverage will be expanded with the bootstrap Playwright foundation.
-- Audio generation, subtitles, and rendering are not implemented yet.
+- Rendering is not implemented yet. Subtitles produce a validated timeline contract and caption exports, but Remotion preview/render (Phase 9) consumes them in a later phase.
+- Subtitle word-level timing is intentionally never synthesized; captions use scene- or sentence-level timing distributed across the measured audio duration. Per-cue timing is not hand-editable (only cue text), because timing is always recomputed deterministically from approved audio.
 - Phase 5 generates one scene image per confirmed request. Batch generation and a workspace style-preset editor are deferred; the immutable seeded preset and generation history are available now.
 - Remotion crop/fit behavior for translating OpenAI's supported image sizes to final video dimensions will be added with rendering.
 - Script version history is currently bounded to the latest 50 versions in the editor.
@@ -259,10 +270,11 @@ Scene analysis and scene-image generation show a conservative estimate before co
 
 ## Implementation status
 
-Phases 1–7 are implemented through authenticated workspaces, project/script versioning, durable AI scene planning, workspace character consistency references, cost-controlled single-scene image generation and review, the storyboard with controlled bulk image generation, and per-scene narration audio with FFprobe-measured durations and a deterministic project timeline. Subtitles and rendering remain future phases.
+Phases 1–8 are implemented through authenticated workspaces, project/script versioning, durable AI scene planning, workspace character consistency references, cost-controlled single-scene image generation and review, the storyboard with controlled bulk image generation, per-scene narration audio with FFprobe-measured durations and a deterministic project timeline, and deterministic subtitles with a typed video timeline contract and SRT/WebVTT/Remotion caption outputs. Rendering (Phase 9) remains a future phase.
 
 ## Recent major changes
 
+- 2026-07-18: Implemented Phase 8 deterministic subtitles and the typed video timeline contract — a new `project_subtitle_settings` table and `subtitle_granularity` enum (one row per project holding granularity, a validated caption-style JSONB, and per-cue text overrides keyed by `sceneVersionId:index`), pure subtitle domain logic (sentence/scene segmentation with no fabricated word timing, largest-remainder proportional timing that sums exactly to each scene's measured audio duration, overlap-free track assembly, SRT/WebVTT/Remotion serializers, and a canonical caption-style validator), a `buildVideoTimeline` builder that lays out approved image + audio + captions + camera motion + transition deterministically and returns an actionable per-scene validation report (blocking errors for missing assets, non-blocking duration-mismatch warnings), a workspace-only Phase 8 env group (five variables added to `.env`/`.env.vercel`/`.env.example` but deliberately not `.env.trigger.dev`, since no worker reads them), a `manageSubtitles` capability, a `/app/projects/[id]/subtitles` route and tab, subtitle GET and SRT/WebVTT export routes, eleven one-per-file components (workspace, track selector, editor, segment list/row, caption-style form, live preview, export buttons, timeline validation panel/issue, build-timeline button), and thirty-four unit tests covering SRT/WebVTT generation, overlap prevention, deterministic timeline output, missing-asset validation, duration-mismatch detection, frame-count calculation, segmentation, and caption-style validation.
 - 2026-07-18: Added an at-a-glance image indicator to the Scenes tab — the scene navigator list and the selected scene's Images tab now show a badge (approved / generated / generating / failed) computed on the server from each scene's current-version generations, so users can see which scenes already have imagery without opening the Images panel.
 - 2026-07-18: Implemented Phase 7 per-scene narration audio, review, and timing — new `voice_presets` and `scene_audio_generations` tables plus a `scene_audio_generation` operation type and `audio_generation_id` on the shared usage ledger (extended via `operation_type::text` comparisons to avoid the same-transaction enum-safety error), an OpenAI TTS provider, a shell-safe FFprobe wrapper (with a pure, unit-tested JSON parser) provisioned in production through the Trigger.dev `ffmpeg` build extension, a deterministic drift-free timeline service (integer milliseconds, absolute frame conversion, configurable padding), workspace voice presets, a bulk-capable audio orchestrator reusing the Phase 5/6 reservation/budget/idempotency machinery, a concurrency-limited `scene-audio-generation` task with graceful degradation when ffprobe is missing (paid audio is kept, duration marked pending), a five-minute expired-reservation reconciler, a `/app/projects/[id]/audio` route and tab with fifteen one-per-file components, and unit plus opt-in PostgreSQL audio invariant tests.
 - 2026-07-17: Implemented Phase 6 storyboard and controlled bulk image generation — a new `scene_image_batches` table and nullable `batch_id` on generations (live-derived aggregate counts, no mutable counters), a `MAX_IMAGES_PER_BATCH` limit added to all environment files, a bulk orchestrator that reserves each eligible scene through the proven Phase 5 machinery and dispatches them with a single Trigger.dev `tasks.batchTrigger` (respecting the image-generation queue concurrency), idempotent duplicate-submission handling, cancellation that releases only not-yet-billed reservations, a `/app/projects/[id]/storyboard` route and tab, a polling storyboard API, sixteen one-per-file storyboard components, and unit plus opt-in PostgreSQL batch invariant tests.

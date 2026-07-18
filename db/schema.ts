@@ -13,6 +13,10 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import type {
+  CaptionStyleData,
+  SubtitleSegmentTextOverrides,
+} from "@/lib/subtitles/caption-style-data";
 
 export const workspaceRoleEnum = pgEnum("workspace_role", [
   "owner",
@@ -161,6 +165,11 @@ export const audioOutputFormatEnum = pgEnum("audio_output_format", [
   "flac",
   "wav",
   "pcm",
+]);
+
+export const subtitleGranularityEnum = pgEnum("subtitle_granularity", [
+  "scene",
+  "sentence",
 ]);
 
 export const providerRequestStatusEnum = pgEnum("provider_request_status", [
@@ -1614,6 +1623,46 @@ export const usageEvents = pgTable(
   ],
 );
 
+export const projectSubtitleSettings = pgTable(
+  "project_subtitle_settings",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").notNull(),
+    granularity: subtitleGranularityEnum("granularity")
+      .notNull()
+      .default("sentence"),
+    captionStyle: jsonb("caption_style").$type<CaptionStyleData>().notNull(),
+    segmentTextOverrides: jsonb("segment_text_overrides")
+      .$type<SubtitleSegmentTextOverrides>()
+      .notNull()
+      .default({}),
+    updatedByUserId: uuid("updated_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("project_subtitle_settings_project_unique").on(table.projectId),
+    uniqueIndex("project_subtitle_settings_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [projects.id, projects.workspaceId],
+      name: "project_subtitle_settings_tenant_project_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
 export const clerkWebhookEvents = pgTable(
   "clerk_webhook_events",
   {
@@ -1683,3 +1732,7 @@ export type GenerationReferenceAsset =
 export type ProviderRequest = typeof providerRequests.$inferSelect;
 export type UsageReservation = typeof usageReservations.$inferSelect;
 export type UsageEvent = typeof usageEvents.$inferSelect;
+export type ProjectSubtitleSettings =
+  typeof projectSubtitleSettings.$inferSelect;
+export type SubtitleGranularityValue =
+  (typeof subtitleGranularityEnum.enumValues)[number];

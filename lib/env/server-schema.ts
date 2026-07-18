@@ -310,6 +310,37 @@ export const sceneAudioEnvironmentSchema = z.object({
     .transform((value) => value === "true"),
 });
 
+export const subtitleEnvironmentSchema = z.object({
+  SUBTITLE_MAX_LINE_CHARACTERS: z.coerce
+    .number()
+    .int()
+    .min(16)
+    .max(120)
+    .default(42),
+  SUBTITLE_MIN_SEGMENT_DURATION_MILLISECONDS: z.coerce
+    .number()
+    .int()
+    .min(200)
+    .max(10_000)
+    .default(700),
+  SUBTITLE_MAX_SEGMENT_DURATION_MILLISECONDS: z.coerce
+    .number()
+    .int()
+    .min(1000)
+    .max(30_000)
+    .default(7000),
+  SUBTITLE_DURATION_MISMATCH_TOLERANCE_MILLISECONDS: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(10_000)
+    .default(1500),
+  ENABLE_SUBTITLES: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((value) => value === "true"),
+});
+
 export type ServerEnvironment = z.infer<typeof serverEnvironmentSchema>;
 export type DatabaseEnvironment = z.infer<typeof databaseEnvironmentSchema>;
 export type ClerkWebhookEnvironment = z.infer<
@@ -323,6 +354,7 @@ export type SceneAnalysisEnvironment = z.infer<
 >;
 export type SceneImageEnvironment = z.infer<typeof sceneImageEnvironmentSchema>;
 export type SceneAudioEnvironment = z.infer<typeof sceneAudioEnvironmentSchema>;
+export type SubtitleEnvironment = z.infer<typeof subtitleEnvironmentSchema>;
 
 export function parseServerEnvironment(
   environment: Record<string, string | undefined>,
