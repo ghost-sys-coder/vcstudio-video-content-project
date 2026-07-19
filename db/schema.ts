@@ -110,6 +110,14 @@ export const sceneAnalysisStatusEnum = pgEnum("scene_analysis_status", [
   "failed",
 ]);
 
+// Distribution platforms for briefs, titles, and thumbnails.
+export const contentPlatformEnum = pgEnum("content_platform", [
+  "youtube",
+  "tiktok",
+  "facebook",
+  "instagram",
+]);
+
 export const usageReservationStatusEnum = pgEnum("usage_reservation_status", [
   "pending",
   "reconciled",
@@ -199,6 +207,7 @@ export const usageOperationTypeEnum = pgEnum("usage_operation_type", [
   "scene_image_generation",
   "scene_audio_generation",
   "video_render",
+  "script_generation",
 ]);
 
 export const usageEventTypeEnum = pgEnum("usage_event_type", [
@@ -697,6 +706,110 @@ export const projectScriptVersions = pgTable(
       foreignColumns: [table.id],
       name: "project_script_versions_restored_from_fkey",
     }).onDelete("set null"),
+  ],
+);
+
+// One editable content brief per project — the subject/audience/tone/platform
+// input that AI script, title, and thumbnail generation read from.
+export const projectBriefs = pgTable(
+  "project_briefs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    topic: text("topic").notNull().default(""),
+    targetAudience: text("target_audience").notNull().default(""),
+    tone: text("tone").notNull().default(""),
+    targetDurationSeconds: integer("target_duration_seconds"),
+    primaryPlatform: contentPlatformEnum("primary_platform")
+      .notNull()
+      .default("youtube"),
+    hookAngle: text("hook_angle").notNull().default(""),
+    updatedByUserId: uuid("updated_by_user_id").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("project_briefs_project_unique").on(table.projectId),
+    index("project_briefs_workspace_project_index").on(
+      table.workspaceId,
+      table.projectId,
+    ),
+    check(
+      "project_briefs_duration_positive",
+      sql`${table.targetDurationSeconds} is null or ${table.targetDurationSeconds} > 0`,
+    ),
+  ],
+);
+
+// Money-safe AI script-generation run (project-scoped, on the usage ledger).
+export const scriptGenerationRuns = pgTable(
+  "script_generation_runs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    requestedByUserId: uuid("requested_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    triggerRunId: text("trigger_run_id"),
+    idempotencyKey: text("idempotency_key").notNull(),
+    requestFingerprint: text("request_fingerprint").notNull(),
+    model: text("model").notNull(),
+    promptVersion: text("prompt_version").notNull(),
+    finalPrompt: text("final_prompt").notNull(),
+    status: sceneAnalysisStatusEnum("status").notNull().default("pending"),
+    progressPercent: integer("progress_percent").notNull().default(0),
+    providerRequestId: text("provider_request_id"),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    inputTokens: integer("input_tokens"),
+    outputTokens: integer("output_tokens"),
+    estimatedCostCents: integer("estimated_cost_cents").notNull(),
+    actualCostCents: integer("actual_cost_cents"),
+    generatedContent: text("generated_content"),
+    suggestedTitle: text("suggested_title"),
+    errorCategory: text("error_category"),
+    safeErrorMessage: text("safe_error_message"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("script_generation_runs_idempotency_unique").on(
+      table.idempotencyKey,
+    ),
+    index("script_generation_runs_workspace_project_index").on(
+      table.workspaceId,
+      table.projectId,
+      table.createdAt,
+    ),
+    check(
+      "script_generation_runs_progress_valid",
+      sql`${table.progressPercent} between 0 and 100`,
+    ),
+    check(
+      "script_generation_runs_cost_nonnegative",
+      sql`${table.estimatedCostCents} >= 0 and (${table.actualCostCents} is null or ${table.actualCostCents} >= 0)`,
+    ),
   ],
 );
 
@@ -1763,6 +1876,10 @@ export const usageReservations = pgTable(
     imageGenerationId: uuid("image_generation_id"),
     audioGenerationId: uuid("audio_generation_id"),
     videoRenderId: uuid("video_render_id"),
+    scriptGenerationId: uuid("script_generation_id").references(
+      () => scriptGenerationRuns.id,
+      { onDelete: "cascade" },
+    ),
     status: usageReservationStatusEnum("status").notNull().default("pending"),
     reservedCostCents: integer("reserved_cost_cents").notNull(),
     actualCostCents: integer("actual_cost_cents"),
@@ -1793,6 +1910,9 @@ export const usageReservations = pgTable(
     uniqueIndex("usage_reservations_video_render_unique")
       .on(table.videoRenderId)
       .where(sql`${table.videoRenderId} is not null`),
+    uniqueIndex("usage_reservations_script_generation_unique")
+      .on(table.scriptGenerationId)
+      .where(sql`${table.scriptGenerationId} is not null`),
     index("usage_reservations_workspace_project_status_index").on(
       table.workspaceId,
       table.projectId,
@@ -1808,7 +1928,7 @@ export const usageReservations = pgTable(
     ),
     check(
       "usage_reservations_single_operation",
-      sql`(${table.operationType}::text = 'scene_analysis' and ${table.analysisRunId} is not null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null) or (${table.operationType}::text = 'scene_image_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is not null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null) or (${table.operationType}::text = 'scene_audio_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is not null and ${table.videoRenderId} is null) or (${table.operationType}::text = 'video_render' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is not null)`,
+      sql`(${table.operationType}::text = 'scene_analysis' and ${table.analysisRunId} is not null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null) or (${table.operationType}::text = 'scene_image_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is not null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null) or (${table.operationType}::text = 'scene_audio_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is not null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null) or (${table.operationType}::text = 'video_render' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is not null and ${table.scriptGenerationId} is null) or (${table.operationType}::text = 'script_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is not null)`,
     ),
     foreignKey({
       columns: [table.imageGenerationId, table.projectId, table.workspaceId],
@@ -2086,6 +2206,9 @@ export type ProjectAspectRatio =
   (typeof projectAspectRatioEnum.enumValues)[number];
 export type ProjectScriptDraft = typeof projectScriptDrafts.$inferSelect;
 export type ProjectScriptVersion = typeof projectScriptVersions.$inferSelect;
+export type ProjectBrief = typeof projectBriefs.$inferSelect;
+export type ContentPlatform = (typeof contentPlatformEnum.enumValues)[number];
+export type ScriptGenerationRun = typeof scriptGenerationRuns.$inferSelect;
 export type SceneAnalysisRun = typeof sceneAnalysisRuns.$inferSelect;
 export type Scene = typeof scenes.$inferSelect;
 export type SceneVersion = typeof sceneVersions.$inferSelect;

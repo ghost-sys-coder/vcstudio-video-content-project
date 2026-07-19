@@ -31,6 +31,27 @@ export function createSceneAnalysisRetryIdempotencyKey(input: {
   return hash(input.secret, ["scene-analysis-retry", input.failedRunId]);
 }
 
+export function createScriptGenerationIdempotencyKey(input: {
+  secret: string;
+  workspaceId: string;
+  projectId: string;
+  briefFingerprint: string;
+  model: string;
+  promptVersion: string;
+  /** Distinct per intentional "Generate" click so regeneration yields a new run. */
+  requestNonce: string;
+}): string {
+  return hash(input.secret, [
+    input.workspaceId,
+    input.projectId,
+    "script-generation",
+    input.briefFingerprint,
+    input.model,
+    input.promptVersion,
+    input.requestNonce,
+  ]);
+}
+
 export function createSceneImageIdempotencyKey(input: {
   secret: string;
   workspaceId: string;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import type { ProjectScriptDraft, ProjectScriptVersion } from "@/db/schema";
 import {
   createScriptVersionAction,
@@ -33,6 +33,22 @@ export function ScriptEditor({
     () => calculateScriptStatistics(content),
     [content],
   );
+  // Bridge for the generate-script panel: replacing the textarea leaves the
+  // saved draft untouched until the user explicitly saves (non-destructive).
+  useEffect(() => {
+    if (!canEdit) return;
+    function handleInsert(event: Event) {
+      const detail = (event as CustomEvent<string>).detail;
+      if (typeof detail === "string") {
+        setContent(detail);
+        setMessage("Generated script inserted — review and save the draft.");
+        setError(null);
+      }
+    }
+    window.addEventListener("vcstudio:insert-script", handleInsert);
+    return () =>
+      window.removeEventListener("vcstudio:insert-script", handleInsert);
+  }, [canEdit]);
   function formData() {
     const data = new FormData();
     data.set("projectId", draft.projectId);

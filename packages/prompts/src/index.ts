@@ -3,6 +3,14 @@ export {
   SCENE_ANALYSIS_PROMPT_VERSION,
 } from "./scene-analysis";
 export {
+  renderScriptGenerationPrompt,
+  SCRIPT_GENERATION_PROMPT_VERSION,
+} from "./script-generation";
+export type {
+  ScriptGenerationPlatform,
+  ScriptGenerationPromptInput,
+} from "./script-generation";
+export {
   renderSceneImagePrompt,
   SCENE_IMAGE_PROMPT_TEMPLATE_SOURCE,
   SCENE_IMAGE_PROMPT_TEMPLATE_SOURCE_HASH,

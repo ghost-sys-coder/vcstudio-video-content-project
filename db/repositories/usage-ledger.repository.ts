@@ -6,6 +6,7 @@ import {
   sceneAnalysisRuns,
   sceneAudioGenerations,
   sceneImageGenerations,
+  scriptGenerationRuns,
   usageReservations,
   users,
   videoRenders,
@@ -76,6 +77,7 @@ export async function listUsageLedgerEntries(input: {
   const imageIds: string[] = [];
   const audioIds: string[] = [];
   const renderIds: string[] = [];
+  const scriptIds: string[] = [];
   for (const reservation of reservations) {
     if (reservation.analysisRunId) analysisIds.push(reservation.analysisRunId);
     if (reservation.imageGenerationId)
@@ -83,6 +85,8 @@ export async function listUsageLedgerEntries(input: {
     if (reservation.audioGenerationId)
       audioIds.push(reservation.audioGenerationId);
     if (reservation.videoRenderId) renderIds.push(reservation.videoRenderId);
+    if (reservation.scriptGenerationId)
+      scriptIds.push(reservation.scriptGenerationId);
   }
 
   const enrichment = new Map<string, Enrichment>();
@@ -215,6 +219,39 @@ export async function listUsageLedgerEntries(input: {
                 workflowRunId: row.triggerRunId,
               });
           }),
+    scriptIds.length === 0
+      ? Promise.resolve()
+      : database
+          .select({
+            id: scriptGenerationRuns.id,
+            requestedByUserId: scriptGenerationRuns.requestedByUserId,
+            model: scriptGenerationRuns.model,
+            providerRequestId: scriptGenerationRuns.providerRequestId,
+            triggerRunId: scriptGenerationRuns.triggerRunId,
+            inputTokens: scriptGenerationRuns.inputTokens,
+            outputTokens: scriptGenerationRuns.outputTokens,
+            estimatedCostCents: scriptGenerationRuns.estimatedCostCents,
+          })
+          .from(scriptGenerationRuns)
+          .where(
+            and(
+              eq(scriptGenerationRuns.workspaceId, input.workspaceId),
+              inArray(scriptGenerationRuns.id, scriptIds),
+            ),
+          )
+          .then((rows) => {
+            for (const row of rows)
+              enrichment.set(row.id, {
+                requestedByUserId: row.requestedByUserId,
+                provider: "openai",
+                model: row.model,
+                estimatedCostCents: row.estimatedCostCents,
+                inputUnits: row.inputTokens,
+                outputUnits: row.outputTokens,
+                providerRequestId: row.providerRequestId,
+                workflowRunId: row.triggerRunId,
+              });
+          }),
   ]);
 
   const userIds = [
@@ -238,7 +275,8 @@ export async function listUsageLedgerEntries(input: {
       reservation.analysisRunId ??
       reservation.imageGenerationId ??
       reservation.audioGenerationId ??
-      reservation.videoRenderId;
+      reservation.videoRenderId ??
+      reservation.scriptGenerationId;
     const detail = operationId ? enrichment.get(operationId) : undefined;
     return {
       reservationId: reservation.id,

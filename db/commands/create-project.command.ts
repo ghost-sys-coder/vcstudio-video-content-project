@@ -2,6 +2,7 @@ import "server-only";
 
 import { getDatabase } from "@/db/drizzle";
 import {
+  projectBriefs,
   projectScriptDrafts,
   projects,
   type ProjectAspectRatio,
@@ -38,6 +39,11 @@ export async function createProject(input: {
       })
       .returning(),
     getDatabase().insert(projectScriptDrafts).values({
+      workspaceId: input.workspaceId,
+      projectId,
+      updatedByUserId: input.userId,
+    }),
+    getDatabase().insert(projectBriefs).values({
       workspaceId: input.workspaceId,
       projectId,
       updatedByUserId: input.userId,

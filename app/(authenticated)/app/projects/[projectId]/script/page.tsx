@@ -1,13 +1,17 @@
 import { notFound } from "next/navigation";
+import { BriefForm } from "@/components/projects/BriefForm";
+import { GenerateScriptPanel } from "@/components/projects/GenerateScriptPanel";
 import { ScriptEditor } from "@/components/projects/ScriptEditor";
 import {
   findProject,
   findProjectScriptDraft,
   listProjectScriptVersions,
 } from "@/db/repositories/projects.repository";
+import { findProjectBrief } from "@/db/repositories/project-briefs.repository";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import { getProjectEnvironment } from "@/lib/env/server";
 import { canEditProject } from "@/lib/policies/workspace-policy";
+import { loadScriptGenerationView } from "@/lib/scripts/script-generation-view";
 
 export default async function ProjectScriptPage({
   params,
@@ -21,21 +25,38 @@ export default async function ProjectScriptPage({
     workspaceId: context.activeMembership.workspaceId,
     projectId,
   };
-  const [project, draft, versions] = await Promise.all([
+  const [project, draft, versions, brief] = await Promise.all([
     findProject(scope),
     findProjectScriptDraft(scope),
     listProjectScriptVersions(scope),
+    findProjectBrief(scope),
   ]);
   if (!project || !draft) notFound();
+  const canEdit =
+    canEditProject(context.activeMembership.role) &&
+    project.status !== "archived";
+  const scriptGenerationView = await loadScriptGenerationView({
+    workspaceId: scope.workspaceId,
+    project,
+    brief,
+  });
   return (
-    <ScriptEditor
-      canEdit={
-        canEditProject(context.activeMembership.role) &&
-        project.status !== "archived"
-      }
-      draft={draft}
-      maximumCharacters={getProjectEnvironment().MAX_SCRIPT_CHARACTERS}
-      versions={versions}
-    />
+    <div className="space-y-6">
+      <BriefForm brief={brief} canEdit={canEdit} projectId={project.id} />
+      <GenerateScriptPanel
+        canEdit={canEdit}
+        estimatedCostCents={scriptGenerationView.estimatedCostCents}
+        hasBriefTopic={scriptGenerationView.hasBriefTopic}
+        initialLatestRun={scriptGenerationView.latestRun}
+        model={scriptGenerationView.model}
+        projectId={project.id}
+      />
+      <ScriptEditor
+        canEdit={canEdit}
+        draft={draft}
+        maximumCharacters={getProjectEnvironment().MAX_SCRIPT_CHARACTERS}
+        versions={versions}
+      />
+    </div>
   );
 }

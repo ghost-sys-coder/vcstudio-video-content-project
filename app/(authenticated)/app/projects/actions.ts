@@ -9,12 +9,27 @@ import {
   restoreScriptVersion,
   saveScriptDraft,
 } from "@/db/commands/script-commands";
+import { saveProjectBrief } from "@/db/commands/project-brief.command";
 import { updateProject } from "@/db/commands/update-project.command";
 import { findProject } from "@/db/repositories/projects.repository";
+import { findProjectBrief } from "@/db/repositories/project-briefs.repository";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import { getProjectEnvironment } from "@/lib/env/server";
 import { requireCapability } from "@/lib/policies/workspace-policy";
 import {
+  startScriptGeneration,
+  ScriptGenerationRequestError,
+} from "@/lib/scripts/start-script-generation";
+import {
+  loadScriptGenerationView,
+  type ScriptGenerationView,
+} from "@/lib/scripts/script-generation-view";
+import {
+  BudgetExceededError,
+  RateLimitExceededError,
+} from "@/lib/domain/errors";
+import {
+  briefSchema,
   createProjectSchema,
   createScriptContentSchema,
   createScriptVersionSchema,
@@ -108,6 +123,108 @@ export async function updateProjectAction(
       success: false,
     };
   }
+}
+
+export async function saveProjectBriefAction(
+  formData: FormData,
+): Promise<ProjectActionState> {
+  const rawDuration = String(
+    formData.get("targetDurationSeconds") ?? "",
+  ).trim();
+  const parsed = briefSchema.safeParse({
+    projectId: formData.get("projectId"),
+    topic: formData.get("topic") ?? "",
+    targetAudience: formData.get("targetAudience") ?? "",
+    tone: formData.get("tone") ?? "",
+    targetDurationSeconds: rawDuration === "" ? undefined : rawDuration,
+    primaryPlatform: formData.get("primaryPlatform"),
+    hookAngle: formData.get("hookAngle") ?? "",
+  });
+  if (!parsed.success)
+    return {
+      error: parsed.error.issues[0]?.message ?? "Invalid brief.",
+      success: false,
+    };
+  try {
+    const { context } = await requireProjectMutation(parsed.data.projectId);
+    await saveProjectBrief({
+      workspaceId: context.activeMembership.workspaceId,
+      projectId: parsed.data.projectId,
+      topic: parsed.data.topic,
+      targetAudience: parsed.data.targetAudience,
+      tone: parsed.data.tone,
+      targetDurationSeconds: parsed.data.targetDurationSeconds ?? null,
+      primaryPlatform: parsed.data.primaryPlatform,
+      hookAngle: parsed.data.hookAngle,
+      userId: context.user.id,
+    });
+    revalidatePath(`/app/projects/${parsed.data.projectId}/script`);
+    return { error: null, success: true };
+  } catch {
+    return { error: "The brief could not be saved.", success: false };
+  }
+}
+
+export async function generateScriptAction(
+  formData: FormData,
+): Promise<ProjectActionState> {
+  const projectId = String(formData.get("projectId") ?? "");
+  const requestNonce = String(formData.get("requestNonce") ?? "");
+  if (!projectId || !requestNonce)
+    return { error: "Invalid script generation request.", success: false };
+  try {
+    const { context, project } = await requireProjectMutation(projectId);
+    const brief = await findProjectBrief({
+      workspaceId: context.activeMembership.workspaceId,
+      projectId,
+    });
+    await startScriptGeneration({
+      workspaceId: context.activeMembership.workspaceId,
+      project,
+      brief,
+      requestedByUserId: context.user.id,
+      requestNonce,
+    });
+    revalidatePath(`/app/projects/${projectId}/script`);
+    return { error: null, success: true };
+  } catch (error) {
+    if (error instanceof ScriptGenerationRequestError)
+      return { error: error.message, success: false };
+    if (error instanceof RateLimitExceededError)
+      return { error: error.message, success: false };
+    if (error instanceof BudgetExceededError)
+      return {
+        error:
+          error.scope === "project"
+            ? "This script would exceed the project budget."
+            : error.scope === "workspace_daily"
+              ? "This script would exceed the workspace daily budget."
+              : "This script would exceed the workspace monthly budget.",
+        success: false,
+      };
+    return { error: "The script could not be generated.", success: false };
+  }
+}
+
+export async function loadScriptGenerationViewAction(
+  projectId: string,
+): Promise<ScriptGenerationView | null> {
+  const context = await getAuthenticatedWorkspaceContext();
+  if (!context) return null;
+  const project = await findProject({
+    workspaceId: context.activeMembership.workspaceId,
+    projectId,
+  });
+  if (!project) return null;
+  const brief = await findProjectBrief({
+    workspaceId: context.activeMembership.workspaceId,
+    projectId,
+  });
+  return loadScriptGenerationView({
+    workspaceId: context.activeMembership.workspaceId,
+    project,
+    brief,
+  });
 }
 
 export async function saveScriptDraftAction(

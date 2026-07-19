@@ -64,7 +64,14 @@
       "mcp__trigger__stop_dev_server",
       "Bash(RUN_DATABASE_INTEGRATION_TESTS=true npx vitest run db/integration/project-cast-postgres.integration.test.ts)",
       "Bash(echo \"FORMAT_EXIT=$?\")",
-      "Bash(echo \"LINT_EXIT=$?\")"
+      "Bash(echo \"LINT_EXIT=$?\")",
+      "Bash(echo \"FORMAT=$?\")",
+      "Bash(echo \"LINT=$?\")",
+      "Bash(touch /tmp/done_marker)",
+      "Bash(break)"
+    ],
+    "additionalDirectories": [
+      "\\tmp"
     ]
   }
 }

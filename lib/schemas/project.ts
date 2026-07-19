@@ -35,6 +35,23 @@ export const updateProjectSchema = createProjectSchema.extend({
   status: projectStatusSchema,
 });
 
+export const contentPlatformSchema = z.enum([
+  "youtube",
+  "tiktok",
+  "facebook",
+  "instagram",
+]);
+
+export const briefSchema = z.object({
+  projectId: z.uuid(),
+  topic: z.string().trim().max(2000).default(""),
+  targetAudience: z.string().trim().max(1000).default(""),
+  tone: z.string().trim().max(500).default(""),
+  targetDurationSeconds: z.coerce.number().int().min(1).max(7200).nullish(),
+  primaryPlatform: contentPlatformSchema,
+  hookAngle: z.string().trim().max(1000).default(""),
+});
+
 export const scriptMutationSchema = z.object({
   projectId: z.uuid(),
   content: z.string(),
