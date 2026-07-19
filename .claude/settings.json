@@ -61,7 +61,10 @@
       "mcp__trigger__trigger_task",
       "mcp__trigger__wait_for_run_to_complete",
       "mcp__trigger__get_run_details",
-      "mcp__trigger__stop_dev_server"
+      "mcp__trigger__stop_dev_server",
+      "Bash(RUN_DATABASE_INTEGRATION_TESTS=true npx vitest run db/integration/project-cast-postgres.integration.test.ts)",
+      "Bash(echo \"FORMAT_EXIT=$?\")",
+      "Bash(echo \"LINT_EXIT=$?\")"
     ]
   }
 }

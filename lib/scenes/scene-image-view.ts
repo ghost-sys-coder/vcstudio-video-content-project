@@ -59,6 +59,9 @@ export interface SceneImageDetailsView {
   configuration: SceneImageClientConfiguration;
   promptTemplateVersion: string;
   availableBudgetCents: number;
+  // Canonical references (one per assigned character) pre-selected by default so
+  // generations stay character-consistent without manual reference picking.
+  defaultReferenceAssetIds: string[];
 }
 
 export type SceneImageDetailsResponse =

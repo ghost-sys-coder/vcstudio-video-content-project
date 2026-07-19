@@ -3,7 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { tasks } from "@trigger.dev/sdk";
 import { assignSceneCharacters } from "@/db/commands/character-commands";
-import { assignSceneCharactersSchema } from "@/lib/schemas/character";
+import {
+  addCharacterToProjectCast,
+  applyCastToScenes,
+  removeCharacterFromProjectCast,
+} from "@/db/commands/project-characters.command";
+import {
+  applyCastToScenesSchema,
+  assignSceneCharactersSchema,
+  projectCastMemberSchema,
+} from "@/lib/schemas/character";
 import type { sceneAnalysisTask } from "@/trigger/scene-analysis";
 import { findProject } from "@/db/repositories/projects.repository";
 import {
@@ -88,6 +97,117 @@ export async function assignSceneCharactersAction(
     return {
       success: false,
       error: "The scene characters could not be assigned.",
+    };
+  }
+}
+
+export async function addCastCharacterAction(
+  formData: FormData,
+): Promise<SceneActionState> {
+  const parsed = projectCastMemberSchema.safeParse(
+    Object.fromEntries(formData),
+  );
+  if (!parsed.success)
+    return { success: false, error: "Invalid cast character." };
+  try {
+    const { context } = await requireProjectMutation(
+      parsed.data.projectId,
+      "editScenes",
+    );
+    await addCharacterToProjectCast({
+      workspaceId: context.activeMembership.workspaceId,
+      projectId: parsed.data.projectId,
+      characterId: parsed.data.characterId,
+      userId: context.user.id,
+    });
+    revalidatePath(`/app/projects/${parsed.data.projectId}/scenes`);
+    return { success: true, error: null };
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message === "PROJECT_CAST_LIMIT_REACHED"
+    )
+      return {
+        success: false,
+        error: "This project's cast is full. Remove a character first.",
+      };
+    return {
+      success: false,
+      error: "The character could not be added to the cast.",
+    };
+  }
+}
+
+export async function removeCastCharacterAction(
+  formData: FormData,
+): Promise<SceneActionState> {
+  const parsed = projectCastMemberSchema.safeParse(
+    Object.fromEntries(formData),
+  );
+  if (!parsed.success)
+    return { success: false, error: "Invalid cast character." };
+  try {
+    const { context } = await requireProjectMutation(
+      parsed.data.projectId,
+      "editScenes",
+    );
+    await removeCharacterFromProjectCast({
+      workspaceId: context.activeMembership.workspaceId,
+      projectId: parsed.data.projectId,
+      characterId: parsed.data.characterId,
+    });
+    revalidatePath(`/app/projects/${parsed.data.projectId}/scenes`);
+    return { success: true, error: null };
+  } catch {
+    return {
+      success: false,
+      error: "The character could not be removed from the cast.",
+    };
+  }
+}
+
+export type ApplyCastActionState = SceneActionState & {
+  scenesAffected: number;
+  assignmentsCreated: number;
+};
+
+export async function applyCastToScenesAction(
+  formData: FormData,
+): Promise<ApplyCastActionState> {
+  const parsed = applyCastToScenesSchema.safeParse(
+    Object.fromEntries(formData),
+  );
+  if (!parsed.success)
+    return {
+      success: false,
+      error: "Invalid apply request.",
+      scenesAffected: 0,
+      assignmentsCreated: 0,
+    };
+  try {
+    const { context } = await requireProjectMutation(
+      parsed.data.projectId,
+      "editScenes",
+    );
+    const result = await applyCastToScenes({
+      workspaceId: context.activeMembership.workspaceId,
+      projectId: parsed.data.projectId,
+      mode: parsed.data.mode,
+      userId: context.user.id,
+    });
+    revalidatePath(`/app/projects/${parsed.data.projectId}/scenes`);
+    return {
+      success: true,
+      error: null,
+      scenesAffected: result.scenesAffected,
+      assignmentsCreated: result.assignmentsCreated,
+    };
+  } catch {
+    return {
+      success: false,
+      error: "The cast could not be applied to scenes.",
+      scenesAffected: 0,
+      assignmentsCreated: 0,
     };
   }
 }

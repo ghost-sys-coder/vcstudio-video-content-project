@@ -15,8 +15,11 @@ import {
   listCharacters,
   listSceneVersionCharacters,
 } from "@/db/repositories/characters.repository";
+import { listProjectCast } from "@/db/repositories/project-characters.repository";
 import { listSceneImageGenerationsForSceneVersions } from "@/db/repositories/scene-images.repository";
 import { buildSceneImageIndicatorMap } from "@/lib/scenes/scene-image-indicator";
+import { matchCharacterNamesToCast } from "@/lib/scenes/character-name-matching";
+import type { ProjectCastEntry } from "@/components/scenes/ProjectCastPanel";
 
 export default async function ProjectScenesPage({
   params,
@@ -45,7 +48,7 @@ export default async function ProjectScenesPage({
     listCurrentScenes(scope),
   ]);
   if (!project) notFound();
-  const [availableCharacters, assignments, imageGenerations] =
+  const [availableCharacters, assignments, imageGenerations, cast] =
     await Promise.all([
       listCharacters({ workspaceId: scope.workspaceId, status: "active" }),
       listSceneVersionCharacters({
@@ -56,7 +59,35 @@ export default async function ProjectScenesPage({
         ...scope,
         sceneVersionIds: rows.map((row) => row.version.id),
       }),
+      listProjectCast(scope),
     ]);
+  const castCandidates = cast.map((member) => ({
+    id: member.characterId,
+    name: member.character.name,
+  }));
+  const matchedSceneCountByCharacter = new Map<string, number>();
+  for (const row of rows) {
+    for (const characterId of matchCharacterNamesToCast(
+      row.version.characterNames ?? [],
+      castCandidates,
+    )) {
+      matchedSceneCountByCharacter.set(
+        characterId,
+        (matchedSceneCountByCharacter.get(characterId) ?? 0) + 1,
+      );
+    }
+  }
+  const castEntries: ProjectCastEntry[] = cast.map((member) => ({
+    characterId: member.characterId,
+    name: member.character.name,
+    status: member.character.status,
+    matchedSceneCount:
+      matchedSceneCountByCharacter.get(member.characterId) ?? 0,
+  }));
+  const castCharacterIds = new Set(cast.map((member) => member.characterId));
+  const castAvailableCharacters = availableCharacters.filter(
+    (character) => !castCharacterIds.has(character.id),
+  );
   const imageIndicatorBySceneId = buildSceneImageIndicatorMap(imageGenerations);
   const rowsWithCharacters = rows.map((row) => ({
     ...row,
@@ -98,6 +129,8 @@ export default async function ProjectScenesPage({
       projectId={project.id}
       rows={rowsWithCharacters}
       availableCharacters={availableCharacters}
+      cast={castEntries}
+      castAvailableCharacters={castAvailableCharacters}
       projectAspectRatio={project.aspectRatio}
       canGenerateImages={
         can(context.activeMembership.role, "generateSceneImages") &&

@@ -93,6 +93,7 @@ export const sceneImageDetailsResponseSchema = z.discriminatedUnion("success", [
       }),
       promptTemplateVersion: z.string(),
       availableBudgetCents: z.number().int().nonnegative(),
+      defaultReferenceAssetIds: z.array(z.uuid()),
     }),
   }),
   z.object({ success: z.literal(false), error: z.string() }),

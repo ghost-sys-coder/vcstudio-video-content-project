@@ -34,11 +34,35 @@ export const updateCharacterSchema = characterFormSchema.extend({
 
 export const characterIdSchema = z.object({ characterId: z.uuid() });
 
+export const generatableCharacterReferenceTypes = [
+  "master",
+  "front",
+  "threeQuarter",
+  "side",
+  "fullBody",
+] as const;
+
+export const generateCharacterReferenceSchema = z.object({
+  characterId: z.uuid(),
+  referenceType: z.enum(generatableCharacterReferenceTypes),
+  requestNonce: z.string().trim().min(1).max(200),
+});
+
 export const assignSceneCharactersSchema = z.object({
   projectId: z.uuid(),
   sceneId: z.uuid(),
   sceneVersionId: z.uuid(),
   characterIds: z.array(z.uuid()).max(50),
+});
+
+export const projectCastMemberSchema = z.object({
+  projectId: z.uuid(),
+  characterId: z.uuid(),
+});
+
+export const applyCastToScenesSchema = z.object({
+  projectId: z.uuid(),
+  mode: z.enum(["matched", "all"]),
 });
 
 export function createCharacterReferenceUploadSchema(input: {

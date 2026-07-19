@@ -18,6 +18,8 @@ import {
   listCurrentScenes,
 } from "@/db/repositories/scenes.repository";
 import { findProjectScriptVersion } from "@/db/repositories/projects.repository";
+import { listProjectCast } from "@/db/repositories/project-characters.repository";
+import { matchCharacterNamesToCast } from "@/lib/scenes/character-name-matching";
 import { BudgetExceededError } from "@/lib/domain/errors";
 
 export async function approveScriptVersion(input: {
@@ -330,6 +332,37 @@ export async function completeSceneAnalysis(input: {
         ),
       ),
   ]);
+
+  // Auto-apply the project cast to the freshly created scene versions so
+  // characters flow into scenes without manual per-scene assignment. Matched by
+  // the analysis-extracted character names; a no-op when the cast is empty.
+  const cast = await listProjectCast({
+    workspaceId: input.workspaceId,
+    projectId: input.projectId,
+  });
+  if (cast.length > 0) {
+    const candidates = cast.map((member) => ({
+      id: member.characterId,
+      name: member.character.name,
+    }));
+    const assignmentRows = versionRows.flatMap((version) =>
+      matchCharacterNamesToCast(version.characterNames ?? [], candidates).map(
+        (characterId) => ({
+          workspaceId: input.workspaceId,
+          projectId: input.projectId,
+          sceneVersionId: version.id,
+          characterId,
+          assignedByUserId: input.userId,
+        }),
+      ),
+    );
+    if (assignmentRows.length > 0) {
+      await getDatabase()
+        .insert(sceneVersionCharacters)
+        .values(assignmentRows)
+        .onConflictDoNothing();
+    }
+  }
 }
 
 export async function failSceneAnalysis(input: {

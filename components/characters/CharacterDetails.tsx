@@ -1,18 +1,23 @@
 import type { Character, CharacterReferenceAsset } from "@/db/schema";
+import type { CharacterPortraitView } from "@/lib/characters/character-reference-generation-view";
 import { ArchiveCharacterDialog } from "@/components/characters/ArchiveCharacterDialog";
 import { CharacterForm } from "@/components/characters/CharacterForm";
+import { CharacterPortraitGenerationList } from "@/components/characters/CharacterPortraitGenerationList";
 import { CharacterReferenceGallery } from "@/components/characters/CharacterReferenceGallery";
 import { CharacterReferenceUploader } from "@/components/characters/CharacterReferenceUploader";
 import { CharacterStatusBadge } from "@/components/characters/CharacterStatusBadge";
+import { GenerateCharacterPortraitDialog } from "@/components/characters/GenerateCharacterPortraitDialog";
 
 export function CharacterDetails({
   character,
   references,
   canManage,
+  portrait,
 }: {
   character: Character;
   references: CharacterReferenceAsset[];
   canManage: boolean;
+  portrait: CharacterPortraitView | null;
 }) {
   const editable = canManage && character.status !== "archived";
   return (
@@ -58,6 +63,34 @@ export function CharacterDetails({
           references={references}
         />
       </section>
+      {editable && portrait ? (
+        <section className="space-y-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">Generated portraits</h2>
+              <p className="text-sm text-muted-foreground">
+                Generate canonical reference images from this character&apos;s
+                identity. They join the gallery above and are used automatically
+                in scenes.
+              </p>
+            </div>
+            {portrait.enabled ? (
+              <GenerateCharacterPortraitDialog
+                characterId={character.id}
+                model={portrait.model}
+                views={portrait.views}
+              />
+            ) : null}
+          </div>
+          {portrait.enabled ? (
+            <CharacterPortraitGenerationList rows={portrait.recent} />
+          ) : (
+            <p className="rounded-xl border bg-muted/30 p-4 text-sm text-muted-foreground">
+              Portrait generation is disabled by server configuration.
+            </p>
+          )}
+        </section>
+      ) : null}
     </div>
   );
 }

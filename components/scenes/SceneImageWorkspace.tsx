@@ -75,7 +75,12 @@ export function SceneImageWorkspace({
             : (defaultPreset?.versionId ?? ""),
         quality: current?.quality ?? nextDetails.configuration.draftQuality,
         size: current?.size ?? nextDetails.configuration.defaultSize,
-        referenceAssetIds: (current?.referenceAssetIds ?? []).filter((id) =>
+        // First load (no prior selection) pre-selects the canonical references
+        // for the scene's assigned characters; later refreshes keep the user's
+        // choice. Always drop ids no longer eligible.
+        referenceAssetIds: (
+          current?.referenceAssetIds ?? nextDetails.defaultReferenceAssetIds
+        ).filter((id) =>
           nextDetails.references.some((reference) => reference.id === id),
         ),
       };
