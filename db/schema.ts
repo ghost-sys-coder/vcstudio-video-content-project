@@ -57,6 +57,11 @@ export const characterReferenceSourceEnum = pgEnum(
   ["uploaded", "generated"],
 );
 
+export const characterReferenceGenerationStatusEnum = pgEnum(
+  "character_reference_generation_status",
+  ["queued", "running", "succeeded", "failed"],
+);
+
 export const characterAuditActionEnum = pgEnum("character_audit_action", [
   "archived",
   "referenceDeleted",
@@ -459,6 +464,87 @@ export const characterAuditEvents = pgTable(
   ],
 );
 
+// Workspace-scoped, self-contained record for generating a character reference
+// portrait. Portraits belong to a character, not a project, so their spend is
+// tracked here (estimated/actual cost + status) rather than on the
+// project-scoped `usage_reservations` ledger.
+export const characterReferenceGenerations = pgTable(
+  "character_reference_generations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    characterId: uuid("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "cascade" }),
+    referenceType: characterReferenceTypeEnum("reference_type").notNull(),
+    status: characterReferenceGenerationStatusEnum("status")
+      .notNull()
+      .default("queued"),
+    model: text("model").notNull(),
+    size: text("size").notNull(),
+    quality: text("quality").notNull(),
+    outputFormat: text("output_format").notNull(),
+    outputCompression: integer("output_compression").notNull(),
+    background: text("background").notNull(),
+    finalPrompt: text("final_prompt").notNull(),
+    promptTemplateVersion: text("prompt_template_version").notNull(),
+    promptTemplateVersionId: uuid("prompt_template_version_id")
+      .notNull()
+      .references(() => promptTemplateVersions.id, { onDelete: "restrict" }),
+    requestNonce: text("request_nonce").notNull(),
+    idempotencyKey: text("idempotency_key").notNull(),
+    requestFingerprint: text("request_fingerprint").notNull(),
+    estimatedCostCents: integer("estimated_cost_cents").notNull(),
+    actualCostCents: integer("actual_cost_cents"),
+    progressPercent: integer("progress_percent").notNull().default(0),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    resultReferenceAssetId: uuid("result_reference_asset_id"),
+    providerRequestId: text("provider_request_id"),
+    triggerRunId: text("trigger_run_id"),
+    safeErrorMessage: text("safe_error_message"),
+    requestedByUserId: uuid("requested_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("character_reference_generations_idempotency_unique").on(
+      table.idempotencyKey,
+    ),
+    uniqueIndex("character_reference_generations_workspace_nonce_unique").on(
+      table.workspaceId,
+      table.requestNonce,
+    ),
+    index("character_reference_generations_character_index").on(
+      table.workspaceId,
+      table.characterId,
+      table.createdAt,
+    ),
+    index("character_reference_generations_status_index").on(
+      table.workspaceId,
+      table.status,
+      table.createdAt,
+    ),
+    check(
+      "character_reference_generations_cost_nonnegative",
+      sql`${table.estimatedCostCents} >= 0 and (${table.actualCostCents} is null or ${table.actualCostCents} >= 0)`,
+    ),
+    check(
+      "character_reference_generations_progress_range",
+      sql`${table.progressPercent} between 0 and 100`,
+    ),
+  ],
+);
+
 export const projects = pgTable(
   "projects",
   {
@@ -819,6 +905,42 @@ export const sceneVersionCharacters = pgTable(
       table.sceneVersionId,
     ),
     index("scene_version_characters_character_index").on(table.characterId),
+  ],
+);
+
+// The durable project "cast": which characters a project uses. Survives scene
+// re-analysis (which creates new `sceneVersions`) so the roster can be
+// re-applied to freshly generated scene versions.
+export const projectCharacters = pgTable(
+  "project_characters",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    characterId: uuid("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "cascade" }),
+    addedByUserId: uuid("added_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("project_characters_project_character_unique").on(
+      table.projectId,
+      table.characterId,
+    ),
+    index("project_characters_workspace_project_index").on(
+      table.workspaceId,
+      table.projectId,
+    ),
+    index("project_characters_character_index").on(table.characterId),
   ],
 );
 
@@ -1954,6 +2076,10 @@ export type CharacterReferenceType =
   (typeof characterReferenceTypeEnum.enumValues)[number];
 export type CharacterReferenceSource =
   (typeof characterReferenceSourceEnum.enumValues)[number];
+export type CharacterReferenceGeneration =
+  typeof characterReferenceGenerations.$inferSelect;
+export type CharacterReferenceGenerationStatus =
+  (typeof characterReferenceGenerationStatusEnum.enumValues)[number];
 export type Project = typeof projects.$inferSelect;
 export type ProjectStatus = (typeof projectStatusEnum.enumValues)[number];
 export type ProjectAspectRatio =
@@ -1964,6 +2090,7 @@ export type SceneAnalysisRun = typeof sceneAnalysisRuns.$inferSelect;
 export type Scene = typeof scenes.$inferSelect;
 export type SceneVersion = typeof sceneVersions.$inferSelect;
 export type SceneStatus = (typeof sceneStatusEnum.enumValues)[number];
+export type ProjectCharacter = typeof projectCharacters.$inferSelect;
 export type StylePreset = typeof stylePresets.$inferSelect;
 export type StylePresetVersion = typeof stylePresetVersions.$inferSelect;
 export type PromptTemplateVersion = typeof promptTemplateVersions.$inferSelect;

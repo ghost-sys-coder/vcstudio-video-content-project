@@ -7,6 +7,7 @@ import {
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import { can } from "@/lib/policies/workspace-policy";
 import { getCharacterEnvironment } from "@/lib/env/server";
+import { loadCharacterPortraitView } from "@/lib/characters/character-reference-generation-view";
 
 export default async function CharacterPage({
   params,
@@ -26,11 +27,20 @@ export default async function CharacterPage({
     listCharacterReferences(scope),
   ]);
   if (!character) notFound();
+  const canManage = can(context.activeMembership.role, "manageCharacters");
+  const portrait =
+    canManage && character.status !== "archived"
+      ? await loadCharacterPortraitView({
+          workspaceId: scope.workspaceId,
+          character,
+        })
+      : null;
   return (
     <CharacterDetails
-      canManage={can(context.activeMembership.role, "manageCharacters")}
+      canManage={canManage}
       character={character}
       references={references}
+      portrait={portrait}
     />
   );
 }

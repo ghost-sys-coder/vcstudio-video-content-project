@@ -14,3 +14,14 @@ export type {
   SceneImagePromptInput,
   SceneImagePromptReference,
 } from "./scene-image";
+export {
+  renderCharacterReferencePrompt,
+  CHARACTER_REFERENCE_PROMPT_TEMPLATE_SOURCE,
+  CHARACTER_REFERENCE_PROMPT_TEMPLATE_SOURCE_HASH,
+  CHARACTER_REFERENCE_PROMPT_VERSION,
+} from "./character-reference";
+export type {
+  CharacterReferencePromptCharacter,
+  CharacterReferencePromptInput,
+  CharacterReferenceView,
+} from "./character-reference";

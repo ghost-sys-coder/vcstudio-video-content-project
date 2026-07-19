@@ -43,6 +43,50 @@ function formatCreatedAt(value: Date): string {
   return `${value.toISOString().slice(0, 16).replace("T", " ")} UTC`;
 }
 
+// Preference order for the single canonical reference chosen per character when
+// pre-selecting defaults. Non-identity views (expression/outfit/pose) are never
+// auto-selected.
+const canonicalReferencePriority: CharacterReferenceType[] = [
+  "master",
+  "front",
+  "threeQuarter",
+  "side",
+  "fullBody",
+];
+
+/**
+ * Pick one canonical reference per assigned character (highest-priority view
+ * available), capped at `maximum`, so scene image generation is
+ * character-consistent by default without manual reference selection.
+ */
+function selectDefaultReferenceAssetIds(
+  rows: {
+    character: { id: string; name: string };
+    reference: { id: string; type: CharacterReferenceType };
+  }[],
+  maximum: number,
+): string[] {
+  const bestByCharacter = new Map<
+    string,
+    { referenceId: string; name: string; rank: number }
+  >();
+  for (const { character, reference } of rows) {
+    const rank = canonicalReferencePriority.indexOf(reference.type);
+    if (rank === -1) continue;
+    const existing = bestByCharacter.get(character.id);
+    if (!existing || rank < existing.rank)
+      bestByCharacter.set(character.id, {
+        referenceId: reference.id,
+        name: character.name,
+        rank,
+      });
+  }
+  return [...bestByCharacter.values()]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .slice(0, maximum)
+    .map((entry) => entry.referenceId);
+}
+
 export async function loadSceneImageDetails(input: {
   workspaceId: string;
   project: Project;
@@ -194,6 +238,13 @@ export async function loadSceneImageDetails(input: {
       outputCostMatrix: createSceneImageOutputCostMatrix(environment),
     },
     promptTemplateVersion: SCENE_IMAGE_PROMPT_VERSION,
+    defaultReferenceAssetIds: selectDefaultReferenceAssetIds(
+      referenceRows.map(({ character, reference }) => ({
+        character,
+        reference,
+      })),
+      environment.MAX_REFERENCE_ASSETS_PER_GENERATION,
+    ),
     availableBudgetCents: calculateAvailableSceneImageBudgetCents({
       projectLimitCents: input.project.maximumBudgetCents,
       projectCommittedCents,

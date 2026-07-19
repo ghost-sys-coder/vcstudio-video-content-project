@@ -69,6 +69,41 @@ export async function inspectCharacterReference(objectKey: string) {
   return { head, width, height };
 }
 
+export async function putCharacterReferenceImage(input: {
+  objectKey: string;
+  bytes: Uint8Array;
+  contentType: string;
+  width: number;
+  height: number;
+}): Promise<{
+  objectKey: string;
+  contentType: string;
+  sizeBytes: number;
+  width: number;
+  height: number;
+  etag: string;
+}> {
+  const environment = getStorageEnvironment();
+  const response = await getR2Client().send(
+    new PutObjectCommand({
+      Bucket: environment.R2_BUCKET_NAME,
+      Key: input.objectKey,
+      Body: input.bytes,
+      ContentLength: input.bytes.byteLength,
+      ContentType: input.contentType,
+    }),
+  );
+  if (!response.ETag) throw new Error("CHARACTER_REFERENCE_ETAG_MISSING");
+  return {
+    objectKey: input.objectKey,
+    contentType: input.contentType,
+    sizeBytes: input.bytes.byteLength,
+    width: input.width,
+    height: input.height,
+    etag: response.ETag,
+  };
+}
+
 export async function deleteCharacterReferenceObject(objectKey: string) {
   const environment = getStorageEnvironment();
   await getR2Client().send(

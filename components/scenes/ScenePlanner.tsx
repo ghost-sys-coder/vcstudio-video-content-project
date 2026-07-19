@@ -10,6 +10,10 @@ import { ScenePlannerHeader } from "@/components/scenes/ScenePlannerHeader";
 import { AnalysisProgressPanel } from "@/components/scenes/AnalysisProgressPanel";
 import { SceneAnalysisErrorState } from "@/components/scenes/SceneAnalysisErrorState";
 import { SceneList } from "@/components/scenes/SceneList";
+import {
+  ProjectCastPanel,
+  type ProjectCastEntry,
+} from "@/components/scenes/ProjectCastPanel";
 
 export function ScenePlanner({
   projectId,
@@ -20,6 +24,8 @@ export function ScenePlanner({
   canEdit,
   initialSceneNumber,
   availableCharacters,
+  cast,
+  castAvailableCharacters,
   projectAspectRatio,
   canGenerateImages,
   canReviewImages,
@@ -37,6 +43,8 @@ export function ScenePlanner({
   canEdit: boolean;
   initialSceneNumber: number | null;
   availableCharacters: Character[];
+  cast: ProjectCastEntry[];
+  castAvailableCharacters: Character[];
   projectAspectRatio: "16:9" | "9:16" | "1:1";
   canGenerateImages: boolean;
   canReviewImages: boolean;
@@ -58,6 +66,15 @@ export function ScenePlanner({
       {latestRun && active ? <AnalysisProgressPanel run={latestRun} /> : null}
       {latestRun?.status === "failed" ? (
         <SceneAnalysisErrorState run={latestRun} />
+      ) : null}
+      {rows.length > 0 ? (
+        <ProjectCastPanel
+          availableCharacters={castAvailableCharacters}
+          canEdit={canEdit}
+          cast={cast}
+          projectId={projectId}
+          totalScenes={rows.length}
+        />
       ) : null}
       <SceneList
         canEdit={canEdit}

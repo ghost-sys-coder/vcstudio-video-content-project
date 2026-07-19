@@ -14,8 +14,11 @@ import { requireCapability } from "@/lib/policies/workspace-policy";
 import {
   characterFormSchema,
   characterIdSchema,
+  generateCharacterReferenceSchema,
   updateCharacterSchema,
 } from "@/lib/schemas/character";
+import { startCharacterReferenceGeneration } from "@/lib/characters/start-character-reference-generation";
+import { BudgetExceededError } from "@/lib/domain/errors";
 
 export type CharacterActionState = { success: boolean; error: string | null };
 
@@ -57,6 +60,38 @@ export async function createCharacterAction(
   }
   revalidatePath("/app/characters");
   redirect(`/app/characters/${characterId}`);
+}
+
+export async function generateCharacterReferenceAction(
+  formData: FormData,
+): Promise<CharacterActionState> {
+  const parsed = generateCharacterReferenceSchema.safeParse(
+    Object.fromEntries(formData),
+  );
+  if (!parsed.success)
+    return { success: false, error: "Invalid portrait request." };
+  try {
+    const context = await requireCharacterManager();
+    await startCharacterReferenceGeneration({
+      workspaceId: context.activeMembership.workspaceId,
+      requestedByUserId: context.user.id,
+      characterId: parsed.data.characterId,
+      referenceType: parsed.data.referenceType,
+      requestNonce: parsed.data.requestNonce,
+    });
+    revalidatePath(`/app/characters/${parsed.data.characterId}`);
+    return { success: true, error: null };
+  } catch (error) {
+    if (error instanceof BudgetExceededError)
+      return {
+        success: false,
+        error:
+          error.scope === "workspace_daily"
+            ? "This portrait would exceed the workspace daily budget."
+            : "This portrait would exceed the workspace monthly budget.",
+      };
+    return { success: false, error: "The portrait could not be started." };
+  }
 }
 
 export async function updateCharacterAction(
