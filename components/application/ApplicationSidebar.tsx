@@ -3,6 +3,7 @@
 import {
   FolderKanban,
   LayoutDashboard,
+  ReceiptText,
   Settings,
   UsersIcon,
 } from "lucide-react";
@@ -28,11 +29,13 @@ import {
 export function ApplicationSidebar({
   activeMembership,
   canManageSettings,
+  canManageUsage,
   logoUrl,
   memberships,
 }: {
   activeMembership: WorkspaceMembershipView;
   canManageSettings: boolean;
+  canManageUsage: boolean;
   logoUrl: string | null;
   memberships: WorkspaceMembershipView[];
 }) {
@@ -105,6 +108,18 @@ export function ApplicationSidebar({
                   <span>Projects</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              {canManageUsage ? (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={pathname.startsWith("/app/usage")}
+                    render={<Link href="/app/usage" />}
+                    tooltip="Usage & budgets"
+                  >
+                    <ReceiptText />
+                    <span>Usage &amp; budgets</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ) : null}
               {canManageSettings ? (
                 <SidebarMenuItem>
                   <SidebarMenuButton

@@ -418,6 +418,46 @@ export const renderEnvironmentSchema = z.object({
     .transform((value) => value === "true"),
 });
 
+// Phase 10 usage/budget configuration read in the web runtime when it resolves
+// a workspace's effective budgets and decides whether an estimate crosses the
+// manual-confirmation threshold. The daily/monthly defaults mirror the other
+// budget-bearing groups (they seed a workspace's editable settings row); the
+// threshold is a Vercel-only preflight/UX value that no worker reads.
+export const usageEnvironmentSchema = z.object({
+  DEFAULT_DAILY_BUDGET_CENTS: z.coerce.number().int().positive().default(500),
+  DEFAULT_MONTHLY_BUDGET_CENTS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(5000),
+  MANUAL_CONFIRMATION_THRESHOLD_CENTS: z.coerce
+    .number()
+    .int()
+    .nonnegative()
+    .max(100000)
+    .default(100),
+  // Fixed-window rate limiting for billable/mutating operations. Enforced in the
+  // web runtime before a reservation is created, so these are Vercel-only.
+  RATE_LIMIT_WINDOW_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(3600)
+    .default(60),
+  RATE_LIMIT_GENERATIONS_PER_WINDOW: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(1000)
+    .default(30),
+  RATE_LIMIT_RENDERS_PER_WINDOW: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(1000)
+    .default(10),
+});
+
 export type ServerEnvironment = z.infer<typeof serverEnvironmentSchema>;
 export type DatabaseEnvironment = z.infer<typeof databaseEnvironmentSchema>;
 export type ClerkWebhookEnvironment = z.infer<
@@ -433,6 +473,7 @@ export type SceneImageEnvironment = z.infer<typeof sceneImageEnvironmentSchema>;
 export type SceneAudioEnvironment = z.infer<typeof sceneAudioEnvironmentSchema>;
 export type SubtitleEnvironment = z.infer<typeof subtitleEnvironmentSchema>;
 export type RenderEnvironment = z.infer<typeof renderEnvironmentSchema>;
+export type UsageEnvironment = z.infer<typeof usageEnvironmentSchema>;
 
 export function parseServerEnvironment(
   environment: Record<string, string | undefined>,

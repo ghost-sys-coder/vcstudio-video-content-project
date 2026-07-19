@@ -50,6 +50,7 @@ export interface StoryboardBatchView {
 export interface StoryboardConfigurationView {
   enabled: boolean;
   maximumImagesPerBatch: number;
+  manualConfirmationThresholdCents: number;
   draftQuality: "low";
   finalQuality: "medium";
   defaultSize: SceneImageApiSize;

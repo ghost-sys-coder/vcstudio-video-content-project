@@ -25,6 +25,10 @@ import {
   calculateAvailableSceneImageBudgetCents,
   getUtcBudgetWindowStarts,
 } from "@/lib/scenes/scene-image-budget";
+import { loadEffectiveWorkspaceBudget } from "@/lib/budgets/workspace-budget";
+import { loadEffectiveWorkspaceLimits } from "@/lib/budgets/current-settings";
+import { recordAuditEvent } from "@/lib/audit/record-audit-event";
+import { enforceRateLimit } from "@/lib/rate-limit/enforce-rate-limit";
 import { buildSubtitleContext } from "@/lib/subtitles/subtitle-workspace-details";
 import type { videoRenderTask } from "@/trigger/video-render";
 
@@ -77,6 +81,11 @@ export async function startVideoRender(input: {
   const environment = getRenderEnvironment();
   if (!environment.ENABLE_VIDEO_RENDERING)
     throw new VideoRenderRequestError("Video rendering is currently disabled.");
+  await enforceRateLimit({
+    workspaceId: input.workspaceId,
+    operation: "video_render",
+    now: input.now,
+  });
 
   const preset = defaultPresetForAspectRatio(input.project.aspectRatio);
   if (input.presetId && input.presetId !== preset.id)
@@ -105,9 +114,12 @@ export async function startVideoRender(input: {
     includeWatermark: input.includeWatermark,
   });
 
+  const effectiveLimits = await loadEffectiveWorkspaceLimits({
+    workspaceId: input.workspaceId,
+  });
   const durationValidation = validateRenderDuration({
     durationMilliseconds: snapshot.totalDurationMilliseconds,
-    maxRenderDurationSeconds: environment.MAX_RENDER_DURATION_SECONDS,
+    maxRenderDurationSeconds: effectiveLimits.maxRenderDurationSeconds,
   });
   if (!durationValidation.ok)
     throw new VideoRenderRequestError(durationValidation.reason);
@@ -127,6 +139,9 @@ export async function startVideoRender(input: {
   const now = input.now ?? new Date();
   const { dailyWindowStart, monthlyWindowStart } =
     getUtcBudgetWindowStarts(now);
+  const effectiveBudget = await loadEffectiveWorkspaceBudget({
+    workspaceId: input.workspaceId,
+  });
   const scope = { workspaceId: input.workspaceId, projectId: input.project.id };
   const [
     projectCommittedCents,
@@ -146,9 +161,9 @@ export async function startVideoRender(input: {
   const availableBudgetCents = calculateAvailableSceneImageBudgetCents({
     projectLimitCents: input.project.maximumBudgetCents,
     projectCommittedCents,
-    workspaceDailyLimitCents: environment.DEFAULT_DAILY_BUDGET_CENTS,
+    workspaceDailyLimitCents: effectiveBudget.dailyBudgetCents,
     workspaceDailyCommittedCents,
-    workspaceMonthlyLimitCents: environment.DEFAULT_MONTHLY_BUDGET_CENTS,
+    workspaceMonthlyLimitCents: effectiveBudget.monthlyBudgetCents,
     workspaceMonthlyCommittedCents,
   });
   if (estimatedCostCents > availableBudgetCents)
@@ -206,8 +221,8 @@ export async function startVideoRender(input: {
           environment.VIDEO_RENDER_RESERVATION_EXPIRY_MINUTES * 60_000,
       ),
       budget: {
-        workspaceDailyLimitCents: environment.DEFAULT_DAILY_BUDGET_CENTS,
-        workspaceMonthlyLimitCents: environment.DEFAULT_MONTHLY_BUDGET_CENTS,
+        workspaceDailyLimitCents: effectiveBudget.dailyBudgetCents,
+        workspaceMonthlyLimitCents: effectiveBudget.monthlyBudgetCents,
         dailyWindowStart,
         monthlyWindowStart,
       },
@@ -219,6 +234,21 @@ export async function startVideoRender(input: {
       );
     throw error;
   }
+
+  if (reservation.created)
+    await recordAuditEvent({
+      workspaceId: input.workspaceId,
+      actorUserId: input.requestedByUserId,
+      projectId: input.project.id,
+      action: "render_started",
+      targetType: "video_render",
+      targetId: renderId,
+      metadata: {
+        preset: preset.id,
+        estimatedCostCents,
+        durationMilliseconds: snapshot.totalDurationMilliseconds,
+      },
+    });
 
   // An existing render for this exact timeline is reused rather than re-billed.
   if (!reservation.created)

@@ -31,6 +31,12 @@ export default defineConfig({
   legacyDevProcessCwdBehaviour: false,
   build: {
     conditions: ["react-server"],
+    // Remotion's renderer and bundler (the bundler pulls in @rspack/core) ship
+    // native binaries and cannot be bundled — they must be installed in the
+    // deploy image so npm resolves the correct platform binding on the Linux
+    // build machine instead of the host's (e.g. win32) binding. See
+    // https://trigger.dev/docs/config/config-file#external.
+    external: ["@remotion/renderer", "@remotion/bundler", "remotion"],
     extensions: [
       // Provisions ffmpeg/ffprobe for Phase 7 audio inspection and Phase 9
       // video muxing.

@@ -1,0 +1,8 @@
+# Generated Drizzle migrations are immutable once applied. Formatting them would
+# rewrite committed snapshots of already-applied migrations, so they are excluded
+# from `prettier --write`.
+migrations/
+
+# Build and coverage output.
+.next/
+coverage/

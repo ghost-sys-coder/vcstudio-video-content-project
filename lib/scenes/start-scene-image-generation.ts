@@ -35,6 +35,8 @@ import {
   getUtcBudgetWindowStarts,
   type SceneImageBudgetConstraint,
 } from "@/lib/scenes/scene-image-budget";
+import { loadEffectiveWorkspaceBudget } from "@/lib/budgets/workspace-budget";
+import { enforceRateLimit } from "@/lib/rate-limit/enforce-rate-limit";
 import {
   createSceneImageOutputCostMatrix,
   getSceneImageCompression,
@@ -157,6 +159,10 @@ export async function startSceneImageGeneration(input: {
     throw new SceneImageGenerationRequestError(
       "Scene image generation is disabled.",
     );
+  await enforceRateLimit({
+    workspaceId: input.workspaceId,
+    operation: "scene_image_generation",
+  });
   if (
     input.request.referenceAssetIds.length >
     environment.MAX_REFERENCE_ASSETS_PER_GENERATION
@@ -325,6 +331,9 @@ export async function startSceneImageGeneration(input: {
   const { dailyWindowStart, monthlyWindowStart } = getUtcBudgetWindowStarts(
     new Date(),
   );
+  const effectiveBudget = await loadEffectiveWorkspaceBudget({
+    workspaceId: input.workspaceId,
+  });
   const [
     projectCommittedCents,
     workspaceDailyCommittedCents,
@@ -347,9 +356,9 @@ export async function startSceneImageGeneration(input: {
     snapshot: {
       projectLimitCents: input.project.maximumBudgetCents,
       projectCommittedCents,
-      workspaceDailyLimitCents: environment.DEFAULT_DAILY_BUDGET_CENTS,
+      workspaceDailyLimitCents: effectiveBudget.dailyBudgetCents,
       workspaceDailyCommittedCents,
-      workspaceMonthlyLimitCents: environment.DEFAULT_MONTHLY_BUDGET_CENTS,
+      workspaceMonthlyLimitCents: effectiveBudget.monthlyBudgetCents,
       workspaceMonthlyCommittedCents,
     },
     estimatedCostCents: estimate.estimatedCostCents,
@@ -425,8 +434,8 @@ export async function startSceneImageGeneration(input: {
             environment.GENERATION_RESERVATION_EXPIRY_MINUTES * 60_000,
         ),
         budget: {
-          workspaceDailyLimitCents: environment.DEFAULT_DAILY_BUDGET_CENTS,
-          workspaceMonthlyLimitCents: environment.DEFAULT_MONTHLY_BUDGET_CENTS,
+          workspaceDailyLimitCents: effectiveBudget.dailyBudgetCents,
+          workspaceMonthlyLimitCents: effectiveBudget.monthlyBudgetCents,
           dailyWindowStart,
           monthlyWindowStart,
         },

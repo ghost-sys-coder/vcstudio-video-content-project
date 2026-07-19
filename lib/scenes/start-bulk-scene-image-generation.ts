@@ -37,6 +37,9 @@ import {
   calculateAvailableSceneImageBudgetCents,
   getUtcBudgetWindowStarts,
 } from "@/lib/scenes/scene-image-budget";
+import { loadEffectiveWorkspaceBudget } from "@/lib/budgets/workspace-budget";
+import { loadEffectiveWorkspaceLimits } from "@/lib/budgets/current-settings";
+import { enforceRateLimit } from "@/lib/rate-limit/enforce-rate-limit";
 import {
   createSceneImageOutputCostMatrix,
   getSceneImageCompression,
@@ -113,15 +116,23 @@ export async function startBulkSceneImageGeneration(input: {
     throw new BulkSceneImageGenerationRequestError(
       "Scene image generation is disabled.",
     );
+  await enforceRateLimit({
+    workspaceId: input.workspaceId,
+    operation: "scene_image_generation",
+    now: input.now,
+  });
 
   const requestedSceneIds = [...new Set(input.request.sceneIds)];
   if (requestedSceneIds.length === 0)
     throw new BulkSceneImageGenerationRequestError(
       "Select at least one scene.",
     );
-  if (requestedSceneIds.length > environment.MAX_IMAGES_PER_BATCH)
+  const limits = await loadEffectiveWorkspaceLimits({
+    workspaceId: input.workspaceId,
+  });
+  if (requestedSceneIds.length > limits.maxImagesPerBatch)
     throw new BulkSceneImageGenerationRequestError(
-      `Generate no more than ${environment.MAX_IMAGES_PER_BATCH} scenes in a single batch.`,
+      `Generate no more than ${limits.maxImagesPerBatch} scenes in a single batch.`,
     );
 
   const scope = {
@@ -278,6 +289,9 @@ export async function startBulkSceneImageGeneration(input: {
   const now = input.now ?? new Date();
   const { dailyWindowStart, monthlyWindowStart } =
     getUtcBudgetWindowStarts(now);
+  const effectiveBudget = await loadEffectiveWorkspaceBudget({
+    workspaceId: scope.workspaceId,
+  });
   const [
     projectCommittedCents,
     workspaceDailyCommittedCents,
@@ -296,9 +310,9 @@ export async function startBulkSceneImageGeneration(input: {
   const availableBudgetCents = calculateAvailableSceneImageBudgetCents({
     projectLimitCents: input.project.maximumBudgetCents,
     projectCommittedCents,
-    workspaceDailyLimitCents: environment.DEFAULT_DAILY_BUDGET_CENTS,
+    workspaceDailyLimitCents: effectiveBudget.dailyBudgetCents,
     workspaceDailyCommittedCents,
-    workspaceMonthlyLimitCents: environment.DEFAULT_MONTHLY_BUDGET_CENTS,
+    workspaceMonthlyLimitCents: effectiveBudget.monthlyBudgetCents,
     workspaceMonthlyCommittedCents,
   });
   if (estimatedTotalCents > availableBudgetCents)
@@ -440,9 +454,8 @@ export async function startBulkSceneImageGeneration(input: {
               environment.GENERATION_RESERVATION_EXPIRY_MINUTES * 60_000,
           ),
           budget: {
-            workspaceDailyLimitCents: environment.DEFAULT_DAILY_BUDGET_CENTS,
-            workspaceMonthlyLimitCents:
-              environment.DEFAULT_MONTHLY_BUDGET_CENTS,
+            workspaceDailyLimitCents: effectiveBudget.dailyBudgetCents,
+            workspaceMonthlyLimitCents: effectiveBudget.monthlyBudgetCents,
             dailyWindowStart,
             monthlyWindowStart,
           },

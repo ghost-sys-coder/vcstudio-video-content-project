@@ -16,6 +16,8 @@ import {
   calculateAvailableSceneImageBudgetCents,
   getUtcBudgetWindowStarts,
 } from "@/lib/scenes/scene-image-budget";
+import { loadEffectiveWorkspaceBudget } from "@/lib/budgets/workspace-budget";
+import { loadEffectiveWorkspaceLimits } from "@/lib/budgets/current-settings";
 import { buildProjectTimeline } from "@/lib/timeline/scene-timeline";
 import type {
   AudioProgressCounts,
@@ -182,6 +184,13 @@ export async function loadAudioWorkspace(input: {
     }),
   );
 
+  const effectiveBudget = await loadEffectiveWorkspaceBudget({
+    workspaceId: input.workspaceId,
+  });
+  const effectiveLimits = await loadEffectiveWorkspaceLimits({
+    workspaceId: input.workspaceId,
+  });
+
   return {
     scenes,
     voicePresets: voicePresets.map((preset) => ({
@@ -205,7 +214,9 @@ export async function loadAudioWorkspace(input: {
     },
     configuration: {
       enabled: environment.ENABLE_SCENE_AUDIO_GENERATION,
-      maximumScenesPerBatch: environment.MAX_SCENES_PER_AUDIO_BATCH,
+      maximumScenesPerBatch: effectiveLimits.maxScenesPerAudioBatch,
+      manualConfirmationThresholdCents:
+        effectiveBudget.manualConfirmationThresholdCents,
       costPerMillionCharactersCents:
         environment.OPENAI_TTS_COST_PER_MILLION_CHARACTERS_CENTS,
       minimumEstimateCents: environment.OPENAI_TTS_MINIMUM_ESTIMATE_CENTS,
@@ -214,9 +225,9 @@ export async function loadAudioWorkspace(input: {
     availableBudgetCents: calculateAvailableSceneImageBudgetCents({
       projectLimitCents: input.project.maximumBudgetCents,
       projectCommittedCents,
-      workspaceDailyLimitCents: environment.DEFAULT_DAILY_BUDGET_CENTS,
+      workspaceDailyLimitCents: effectiveBudget.dailyBudgetCents,
       workspaceDailyCommittedCents,
-      workspaceMonthlyLimitCents: environment.DEFAULT_MONTHLY_BUDGET_CENTS,
+      workspaceMonthlyLimitCents: effectiveBudget.monthlyBudgetCents,
       workspaceMonthlyCommittedCents,
     }),
     progress,

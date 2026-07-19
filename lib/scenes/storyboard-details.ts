@@ -19,6 +19,8 @@ import {
   calculateAvailableSceneImageBudgetCents,
   getUtcBudgetWindowStarts,
 } from "@/lib/scenes/scene-image-budget";
+import { loadEffectiveWorkspaceBudget } from "@/lib/budgets/workspace-budget";
+import { loadEffectiveWorkspaceLimits } from "@/lib/budgets/current-settings";
 import { createSceneImageOutputCostMatrix } from "@/lib/scenes/scene-image-configuration";
 import { classifySceneBulkEligibility } from "@/lib/scenes/scene-image-eligibility";
 import type {
@@ -43,6 +45,12 @@ export async function loadStoryboard(input: {
   const { dailyWindowStart, monthlyWindowStart } = getUtcBudgetWindowStarts(
     input.now ?? new Date(),
   );
+  const effectiveBudget = await loadEffectiveWorkspaceBudget({
+    workspaceId: scope.workspaceId,
+  });
+  const effectiveLimits = await loadEffectiveWorkspaceLimits({
+    workspaceId: scope.workspaceId,
+  });
 
   const currentScenes = await listCurrentScenes(scope);
   const [
@@ -174,7 +182,9 @@ export async function loadStoryboard(input: {
     latestBatch: latestBatchView,
     configuration: {
       enabled: environment.ENABLE_SCENE_IMAGE_GENERATION,
-      maximumImagesPerBatch: environment.MAX_IMAGES_PER_BATCH,
+      maximumImagesPerBatch: effectiveLimits.maxImagesPerBatch,
+      manualConfirmationThresholdCents:
+        effectiveBudget.manualConfirmationThresholdCents,
       draftQuality: environment.OPENAI_IMAGE_DRAFT_QUALITY,
       finalQuality: environment.OPENAI_IMAGE_FINAL_QUALITY,
       defaultSize: getSceneImageSizeForAspectRatio(input.project.aspectRatio),
@@ -183,9 +193,9 @@ export async function loadStoryboard(input: {
     availableBudgetCents: calculateAvailableSceneImageBudgetCents({
       projectLimitCents: input.project.maximumBudgetCents,
       projectCommittedCents,
-      workspaceDailyLimitCents: environment.DEFAULT_DAILY_BUDGET_CENTS,
+      workspaceDailyLimitCents: effectiveBudget.dailyBudgetCents,
       workspaceDailyCommittedCents,
-      workspaceMonthlyLimitCents: environment.DEFAULT_MONTHLY_BUDGET_CENTS,
+      workspaceMonthlyLimitCents: effectiveBudget.monthlyBudgetCents,
       workspaceMonthlyCommittedCents,
     }),
     promptTemplateVersion: SCENE_IMAGE_PROMPT_VERSION,

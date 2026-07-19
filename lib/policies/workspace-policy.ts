@@ -20,6 +20,7 @@ const workspaceCapabilities = {
     manageVoicePresets: true,
     manageSubtitles: true,
     renderVideo: true,
+    manageUsage: true,
   },
   editor: {
     editWorkspace: true,
@@ -39,6 +40,7 @@ const workspaceCapabilities = {
     manageVoicePresets: true,
     manageSubtitles: true,
     renderVideo: true,
+    manageUsage: true,
   },
   viewer: {
     editWorkspace: false,
@@ -58,6 +60,7 @@ const workspaceCapabilities = {
     manageVoicePresets: false,
     manageSubtitles: false,
     renderVideo: false,
+    manageUsage: false,
   },
 } as const satisfies Record<WorkspaceRole, Record<string, boolean>>;
 

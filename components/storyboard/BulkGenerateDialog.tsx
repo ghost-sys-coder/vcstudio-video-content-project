@@ -12,6 +12,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { BulkGenerationSummary } from "@/components/storyboard/BulkGenerationSummary";
+import { ManualConfirmationField } from "@/components/budgets/ManualConfirmationField";
+import { requiresManualConfirmation } from "@/lib/budgets/budget-settings";
 import { estimateBulkSceneImageCostCents } from "@/lib/costs/scene-image-cost";
 import type { SceneImageQuality } from "@/lib/scenes/scene-image-view";
 import type {
@@ -53,6 +55,7 @@ export function BulkGenerateDialog({
   );
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [confirmedHighCost, setConfirmedHighCost] = useState(false);
 
   const estimatedCostCents = useMemo(
     () =>
@@ -72,11 +75,16 @@ export function BulkGenerateDialog({
 
   const overBudget = estimatedCostCents > availableBudgetCents;
   const overLimit = sceneIds.length > configuration.maximumImagesPerBatch;
+  const needsConfirmation = requiresManualConfirmation(
+    estimatedCostCents,
+    configuration.manualConfirmationThresholdCents,
+  );
   const canConfirm =
     sceneIds.length > 0 &&
     stylePresetVersionId !== "" &&
     !overBudget &&
     !overLimit &&
+    (!needsConfirmation || confirmedHighCost) &&
     !pending;
 
   return (
@@ -140,6 +148,14 @@ export function BulkGenerateDialog({
           estimatedCostCents={estimatedCostCents}
           maximumImagesPerBatch={configuration.maximumImagesPerBatch}
           sceneCount={sceneIds.length}
+        />
+
+        <ManualConfirmationField
+          checked={confirmedHighCost}
+          disabled={pending}
+          estimatedCostCents={estimatedCostCents}
+          onChange={setConfirmedHighCost}
+          thresholdCents={configuration.manualConfirmationThresholdCents}
         />
 
         {error ? (

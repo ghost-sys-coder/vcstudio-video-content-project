@@ -5,6 +5,7 @@ import {
   projectEnvironmentSchema,
   characterEnvironmentSchema,
   sceneImageEnvironmentSchema,
+  usageEnvironmentSchema,
 } from "@/lib/env/server-schema";
 
 const validEnvironment = {
@@ -65,6 +66,27 @@ describe("project environment validation", () => {
       MAX_SCRIPT_CHARACTERS: 50000,
       DEFAULT_PROJECT_BUDGET_CENTS: 500,
     });
+  });
+});
+
+describe("usage environment validation", () => {
+  it("uses the Phase 10 budget and confirmation defaults", () => {
+    expect(usageEnvironmentSchema.parse({})).toEqual({
+      DEFAULT_DAILY_BUDGET_CENTS: 500,
+      DEFAULT_MONTHLY_BUDGET_CENTS: 5000,
+      MANUAL_CONFIRMATION_THRESHOLD_CENTS: 100,
+      RATE_LIMIT_WINDOW_SECONDS: 60,
+      RATE_LIMIT_GENERATIONS_PER_WINDOW: 30,
+      RATE_LIMIT_RENDERS_PER_WINDOW: 10,
+    });
+  });
+
+  it("rejects a negative manual-confirmation threshold", () => {
+    expect(() =>
+      usageEnvironmentSchema.parse({
+        MANUAL_CONFIRMATION_THRESHOLD_CENTS: "-1",
+      }),
+    ).toThrow();
   });
 });
 

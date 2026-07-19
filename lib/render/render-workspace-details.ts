@@ -18,6 +18,8 @@ import {
   calculateAvailableSceneImageBudgetCents,
   getUtcBudgetWindowStarts,
 } from "@/lib/scenes/scene-image-budget";
+import { loadEffectiveWorkspaceBudget } from "@/lib/budgets/workspace-budget";
+import { loadEffectiveWorkspaceLimits } from "@/lib/budgets/current-settings";
 import { buildSubtitleContext } from "@/lib/subtitles/subtitle-workspace-details";
 import type {
   RenderExportView,
@@ -71,6 +73,9 @@ export async function loadRenderWorkspace(input: {
 }): Promise<RenderWorkspaceView> {
   const environment = getRenderEnvironment();
   const scope = { workspaceId: input.workspaceId, projectId: input.project.id };
+  const effectiveLimits = await loadEffectiveWorkspaceLimits({
+    workspaceId: input.workspaceId,
+  });
 
   const [context, renders] = await Promise.all([
     buildSubtitleContext({
@@ -135,7 +140,7 @@ export async function loadRenderWorkspace(input: {
     ready &&
     validateRenderDuration({
       durationMilliseconds: totalDurationMilliseconds,
-      maxRenderDurationSeconds: environment.MAX_RENDER_DURATION_SECONDS,
+      maxRenderDurationSeconds: effectiveLimits.maxRenderDurationSeconds,
     }).ok;
 
   const now = input.now ?? new Date();
@@ -156,12 +161,15 @@ export async function loadRenderWorkspace(input: {
       since: monthlyWindowStart,
     }),
   ]);
+  const effectiveBudget = await loadEffectiveWorkspaceBudget({
+    workspaceId: input.workspaceId,
+  });
   const availableBudgetCents = calculateAvailableSceneImageBudgetCents({
     projectLimitCents: input.project.maximumBudgetCents,
     projectCommittedCents,
-    workspaceDailyLimitCents: environment.DEFAULT_DAILY_BUDGET_CENTS,
+    workspaceDailyLimitCents: effectiveBudget.dailyBudgetCents,
     workspaceDailyCommittedCents,
-    workspaceMonthlyLimitCents: environment.DEFAULT_MONTHLY_BUDGET_CENTS,
+    workspaceMonthlyLimitCents: effectiveBudget.monthlyBudgetCents,
     workspaceMonthlyCommittedCents,
   });
 
@@ -174,7 +182,7 @@ export async function loadRenderWorkspace(input: {
     presets,
     configuration: {
       enabled: environment.ENABLE_VIDEO_RENDERING,
-      maxRenderDurationSeconds: environment.MAX_RENDER_DURATION_SECONDS,
+      maxRenderDurationSeconds: effectiveLimits.maxRenderDurationSeconds,
       estimatedCostCents,
       withinDurationLimit,
       watermarkAvailable: environment.VIDEO_WATERMARK_TEXT.length > 0,

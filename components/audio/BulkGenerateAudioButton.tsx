@@ -58,6 +58,9 @@ export function BulkGenerateAudioButton({
         confirmLabel={`Generate ${scenes.length} ${scenes.length === 1 ? "scene" : "scenes"}`}
         description={`Generate narration audio for ${scenes.length} selected ${scenes.length === 1 ? "scene" : "scenes"}.`}
         estimatedCostCents={estimatedCostCents}
+        manualConfirmationThresholdCents={
+          configuration.manualConfirmationThresholdCents
+        }
         maximumScenesPerBatch={configuration.maximumScenesPerBatch}
         onConfirm={() =>
           onGenerate({

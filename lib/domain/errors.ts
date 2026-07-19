@@ -37,6 +37,15 @@ export class BudgetExceededError extends Error {
   }
 }
 
+export class RateLimitExceededError extends Error {
+  readonly code = "RATE_LIMIT_EXCEEDED";
+
+  constructor(readonly operation: string) {
+    super("Too many requests. Please wait a moment and try again.");
+    this.name = "RateLimitExceededError";
+  }
+}
+
 export class ClerkSynchronizationError extends Error {
   readonly code = "CLERK_SYNCHRONIZATION_FAILED";
 
