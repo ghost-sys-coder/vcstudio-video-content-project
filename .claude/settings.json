@@ -57,7 +57,11 @@
       "Bash(node -e \"const p=require\\('./node_modules/@rspack/binding/package.json'\\); console.log\\('version', p.version\\); console.log\\('deps:', JSON.stringify\\(p.dependencies||{}, null, 0\\)\\); console.log\\('optionalDeps:', JSON.stringify\\(p.optionalDependencies||{}, null, 0\\)\\);\")",
       "mcp__trigger__search_docs",
       "mcp__trigger__dev_server_status",
-      "mcp__trigger__start_dev_server"
+      "mcp__trigger__start_dev_server",
+      "mcp__trigger__trigger_task",
+      "mcp__trigger__wait_for_run_to_complete",
+      "mcp__trigger__get_run_details",
+      "mcp__trigger__stop_dev_server"
     ]
   }
 }

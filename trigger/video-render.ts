@@ -37,6 +37,9 @@ type VideoRenderTaskPayload = z.infer<typeof videoRenderTaskPayloadSchema>;
 export const videoRenderTask = task({
   id: "video-render",
   queue: { name: "video-rendering", concurrencyLimit: 1 },
+  // Remotion drives a headless Chromium and bundles the composition in-process,
+  // which is memory-heavy; the default machine OOM-kills even a short render.
+  machine: "large-1x",
   retry: {
     maxAttempts: 3,
     minTimeoutInMs: 5_000,
@@ -181,6 +184,13 @@ export const videoRenderTask = task({
         },
       });
     } catch (error) {
+      // Log the underlying provider error before any follow-up work so it is
+      // never masked if the failure-recording write itself throws.
+      console.error("Video render failed.", {
+        renderId: render.id,
+        error: error instanceof Error ? (error.stack ?? error.message) : error,
+      });
+      await rm(outputFilePath, { force: true });
       await failVideoRender({
         ...scope,
         category: "render_failed",
@@ -188,8 +198,6 @@ export const videoRenderTask = task({
           "The video could not be rendered. Start a new render to try again.",
         providerRequestId,
       });
-      await rm(outputFilePath, { force: true });
-      console.error("Video render failed.", { renderId: render.id, error });
       return { renderId: render.id, status: "failed" as const };
     }
 

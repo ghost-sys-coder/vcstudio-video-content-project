@@ -4,6 +4,8 @@ import {
   aptGet,
   ffmpeg,
 } from "@trigger.dev/build/extensions/core";
+import { esbuildPlugin } from "@trigger.dev/build/extensions";
+import type { Plugin } from "esbuild";
 
 // System libraries the headless Chromium that Remotion drives needs on the
 // Debian-based deploy image. Adjust for the current base image if the render
@@ -25,12 +27,31 @@ const REMOTION_CHROMIUM_PACKAGES = [
   "libcups2",
 ];
 
+// `server-only`/`client-only` only exist to guard the React Server/Client
+// boundary; in the Trigger.dev Node worker they must be inert. We stub them to
+// empty modules via esbuild rather than relying on the `react-server` export
+// condition, because that condition also makes Remotion's core throw its RSC
+// guard ("Remotion requires React.createContext, but it is undefined") when the
+// render worker loads `@remotion/renderer`/`@remotion/bundler` at runtime.
+const stubServerOnlyBoundary: Plugin = {
+  name: "stub-server-only-boundary",
+  setup(build) {
+    build.onResolve({ filter: /^(server-only|client-only)$/ }, (args) => ({
+      path: args.path,
+      namespace: "trigger-empty-module",
+    }));
+    build.onLoad({ filter: /.*/, namespace: "trigger-empty-module" }, () => ({
+      contents: "export {};",
+      loader: "js",
+    }));
+  },
+};
+
 export default defineConfig({
   project: process.env.TRIGGER_PROJECT_REF ?? "",
   dirs: ["./trigger"],
   legacyDevProcessCwdBehaviour: false,
   build: {
-    conditions: ["react-server"],
     // Remotion's renderer and bundler (the bundler pulls in @rspack/core) ship
     // native binaries and cannot be bundled — they must be installed in the
     // deploy image so npm resolves the correct platform binding on the Linux
@@ -54,6 +75,7 @@ export default defineConfig({
         ],
       }),
       aptGet({ packages: REMOTION_CHROMIUM_PACKAGES }),
+      esbuildPlugin(stubServerOnlyBoundary),
     ],
   },
   maxDuration: 300,
