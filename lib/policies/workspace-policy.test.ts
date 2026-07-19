@@ -49,4 +49,13 @@ describe("workspace policy", () => {
       WorkspacePermissionDeniedError,
     );
   });
+
+  it("gates usage administration to owners and editors only", () => {
+    expect(can("owner", "manageUsage")).toBe(true);
+    expect(can("editor", "manageUsage")).toBe(true);
+    expect(can("viewer", "manageUsage")).toBe(false);
+    expect(() => requireCapability("viewer", "manageUsage")).toThrow(
+      WorkspacePermissionDeniedError,
+    );
+  });
 });

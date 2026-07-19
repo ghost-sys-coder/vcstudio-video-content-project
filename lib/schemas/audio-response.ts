@@ -95,6 +95,7 @@ export const audioWorkspaceResponseSchema = z.discriminatedUnion("success", [
       configuration: z.object({
         enabled: z.boolean(),
         maximumScenesPerBatch: z.number().int().min(1).max(100),
+        manualConfirmationThresholdCents: z.number().int().min(0),
         costPerMillionCharactersCents: z.number().int().positive(),
         minimumEstimateCents: z.number().int().positive(),
         defaultFormat: audioFormatSchema,

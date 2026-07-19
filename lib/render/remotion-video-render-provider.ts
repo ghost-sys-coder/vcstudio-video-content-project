@@ -1,11 +1,5 @@
 import "server-only";
 
-import { bundle } from "@remotion/bundler";
-import {
-  ensureBrowser,
-  renderMedia,
-  selectComposition,
-} from "@remotion/renderer";
 import type {
   VideoRenderProvider,
   VideoRenderProviderInput,
@@ -17,6 +11,13 @@ import type {
  * headless Chromium, so it is imported only by the render worker and is kept
  * out of the Next.js bundle (see `serverExternalPackages` in next.config.ts).
  *
+ * `@remotion/bundler` and `@remotion/renderer` are imported dynamically inside
+ * `render()` rather than at module top level: they transitively load `remotion`
+ * core, whose React Server Component guard throws under the `react-server`
+ * build condition (which the worker needs so `server-only` resolves). Deferring
+ * the import keeps them out of the deploy indexer's module graph while still
+ * resolving them normally at render time.
+ *
  * Bundling happens per render for simplicity in this release; a hot path could
  * cache the serve URL across renders of the same code version.
  */
@@ -24,6 +25,10 @@ export class RemotionVideoRenderProvider implements VideoRenderProvider {
   async render(
     input: VideoRenderProviderInput,
   ): Promise<VideoRenderProviderOutput> {
+    const { bundle } = await import("@remotion/bundler");
+    const { ensureBrowser, renderMedia, selectComposition } =
+      await import("@remotion/renderer");
+
     await ensureBrowser(
       input.chromiumExecutable
         ? { browserExecutable: input.chromiumExecutable }

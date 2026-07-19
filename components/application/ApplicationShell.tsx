@@ -11,6 +11,7 @@ import {
 export function ApplicationShell({
   activeMembership,
   canManageSettings,
+  canManageUsage,
   children,
   defaultSidebarOpen,
   logoUrl,
@@ -19,6 +20,7 @@ export function ApplicationShell({
 }: {
   activeMembership: WorkspaceMembershipView;
   canManageSettings: boolean;
+  canManageUsage: boolean;
   children: React.ReactNode;
   defaultSidebarOpen: boolean;
   logoUrl: string | null;
@@ -30,6 +32,7 @@ export function ApplicationShell({
       <ApplicationSidebar
         activeMembership={activeMembership}
         canManageSettings={canManageSettings}
+        canManageUsage={canManageUsage}
         logoUrl={logoUrl}
         memberships={memberships}
       />

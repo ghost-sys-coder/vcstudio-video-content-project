@@ -202,6 +202,22 @@ export const usageEventTypeEnum = pgEnum("usage_event_type", [
   "released",
 ]);
 
+export const auditActionEnum = pgEnum("audit_action", [
+  "workspace_created",
+  "role_changed",
+  "project_archived",
+  "project_restored",
+  "script_restored",
+  "scene_approved",
+  "asset_approved",
+  "generation_started",
+  "generation_cancelled",
+  "render_started",
+  "export_deleted",
+  "budget_changed",
+  "limits_changed",
+]);
+
 export const users = pgTable(
   "users",
   {
@@ -1758,6 +1774,87 @@ export const usageEvents = pgTable(
   ],
 );
 
+export const workspaceBudgetSettings = pgTable(
+  "workspace_budget_settings",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    dailyBudgetCents: integer("daily_budget_cents").notNull(),
+    monthlyBudgetCents: integer("monthly_budget_cents").notNull(),
+    manualConfirmationThresholdCents: integer(
+      "manual_confirmation_threshold_cents",
+    ).notNull(),
+    maxImagesPerBatch: integer("max_images_per_batch"),
+    maxScenesPerAudioBatch: integer("max_scenes_per_audio_batch"),
+    maxRenderDurationSeconds: integer("max_render_duration_seconds"),
+    maxRetryAttempts: integer("max_retry_attempts"),
+    updatedByUserId: uuid("updated_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("workspace_budget_settings_workspace_unique").on(
+      table.workspaceId,
+    ),
+    check(
+      "workspace_budget_settings_budgets_nonnegative",
+      sql`${table.dailyBudgetCents} >= 0 and ${table.monthlyBudgetCents} >= 0 and ${table.manualConfirmationThresholdCents} >= 0`,
+    ),
+    check(
+      "workspace_budget_settings_overrides_valid",
+      sql`(${table.maxImagesPerBatch} is null or ${table.maxImagesPerBatch} > 0) and (${table.maxScenesPerAudioBatch} is null or ${table.maxScenesPerAudioBatch} > 0) and (${table.maxRenderDurationSeconds} is null or ${table.maxRenderDurationSeconds} > 0) and (${table.maxRetryAttempts} is null or ${table.maxRetryAttempts} >= 0)`,
+    ),
+  ],
+);
+
+export const auditLogEvents = pgTable(
+  "audit_log_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    actorUserId: uuid("actor_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    projectId: uuid("project_id"),
+    action: auditActionEnum("action").notNull(),
+    targetType: text("target_type").notNull(),
+    targetId: uuid("target_id"),
+    safeMetadata: jsonb("safe_metadata")
+      .$type<Record<string, string | number | boolean | null>>()
+      .notNull()
+      .default({}),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("audit_log_events_workspace_created_index").on(
+      table.workspaceId,
+      table.createdAt,
+    ),
+    index("audit_log_events_workspace_action_created_index").on(
+      table.workspaceId,
+      table.action,
+      table.createdAt,
+    ),
+    index("audit_log_events_workspace_project_created_index").on(
+      table.workspaceId,
+      table.projectId,
+      table.createdAt,
+    ),
+  ],
+);
+
 export const projectSubtitleSettings = pgTable(
   "project_subtitle_settings",
   {
@@ -1795,6 +1892,30 @@ export const projectSubtitleSettings = pgTable(
       foreignColumns: [projects.id, projects.workspaceId],
       name: "project_subtitle_settings_tenant_project_fkey",
     }).onDelete("cascade"),
+  ],
+);
+
+export const rateLimitCounters = pgTable(
+  "rate_limit_counters",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    scopeKey: text("scope_key").notNull(),
+    windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+    count: integer("count").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("rate_limit_counters_scope_window_unique").on(
+      table.scopeKey,
+      table.windowStart,
+    ),
+    index("rate_limit_counters_window_index").on(table.windowStart),
+    check("rate_limit_counters_count_nonnegative", sql`${table.count} >= 0`),
   ],
 );
 
@@ -1873,3 +1994,8 @@ export type SubtitleGranularityValue =
   (typeof subtitleGranularityEnum.enumValues)[number];
 export type VideoRender = typeof videoRenders.$inferSelect;
 export type RenderStatus = (typeof renderStatusEnum.enumValues)[number];
+export type WorkspaceBudgetSettings =
+  typeof workspaceBudgetSettings.$inferSelect;
+export type AuditLogEvent = typeof auditLogEvents.$inferSelect;
+export type AuditAction = (typeof auditActionEnum.enumValues)[number];
+export type RateLimitCounter = typeof rateLimitCounters.$inferSelect;

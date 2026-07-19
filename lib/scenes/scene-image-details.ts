@@ -16,6 +16,7 @@ import {
   calculateAvailableSceneImageBudgetCents,
   getUtcBudgetWindowStarts,
 } from "@/lib/scenes/scene-image-budget";
+import { loadEffectiveWorkspaceBudget } from "@/lib/budgets/workspace-budget";
 import { createSceneImageOutputCostMatrix } from "@/lib/scenes/scene-image-configuration";
 import type {
   SceneImageDetailsView,
@@ -64,6 +65,9 @@ export async function loadSceneImageDetails(input: {
   const { dailyWindowStart, monthlyWindowStart } = getUtcBudgetWindowStarts(
     input.now ?? new Date(),
   );
+  const effectiveBudget = await loadEffectiveWorkspaceBudget({
+    workspaceId: scope.workspaceId,
+  });
   const [
     initialStylePresetRows,
     referenceRows,
@@ -193,9 +197,9 @@ export async function loadSceneImageDetails(input: {
     availableBudgetCents: calculateAvailableSceneImageBudgetCents({
       projectLimitCents: input.project.maximumBudgetCents,
       projectCommittedCents,
-      workspaceDailyLimitCents: environment.DEFAULT_DAILY_BUDGET_CENTS,
+      workspaceDailyLimitCents: effectiveBudget.dailyBudgetCents,
       workspaceDailyCommittedCents,
-      workspaceMonthlyLimitCents: environment.DEFAULT_MONTHLY_BUDGET_CENTS,
+      workspaceMonthlyLimitCents: effectiveBudget.monthlyBudgetCents,
       workspaceMonthlyCommittedCents,
     }),
   };

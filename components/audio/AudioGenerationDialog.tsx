@@ -11,6 +11,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ManualConfirmationField } from "@/components/budgets/ManualConfirmationField";
+import { requiresManualConfirmation } from "@/lib/budgets/budget-settings";
 import { formatUsdCents } from "@/lib/format/currency";
 import type { SceneAudioActionResult } from "@/lib/audio/audio-view";
 
@@ -23,6 +25,7 @@ export function AudioGenerationDialog({
   estimatedCostCents,
   availableBudgetCents,
   maximumScenesPerBatch,
+  manualConfirmationThresholdCents,
   voicePresetName,
   confirmLabel,
   onConfirm,
@@ -35,15 +38,28 @@ export function AudioGenerationDialog({
   estimatedCostCents: number;
   availableBudgetCents: number;
   maximumScenesPerBatch: number;
+  manualConfirmationThresholdCents?: number;
   voicePresetName: string;
   confirmLabel: string;
   onConfirm: () => Promise<SceneAudioActionResult>;
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [confirmedHighCost, setConfirmedHighCost] = useState(false);
   const overBudget = estimatedCostCents > availableBudgetCents;
   const overLimit = sceneCount > maximumScenesPerBatch;
-  const canConfirm = sceneCount > 0 && !overBudget && !overLimit && !pending;
+  const needsConfirmation =
+    manualConfirmationThresholdCents !== undefined &&
+    requiresManualConfirmation(
+      estimatedCostCents,
+      manualConfirmationThresholdCents,
+    );
+  const canConfirm =
+    sceneCount > 0 &&
+    !overBudget &&
+    !overLimit &&
+    (!needsConfirmation || confirmedHighCost) &&
+    !pending;
 
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
@@ -91,6 +107,16 @@ export function AudioGenerationDialog({
             </p>
           )}
         </div>
+
+        {manualConfirmationThresholdCents !== undefined ? (
+          <ManualConfirmationField
+            checked={confirmedHighCost}
+            disabled={pending}
+            estimatedCostCents={estimatedCostCents}
+            onChange={setConfirmedHighCost}
+            thresholdCents={manualConfirmationThresholdCents}
+          />
+        ) : null}
 
         {error ? (
           <p className="text-sm text-destructive" role="alert">

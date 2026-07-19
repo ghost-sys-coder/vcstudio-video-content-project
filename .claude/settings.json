@@ -44,7 +44,20 @@
       "Bash(xargs grep -lE \"pauseWhenBuffering\")",
       "Bash(xargs grep -l \"export declare const prefetch\\\\|prefetch:\")",
       "Bash(xargs grep -A20 \"prefetch\")",
-      "Bash(xargs sed -n '1,40p')"
+      "Bash(xargs sed -n '1,40p')",
+      "Bash(awk '$1!=\"0\" || $2!=\"0\" {print $3}')",
+      "Bash(awk '\\($1!=\"0\" || $2!=\"0\"\\) {print $3}')",
+      "Bash(echo \"LINT_DONE_EXIT_$?\")",
+      "mcp__trigger__whoami",
+      "mcp__trigger__get_current_worker",
+      "mcp__trigger__list_deploys",
+      "mcp__trigger__list_projects",
+      "mcp__trigger__deploy",
+      "Bash(npm ls *)",
+      "Bash(node -e \"const p=require\\('./node_modules/@rspack/binding/package.json'\\); console.log\\('version', p.version\\); console.log\\('deps:', JSON.stringify\\(p.dependencies||{}, null, 0\\)\\); console.log\\('optionalDeps:', JSON.stringify\\(p.optionalDependencies||{}, null, 0\\)\\);\")",
+      "mcp__trigger__search_docs",
+      "mcp__trigger__dev_server_status",
+      "mcp__trigger__start_dev_server"
     ]
   }
 }

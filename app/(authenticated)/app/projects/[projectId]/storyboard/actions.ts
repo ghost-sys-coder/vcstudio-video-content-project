@@ -5,6 +5,8 @@ import { cancelSceneImageBatch } from "@/db/commands/scene-image-batch-commands"
 import { findProject } from "@/db/repositories/projects.repository";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import { requireCapability } from "@/lib/policies/workspace-policy";
+import { RateLimitExceededError } from "@/lib/domain/errors";
+import { recordAuditEvent } from "@/lib/audit/record-audit-event";
 import {
   BulkSceneImageGenerationRequestError,
   startBulkSceneImageGeneration,
@@ -43,10 +45,7 @@ export async function startBulkSceneImageGenerationAction(
     const { context, project } = await requireProjectAccess(
       parsed.data.projectId,
     );
-    requireCapability(
-      context.activeMembership.role,
-      "generateSceneImages",
-    );
+    requireCapability(context.activeMembership.role, "generateSceneImages");
     if (project.status === "archived")
       return {
         success: false,
@@ -61,6 +60,8 @@ export async function startBulkSceneImageGenerationAction(
     revalidatePath(`/app/projects/${project.id}/storyboard`);
     return { success: true, error: null };
   } catch (error) {
+    if (error instanceof RateLimitExceededError)
+      return { success: false, error: error.message };
     return {
       success: false,
       error:
@@ -84,14 +85,19 @@ export async function cancelSceneImageBatchAction(
     const { context, project } = await requireProjectAccess(
       parsed.data.projectId,
     );
-    requireCapability(
-      context.activeMembership.role,
-      "generateSceneImages",
-    );
+    requireCapability(context.activeMembership.role, "generateSceneImages");
     await cancelSceneImageBatch({
       workspaceId: context.activeMembership.workspaceId,
       projectId: parsed.data.projectId,
       batchId: parsed.data.batchId,
+    });
+    await recordAuditEvent({
+      workspaceId: context.activeMembership.workspaceId,
+      actorUserId: context.user.id,
+      projectId: parsed.data.projectId,
+      action: "generation_cancelled",
+      targetType: "scene_image_batch",
+      targetId: parsed.data.batchId,
     });
     revalidatePath(`/app/projects/${project.id}/storyboard`);
     return { success: true, error: null };

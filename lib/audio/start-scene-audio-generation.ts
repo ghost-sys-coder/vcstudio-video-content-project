@@ -29,6 +29,9 @@ import {
   calculateAvailableSceneImageBudgetCents,
   getUtcBudgetWindowStarts,
 } from "@/lib/scenes/scene-image-budget";
+import { loadEffectiveWorkspaceBudget } from "@/lib/budgets/workspace-budget";
+import { loadEffectiveWorkspaceLimits } from "@/lib/budgets/current-settings";
+import { enforceRateLimit } from "@/lib/rate-limit/enforce-rate-limit";
 import type { sceneAudioGenerationTask } from "@/trigger/scene-audio-generation";
 
 export class SceneAudioGenerationRequestError extends Error {
@@ -86,13 +89,21 @@ export async function startSceneAudioGeneration(input: {
     throw new SceneAudioGenerationRequestError(
       "Scene audio generation is disabled.",
     );
+  await enforceRateLimit({
+    workspaceId: input.workspaceId,
+    operation: "scene_audio_generation",
+    now: input.now,
+  });
 
   const requestedSceneIds = [...new Set(input.sceneIds)];
   if (requestedSceneIds.length === 0)
     throw new SceneAudioGenerationRequestError("Select at least one scene.");
-  if (requestedSceneIds.length > environment.MAX_SCENES_PER_AUDIO_BATCH)
+  const limits = await loadEffectiveWorkspaceLimits({
+    workspaceId: input.workspaceId,
+  });
+  if (requestedSceneIds.length > limits.maxScenesPerAudioBatch)
     throw new SceneAudioGenerationRequestError(
-      `Generate no more than ${environment.MAX_SCENES_PER_AUDIO_BATCH} scenes at once.`,
+      `Generate no more than ${limits.maxScenesPerAudioBatch} scenes at once.`,
     );
 
   const scope = { workspaceId: input.workspaceId, projectId: input.project.id };
@@ -182,6 +193,9 @@ export async function startSceneAudioGeneration(input: {
       since: monthlyWindowStart,
     }),
   ]);
+  const effectiveBudget = await loadEffectiveWorkspaceBudget({
+    workspaceId: input.workspaceId,
+  });
   const estimatedTotalCents = plans.reduce(
     (total, plan) => total + plan.estimatedCostCents,
     0,
@@ -189,9 +203,9 @@ export async function startSceneAudioGeneration(input: {
   const availableBudgetCents = calculateAvailableSceneImageBudgetCents({
     projectLimitCents: input.project.maximumBudgetCents,
     projectCommittedCents,
-    workspaceDailyLimitCents: environment.DEFAULT_DAILY_BUDGET_CENTS,
+    workspaceDailyLimitCents: effectiveBudget.dailyBudgetCents,
     workspaceDailyCommittedCents,
-    workspaceMonthlyLimitCents: environment.DEFAULT_MONTHLY_BUDGET_CENTS,
+    workspaceMonthlyLimitCents: effectiveBudget.monthlyBudgetCents,
     workspaceMonthlyCommittedCents,
   });
   if (estimatedTotalCents > availableBudgetCents)
@@ -271,9 +285,8 @@ export async function startSceneAudioGeneration(input: {
               environment.GENERATION_RESERVATION_EXPIRY_MINUTES * 60_000,
           ),
           budget: {
-            workspaceDailyLimitCents: environment.DEFAULT_DAILY_BUDGET_CENTS,
-            workspaceMonthlyLimitCents:
-              environment.DEFAULT_MONTHLY_BUDGET_CENTS,
+            workspaceDailyLimitCents: effectiveBudget.dailyBudgetCents,
+            workspaceMonthlyLimitCents: effectiveBudget.monthlyBudgetCents,
             dailyWindowStart,
             monthlyWindowStart,
           },

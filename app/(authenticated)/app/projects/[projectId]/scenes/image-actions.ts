@@ -8,6 +8,8 @@ import {
 import { findProject } from "@/db/repositories/projects.repository";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import { requireCapability } from "@/lib/policies/workspace-policy";
+import { RateLimitExceededError } from "@/lib/domain/errors";
+import { recordAuditEvent } from "@/lib/audit/record-audit-event";
 import {
   SceneImageGenerationRequestError,
   startSceneImageGeneration,
@@ -65,6 +67,8 @@ export async function startSceneImageGenerationAction(
     revalidatePath(`/app/projects/${project.id}/scenes`);
     return { success: true, error: null };
   } catch (error) {
+    if (error instanceof RateLimitExceededError)
+      return { success: false, error: error.message };
     return {
       success: false,
       error:
@@ -120,6 +124,14 @@ export async function approveGeneratedImageAction(
       projectId: parsed.data.projectId,
       generationId: parsed.data.generationId,
       userId: context.user.id,
+    });
+    await recordAuditEvent({
+      workspaceId: context.activeMembership.workspaceId,
+      actorUserId: context.user.id,
+      projectId: parsed.data.projectId,
+      action: "asset_approved",
+      targetType: "scene_image_generation",
+      targetId: parsed.data.generationId,
     });
     revalidatePath(`/app/projects/${parsed.data.projectId}/scenes`);
     return { success: true, error: null };

@@ -31,6 +31,7 @@ import {
   updateSceneSchema,
 } from "@/lib/schemas/scene";
 import { getSceneAnalysisEnvironment } from "@/lib/env/server";
+import { loadEffectiveWorkspaceBudget } from "@/lib/budgets/workspace-budget";
 import {
   renderSceneAnalysisPrompt,
   SCENE_ANALYSIS_PROMPT_VERSION,
@@ -42,7 +43,12 @@ import {
 } from "@/lib/domain/idempotency";
 import { resolveSceneAnalysisIdempotency } from "@/lib/workflows/scene-analysis-idempotency";
 import { reconcileSceneAnalysisRun } from "@/lib/trigger/reconcile-scene-analysis";
-import { BudgetExceededError } from "@/lib/domain/errors";
+import {
+  BudgetExceededError,
+  RateLimitExceededError,
+} from "@/lib/domain/errors";
+import { enforceRateLimit } from "@/lib/rate-limit/enforce-rate-limit";
+import { recordAuditEvent } from "@/lib/audit/record-audit-event";
 
 export type SceneActionState = { success: boolean; error: string | null };
 
@@ -139,6 +145,7 @@ export async function startSceneAnalysisAction(
       "analyzeScenes",
     );
     const workspaceId = context.activeMembership.workspaceId;
+    await enforceRateLimit({ workspaceId, operation: "scene_analysis" });
     const environment = getSceneAnalysisEnvironment();
     const version = await findApprovedScriptVersion({
       workspaceId,
@@ -169,11 +176,13 @@ export async function startSceneAnalysisAction(
     const startOfMonth = new Date(
       Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
     );
-    const [committed, dailyCommitted, monthlyCommitted] = await Promise.all([
-      getProjectCommittedCostCents({ workspaceId, projectId: project.id }),
-      getWorkspaceCommittedCostCents({ workspaceId, since: startOfDay }),
-      getWorkspaceCommittedCostCents({ workspaceId, since: startOfMonth }),
-    ]);
+    const [committed, dailyCommitted, monthlyCommitted, effectiveBudget] =
+      await Promise.all([
+        getProjectCommittedCostCents({ workspaceId, projectId: project.id }),
+        getWorkspaceCommittedCostCents({ workspaceId, since: startOfDay }),
+        getWorkspaceCommittedCostCents({ workspaceId, since: startOfMonth }),
+        loadEffectiveWorkspaceBudget({ workspaceId }),
+      ]);
     if (committed + estimate.estimatedCostCents > project.maximumBudgetCents)
       return {
         success: false,
@@ -181,7 +190,7 @@ export async function startSceneAnalysisAction(
       };
     if (
       dailyCommitted + estimate.estimatedCostCents >
-      environment.DEFAULT_DAILY_BUDGET_CENTS
+      effectiveBudget.dailyBudgetCents
     )
       return {
         success: false,
@@ -189,7 +198,7 @@ export async function startSceneAnalysisAction(
       };
     if (
       monthlyCommitted + estimate.estimatedCostCents >
-      environment.DEFAULT_MONTHLY_BUDGET_CENTS
+      effectiveBudget.monthlyBudgetCents
     )
       return {
         success: false,
@@ -232,8 +241,8 @@ export async function startSceneAnalysisAction(
         Date.now() + environment.GENERATION_RESERVATION_EXPIRY_MINUTES * 60_000,
       ),
       budget: {
-        workspaceDailyLimitCents: environment.DEFAULT_DAILY_BUDGET_CENTS,
-        workspaceMonthlyLimitCents: environment.DEFAULT_MONTHLY_BUDGET_CENTS,
+        workspaceDailyLimitCents: effectiveBudget.dailyBudgetCents,
+        workspaceMonthlyLimitCents: effectiveBudget.monthlyBudgetCents,
         dailyWindowStart: startOfDay,
         monthlyWindowStart: startOfMonth,
       },
@@ -262,6 +271,8 @@ export async function startSceneAnalysisAction(
     revalidatePath(`/app/projects/${project.id}/scenes`);
     return { success: true, error: null };
   } catch (error) {
+    if (error instanceof RateLimitExceededError)
+      return { success: false, error: error.message };
     if (error instanceof BudgetExceededError) {
       const budgetLabel =
         error.scope === "project"
@@ -359,6 +370,14 @@ export async function approveSceneAction(
     await approveScene({
       ...parsed.data,
       workspaceId: context.activeMembership.workspaceId,
+    });
+    await recordAuditEvent({
+      workspaceId: context.activeMembership.workspaceId,
+      actorUserId: context.user.id,
+      projectId: parsed.data.projectId,
+      action: "scene_approved",
+      targetType: "scene",
+      targetId: parsed.data.sceneId,
     });
     revalidatePath(`/app/projects/${parsed.data.projectId}/scenes`);
     return { success: true, error: null };

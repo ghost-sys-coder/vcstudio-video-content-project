@@ -10,6 +10,8 @@ import { createVoicePreset } from "@/db/commands/voice-preset-commands";
 import { findProject } from "@/db/repositories/projects.repository";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import { requireCapability } from "@/lib/policies/workspace-policy";
+import { RateLimitExceededError } from "@/lib/domain/errors";
+import { recordAuditEvent } from "@/lib/audit/record-audit-event";
 import {
   SceneAudioGenerationRequestError,
   startSceneAudioGeneration,
@@ -42,7 +44,10 @@ export async function startSceneAudioGenerationAction(
     sceneIds: formData.getAll("sceneIds"),
   });
   if (!parsed.success)
-    return { success: false, error: "The audio generation request is invalid." };
+    return {
+      success: false,
+      error: "The audio generation request is invalid.",
+    };
 
   try {
     const { context, project } = await requireProjectAccess(
@@ -62,6 +67,8 @@ export async function startSceneAudioGenerationAction(
     revalidatePath(`/app/projects/${project.id}/audio`);
     return { success: true, error: null };
   } catch (error) {
+    if (error instanceof RateLimitExceededError)
+      return { success: false, error: error.message };
     return {
       success: false,
       error:
@@ -88,6 +95,14 @@ export async function approveSceneAudioAction(
       projectId: parsed.data.projectId,
       generationId: parsed.data.generationId,
       userId: context.user.id,
+    });
+    await recordAuditEvent({
+      workspaceId: context.activeMembership.workspaceId,
+      actorUserId: context.user.id,
+      projectId: parsed.data.projectId,
+      action: "asset_approved",
+      targetType: "scene_audio_generation",
+      targetId: parsed.data.generationId,
     });
     revalidatePath(`/app/projects/${parsed.data.projectId}/audio`);
     return { success: true, error: null };
@@ -141,6 +156,14 @@ export async function cancelSceneAudioAction(
       workspaceId: context.activeMembership.workspaceId,
       projectId: parsed.data.projectId,
       generationId: parsed.data.generationId,
+    });
+    await recordAuditEvent({
+      workspaceId: context.activeMembership.workspaceId,
+      actorUserId: context.user.id,
+      projectId: parsed.data.projectId,
+      action: "generation_cancelled",
+      targetType: "scene_audio_generation",
+      targetId: parsed.data.generationId,
     });
     revalidatePath(`/app/projects/${parsed.data.projectId}/audio`);
     return { success: true, error: null };

@@ -4,7 +4,10 @@ import { revalidatePath } from "next/cache";
 import { cancelVideoRender } from "@/db/commands/video-render-commands";
 import { findProject } from "@/db/repositories/projects.repository";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
-import { BudgetExceededError } from "@/lib/domain/errors";
+import {
+  BudgetExceededError,
+  RateLimitExceededError,
+} from "@/lib/domain/errors";
 import { requireCapability } from "@/lib/policies/workspace-policy";
 import {
   startVideoRender,
@@ -41,7 +44,9 @@ export async function startRenderAction(
     return { success: false, error: "The render request is invalid." };
 
   try {
-    const { context, project } = await requireRenderAccess(parsed.data.projectId);
+    const { context, project } = await requireRenderAccess(
+      parsed.data.projectId,
+    );
     const result = await startVideoRender({
       workspaceId: context.activeMembership.workspaceId,
       requestedByUserId: context.user.id,
@@ -54,6 +59,8 @@ export async function startRenderAction(
     revalidatePath(`/app/projects/${parsed.data.projectId}/render`);
     return { success: true, error: null, renderId: result.renderId };
   } catch (error) {
+    if (error instanceof RateLimitExceededError)
+      return { success: false, error: error.message };
     if (error instanceof VideoRenderTimelineInvalidError)
       return {
         success: false,

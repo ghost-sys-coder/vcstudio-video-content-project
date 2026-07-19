@@ -99,6 +99,7 @@ export const storyboardResponseSchema = z.discriminatedUnion("success", [
       configuration: z.object({
         enabled: z.boolean(),
         maximumImagesPerBatch: z.number().int().min(1).max(100),
+        manualConfirmationThresholdCents: z.number().int().min(0),
         draftQuality: z.literal("low"),
         finalQuality: z.literal("medium"),
         defaultSize: sceneImageApiSizeSchema,

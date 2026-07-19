@@ -68,6 +68,7 @@ export interface AudioTimelineView {
 export interface AudioConfigurationView {
   enabled: boolean;
   maximumScenesPerBatch: number;
+  manualConfirmationThresholdCents: number;
   costPerMillionCharactersCents: number;
   minimumEstimateCents: number;
   defaultFormat: SceneAudioFormat;

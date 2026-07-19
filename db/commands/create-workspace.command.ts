@@ -8,6 +8,7 @@ import {
   workspaces,
 } from "@/db/schema";
 import { DEFAULT_STYLE_PRESET } from "@/lib/domain/default-style-preset";
+import { recordAuditEvent } from "@/lib/audit/record-audit-event";
 
 function createWorkspaceSlug(name: string): string {
   const normalized = name
@@ -68,6 +69,15 @@ export async function createOwnedWorkspace(input: {
   if (!workspace) {
     throw new Error("Workspace creation returned no workspace record.");
   }
+
+  await recordAuditEvent({
+    workspaceId: workspace.id,
+    actorUserId: input.userId,
+    action: "workspace_created",
+    targetType: "workspace",
+    targetId: workspace.id,
+    metadata: { name: workspace.name },
+  });
 
   return workspace;
 }
