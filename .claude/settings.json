@@ -76,7 +76,9 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/)",
       "Bash(curl -s -o /dev/null -w \"http_status=%{http_code}\\\\n\" http://localhost:3000/)",
       "Bash(node -e \"const l=require\\('lucide-react'\\); console.log\\(['SparklesIcon','ArrowRightIcon','FileTextIcon','LayersIcon','ImageIcon','AudioLinesIcon','CaptionsIcon','FilmIcon','WalletIcon','CheckCircle2Icon','UsersIcon','ShieldCheckIcon','HistoryIcon'].map\\(n=>n+': '+\\(typeof l[n]\\)\\).join\\('\\\\n'\\)\\)\")",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(node -e \"const sdk=require\\('@trigger.dev/sdk'\\); console.log\\('runs:', typeof sdk.runs\\); console.log\\('runs.cancel:', sdk.runs && typeof sdk.runs.cancel\\); console.log\\('runs.retrieve:', sdk.runs && typeof sdk.runs.retrieve\\);\")",
+      "Bash(node -e \"console.log\\(require\\('@trigger.dev/sdk/package.json'\\).version\\)\")"
     ],
     "additionalDirectories": ["\\tmp"]
   }

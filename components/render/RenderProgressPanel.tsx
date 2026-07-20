@@ -18,7 +18,14 @@ export function RenderProgressPanel({
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const cancellable = render.status === "pending" || render.status === "queued";
+  // A render can be cancelled at any pre-terminal stage, including while it is
+  // running: renders can stall mid-flight, so the reserved budget and worker
+  // must be reclaimable without waiting for the reservation to expire.
+  const cancellable =
+    render.status === "pending" ||
+    render.status === "queued" ||
+    render.status === "running";
+  const cancelLabel = render.status === "running" ? "Cancel render" : "Cancel";
 
   return (
     <section
@@ -48,7 +55,7 @@ export function RenderProgressPanel({
             type="button"
             variant="ghost"
           >
-            {pending ? "Cancelling…" : "Cancel"}
+            {pending ? "Cancelling…" : cancelLabel}
           </Button>
         ) : null}
       </div>

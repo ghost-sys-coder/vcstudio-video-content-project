@@ -240,6 +240,7 @@ describeDatabase("Phase 9 video render invariants", () => {
       renderId: reservation.render.id,
     });
     expect(result.cancelled).toBe(true);
+    expect(result.wasRunning).toBe(false);
 
     const render = await findVideoRender({
       workspaceId: fixture.workspaceId,
@@ -247,12 +248,103 @@ describeDatabase("Phase 9 video render invariants", () => {
       renderId: reservation.render.id,
     });
     expect(render?.status).toBe("cancelled");
+    expect(render?.safeErrorMessage).toBe(
+      "This render was cancelled before it started.",
+    );
     const released = await findVideoRenderReservation({
       workspaceId: fixture.workspaceId,
       projectId: fixture.projectId,
       renderId: reservation.render.id,
     });
     expect(released?.status).toBe("released");
+  }, 30_000);
+
+  it("cancels a running render and releases its budget", async () => {
+    const fixture = await createFixture();
+    const reservation = await createVideoRenderReservation(
+      reservationInput(fixture),
+    );
+    await claimVideoRenderRunning({
+      workspaceId: fixture.workspaceId,
+      projectId: fixture.projectId,
+      renderId: reservation.render.id,
+      attemptNumber: 1,
+      providerRequestId: randomUUID(),
+    });
+
+    const result = await cancelVideoRender({
+      workspaceId: fixture.workspaceId,
+      projectId: fixture.projectId,
+      renderId: reservation.render.id,
+    });
+    expect(result.cancelled).toBe(true);
+    expect(result.wasRunning).toBe(true);
+
+    const render = await findVideoRender({
+      workspaceId: fixture.workspaceId,
+      projectId: fixture.projectId,
+      renderId: reservation.render.id,
+    });
+    expect(render?.status).toBe("cancelled");
+    expect(render?.actualCostCents).toBe(0);
+    expect(render?.safeErrorMessage).toBe(
+      "This render was cancelled while it was rendering.",
+    );
+    const released = await findVideoRenderReservation({
+      workspaceId: fixture.workspaceId,
+      projectId: fixture.projectId,
+      renderId: reservation.render.id,
+    });
+    expect(released?.status).toBe("released");
+    expect(released?.actualCostCents).toBe(0);
+  }, 30_000);
+
+  it("does not cancel a render that already succeeded", async () => {
+    const fixture = await createFixture();
+    const reservation = await createVideoRenderReservation(
+      reservationInput(fixture),
+    );
+    await claimVideoRenderRunning({
+      workspaceId: fixture.workspaceId,
+      projectId: fixture.projectId,
+      renderId: reservation.render.id,
+      attemptNumber: 1,
+      providerRequestId: randomUUID(),
+    });
+    await completeVideoRender({
+      workspaceId: fixture.workspaceId,
+      projectId: fixture.projectId,
+      renderId: reservation.render.id,
+      providerRequestId: "req_integration",
+      actualCostCents: 5,
+      outputDurationMilliseconds: 5_000,
+      asset: {
+        objectKey: `renders/${reservation.render.id}.mp4`,
+        contentType: "video/mp4",
+        sizeBytes: 4096,
+        etag: "etag-integration",
+      },
+    });
+
+    const result = await cancelVideoRender({
+      workspaceId: fixture.workspaceId,
+      projectId: fixture.projectId,
+      renderId: reservation.render.id,
+    });
+    expect(result.cancelled).toBe(false);
+
+    const render = await findVideoRender({
+      workspaceId: fixture.workspaceId,
+      projectId: fixture.projectId,
+      renderId: reservation.render.id,
+    });
+    expect(render?.status).toBe("succeeded");
+    const reconciled = await findVideoRenderReservation({
+      workspaceId: fixture.workspaceId,
+      projectId: fixture.projectId,
+      renderId: reservation.render.id,
+    });
+    expect(reconciled?.status).toBe("reconciled");
   }, 30_000);
 
   it("completes a claimed render and reconciles its reservation", async () => {

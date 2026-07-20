@@ -632,18 +632,34 @@ export async function failVideoRender(input: {
   throw new Error("VIDEO_RENDER_FAILURE_CONFLICT");
 }
 
+/**
+ * Cancels a render that has not yet reached a terminal state, releasing its
+ * reservation to a zero actual cost. Unlike completion/failure, cancellation is
+ * user-initiated and covers a render still `running` — a render can stall
+ * mid-flight (for example when its signed asset URLs expire and Chromium starts
+ * receiving HTTP 403s), and there must be a way to reclaim the reserved budget.
+ *
+ * This only settles application state and the money ledger. Stopping the live
+ * Trigger.dev run (so the worker machine actually halts) is the caller's
+ * responsibility — see `cancelVideoRenderRun`. `wasRunning` reflects the row's
+ * locked prior status so the caller knows a worker was in flight.
+ */
 export async function cancelVideoRender(input: {
   workspaceId: string;
   projectId: string;
   renderId: string;
-}): Promise<{ cancelled: boolean }> {
+}): Promise<{ cancelled: boolean; wasRunning: boolean }> {
   const render = await findVideoRender(input);
   if (!render) throw new Error("VIDEO_RENDER_NOT_FOUND");
-  if (render.status !== "pending" && render.status !== "queued")
-    return { cancelled: false };
+  if (
+    render.status !== "pending" &&
+    render.status !== "queued" &&
+    render.status !== "running"
+  )
+    return { cancelled: false, wasRunning: false };
   const reservation = await findVideoRenderReservation(input);
   if (!reservation || reservation.status !== "pending")
-    return { cancelled: false };
+    return { cancelled: false, wasRunning: false };
 
   const eventMetadata = JSON.stringify({
     renderId: input.renderId,
@@ -651,9 +667,9 @@ export async function cancelVideoRender(input: {
   });
   const eventId = createUsageEventId(reservation.id, "released");
 
-  const result = await getDatabase().execute<{ id: string }>(sql`
+  const result = await getDatabase().execute<{ prior_status: string }>(sql`
     with eligible as materialized (
-      select render.id
+      select render.id, render.status as prior_status
       from video_renders render
       inner join usage_reservations reservation
         on reservation.workspace_id = render.workspace_id
@@ -663,7 +679,7 @@ export async function cancelVideoRender(input: {
       where render.workspace_id = ${input.workspaceId}
         and render.project_id = ${input.projectId}
         and render.id = ${input.renderId}
-        and render.status in ('pending', 'queued')
+        and render.status in ('pending', 'queued', 'running')
         and reservation.status = 'pending'
       for update of render, reservation
     ),
@@ -674,7 +690,11 @@ export async function cancelVideoRender(input: {
         actual_cost_cents = 0,
         progress_percent = 100,
         error_category = 'cancelled',
-        safe_error_message = 'This render was cancelled before it started.',
+        safe_error_message = case
+          when eligible.prior_status = 'running'
+            then 'This render was cancelled while it was rendering.'
+          else 'This render was cancelled before it started.'
+        end,
         completed_at = now(),
         updated_at = now()
       from eligible
@@ -710,10 +730,15 @@ export async function cancelVideoRender(input: {
       from transitioned_reservation
       returning id
     )
-    select transitioned_render.id
-    from transitioned_render
+    select eligible.prior_status
+    from eligible
+    inner join transitioned_render on true
     inner join transitioned_reservation on true
     inner join inserted_event on true
   `);
-  return { cancelled: result.rows.length === 1 };
+  const row = result.rows[0];
+  return {
+    cancelled: result.rows.length === 1,
+    wasRunning: row?.prior_status === "running",
+  };
 }

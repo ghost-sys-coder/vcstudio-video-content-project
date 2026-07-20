@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { cancelVideoRender } from "@/db/commands/video-render-commands";
 import { findProject } from "@/db/repositories/projects.repository";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import {
@@ -9,6 +8,7 @@ import {
   RateLimitExceededError,
 } from "@/lib/domain/errors";
 import { requireCapability } from "@/lib/policies/workspace-policy";
+import { cancelVideoRenderRun } from "@/lib/render/cancel-video-render";
 import {
   startVideoRender,
   VideoRenderRequestError,
@@ -90,10 +90,11 @@ export async function cancelRenderAction(
 
   try {
     const { context } = await requireRenderAccess(parsed.data.projectId);
-    const result = await cancelVideoRender({
+    const result = await cancelVideoRenderRun({
       workspaceId: context.activeMembership.workspaceId,
       projectId: parsed.data.projectId,
       renderId: parsed.data.renderId,
+      actorUserId: context.user.id,
     });
     revalidatePath(`/app/projects/${parsed.data.projectId}/render`);
     if (!result.cancelled)

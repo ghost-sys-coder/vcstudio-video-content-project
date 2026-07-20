@@ -34,6 +34,10 @@ export const videoRenderTaskPayloadSchema = z.object({
 
 type VideoRenderTaskPayload = z.infer<typeof videoRenderTaskPayloadSchema>;
 
+// The worker's hard wall-clock ceiling. Asset download URLs are signed for this
+// same window so they can never expire before the run itself is terminated.
+const MAX_RENDER_WALL_CLOCK_SECONDS = 3_600;
+
 export const videoRenderTask = task({
   id: "video-render",
   queue: { name: "video-rendering", concurrencyLimit: 1 },
@@ -47,7 +51,7 @@ export const videoRenderTask = task({
     factor: 2,
     randomize: true,
   },
-  maxDuration: 3_600,
+  maxDuration: MAX_RENDER_WALL_CLOCK_SECONDS,
   run: async (payload: VideoRenderTaskPayload) => {
     const input = videoRenderTaskPayloadSchema.parse(payload);
     const environment = getRenderEnvironment();
@@ -141,7 +145,18 @@ export const videoRenderTask = task({
       scene.image.objectKey,
       scene.audio.objectKey,
     ]);
-    const assetUrls = await createRenderAssetDownloadUrls(objectKeys);
+    // Sign for the full render window, not the short default download TTL. The
+    // worker downloads Chromium, bundles the composition, and renders every
+    // frame before it finishes fetching assets; on a long timeline that can
+    // outlast a 15-minute URL. When a URL expires mid-render, Chromium receives
+    // HTTP 403 from R2 and Remotion fails to decode the response as an image
+    // ("EncodingError: The source image cannot be decoded"), so the run stalls
+    // instead of progressing. Matching the worker's own hard timeout guarantees
+    // the URLs outlive any render this task can legally run.
+    const assetUrls = await createRenderAssetDownloadUrls(
+      objectKeys,
+      MAX_RENDER_WALL_CLOCK_SECONDS,
+    );
     const compositionInput = parseVideoCompositionInput(
       buildVideoCompositionInput({
         snapshot: render.timelineSnapshot,

@@ -100,6 +100,19 @@ export function AudioWorkspace({
     return selectable.length > 0 ? selectable : eligibleScenes;
   }, [data.scenes, eligibleScenes, selected]);
 
+  const pendingReviewSceneIds = useMemo(
+    () =>
+      data.scenes
+        .filter(
+          (scene) =>
+            scene.latestStatus === "succeeded" &&
+            scene.latestReviewStatus === "pending" &&
+            scene.latestGenerationId !== null,
+        )
+        .map((scene) => scene.sceneId),
+    [data.scenes],
+  );
+
   const approvableGenerationIds = useMemo(
     () =>
       data.scenes
@@ -127,6 +140,10 @@ export function AudioWorkspace({
       return next;
     });
   }, []);
+
+  const selectAllPendingReview = useCallback(() => {
+    setSelected(new Set(pendingReviewSceneIds));
+  }, [pendingReviewSceneIds]);
 
   const handleGenerate = useCallback(
     async (input: AudioGenerateInput): Promise<SceneAudioActionResult> => {
@@ -221,6 +238,16 @@ export function AudioWorkspace({
               variant="ghost"
             >
               Clear
+            </Button>
+          ) : null}
+          {canReview && pendingReviewSceneIds.length > 0 ? (
+            <Button
+              onClick={selectAllPendingReview}
+              size="sm"
+              type="button"
+              variant="ghost"
+            >
+              Select all pending ({pendingReviewSceneIds.length})
             </Button>
           ) : null}
           {canReview ? (
