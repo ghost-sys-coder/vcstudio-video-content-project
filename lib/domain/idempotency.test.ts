@@ -3,6 +3,7 @@ import {
   createSceneAnalysisIdempotencyKey,
   createSceneAnalysisRetryIdempotencyKey,
   createSceneImageIdempotencyKey,
+  createTitleGenerationIdempotencyKey,
 } from "@/lib/domain/idempotency";
 
 describe("createSceneAnalysisIdempotencyKey", () => {
@@ -84,6 +85,47 @@ describe("createSceneImageIdempotencyKey", () => {
       createSceneImageIdempotencyKey({
         ...input,
         referenceAssetIds: ["reference-a"],
+      }),
+    ).not.toBe(first);
+  });
+});
+
+describe("createTitleGenerationIdempotencyKey", () => {
+  const input = {
+    secret: "s".repeat(32),
+    workspaceId: "workspace-1",
+    projectId: "project-1",
+    platform: "youtube",
+    briefFingerprint: "fingerprint-1",
+    model: "gpt-5",
+    promptVersion: "title-generation-v1",
+    requestNonce: "nonce-1",
+  };
+
+  it("is deterministic for the same inputs", () => {
+    expect(createTitleGenerationIdempotencyKey(input)).toBe(
+      createTitleGenerationIdempotencyKey(input),
+    );
+  });
+
+  it("differs per platform so each platform is a distinct run", () => {
+    expect(
+      createTitleGenerationIdempotencyKey({ ...input, platform: "tiktok" }),
+    ).not.toBe(createTitleGenerationIdempotencyKey(input));
+  });
+
+  it("changes with the brief fingerprint and the request nonce", () => {
+    const first = createTitleGenerationIdempotencyKey(input);
+    expect(
+      createTitleGenerationIdempotencyKey({
+        ...input,
+        briefFingerprint: "fingerprint-2",
+      }),
+    ).not.toBe(first);
+    expect(
+      createTitleGenerationIdempotencyKey({
+        ...input,
+        requestNonce: "nonce-2",
       }),
     ).not.toBe(first);
   });

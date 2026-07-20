@@ -86,7 +86,10 @@
       "Bash(node ensure-v2.mjs)",
       "Bash(node -e \"const s=require\\('@base-ui/react/select'\\); console.log\\('exports:', Object.keys\\(s.Select||s\\).slice\\(0,20\\)\\)\")",
       "Bash(grep -iv \"//\")",
-      "Bash(git checkout *)"
+      "Bash(git checkout *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} -> %{redirect_url}\\\\n\" \"http://localhost:3000/app/projects/11111111-1111-1111-1111-111111111111\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} -> %{redirect_url}\\\\n\" \"http://localhost:3000/app/projects/11111111-1111-1111-1111-111111111111/script\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} -> %{redirect_url}\\\\n\" \"http://localhost:3000/app/projects/11111111-1111-1111-1111-111111111111/publish\")"
     ],
     "additionalDirectories": [
       "\\tmp"

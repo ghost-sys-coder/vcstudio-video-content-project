@@ -41,6 +41,7 @@ export const USAGE_OPERATION_LABELS: Record<UsageOperationType, string> = {
   scene_audio_generation: "Scene narration",
   video_render: "Video render",
   script_generation: "Script generation",
+  title_generation: "Platform titles",
 };
 
 export const USAGE_STATUS_LABELS: Record<UsageReservationStatus, string> = {
@@ -55,6 +56,7 @@ export const USAGE_OPERATION_PROVIDERS: Record<UsageOperationType, string> = {
   scene_audio_generation: "openai",
   video_render: "remotion",
   script_generation: "openai",
+  title_generation: "openai",
 };
 
 /** Deterministic `YYYY-MM-DD HH:MM` (UTC) timestamp for ledger/audit tables. */

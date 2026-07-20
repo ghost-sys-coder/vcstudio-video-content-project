@@ -11,6 +11,11 @@ export type {
   ScriptGenerationPromptInput,
 } from "./script-generation";
 export {
+  renderTitleGenerationPrompt,
+  TITLE_GENERATION_PROMPT_VERSION,
+} from "./title-generation";
+export type { TitleGenerationPromptInput } from "./title-generation";
+export {
   renderSceneImagePrompt,
   SCENE_IMAGE_PROMPT_TEMPLATE_SOURCE,
   SCENE_IMAGE_PROMPT_TEMPLATE_SOURCE_HASH,

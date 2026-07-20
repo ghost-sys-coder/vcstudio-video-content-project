@@ -5,6 +5,7 @@ import { zodTextFormat } from "openai/helpers/zod";
 import { getSceneAnalysisEnvironment } from "@/lib/env/server";
 import { sceneAnalysisOutputSchema } from "@/lib/schemas/scene";
 import { scriptGenerationOutputSchema } from "@/lib/schemas/script-generation";
+import { titleGenerationOutputSchema } from "@/lib/schemas/title-generation";
 import type { TextGenerationProvider } from "@/lib/openai/text-generation-provider";
 
 export class OpenAiTextGenerationProvider implements TextGenerationProvider {
@@ -56,6 +57,30 @@ export class OpenAiTextGenerationProvider implements TextGenerationProvider {
     if (!response.output_parsed) throw new Error("OPENAI_INVALID_RESPONSE");
     return {
       output: scriptGenerationOutputSchema.parse(response.output_parsed),
+      requestId: response.id,
+      inputTokens: response.usage?.input_tokens ?? 0,
+      outputTokens: response.usage?.output_tokens ?? 0,
+    };
+  }
+
+  async generateTitles(input: { model: string; prompt: string }) {
+    const response = await this.createClient().responses.parse({
+      model: input.model,
+      input: [
+        {
+          role: "system",
+          content:
+            "You are an expert video title strategist. Return platform-tuned title options that earn honest clicks.",
+        },
+        { role: "user", content: input.prompt },
+      ],
+      text: {
+        format: zodTextFormat(titleGenerationOutputSchema, "generated_titles"),
+      },
+    });
+    if (!response.output_parsed) throw new Error("OPENAI_INVALID_RESPONSE");
+    return {
+      output: titleGenerationOutputSchema.parse(response.output_parsed),
       requestId: response.id,
       inputTokens: response.usage?.input_tokens ?? 0,
       outputTokens: response.usage?.output_tokens ?? 0,

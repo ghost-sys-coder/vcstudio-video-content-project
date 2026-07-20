@@ -52,6 +52,29 @@ export function createScriptGenerationIdempotencyKey(input: {
   ]);
 }
 
+export function createTitleGenerationIdempotencyKey(input: {
+  secret: string;
+  workspaceId: string;
+  projectId: string;
+  platform: string;
+  briefFingerprint: string;
+  model: string;
+  promptVersion: string;
+  /** Distinct per intentional "Generate" click so regeneration yields a new run. */
+  requestNonce: string;
+}): string {
+  return hash(input.secret, [
+    input.workspaceId,
+    input.projectId,
+    "title-generation",
+    input.platform,
+    input.briefFingerprint,
+    input.model,
+    input.promptVersion,
+    input.requestNonce,
+  ]);
+}
+
 export function createSceneImageIdempotencyKey(input: {
   secret: string;
   workspaceId: string;

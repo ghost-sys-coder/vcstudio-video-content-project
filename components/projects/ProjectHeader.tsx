@@ -24,9 +24,11 @@ export function ProjectHeader({
           ? "subtitles"
           : pathname.endsWith("/render")
             ? "render"
-            : pathname.endsWith("/scenes")
-              ? "scenes"
-              : "script";
+            : pathname.endsWith("/publish")
+              ? "publish"
+              : pathname.endsWith("/scenes")
+                ? "scenes"
+                : "script";
 
   return (
     <Tabs
@@ -47,6 +49,7 @@ export function ProjectHeader({
           <TabsTrigger value="audio">Audio</TabsTrigger>
           <TabsTrigger value="subtitles">Subtitles</TabsTrigger>
           <TabsTrigger value="render">Render</TabsTrigger>
+          <TabsTrigger value="publish">Publish</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
       </header>

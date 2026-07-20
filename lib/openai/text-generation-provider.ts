@@ -1,5 +1,6 @@
 import type { SceneAnalysisOutput } from "@/lib/schemas/scene";
 import type { ScriptGenerationOutput } from "@/lib/schemas/script-generation";
+import type { TitleGenerationOutput } from "@/lib/schemas/title-generation";
 
 export type SceneAnalysisProviderResult = {
   output: SceneAnalysisOutput;
@@ -15,6 +16,13 @@ export type ScriptGenerationProviderResult = {
   outputTokens: number;
 };
 
+export type TitleGenerationProviderResult = {
+  output: TitleGenerationOutput;
+  requestId: string;
+  inputTokens: number;
+  outputTokens: number;
+};
+
 export interface TextGenerationProvider {
   analyzeScenes(input: {
     model: string;
@@ -24,4 +32,8 @@ export interface TextGenerationProvider {
     model: string;
     prompt: string;
   }): Promise<ScriptGenerationProviderResult>;
+  generateTitles(input: {
+    model: string;
+    prompt: string;
+  }): Promise<TitleGenerationProviderResult>;
 }

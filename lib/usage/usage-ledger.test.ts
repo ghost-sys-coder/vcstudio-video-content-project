@@ -39,7 +39,7 @@ describe("committedCents", () => {
 
 describe("label maps", () => {
   it("covers every operation and status", () => {
-    expect(Object.keys(USAGE_OPERATION_LABELS)).toHaveLength(5);
+    expect(Object.keys(USAGE_OPERATION_LABELS)).toHaveLength(6);
     expect(Object.keys(USAGE_STATUS_LABELS)).toHaveLength(3);
   });
 });

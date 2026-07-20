@@ -208,6 +208,7 @@ export const usageOperationTypeEnum = pgEnum("usage_operation_type", [
   "scene_audio_generation",
   "video_render",
   "script_generation",
+  "title_generation",
 ]);
 
 export const usageEventTypeEnum = pgEnum("usage_event_type", [
@@ -810,6 +811,136 @@ export const scriptGenerationRuns = pgTable(
       "script_generation_runs_cost_nonnegative",
       sql`${table.estimatedCostCents} >= 0 and (${table.actualCostCents} is null or ${table.actualCostCents} >= 0)`,
     ),
+  ],
+);
+
+// Money-safe AI platform-title-generation run (project-scoped, on the usage
+// ledger). Each run targets one distribution platform and produces N ranked
+// title options (stored in `project_title_suggestions`).
+export const titleGenerationRuns = pgTable(
+  "title_generation_runs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    requestedByUserId: uuid("requested_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    platform: contentPlatformEnum("platform").notNull(),
+    scriptVersionId: uuid("script_version_id").references(
+      () => projectScriptVersions.id,
+      { onDelete: "set null" },
+    ),
+    triggerRunId: text("trigger_run_id"),
+    idempotencyKey: text("idempotency_key").notNull(),
+    requestFingerprint: text("request_fingerprint").notNull(),
+    model: text("model").notNull(),
+    promptVersion: text("prompt_version").notNull(),
+    finalPrompt: text("final_prompt").notNull(),
+    requestedOptionCount: integer("requested_option_count").notNull(),
+    status: sceneAnalysisStatusEnum("status").notNull().default("pending"),
+    progressPercent: integer("progress_percent").notNull().default(0),
+    providerRequestId: text("provider_request_id"),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    inputTokens: integer("input_tokens"),
+    outputTokens: integer("output_tokens"),
+    estimatedCostCents: integer("estimated_cost_cents").notNull(),
+    actualCostCents: integer("actual_cost_cents"),
+    resultOptionCount: integer("result_option_count"),
+    errorCategory: text("error_category"),
+    safeErrorMessage: text("safe_error_message"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("title_generation_runs_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    uniqueIndex("title_generation_runs_idempotency_unique").on(
+      table.idempotencyKey,
+    ),
+    index("title_generation_runs_workspace_project_index").on(
+      table.workspaceId,
+      table.projectId,
+      table.createdAt,
+    ),
+    check(
+      "title_generation_runs_option_count_positive",
+      sql`${table.requestedOptionCount} > 0`,
+    ),
+    check(
+      "title_generation_runs_progress_valid",
+      sql`${table.progressPercent} between 0 and 100`,
+    ),
+    check(
+      "title_generation_runs_cost_nonnegative",
+      sql`${table.estimatedCostCents} >= 0 and (${table.actualCostCents} is null or ${table.actualCostCents} >= 0)`,
+    ),
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [projects.id, projects.workspaceId],
+      name: "title_generation_runs_tenant_project_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
+// One generated title option, produced by a `title_generation_runs` row. Users
+// favorite and copy the best options; this is durable output, not billing state.
+export const projectTitleSuggestions = pgTable(
+  "project_title_suggestions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").notNull(),
+    titleGenerationRunId: uuid("title_generation_run_id").notNull(),
+    platform: contentPlatformEnum("platform").notNull(),
+    text: text("text").notNull(),
+    rationale: text("rationale").notNull().default(""),
+    hookType: text("hook_type").notNull().default(""),
+    position: integer("position").notNull(),
+    isFavorite: boolean("is_favorite").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("project_title_suggestions_run_position_unique").on(
+      table.titleGenerationRunId,
+      table.position,
+    ),
+    index("project_title_suggestions_workspace_project_platform_index").on(
+      table.workspaceId,
+      table.projectId,
+      table.platform,
+      table.createdAt,
+    ),
+    check(
+      "project_title_suggestions_position_nonnegative",
+      sql`${table.position} >= 0`,
+    ),
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [projects.id, projects.workspaceId],
+      name: "project_title_suggestions_tenant_project_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.titleGenerationRunId, table.workspaceId],
+      foreignColumns: [titleGenerationRuns.id, titleGenerationRuns.workspaceId],
+      name: "project_title_suggestions_tenant_run_fkey",
+    }).onDelete("cascade"),
   ],
 );
 
@@ -1880,6 +2011,10 @@ export const usageReservations = pgTable(
       () => scriptGenerationRuns.id,
       { onDelete: "cascade" },
     ),
+    titleGenerationId: uuid("title_generation_id").references(
+      () => titleGenerationRuns.id,
+      { onDelete: "cascade" },
+    ),
     status: usageReservationStatusEnum("status").notNull().default("pending"),
     reservedCostCents: integer("reserved_cost_cents").notNull(),
     actualCostCents: integer("actual_cost_cents"),
@@ -1913,6 +2048,9 @@ export const usageReservations = pgTable(
     uniqueIndex("usage_reservations_script_generation_unique")
       .on(table.scriptGenerationId)
       .where(sql`${table.scriptGenerationId} is not null`),
+    uniqueIndex("usage_reservations_title_generation_unique")
+      .on(table.titleGenerationId)
+      .where(sql`${table.titleGenerationId} is not null`),
     index("usage_reservations_workspace_project_status_index").on(
       table.workspaceId,
       table.projectId,
@@ -1928,7 +2066,7 @@ export const usageReservations = pgTable(
     ),
     check(
       "usage_reservations_single_operation",
-      sql`(${table.operationType}::text = 'scene_analysis' and ${table.analysisRunId} is not null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null) or (${table.operationType}::text = 'scene_image_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is not null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null) or (${table.operationType}::text = 'scene_audio_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is not null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null) or (${table.operationType}::text = 'video_render' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is not null and ${table.scriptGenerationId} is null) or (${table.operationType}::text = 'script_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is not null)`,
+      sql`(${table.operationType}::text = 'scene_analysis' and ${table.analysisRunId} is not null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null) or (${table.operationType}::text = 'scene_image_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is not null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null) or (${table.operationType}::text = 'scene_audio_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is not null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null) or (${table.operationType}::text = 'video_render' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is not null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null) or (${table.operationType}::text = 'script_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is not null and ${table.titleGenerationId} is null) or (${table.operationType}::text = 'title_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is not null)`,
     ),
     foreignKey({
       columns: [table.imageGenerationId, table.projectId, table.workspaceId],
@@ -2209,6 +2347,9 @@ export type ProjectScriptVersion = typeof projectScriptVersions.$inferSelect;
 export type ProjectBrief = typeof projectBriefs.$inferSelect;
 export type ContentPlatform = (typeof contentPlatformEnum.enumValues)[number];
 export type ScriptGenerationRun = typeof scriptGenerationRuns.$inferSelect;
+export type TitleGenerationRun = typeof titleGenerationRuns.$inferSelect;
+export type ProjectTitleSuggestion =
+  typeof projectTitleSuggestions.$inferSelect;
 export type SceneAnalysisRun = typeof sceneAnalysisRuns.$inferSelect;
 export type Scene = typeof scenes.$inferSelect;
 export type SceneVersion = typeof sceneVersions.$inferSelect;
