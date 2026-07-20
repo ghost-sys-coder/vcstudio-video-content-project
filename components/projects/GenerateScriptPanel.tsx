@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import {
+  cancelScriptGenerationAction,
   generateScriptAction,
   loadScriptGenerationViewAction,
 } from "@/app/(authenticated)/app/projects/actions";
@@ -14,6 +15,10 @@ function formatCents(cents: number): string {
 
 function isActive(status: ScriptGenerationRunView["status"]): boolean {
   return status === "pending" || status === "queued" || status === "running";
+}
+
+function isCancellable(status: ScriptGenerationRunView["status"]): boolean {
+  return status === "pending" || status === "queued";
 }
 
 export function GenerateScriptPanel({
@@ -34,9 +39,11 @@ export function GenerateScriptPanel({
   const [latestRun, setLatestRun] = useState(initialLatestRun);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [cancelling, startCancelTransition] = useTransition();
   const pollingRef = useRef(false);
 
   const generating = latestRun !== null && isActive(latestRun.status);
+  const cancellable = latestRun !== null && isCancellable(latestRun.status);
 
   const poll = useCallback(async () => {
     if (pollingRef.current) return;
@@ -66,6 +73,24 @@ export function GenerateScriptPanel({
       data.set("projectId", projectId);
       data.set("requestNonce", crypto.randomUUID());
       const result = await generateScriptAction(data);
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
+      const view = await loadScriptGenerationViewAction(projectId);
+      if (view?.latestRun) setLatestRun(view.latestRun);
+    });
+  }
+
+  function cancel() {
+    if (!latestRun) return;
+    const runId = latestRun.id;
+    startCancelTransition(async () => {
+      setError(null);
+      const data = new FormData();
+      data.set("projectId", projectId);
+      data.set("scriptGenerationRunId", runId);
+      const result = await cancelScriptGenerationAction(data);
       if (!result.success) {
         setError(result.error);
         return;
@@ -118,12 +143,35 @@ export function GenerateScriptPanel({
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
       {generating ? (
-        <p className="text-sm text-muted-foreground" role="status">
-          Generating your script… this usually takes a few seconds.
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-sm text-muted-foreground" role="status">
+            Generating your script… this usually takes a few seconds.
+          </p>
+          {canEdit && cancellable ? (
+            <Button
+              disabled={cancelling}
+              onClick={cancel}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              {cancelling ? "Cancelling…" : "Cancel generation"}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {latestRun &&
+      latestRun.status === "failed" &&
+      latestRun.errorCategory === "cancelled" ? (
+        <p className="text-sm text-muted-foreground">
+          {latestRun.safeErrorMessage ?? "Script generation was cancelled."}
         </p>
       ) : null}
 
-      {latestRun && latestRun.status === "failed" ? (
+      {latestRun &&
+      latestRun.status === "failed" &&
+      latestRun.errorCategory !== "cancelled" ? (
         <p className="text-sm text-destructive">
           {latestRun.safeErrorMessage ??
             "The last script generation failed. Try again."}

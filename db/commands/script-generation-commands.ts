@@ -155,6 +155,72 @@ export async function createScriptGenerationReservation(input: {
   throw new BudgetExceededError("workspace_monthly");
 }
 
+/**
+ * Cancel a script-generation run that has not started executing yet, releasing
+ * its budget reservation. Mirrors `cancelSceneAudioGeneration`: a single locked
+ * statement only transitions the run when it is still `pending`/`queued` and its
+ * reservation is still `pending`, so no in-flight provider spend is stranded. The
+ * run enum has no `cancelled` value, so it is marked `failed` with a `cancelled`
+ * error category. If the run already reached `running`/`completed`/`failed`, this
+ * is a no-op (`cancelled: false`) and the task's own preflight/early-return keep
+ * billing correct.
+ */
+export async function cancelScriptGeneration(input: {
+  workspaceId: string;
+  projectId: string;
+  scriptGenerationRunId: string;
+}): Promise<{ cancelled: boolean }> {
+  const result = await getDatabase().execute<{ id: string }>(sql`
+    with eligible as materialized (
+      select run.id
+      from script_generation_runs run
+      inner join usage_reservations reservation
+        on reservation.workspace_id = run.workspace_id
+        and reservation.project_id = run.project_id
+        and reservation.operation_type = 'script_generation'
+        and reservation.script_generation_id = run.id
+      where run.workspace_id = ${input.workspaceId}
+        and run.project_id = ${input.projectId}
+        and run.id = ${input.scriptGenerationRunId}
+        and run.status in ('pending', 'queued')
+        and reservation.status = 'pending'
+      for update of run, reservation
+    ),
+    transitioned_run as (
+      update script_generation_runs run
+      set
+        status = 'failed'::scene_analysis_status,
+        actual_cost_cents = 0,
+        progress_percent = 100,
+        error_category = 'cancelled',
+        safe_error_message = 'Script generation was cancelled before it started.',
+        completed_at = now(),
+        updated_at = now()
+      from eligible
+      where run.id = eligible.id
+      returning run.id
+    ),
+    transitioned_reservation as (
+      update usage_reservations reservation
+      set
+        status = 'released'::usage_reservation_status,
+        actual_cost_cents = 0,
+        updated_at = now()
+      from transitioned_run
+      where reservation.workspace_id = ${input.workspaceId}
+        and reservation.project_id = ${input.projectId}
+        and reservation.operation_type = 'script_generation'
+        and reservation.script_generation_id = transitioned_run.id
+        and reservation.status = 'pending'
+      returning reservation.id
+    )
+    select transitioned_run.id
+    from transitioned_run
+    inner join transitioned_reservation on true
+  `);
+  return { cancelled: result.rows.length === 1 };
+}
+
 export async function attachScriptGenerationTriggerRun(input: {
   scriptGenerationRunId: string;
   triggerRunId: string;

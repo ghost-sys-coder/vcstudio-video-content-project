@@ -6,9 +6,12 @@ import { afterAll, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 import {
+  attachScriptGenerationTriggerRun,
+  cancelScriptGeneration,
   completeScriptGeneration,
   createScriptGenerationReservation,
   failScriptGeneration,
+  markScriptGenerationRunning,
 } from "@/db/commands/script-generation-commands";
 import { getDatabase } from "@/db/drizzle";
 import { BudgetExceededError } from "@/lib/domain/errors";
@@ -178,6 +181,75 @@ describeDatabase("script generation ledger (postgres)", () => {
     expect(released?.status).toBe("released");
     expect(released?.actualCostCents).toBe(0);
   });
+
+  it(
+    "cancels a queued run and releases its reservation",
+    { timeout: 60_000 },
+    async () => {
+      const fixture = await createFixture(1_000);
+      const input = reservationInput(fixture, 20);
+      await createScriptGenerationReservation(input);
+      await attachScriptGenerationTriggerRun({
+        scriptGenerationRunId: input.id,
+        triggerRunId: `run_${randomUUID()}`,
+      });
+
+      const cancelled = await cancelScriptGeneration({
+        workspaceId: fixture.workspaceId,
+        projectId: fixture.projectId,
+        scriptGenerationRunId: input.id,
+      });
+      expect(cancelled.cancelled).toBe(true);
+
+      const [run] = await getDatabase()
+        .select()
+        .from(scriptGenerationRuns)
+        .where(eq(scriptGenerationRuns.id, input.id));
+      expect(run?.status).toBe("failed");
+      expect(run?.errorCategory).toBe("cancelled");
+      expect(run?.actualCostCents).toBe(0);
+
+      const [released] = await getDatabase()
+        .select()
+        .from(usageReservations)
+        .where(eq(usageReservations.scriptGenerationId, input.id));
+      expect(released?.status).toBe("released");
+      expect(released?.actualCostCents).toBe(0);
+    },
+  );
+
+  it(
+    "does not cancel a run that is already running",
+    { timeout: 60_000 },
+    async () => {
+      const fixture = await createFixture(1_000);
+      const input = reservationInput(fixture, 20);
+      await createScriptGenerationReservation(input);
+      await markScriptGenerationRunning({
+        scriptGenerationRunId: input.id,
+        attemptCount: 1,
+      });
+
+      const cancelled = await cancelScriptGeneration({
+        workspaceId: fixture.workspaceId,
+        projectId: fixture.projectId,
+        scriptGenerationRunId: input.id,
+      });
+      expect(cancelled.cancelled).toBe(false);
+
+      const [run] = await getDatabase()
+        .select()
+        .from(scriptGenerationRuns)
+        .where(eq(scriptGenerationRuns.id, input.id));
+      expect(run?.status).toBe("running");
+
+      const [reservation] = await getDatabase()
+        .select()
+        .from(usageReservations)
+        .where(eq(usageReservations.scriptGenerationId, input.id));
+      expect(reservation?.status).toBe("pending");
+    },
+  );
 
   it(
     "rejects a reservation that exceeds the project budget",

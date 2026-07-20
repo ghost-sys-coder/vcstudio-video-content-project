@@ -68,10 +68,12 @@
       "Bash(echo \"FORMAT=$?\")",
       "Bash(echo \"LINT=$?\")",
       "Bash(touch /tmp/done_marker)",
-      "Bash(break)"
+      "Bash(break)",
+      "mcp__trigger__list_runs",
+      "Bash(node \"C:\\\\Users\\\\HP\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\d--TIKTOK-YOUTUBE-CONTENT-content-creation-tool\\\\2a3dd238-83ac-4e05-9454-ee251e8d4d10\\\\scratchpad\\\\diag.mjs\")",
+      "Bash(node diag.mjs)",
+      "Bash(RUN_DATABASE_INTEGRATION_TESTS=true npx vitest run db/integration/script-generation-postgres.integration.test.ts)"
     ],
-    "additionalDirectories": [
-      "\\tmp"
-    ]
+    "additionalDirectories": ["\\tmp"]
   }
 }

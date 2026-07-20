@@ -9,7 +9,9 @@ import {
   restoreScriptVersion,
   saveScriptDraft,
 } from "@/db/commands/script-commands";
+import { cancelScriptGeneration } from "@/db/commands/script-generation-commands";
 import { saveProjectBrief } from "@/db/commands/project-brief.command";
+import { recordAuditEvent } from "@/lib/audit/record-audit-event";
 import { updateProject } from "@/db/commands/update-project.command";
 import { findProject } from "@/db/repositories/projects.repository";
 import { findProjectBrief } from "@/db/repositories/project-briefs.repository";
@@ -203,6 +205,38 @@ export async function generateScriptAction(
         success: false,
       };
     return { error: "The script could not be generated.", success: false };
+  }
+}
+
+export async function cancelScriptGenerationAction(
+  formData: FormData,
+): Promise<ProjectActionState> {
+  const projectId = String(formData.get("projectId") ?? "");
+  const scriptGenerationRunId = String(
+    formData.get("scriptGenerationRunId") ?? "",
+  );
+  if (!projectId || !scriptGenerationRunId)
+    return { error: "Invalid cancel request.", success: false };
+  try {
+    const { context } = await requireProjectMutation(projectId);
+    const result = await cancelScriptGeneration({
+      workspaceId: context.activeMembership.workspaceId,
+      projectId,
+      scriptGenerationRunId,
+    });
+    if (result.cancelled)
+      await recordAuditEvent({
+        workspaceId: context.activeMembership.workspaceId,
+        actorUserId: context.user.id,
+        projectId,
+        action: "generation_cancelled",
+        targetType: "script_generation",
+        targetId: scriptGenerationRunId,
+      });
+    revalidatePath(`/app/projects/${projectId}/script`);
+    return { error: null, success: true };
+  } catch {
+    return { error: "The generation could not be cancelled.", success: false };
   }
 }
 

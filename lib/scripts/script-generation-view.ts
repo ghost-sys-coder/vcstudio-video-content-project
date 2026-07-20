@@ -11,6 +11,7 @@ export type ScriptGenerationRunView = {
   status: ScriptGenerationRun["status"];
   generatedContent: string | null;
   suggestedTitle: string | null;
+  errorCategory: string | null;
   safeErrorMessage: string | null;
   estimatedCostCents: number;
   actualCostCents: number | null;
@@ -30,6 +31,7 @@ function toRunView(run: ScriptGenerationRun): ScriptGenerationRunView {
     status: run.status,
     generatedContent: run.generatedContent,
     suggestedTitle: run.suggestedTitle,
+    errorCategory: run.errorCategory,
     safeErrorMessage: run.safeErrorMessage,
     estimatedCostCents: run.estimatedCostCents,
     actualCostCents: run.actualCostCents,
