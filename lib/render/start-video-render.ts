@@ -6,7 +6,9 @@ import type { Project } from "@/db/schema";
 import {
   attachVideoRenderTriggerRun,
   createVideoRenderReservation,
+  failVideoRender,
 } from "@/db/commands/video-render-commands";
+import { countTerminalVideoRendersForTimeline } from "@/db/repositories/video-render.repository";
 import {
   getProjectCommittedCostCents,
   getWorkspaceCommittedCostCents,
@@ -176,6 +178,19 @@ export async function startVideoRender(input: {
     environment.REQUEST_FINGERPRINT_SECRET,
     snapshotJson,
   );
+  // A render's idempotency key is derived from the timeline, so a second render
+  // of an identical timeline is normally deduplicated. That is correct while a
+  // render is in flight or has succeeded, but it must not permanently block a
+  // retry after a render failed or was cancelled — otherwise the only way to
+  // re-render an unchanged timeline is to delete the dead row. Advancing the
+  // key by the number of prior terminal renders lets a retry through while
+  // still deduping in-flight/succeeded renders and double submits (the latter
+  // guarded separately by the per-click request nonce).
+  const priorTerminalRenders = await countTerminalVideoRendersForTimeline({
+    workspaceId: input.workspaceId,
+    projectId: input.project.id,
+    requestFingerprint: timelineFingerprint,
+  });
   const idempotencyKey = createVideoRenderIdempotencyKey({
     secret: environment.IDEMPOTENCY_HASH_SECRET,
     workspaceId: input.workspaceId,
@@ -187,6 +202,7 @@ export async function startVideoRender(input: {
     includeCaptions: snapshot.includeCaptions,
     includeWatermark: snapshot.includeWatermark,
     timelineFingerprint,
+    attempt: priorTerminalRenders,
   });
 
   const renderId = randomUUID();
@@ -260,7 +276,6 @@ export async function startVideoRender(input: {
       status: reservation.render.status,
     };
 
-  let dispatched = false;
   try {
     const handle = await tasks.trigger<typeof videoRenderTask>(
       "video-render",
@@ -277,15 +292,33 @@ export async function startVideoRender(input: {
       renderId,
       triggerRunId: handle.id,
     });
-    dispatched = true;
-  } catch {
-    dispatched = false;
+  } catch (error) {
+    // The reservation is already committed, so a failed dispatch must not be
+    // swallowed into a success: that leaves a render stuck at "pending" with a
+    // reserved-but-idle budget until the reservation expires, and the user sees
+    // nothing happen. Release the reservation and surface a real error so the
+    // render can be retried immediately.
+    await failVideoRender({
+      workspaceId: input.workspaceId,
+      projectId: input.project.id,
+      renderId,
+      category: "dispatch_failed",
+      safeErrorMessage: "The render could not be queued. Please try again.",
+      providerBilled: false,
+    }).catch(() => {});
+    console.error("Failed to dispatch video render task.", {
+      renderId,
+      error: error instanceof Error ? error.message : "unknown error",
+    });
+    throw new VideoRenderRequestError(
+      "The render could not be queued. Please try again.",
+    );
   }
 
   return {
     renderId,
     created: true,
-    dispatched,
+    dispatched: true,
     estimatedCostCents,
     status: "queued",
   };

@@ -53,4 +53,21 @@ describe("createVideoRenderIdempotencyKey", () => {
       createVideoRenderIdempotencyKey({ ...BASE, workspaceId: "ws-2" }),
     );
   });
+
+  it("treats a zero or omitted attempt as the base key", () => {
+    const base = createVideoRenderIdempotencyKey(BASE);
+    expect(createVideoRenderIdempotencyKey({ ...BASE, attempt: 0 })).toBe(base);
+  });
+
+  it("changes when the retry attempt advances so a terminal render is not reused", () => {
+    const base = createVideoRenderIdempotencyKey(BASE);
+    const firstRetry = createVideoRenderIdempotencyKey({ ...BASE, attempt: 1 });
+    const secondRetry = createVideoRenderIdempotencyKey({
+      ...BASE,
+      attempt: 2,
+    });
+    expect(firstRetry).not.toBe(base);
+    expect(secondRetry).not.toBe(base);
+    expect(secondRetry).not.toBe(firstRetry);
+  });
 });

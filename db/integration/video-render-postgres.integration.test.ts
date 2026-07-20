@@ -21,6 +21,7 @@ import {
   failVideoRender,
 } from "@/db/commands/video-render-commands";
 import {
+  countTerminalVideoRendersForTimeline,
   findVideoRender,
   findVideoRenderReservation,
 } from "@/db/repositories/video-render.repository";
@@ -136,6 +137,7 @@ function reservationInput(
   overrides: Partial<{
     requestNonce: string;
     idempotencyKey: string;
+    requestFingerprint: string;
     estimatedCostCents: number;
   }> = {},
 ) {
@@ -147,7 +149,8 @@ function reservationInput(
     projectId: fixture.projectId,
     requestNonce: overrides.requestNonce ?? randomUUID(),
     idempotencyKey: overrides.idempotencyKey ?? `render-idem-${randomUUID()}`,
-    requestFingerprint: randomUUID().replaceAll("-", ""),
+    requestFingerprint:
+      overrides.requestFingerprint ?? randomUUID().replaceAll("-", ""),
     preset: "landscape_1080p",
     aspectRatio: "16:9" as const,
     width: 1920,
@@ -415,6 +418,53 @@ describeDatabase("Phase 9 video render invariants", () => {
       renderId: reservation.render.id,
     });
     expect(released?.status).toBe("released");
+  }, 30_000);
+
+  it("allows re-rendering an identical timeline after a prior render failed", async () => {
+    const fixture = await createFixture();
+    const requestFingerprint = randomUUID().replaceAll("-", "");
+
+    // First render of this timeline, then it fails.
+    const first = await createVideoRenderReservation(
+      reservationInput(fixture, {
+        requestFingerprint,
+        idempotencyKey: `render-idem-${requestFingerprint}-0`,
+      }),
+    );
+    await failVideoRender({
+      workspaceId: fixture.workspaceId,
+      projectId: fixture.projectId,
+      renderId: first.render.id,
+      category: "render_failed",
+      safeErrorMessage: "The video could not be rendered.",
+      providerBilled: false,
+    });
+
+    // The attempt discriminator advances off the count of terminal renders.
+    const terminalCount = await countTerminalVideoRendersForTimeline({
+      workspaceId: fixture.workspaceId,
+      projectId: fixture.projectId,
+      requestFingerprint,
+    });
+    expect(terminalCount).toBe(1);
+
+    // A retry carries the same timeline fingerprint but an advanced key, so it
+    // is a genuinely new render rather than a dedup against the dead one.
+    const retry = await createVideoRenderReservation(
+      reservationInput(fixture, {
+        requestFingerprint,
+        idempotencyKey: `render-idem-${requestFingerprint}-${terminalCount}`,
+      }),
+    );
+    expect(retry.created).toBe(true);
+    expect(retry.render.id).not.toBe(first.render.id);
+    expect(retry.render.status).toBe("pending");
+
+    const rows = await getDatabase()
+      .select({ id: videoRenders.id })
+      .from(videoRenders)
+      .where(eq(videoRenders.requestFingerprint, requestFingerprint));
+    expect(rows).toHaveLength(2);
   }, 30_000);
 
   it("isolates a render from other workspaces", async () => {

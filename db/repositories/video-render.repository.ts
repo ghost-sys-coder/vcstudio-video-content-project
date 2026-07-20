@@ -1,10 +1,36 @@
 import "server-only";
 
-import { and, asc, desc, eq, inArray, lte } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lte, sql } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
 import { usageReservations, videoRenders } from "@/db/schema";
 
 const MAX_LIST_LIMIT = 100;
+
+/**
+ * Counts how many prior renders of a specific timeline (identified by its
+ * request fingerprint) have already reached a terminal failed/cancelled state.
+ * Used to advance the render idempotency key so a retry of an identical
+ * timeline is not silently deduplicated against a dead render, while in-flight
+ * and succeeded renders (excluded here) still dedupe normally.
+ */
+export async function countTerminalVideoRendersForTimeline(input: {
+  workspaceId: string;
+  projectId: string;
+  requestFingerprint: string;
+}): Promise<number> {
+  const [row] = await getDatabase()
+    .select({ count: sql<number>`count(*)::int` })
+    .from(videoRenders)
+    .where(
+      and(
+        eq(videoRenders.workspaceId, input.workspaceId),
+        eq(videoRenders.projectId, input.projectId),
+        eq(videoRenders.requestFingerprint, input.requestFingerprint),
+        inArray(videoRenders.status, ["failed", "cancelled"]),
+      ),
+    );
+  return row?.count ?? 0;
+}
 
 export async function findVideoRender(input: {
   workspaceId: string;

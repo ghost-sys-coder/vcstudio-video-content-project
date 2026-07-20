@@ -130,8 +130,17 @@ export function createVideoRenderIdempotencyKey(input: {
   includeWatermark: boolean;
   /** Hash of the frozen timeline snapshot (assets, timing, captions). */
   timelineFingerprint: string;
+  /**
+   * Distinguishes a fresh render of an otherwise-identical timeline after a
+   * prior render for it reached a terminal failed/cancelled state. `0` (the
+   * default) leaves the key unchanged, so an in-flight or already-succeeded
+   * render of the same timeline is still reused (never re-billed); a higher
+   * value mints a new key so a retry is not silently deduplicated against the
+   * terminal render.
+   */
+  attempt?: number;
 }): string {
-  return hash(input.secret, [
+  const elements = [
     input.workspaceId,
     input.projectId,
     "video-render",
@@ -142,7 +151,10 @@ export function createVideoRenderIdempotencyKey(input: {
     input.includeCaptions ? "captions" : "no-captions",
     input.includeWatermark ? "watermark" : "no-watermark",
     input.timelineFingerprint,
-  ]);
+  ];
+  if (input.attempt && input.attempt > 0)
+    elements.push(`attempt-${input.attempt}`);
+  return hash(input.secret, elements);
 }
 
 export function createRequestFingerprint(
