@@ -83,7 +83,10 @@
       "Bash(RUN_DATABASE_INTEGRATION_TESTS=true npx vitest run db/integration/video-render-postgres.integration.test.ts)",
       "Bash(npm test *)",
       "Bash(npx tsx -e ' *)",
-      "Bash(node ensure-v2.mjs)"
+      "Bash(node ensure-v2.mjs)",
+      "Bash(node -e \"const s=require\\('@base-ui/react/select'\\); console.log\\('exports:', Object.keys\\(s.Select||s\\).slice\\(0,20\\)\\)\")",
+      "Bash(grep -iv \"//\")",
+      "Bash(git checkout *)"
     ],
     "additionalDirectories": [
       "\\tmp"

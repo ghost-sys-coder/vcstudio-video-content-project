@@ -47,6 +47,23 @@ export function isWorkspaceLogoObjectKey(input: {
   return input.objectKey.startsWith(prefix) && !input.objectKey.includes("..");
 }
 
+/**
+ * Object key for a cached voice-preview clip. Voice previews are shared,
+ * workspace-agnostic system assets: a single clip per (model, voice, sample
+ * text) is synthesized once and replayed by everyone. The key is fully derived
+ * from a fixed allow-list (voice) plus sanitized model/hash segments, so no
+ * untrusted input reaches the key.
+ */
+export function createVoicePreviewObjectKey(input: {
+  model: string;
+  voice: string;
+  sampleHash: string;
+}): string {
+  const safe = (value: string) =>
+    value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-");
+  return `system/voice-previews/${safe(input.model)}/${safe(input.voice)}/${safe(input.sampleHash)}.mp3`;
+}
+
 export function createVideoExportObjectKey(input: {
   workspaceId: string;
   projectId: string;

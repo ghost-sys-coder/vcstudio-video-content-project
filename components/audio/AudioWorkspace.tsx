@@ -14,6 +14,7 @@ import { AudioGenerationProgress } from "@/components/audio/AudioGenerationProgr
 import { BulkGenerateAudioButton } from "@/components/audio/BulkGenerateAudioButton";
 import { SceneAudioList } from "@/components/audio/SceneAudioList";
 import { VoicePresetSelector } from "@/components/audio/VoicePresetSelector";
+import { VoicePreviewPanel } from "@/components/audio/VoicePreviewPanel";
 import type {
   AudioGenerateInput,
   AudioWorkspaceView,
@@ -219,6 +220,8 @@ export function AudioWorkspace({
         progress={data.progress}
         timeline={data.timeline}
       />
+
+      <VoicePreviewPanel />
 
       <div className="flex flex-wrap items-end justify-between gap-3">
         <VoicePresetSelector
