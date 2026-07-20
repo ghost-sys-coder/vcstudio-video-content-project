@@ -1,11 +1,12 @@
-export const SCENE_IMAGE_PROMPT_VERSION = "scene-image-v1";
+export const SCENE_IMAGE_PROMPT_VERSION = "scene-image-v2";
 export const SCENE_IMAGE_PROMPT_TEMPLATE_SOURCE_HASH =
-  "090b20021aad93426915c8cd257c1c96478380e9bf88b503dcac83ce8d8800f5";
+  "d1d0224d441c3ceaa941ca8da724cce56ebd7f2de4e8ea795d567f1cbd459fea";
 
 export const SCENE_IMAGE_PROMPT_TEMPLATE_SOURCE = `VCStudio scene image prompt
 Layers: global style, character identity, character reference requirements,
-scene setting, scene action, camera composition, emotional tone, continuity,
-negative constraints, output dimensions, aspect ratio, and text exclusion.`;
+scene setting, scene action, camera composition, emotional tone, composition
+focus (clean, uncluttered, single clear subject), continuity, negative
+constraints, output dimensions, aspect ratio, and text exclusion.`;
 
 export type SceneImagePromptCharacter = {
   id: string;
@@ -166,7 +167,9 @@ ${renderReferences(input.references)}
 ${compactLines([
   renderField("Visual objective", input.scene.visualDescription),
   renderField("Location and environment", input.scene.locationDescription),
-  propNames.length > 0 ? `- Required props: ${propNames.join(", ")}` : null,
+  propNames.length > 0
+    ? `- Required props (include only these; add no other objects): ${propNames.join(", ")}`
+    : "- No specific props are required; keep the scene free of incidental objects.",
 ])}
 </scene_setting>
 
@@ -186,6 +189,15 @@ ${compactLines([
 ${escapePromptValue(input.scene.emotionalTone)}
 </emotional_tone>
 
+<composition_focus>
+- Keep the composition clean, simple, and uncluttered. Clarity beats detail.
+- Show a single clear focal subject: the character(s) and action described above must dominate the frame and read instantly at a glance.
+- Use a simple, minimal background that supports the subject; include only environment detail essential to the location, never busy or crowded scenery.
+- Leave generous negative space and breathing room around the subject; do not fill the frame edge to edge with objects.
+- Do not invent extra props, background characters, crowds, signage, decoration, or incidental clutter that the scene did not call for.
+- Prefer one strong idea per image over many competing elements.
+</composition_focus>
+
 <continuity_requirements>
 ${escapePromptValue(input.scene.continuityNotes) || "Maintain visual continuity with adjacent scenes and all canonical character rules."}
 </continuity_requirements>
@@ -194,6 +206,7 @@ ${escapePromptValue(input.scene.continuityNotes) || "Maintain visual continuity 
 ${compactLines([
   renderField("Style exclusions", input.stylePreset.negativePrompt),
   ...characterNegativeConstraints,
+  "- No cluttered, busy, or crowded compositions; no visual noise, no densely packed background detail, no extra background characters or crowds, and no unrequested props or decoration.",
   "- No duplicate characters, extra limbs, malformed hands, distorted faces, conflicting light directions, accidental borders, watermarks, logos, or interface chrome.",
 ])}
 </negative_constraints>

@@ -2,8 +2,14 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 import { and, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
+import {
+  SCENE_IMAGE_PROMPT_TEMPLATE_SOURCE,
+  SCENE_IMAGE_PROMPT_TEMPLATE_SOURCE_HASH,
+  SCENE_IMAGE_PROMPT_VERSION,
+} from "@studio/prompts";
 import { getDatabase } from "@/db/drizzle";
 import {
+  promptTemplateVersions,
   providerRequests,
   sceneImageGenerations,
   stylePresets,
@@ -24,6 +30,26 @@ import {
 } from "@/db/repositories/scene-images.repository";
 import { BudgetExceededError } from "@/lib/domain/errors";
 import { assertSceneImageReferenceSelection } from "@/lib/domain/scene-image-references";
+
+export const SCENE_IMAGE_PROMPT_TEMPLATE_KEY = "scene-image";
+
+/**
+ * Ensure the versioned scene-image prompt-template row exists. Runs
+ * `INSERT ... ON CONFLICT DO NOTHING` so a new prompt version works whether the
+ * schema was applied via `db:migrate` (seed included) or `drizzle-kit push`
+ * (schema only, seed skipped). Mirrors `ensureCharacterReferencePromptTemplate`.
+ */
+export async function ensureSceneImagePromptTemplate(): Promise<void> {
+  await getDatabase()
+    .insert(promptTemplateVersions)
+    .values({
+      templateKey: SCENE_IMAGE_PROMPT_TEMPLATE_KEY,
+      version: SCENE_IMAGE_PROMPT_VERSION,
+      sourceHash: SCENE_IMAGE_PROMPT_TEMPLATE_SOURCE_HASH,
+      templateSource: SCENE_IMAGE_PROMPT_TEMPLATE_SOURCE,
+    })
+    .onConflictDoNothing();
+}
 
 type SafeMetadata = Record<string, string | number | boolean | null>;
 type ImageQuality = typeof sceneImageGenerations.$inferInsert.quality;

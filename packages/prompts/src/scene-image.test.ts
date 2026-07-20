@@ -86,7 +86,7 @@ describe("scene image prompt", () => {
   it("renders every required layer deterministically with a source version", () => {
     const first = renderSceneImagePrompt(input);
     expect(renderSceneImagePrompt(input)).toBe(first);
-    expect(SCENE_IMAGE_PROMPT_VERSION).toBe("scene-image-v1");
+    expect(SCENE_IMAGE_PROMPT_VERSION).toBe("scene-image-v2");
     expect(first).toContain("<global_style_preset>");
     expect(first).toContain("<character_identity>");
     expect(first).toContain("<character_reference_requirements>");
@@ -94,10 +94,28 @@ describe("scene image prompt", () => {
     expect(first).toContain("<scene_action>");
     expect(first).toContain("<camera_composition>");
     expect(first).toContain("<emotional_tone>");
+    expect(first).toContain("<composition_focus>");
     expect(first).toContain("<continuity_requirements>");
     expect(first).toContain("<negative_constraints>");
     expect(first).toContain("1536x1024");
     expect(first).toContain("Do not render captions");
+  });
+
+  it("directs the model toward a clean, uncluttered composition", () => {
+    const prompt = renderSceneImagePrompt(input);
+    expect(prompt).toContain("clean, simple, and uncluttered");
+    expect(prompt).toContain("single clear focal subject");
+    expect(prompt).toContain("No cluttered, busy, or crowded compositions");
+  });
+
+  it("limits props to those the scene explicitly requires", () => {
+    const withProps = renderSceneImagePrompt(input);
+    expect(withProps).toContain("include only these; add no other objects");
+    const withoutProps = renderSceneImagePrompt({
+      ...input,
+      scene: { ...input.scene, propNames: [] },
+    });
+    expect(withoutProps).toContain("keep the scene free of incidental objects");
   });
 
   it("orders reference instructions by immutable asset identifier", () => {

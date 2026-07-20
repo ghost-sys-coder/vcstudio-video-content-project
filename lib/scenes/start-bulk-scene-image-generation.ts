@@ -11,7 +11,10 @@ import {
   createSceneImageBatch,
   markSceneImageBatchDispatched,
 } from "@/db/commands/scene-image-batch-commands";
-import { createSceneImageGenerationReservation } from "@/db/commands/scene-image-commands";
+import {
+  createSceneImageGenerationReservation,
+  ensureSceneImagePromptTemplate,
+} from "@/db/commands/scene-image-commands";
 import { listSceneImageGenerationsByBatch } from "@/db/repositories/scene-image-batches.repository";
 import {
   findApprovedCurrentSceneVersion,
@@ -144,6 +147,11 @@ export async function startBulkSceneImageGeneration(input: {
     environment,
     input.request.quality,
   );
+
+  // Self-ensure the versioned prompt-template row so a newly bumped prompt
+  // version works even when the schema was applied via `drizzle-kit push`
+  // (which skips seed inserts).
+  await ensureSceneImagePromptTemplate();
 
   const [stylePreset, promptTemplate, currentScenes] = await Promise.all([
     findStylePresetVersion({

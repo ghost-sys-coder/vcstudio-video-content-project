@@ -81,7 +81,9 @@
       "Bash(node -e \"console.log\\(require\\('@trigger.dev/sdk/package.json'\\).version\\)\")",
       "Bash(node diag-render.mjs)",
       "Bash(RUN_DATABASE_INTEGRATION_TESTS=true npx vitest run db/integration/video-render-postgres.integration.test.ts)",
-      "Bash(npm test *)"
+      "Bash(npm test *)",
+      "Bash(npx tsx -e ' *)",
+      "Bash(node ensure-v2.mjs)"
     ],
     "additionalDirectories": [
       "\\tmp"

@@ -9,6 +9,7 @@ import type { Project } from "@/db/schema";
 import {
   attachSceneImageTriggerRun,
   createSceneImageGenerationReservation,
+  ensureSceneImagePromptTemplate,
 } from "@/db/commands/scene-image-commands";
 import {
   findApprovedCurrentSceneVersion,
@@ -226,6 +227,11 @@ export async function startSceneImageGeneration(input: {
       });
     return { generationId: existingGeneration.id, created: false };
   }
+
+  // Self-ensure the versioned prompt-template row so a newly bumped prompt
+  // version works even when the schema was applied via `drizzle-kit push`
+  // (which skips seed inserts).
+  await ensureSceneImagePromptTemplate();
 
   const [
     stylePreset,
