@@ -72,7 +72,11 @@
       "mcp__trigger__list_runs",
       "Bash(node \"C:\\\\Users\\\\HP\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\d--TIKTOK-YOUTUBE-CONTENT-content-creation-tool\\\\2a3dd238-83ac-4e05-9454-ee251e8d4d10\\\\scratchpad\\\\diag.mjs\")",
       "Bash(node diag.mjs)",
-      "Bash(RUN_DATABASE_INTEGRATION_TESTS=true npx vitest run db/integration/script-generation-postgres.integration.test.ts)"
+      "Bash(RUN_DATABASE_INTEGRATION_TESTS=true npx vitest run db/integration/script-generation-postgres.integration.test.ts)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/)",
+      "Bash(curl -s -o /dev/null -w \"http_status=%{http_code}\\\\n\" http://localhost:3000/)",
+      "Bash(node -e \"const l=require\\('lucide-react'\\); console.log\\(['SparklesIcon','ArrowRightIcon','FileTextIcon','LayersIcon','ImageIcon','AudioLinesIcon','CaptionsIcon','FilmIcon','WalletIcon','CheckCircle2Icon','UsersIcon','ShieldCheckIcon','HistoryIcon'].map\\(n=>n+': '+\\(typeof l[n]\\)\\).join\\('\\\\n'\\)\\)\")",
+      "Bash(node -e ' *)"
     ],
     "additionalDirectories": ["\\tmp"]
   }
