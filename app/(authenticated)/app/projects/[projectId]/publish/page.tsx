@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { PlatformThumbnailsPanel } from "@/components/publish/PlatformThumbnailsPanel";
 import { PlatformTitlesPanel } from "@/components/publish/PlatformTitlesPanel";
+import { PublishToPlatformPanel } from "@/components/publish/PublishToPlatformPanel";
+import { loadPublishingView } from "@/lib/publishing/publishing-view";
 import { findProject } from "@/db/repositories/projects.repository";
 import { findProjectBrief } from "@/db/repositories/project-briefs.repository";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
@@ -28,9 +30,10 @@ export default async function ProjectPublishPage({
   const canGenerate =
     canEditProject(context.activeMembership.role) &&
     project.status !== "archived";
-  const [titlesView, thumbnailsView] = await Promise.all([
+  const [titlesView, thumbnailsView, publishingView] = await Promise.all([
     loadTitlesView({ workspaceId: scope.workspaceId, project, brief }),
     loadThumbnailsView({ workspaceId: scope.workspaceId, project, brief }),
+    loadPublishingView({ workspaceId: scope.workspaceId, project }),
   ]);
   return (
     <div className="space-y-6">
@@ -42,6 +45,11 @@ export default async function ProjectPublishPage({
       <PlatformThumbnailsPanel
         canGenerate={canGenerate}
         initialData={thumbnailsView}
+        projectId={project.id}
+      />
+      <PublishToPlatformPanel
+        canPublish={canGenerate}
+        initialData={publishingView}
         projectId={project.id}
       />
     </div>

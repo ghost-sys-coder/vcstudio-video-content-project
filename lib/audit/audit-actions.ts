@@ -19,6 +19,9 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   export_deleted: "Export deleted",
   budget_changed: "Budget changed",
   limits_changed: "Operational limits changed",
+  platform_connected: "Platform account connected",
+  platform_disconnected: "Platform account disconnected",
+  video_published: "Video published to platform",
 };
 
 // Keys whose values are genuinely sensitive and must never be persisted to the

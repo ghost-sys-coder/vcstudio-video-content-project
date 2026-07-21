@@ -75,6 +75,27 @@ export function createTitleGenerationIdempotencyKey(input: {
   ]);
 }
 
+export function createVideoPublicationIdempotencyKey(input: {
+  secret: string;
+  workspaceId: string;
+  projectId: string;
+  renderId: string;
+  connectionId: string;
+  platform: string;
+  /** Distinct per intentional "Publish" click so a deliberate re-upload is allowed. */
+  requestNonce: string;
+}): string {
+  return hash(input.secret, [
+    input.workspaceId,
+    input.projectId,
+    "video-publication",
+    input.renderId,
+    input.connectionId,
+    input.platform,
+    input.requestNonce,
+  ]);
+}
+
 export function createThumbnailGenerationIdempotencyKey(input: {
   secret: string;
   workspaceId: string;

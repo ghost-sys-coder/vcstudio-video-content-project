@@ -12,6 +12,8 @@ import {
   renderEnvironmentSchema,
   characterEnvironmentSchema,
   usageEnvironmentSchema,
+  publishingEnvironmentSchema,
+  publishingWebEnvironmentSchema,
   type ClerkWebhookEnvironment,
   type DatabaseEnvironment,
   type StorageEnvironment,
@@ -23,6 +25,8 @@ import {
   type RenderEnvironment,
   type CharacterEnvironment,
   type UsageEnvironment,
+  type PublishingEnvironment,
+  type PublishingWebEnvironment,
 } from "@/lib/env/server-schema";
 
 let databaseEnvironment: DatabaseEnvironment | null = null;
@@ -36,6 +40,20 @@ let subtitleEnvironment: SubtitleEnvironment | null = null;
 let renderEnvironment: RenderEnvironment | null = null;
 let characterEnvironment: CharacterEnvironment | null = null;
 let usageEnvironment: UsageEnvironment | null = null;
+let publishingEnvironment: PublishingEnvironment | null = null;
+let publishingWebEnvironment: PublishingWebEnvironment | null = null;
+
+export function getPublishingEnvironment(): PublishingEnvironment {
+  publishingEnvironment ??= publishingEnvironmentSchema.parse(process.env);
+  return publishingEnvironment;
+}
+
+export function getPublishingWebEnvironment(): PublishingWebEnvironment {
+  publishingWebEnvironment ??= publishingWebEnvironmentSchema.parse(
+    process.env,
+  );
+  return publishingWebEnvironment;
+}
 
 export function getDatabaseEnvironment(): DatabaseEnvironment {
   databaseEnvironment ??= databaseEnvironmentSchema.parse(process.env);

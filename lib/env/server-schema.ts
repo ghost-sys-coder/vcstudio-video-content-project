@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { decodeEncryptionKey } from "@/lib/crypto/secret-box";
 
 export const serverEnvironmentSchema = z.object({
   CLERK_SECRET_KEY: z.string().min(1, "CLERK_SECRET_KEY is required"),
@@ -423,6 +424,72 @@ export const renderEnvironmentSchema = z.object({
 // manual-confirmation threshold. The daily/monthly defaults mirror the other
 // budget-bearing groups (they seed a workspace's editable settings row); the
 // threshold is a Vercel-only preflight/UX value that no worker reads.
+// Publishing a finished render to an external platform. Deliberately grouped
+// per-platform-agnostic values first, then the YouTube (Google OAuth) client, so
+// adding Facebook/Instagram/TikTok later means adding their own client block
+// without touching the shared pieces.
+export const publishingEnvironmentSchema = z.object({
+  /** 32 bytes, base64 or hex. Encrypts platform OAuth tokens at rest. */
+  PLATFORM_TOKEN_ENCRYPTION_KEY: z
+    .string()
+    .min(1, "PLATFORM_TOKEN_ENCRYPTION_KEY is required")
+    .superRefine((value, context) => {
+      try {
+        decodeEncryptionKey(value);
+      } catch {
+        context.addIssue({
+          code: "custom",
+          message:
+            "PLATFORM_TOKEN_ENCRYPTION_KEY must decode to 32 bytes (base64 or hex).",
+        });
+      }
+    }),
+  GOOGLE_OAUTH_CLIENT_ID: z
+    .string()
+    .min(1, "GOOGLE_OAUTH_CLIENT_ID is required"),
+  GOOGLE_OAUTH_CLIENT_SECRET: z
+    .string()
+    .min(1, "GOOGLE_OAUTH_CLIENT_SECRET is required"),
+  ENABLE_VIDEO_PUBLISHING: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((value) => value === "true"),
+  /** Hard ceiling on the upload payload, independent of what a render produced. */
+  MAX_PUBLISH_VIDEO_BYTES: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(1_073_741_824),
+  /** Must exceed the publish task's wall clock, or the download URL dies mid-upload. */
+  PUBLISH_ASSET_URL_TTL_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(600)
+    .max(3600)
+    .default(3600),
+});
+
+/**
+ * OAuth values only the **web runtime** needs: the Trigger.dev worker never
+ * mints or verifies an authorization `state`, and never builds a redirect URI.
+ * Kept separate so the state-signing secret is not shipped to a second runtime
+ * that has no use for it.
+ */
+export const publishingWebEnvironmentSchema = z.object({
+  /** Public origin used to build OAuth redirect URIs; must match the client's registered URI. */
+  APP_BASE_URL: z.url("APP_BASE_URL must be a valid URL"),
+  /** Signs the OAuth `state` parameter so a callback cannot be forged or replayed. */
+  OAUTH_STATE_SECRET: z
+    .string()
+    .min(32, "OAUTH_STATE_SECRET must be at least 32 characters"),
+  OAUTH_STATE_TTL_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(60)
+    .max(3600)
+    .default(600),
+});
+
 export const usageEnvironmentSchema = z.object({
   DEFAULT_DAILY_BUDGET_CENTS: z.coerce.number().int().positive().default(500),
   DEFAULT_MONTHLY_BUDGET_CENTS: z.coerce
@@ -470,6 +537,10 @@ export type SceneAnalysisEnvironment = z.infer<
   typeof sceneAnalysisEnvironmentSchema
 >;
 export type SceneImageEnvironment = z.infer<typeof sceneImageEnvironmentSchema>;
+export type PublishingEnvironment = z.infer<typeof publishingEnvironmentSchema>;
+export type PublishingWebEnvironment = z.infer<
+  typeof publishingWebEnvironmentSchema
+>;
 export type SceneAudioEnvironment = z.infer<typeof sceneAudioEnvironmentSchema>;
 export type SubtitleEnvironment = z.infer<typeof subtitleEnvironmentSchema>;
 export type RenderEnvironment = z.infer<typeof renderEnvironmentSchema>;
