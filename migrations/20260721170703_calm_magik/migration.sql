@@ -1,0 +1,1 @@
+ALTER TABLE "thumbnail_generations" ADD COLUMN "dismissed_at" timestamp with time zone;

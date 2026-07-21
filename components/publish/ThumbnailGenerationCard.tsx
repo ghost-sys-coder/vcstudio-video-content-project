@@ -1,6 +1,6 @@
 "use client";
 
-import { DownloadIcon, StarIcon } from "lucide-react";
+import { DownloadIcon, RefreshCwIcon, StarIcon } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import type { ThumbnailView } from "@/lib/thumbnails/thumbnail-view";
 
@@ -12,18 +12,26 @@ export function ThumbnailGenerationCard({
   projectId,
   thumbnail,
   canManage,
+  busy,
   onToggleFavorite,
+  onRegenerate,
+  onDismiss,
 }: {
   projectId: string;
   thumbnail: ThumbnailView;
   canManage: boolean;
+  busy: boolean;
   onToggleFavorite: (thumbnailId: string, isFavorite: boolean) => void;
+  onRegenerate: (thumbnailId: string) => void;
+  onDismiss: (thumbnailId: string) => void;
 }) {
   const assetUrl = `/api/projects/${projectId}/thumbnails/${thumbnail.id}/asset`;
   const isActive =
     thumbnail.status === "pending" ||
     thumbnail.status === "queued" ||
     thumbnail.status === "running";
+  const isDead =
+    thumbnail.status === "failed" || thumbnail.status === "cancelled";
   const modeLabel =
     thumbnail.textMode === "baked" ? "Headline baked in" : "Text-free";
 
@@ -99,20 +107,45 @@ export function ThumbnailGenerationCard({
           </span>
         </div>
 
-        <div className="mt-auto flex items-center justify-between gap-2 pt-1">
+        <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-1">
           <span className="text-xs text-muted-foreground">
             {thumbnail.createdAtLabel}
           </span>
-          {thumbnail.status === "succeeded" && thumbnail.hasAsset ? (
-            <a
-              className={buttonVariants({ size: "sm", variant: "outline" })}
-              download
-              href={assetUrl}
-            >
-              <DownloadIcon aria-hidden className="size-3.5" />
-              Download
-            </a>
-          ) : null}
+          <div className="flex items-center gap-2">
+            {thumbnail.status === "succeeded" && thumbnail.hasAsset ? (
+              <a
+                className={buttonVariants({ size: "sm", variant: "outline" })}
+                download
+                href={assetUrl}
+              >
+                <DownloadIcon aria-hidden className="size-3.5" />
+                Download
+              </a>
+            ) : null}
+            {isDead && canManage ? (
+              <>
+                <Button
+                  disabled={busy}
+                  onClick={() => onDismiss(thumbnail.id)}
+                  size="sm"
+                  type="button"
+                  variant="ghost"
+                >
+                  Dismiss
+                </Button>
+                <Button
+                  disabled={busy}
+                  onClick={() => onRegenerate(thumbnail.id)}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  <RefreshCwIcon aria-hidden className="size-3.5" />
+                  Regenerate
+                </Button>
+              </>
+            ) : null}
+          </div>
         </div>
       </div>
     </li>

@@ -3,8 +3,10 @@
 import { revalidatePath } from "next/cache";
 import {
   cancelThumbnailGeneration,
+  dismissThumbnailGeneration,
   setThumbnailFavorite,
 } from "@/db/commands/thumbnail-generation-commands";
+import { findThumbnailGeneration } from "@/db/repositories/thumbnail-generation.repository";
 import {
   cancelTitleGeneration,
   setTitleSuggestionFavorite,
@@ -34,7 +36,9 @@ import {
 } from "@/lib/schemas/title-generation";
 import {
   cancelThumbnailGenerationSchema,
+  dismissThumbnailSchema,
   generateThumbnailSchema,
+  regenerateThumbnailSchema,
   toggleThumbnailFavoriteSchema,
 } from "@/lib/schemas/thumbnail";
 import {
@@ -214,6 +218,93 @@ export async function generateThumbnailAction(
               : "This would exceed the workspace monthly budget.",
       };
     return { success: false, error: "The thumbnail could not be generated." };
+  }
+}
+
+/**
+ * Start a fresh generation reusing a previous one's settings. This is a new
+ * billable operation, not a free retry: `transport_ambiguous` failures are
+ * classified non-retriable precisely because the provider may already have
+ * billed the original call, so re-running is always an explicit user choice.
+ */
+export async function regenerateThumbnailAction(
+  formData: FormData,
+): Promise<ThumbnailActionResult> {
+  const parsed = regenerateThumbnailSchema.safeParse({
+    projectId: formData.get("projectId"),
+    thumbnailGenerationId: formData.get("thumbnailGenerationId"),
+    requestNonce: formData.get("requestNonce"),
+  });
+  if (!parsed.success)
+    return { success: false, error: "The regenerate request is invalid." };
+  try {
+    const { context, project } = await requirePublishMutation(
+      parsed.data.projectId,
+    );
+    const workspaceId = context.activeMembership.workspaceId;
+    const previous = await findThumbnailGeneration({
+      workspaceId,
+      projectId: parsed.data.projectId,
+      thumbnailGenerationId: parsed.data.thumbnailGenerationId,
+    });
+    if (!previous)
+      return { success: false, error: "That thumbnail no longer exists." };
+
+    const brief = await findProjectBrief({
+      workspaceId,
+      projectId: parsed.data.projectId,
+    });
+    await startThumbnailGeneration({
+      workspaceId,
+      project,
+      brief,
+      platform: previous.platform,
+      textMode: previous.textMode,
+      headlineText: previous.headlineText ?? "",
+      requestedByUserId: context.user.id,
+      requestNonce: parsed.data.requestNonce,
+    });
+    revalidatePath(`/app/projects/${parsed.data.projectId}/publish`);
+    return { success: true, error: null };
+  } catch (error) {
+    if (error instanceof ThumbnailGenerationRequestError)
+      return { success: false, error: error.message };
+    if (error instanceof RateLimitExceededError)
+      return { success: false, error: error.message };
+    if (error instanceof BudgetExceededError)
+      return {
+        success: false,
+        error:
+          error.scope === "project"
+            ? "This would exceed the project budget."
+            : error.scope === "workspace_daily"
+              ? "This would exceed the workspace daily budget."
+              : "This would exceed the workspace monthly budget.",
+      };
+    return { success: false, error: "The thumbnail could not be regenerated." };
+  }
+}
+
+export async function dismissThumbnailAction(
+  formData: FormData,
+): Promise<ThumbnailActionResult> {
+  const parsed = dismissThumbnailSchema.safeParse({
+    projectId: formData.get("projectId"),
+    thumbnailGenerationId: formData.get("thumbnailGenerationId"),
+  });
+  if (!parsed.success)
+    return { success: false, error: "The request is invalid." };
+  try {
+    const { context } = await requirePublishMutation(parsed.data.projectId);
+    await dismissThumbnailGeneration({
+      workspaceId: context.activeMembership.workspaceId,
+      projectId: parsed.data.projectId,
+      thumbnailGenerationId: parsed.data.thumbnailGenerationId,
+    });
+    revalidatePath(`/app/projects/${parsed.data.projectId}/publish`);
+    return { success: true, error: null };
+  } catch {
+    return { success: false, error: "The thumbnail could not be dismissed." };
   }
 }
 

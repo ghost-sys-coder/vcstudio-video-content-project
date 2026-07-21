@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   cancelThumbnailGenerationAction,
+  dismissThumbnailAction,
   generateThumbnailAction,
   loadThumbnailsViewAction,
+  regenerateThumbnailAction,
   toggleThumbnailFavoriteAction,
 } from "@/app/(authenticated)/app/projects/[projectId]/publish/actions";
 import { ThumbnailGenerationCard } from "@/components/publish/ThumbnailGenerationCard";
@@ -33,6 +35,9 @@ const textModeItems = {
   clean: "Text-free (overlay later)",
   baked: "Headline baked in",
 };
+
+/** Sentinel for "I'll type my own" — never sent as a headline. */
+const CUSTOM_HEADLINE_VALUE = "__custom__";
 
 export function PlatformThumbnailsPanel({
   projectId,
@@ -114,6 +119,24 @@ export function PlatformThumbnailsPanel({
     if (generating) void poll();
   }, [generating, poll]);
 
+  const headlineOptions = useMemo(
+    () => current?.headlineOptions ?? [],
+    [current],
+  );
+  const headlineItems = useMemo(
+    () =>
+      Object.fromEntries([
+        ...headlineOptions.map((option) => [option, option]),
+        [CUSTOM_HEADLINE_VALUE, "Custom headline…"],
+      ]),
+    [headlineOptions],
+  );
+  // The input stays the source of truth; the Select just reflects whether the
+  // current text still matches a suggestion.
+  const selectedHeadlineOption = headlineOptions.includes(headline)
+    ? headline
+    : CUSTOM_HEADLINE_VALUE;
+
   const headlineRequired = textMode === "baked";
   const headlineMissing = headlineRequired && headline.trim() === "";
 
@@ -147,6 +170,43 @@ export function PlatformThumbnailsPanel({
       formData.set("projectId", projectId);
       formData.set("thumbnailGenerationId", active.id);
       const result = await cancelThumbnailGenerationAction(formData);
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function regenerate(thumbnailId: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const formData = new FormData();
+      formData.set("projectId", projectId);
+      formData.set("thumbnailGenerationId", thumbnailId);
+      formData.set("requestNonce", crypto.randomUUID());
+      const result = await regenerateThumbnailAction(formData);
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function dismiss(thumbnailId: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const formData = new FormData();
+      formData.set("projectId", projectId);
+      formData.set("thumbnailGenerationId", thumbnailId);
+      const result = await dismissThumbnailAction(formData);
       if (!result.success) {
         setError(result.error);
         return;
@@ -245,6 +305,42 @@ export function PlatformThumbnailsPanel({
           </Select>
         </div>
 
+        {headlineRequired && headlineOptions.length > 0 ? (
+          <div className="space-y-1.5">
+            <Label className="text-xs" htmlFor="thumbnail-headline-suggestion">
+              Suggested headline
+            </Label>
+            <Select
+              items={headlineItems}
+              onValueChange={(value) => {
+                const next = String(value);
+                setError(null);
+                // "custom" is a marker, not a headline — selecting it just hands
+                // the field back to the user without clobbering what they typed.
+                if (next !== CUSTOM_HEADLINE_VALUE) setHeadline(next);
+              }}
+              value={selectedHeadlineOption}
+            >
+              <SelectTrigger
+                className="min-w-56"
+                id="thumbnail-headline-suggestion"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {headlineOptions.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                ))}
+                <SelectItem value={CUSTOM_HEADLINE_VALUE}>
+                  Custom headline…
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
+
         {headlineRequired ? (
           <div className="space-y-1.5">
             <Label className="text-xs" htmlFor="thumbnail-headline">
@@ -309,6 +405,12 @@ export function PlatformThumbnailsPanel({
           Add a headline, or switch to a text-free thumbnail.
         </p>
       ) : null}
+      {headlineRequired && headlineOptions.length === 0 ? (
+        <p className="text-xs text-muted-foreground">
+          Generate {current?.label} titles above, or fill in the brief, to get
+          suggested headlines here.
+        </p>
+      ) : null}
       {textMode === "baked" ? (
         <p className="text-xs text-muted-foreground">
           Image models still render text imperfectly. Check the spelling on the
@@ -331,8 +433,11 @@ export function PlatformThumbnailsPanel({
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {current.thumbnails.map((thumbnail) => (
             <ThumbnailGenerationCard
+              busy={busy}
               canManage={canGenerate}
               key={thumbnail.id}
+              onDismiss={dismiss}
+              onRegenerate={regenerate}
               onToggleFavorite={toggleFavorite}
               projectId={projectId}
               thumbnail={thumbnail}

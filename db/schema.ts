@@ -1003,6 +1003,10 @@ export const thumbnailGenerations = pgTable(
     isFavorite: boolean("is_favorite").notNull().default(false),
     errorCategory: text("error_category"),
     safeErrorMessage: text("safe_error_message"),
+    // Hides a dead generation from the gallery without deleting the row. The
+    // reservation FK cascades on delete, so removing a charged failure would
+    // erase real spend from the ledger — dismissal is always a soft hide.
+    dismissedAt: timestamp("dismissed_at", { withTimezone: true }),
     startedAt: timestamp("started_at", { withTimezone: true }),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })

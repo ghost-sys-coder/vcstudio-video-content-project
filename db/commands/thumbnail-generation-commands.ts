@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
 import {
   thumbnailGenerations,
@@ -405,6 +405,36 @@ export async function cancelThumbnailGeneration(input: {
     inner join transitioned_reservation on true
   `);
   return { cancelled: result.rows.length === 1 };
+}
+
+/**
+ * Hide a dead generation from the gallery. Deliberately a soft flag, never a
+ * delete: `usage_reservations.thumbnail_generation_id` cascades, so deleting a
+ * charged failure would erase real spend from the usage ledger.
+ *
+ * Restricted to terminal generations that produced no asset, so a successful
+ * thumbnail can never be hidden by this path.
+ */
+export async function dismissThumbnailGeneration(input: {
+  workspaceId: string;
+  projectId: string;
+  thumbnailGenerationId: string;
+}): Promise<{ dismissed: boolean }> {
+  const result = await getDatabase()
+    .update(thumbnailGenerations)
+    .set({ dismissedAt: new Date(), updatedAt: new Date() })
+    .where(
+      and(
+        eq(thumbnailGenerations.id, input.thumbnailGenerationId),
+        eq(thumbnailGenerations.workspaceId, input.workspaceId),
+        eq(thumbnailGenerations.projectId, input.projectId),
+        inArray(thumbnailGenerations.status, ["failed", "cancelled"]),
+        isNull(thumbnailGenerations.assetObjectKey),
+        isNull(thumbnailGenerations.dismissedAt),
+      ),
+    )
+    .returning({ id: thumbnailGenerations.id });
+  return { dismissed: result.length === 1 };
 }
 
 /**

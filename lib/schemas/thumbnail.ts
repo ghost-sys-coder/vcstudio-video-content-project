@@ -33,6 +33,17 @@ export const cancelThumbnailGenerationSchema = z.object({
   thumbnailGenerationId: z.uuid(),
 });
 
+export const regenerateThumbnailSchema = z.object({
+  projectId: z.uuid(),
+  thumbnailGenerationId: z.uuid(),
+  requestNonce: z.string().min(1),
+});
+
+export const dismissThumbnailSchema = z.object({
+  projectId: z.uuid(),
+  thumbnailGenerationId: z.uuid(),
+});
+
 export const toggleThumbnailFavoriteSchema = z.object({
   projectId: z.uuid(),
   thumbnailGenerationId: z.uuid(),

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import {
   THUMBNAIL_PROMPT_TEMPLATE_KEY,
   THUMBNAIL_PROMPT_TEMPLATE_SOURCE,
@@ -123,6 +123,7 @@ export async function listProjectThumbnails(input: {
         eq(thumbnailGenerations.workspaceId, input.workspaceId),
         eq(thumbnailGenerations.projectId, input.projectId),
         eq(thumbnailGenerations.platform, input.platform),
+        isNull(thumbnailGenerations.dismissedAt),
       ),
     )
     .orderBy(desc(thumbnailGenerations.createdAt))

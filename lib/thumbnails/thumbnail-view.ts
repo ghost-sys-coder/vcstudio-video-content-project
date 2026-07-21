@@ -13,6 +13,8 @@ import type {
 import { contentPlatformEnum } from "@/db/schema";
 import { findApprovedScriptVersion } from "@/db/repositories/scenes.repository";
 import { listProjectThumbnails } from "@/db/repositories/thumbnail-generation.repository";
+import { listProjectTitleSuggestions } from "@/db/repositories/title-generation.repository";
+import { buildHeadlineOptions } from "@/lib/thumbnails/headline-options";
 import { estimateSceneImageCost } from "@/lib/costs/scene-image-cost";
 import { getSceneImageEnvironment } from "@/lib/env/server";
 import { getSceneImageDimensions } from "@/lib/schemas/scene-image";
@@ -44,6 +46,8 @@ export type PlatformThumbnailsView = {
   label: string;
   size: string;
   estimatedCostCents: number;
+  /** Suggested baked-in headlines, condensed from this platform's titles and the brief. */
+  headlineOptions: string[];
   thumbnails: ThumbnailView[];
 };
 
@@ -91,22 +95,27 @@ export async function loadThumbnailsView(input: {
   const outputCostMatrix = createSceneImageOutputCostMatrix(environment);
   const quality = environment.OPENAI_IMAGE_FINAL_QUALITY;
 
-  const [approvedScript, thumbnailsByPlatform] = await Promise.all([
-    findApprovedScriptVersion({
-      workspaceId: input.workspaceId,
-      projectId: input.project.id,
-    }),
-    Promise.all(
-      contentPlatformEnum.enumValues.map((platform) =>
-        listProjectThumbnails({
-          workspaceId: input.workspaceId,
-          projectId: input.project.id,
-          platform,
-          limit: THUMBNAIL_GALLERY_LIMIT,
-        }),
+  const [approvedScript, titleSuggestions, thumbnailsByPlatform] =
+    await Promise.all([
+      findApprovedScriptVersion({
+        workspaceId: input.workspaceId,
+        projectId: input.project.id,
+      }),
+      listProjectTitleSuggestions({
+        workspaceId: input.workspaceId,
+        projectId: input.project.id,
+      }),
+      Promise.all(
+        contentPlatformEnum.enumValues.map((platform) =>
+          listProjectThumbnails({
+            workspaceId: input.workspaceId,
+            projectId: input.project.id,
+            platform,
+            limit: THUMBNAIL_GALLERY_LIMIT,
+          }),
+        ),
       ),
-    ),
-  ]);
+    ]);
 
   const hasTopic = Boolean(input.brief && input.brief.topic.trim() !== "");
   const hasContext = hasTopic || approvedScript !== null;
@@ -141,11 +150,27 @@ export async function loadThumbnailsView(input: {
         safetyMarginBasisPoints: 0,
       }).estimatedCostCents;
 
+      // Favorited titles first — a starred title is the user's own signal about
+      // which hook they trust, so it should lead the headline suggestions.
+      const platformTitles = titleSuggestions
+        .filter((suggestion) => suggestion.platform === platform)
+        .sort(
+          (left, right) =>
+            Number(right.isFavorite) - Number(left.isFavorite) ||
+            left.position - right.position,
+        )
+        .map((suggestion) => suggestion.text);
+
       return {
         platform,
         label: CONTENT_PLATFORM_LABELS[platform],
         size,
         estimatedCostCents,
+        headlineOptions: buildHeadlineOptions({
+          titles: platformTitles,
+          hookAngle: input.brief?.hookAngle ?? "",
+          topic: input.brief?.topic ?? "",
+        }),
         thumbnails: (thumbnailsByPlatform[index] ?? []).map(toThumbnailView),
       };
     });

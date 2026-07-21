@@ -14,10 +14,12 @@ import {
   cancelThumbnailGeneration,
   completeThumbnailGeneration,
   createThumbnailGenerationReservation,
+  dismissThumbnailGeneration,
   failThumbnailGeneration,
   markThumbnailGenerationRunning,
   setThumbnailFavorite,
 } from "@/db/commands/thumbnail-generation-commands";
+import { listProjectThumbnails } from "@/db/repositories/thumbnail-generation.repository";
 import { getDatabase } from "@/db/drizzle";
 import { BudgetExceededError } from "@/lib/domain/errors";
 import {
@@ -363,6 +365,110 @@ describeDatabase("thumbnail generation ledger (postgres)", () => {
       expect(rows).toHaveLength(0);
     },
   );
+
+  it(
+    "dismisses a charged failure without destroying its ledger entry",
+    { timeout: 60_000 },
+    async () => {
+      const templateId = await ensurePromptTemplate();
+      const fixture = await createFixture(1_000);
+      const input = reservationInput(fixture, templateId, 40);
+      await createThumbnailGenerationReservation(input);
+      await failThumbnailGeneration({
+        thumbnailGenerationId: input.id,
+        category: "transport_ambiguous",
+        message: "The connection ended before completion was confirmed.",
+        chargedCostCents: 40,
+      });
+
+      const dismissal = await dismissThumbnailGeneration({
+        workspaceId: fixture.workspaceId,
+        projectId: fixture.projectId,
+        thumbnailGenerationId: input.id,
+      });
+      expect(dismissal.dismissed).toBe(true);
+
+      // Hidden from the gallery...
+      const visible = await listProjectThumbnails({
+        workspaceId: fixture.workspaceId,
+        projectId: fixture.projectId,
+        platform: "youtube",
+        limit: 20,
+      });
+      expect(visible.map((row) => row.id)).not.toContain(input.id);
+
+      // ...but the row and its reconciled spend both survive.
+      const [generation] = await getDatabase()
+        .select()
+        .from(thumbnailGenerations)
+        .where(eq(thumbnailGenerations.id, input.id));
+      expect(generation?.dismissedAt).not.toBeNull();
+      const [reservation] = await getDatabase()
+        .select()
+        .from(usageReservations)
+        .where(eq(usageReservations.thumbnailGenerationId, input.id));
+      expect(reservation?.status).toBe("reconciled");
+      expect(reservation?.actualCostCents).toBe(40);
+    },
+  );
+
+  it(
+    "refuses to dismiss a succeeded thumbnail that has an asset",
+    { timeout: 60_000 },
+    async () => {
+      const templateId = await ensurePromptTemplate();
+      const fixture = await createFixture(1_000);
+      const input = reservationInput(fixture, templateId, 40);
+      await createThumbnailGenerationReservation(input);
+      await completeThumbnailGeneration({
+        thumbnailGenerationId: input.id,
+        asset: {
+          objectKey: `workspaces/${fixture.workspaceId}/projects/${fixture.projectId}/thumbnails/youtube/${input.id}.webp`,
+          contentType: "image/webp",
+          sizeBytes: 1_000,
+          width: 1536,
+          height: 1024,
+          etag: '"etag"',
+        },
+        actualCostCents: 30,
+        providerRequestId: null,
+      });
+
+      const dismissal = await dismissThumbnailGeneration({
+        workspaceId: fixture.workspaceId,
+        projectId: fixture.projectId,
+        thumbnailGenerationId: input.id,
+      });
+      expect(dismissal.dismissed).toBe(false);
+      const visible = await listProjectThumbnails({
+        workspaceId: fixture.workspaceId,
+        projectId: fixture.projectId,
+        platform: "youtube",
+        limit: 20,
+      });
+      expect(visible.map((row) => row.id)).toContain(input.id);
+    },
+  );
+
+  it("does not dismiss across workspaces", { timeout: 60_000 }, async () => {
+    const templateId = await ensurePromptTemplate();
+    const owner = await createFixture(1_000);
+    const stranger = await createFixture(1_000);
+    const input = reservationInput(owner, templateId, 40);
+    await createThumbnailGenerationReservation(input);
+    await failThumbnailGeneration({
+      thumbnailGenerationId: input.id,
+      category: "provider_error",
+      message: "failed",
+    });
+
+    const dismissal = await dismissThumbnailGeneration({
+      workspaceId: stranger.workspaceId,
+      projectId: stranger.projectId,
+      thumbnailGenerationId: input.id,
+    });
+    expect(dismissal.dismissed).toBe(false);
+  });
 
   it(
     "rejects a reservation that exceeds the project budget",
