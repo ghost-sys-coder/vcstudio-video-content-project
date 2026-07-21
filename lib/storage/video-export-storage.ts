@@ -97,8 +97,15 @@ export async function findStoredVideoExport(input: {
   };
 }
 
+/**
+ * `expiresInSeconds` overrides the short default download lifetime. The publish
+ * worker passes a lifetime longer than its own wall clock, because a URL that
+ * expires while bytes are still streaming fails the upload mid-flight — the same
+ * failure mode that previously stalled long renders.
+ */
 export async function createVideoExportDownloadUrl(
   objectKey: string,
+  expiresInSeconds?: number,
 ): Promise<string> {
   const environment = getStorageEnvironment();
   return getSignedUrl(
@@ -107,7 +114,10 @@ export async function createVideoExportDownloadUrl(
       Bucket: environment.R2_BUCKET_NAME,
       Key: objectKey,
     }),
-    { expiresIn: environment.R2_SIGNED_DOWNLOAD_EXPIRY_SECONDS },
+    {
+      expiresIn:
+        expiresInSeconds ?? environment.R2_SIGNED_DOWNLOAD_EXPIRY_SECONDS,
+    },
   );
 }
 

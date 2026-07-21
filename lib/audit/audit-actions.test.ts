@@ -3,6 +3,7 @@ import {
   AUDIT_ACTION_LABELS,
   sanitizeAuditMetadata,
 } from "@/lib/audit/audit-actions";
+import { auditActionEnum } from "@/db/schema";
 
 describe("sanitizeAuditMetadata", () => {
   it("keeps safe primitive values", () => {
@@ -61,7 +62,20 @@ describe("sanitizeAuditMetadata", () => {
 });
 
 describe("AUDIT_ACTION_LABELS", () => {
-  it("labels all thirteen actions", () => {
-    expect(Object.keys(AUDIT_ACTION_LABELS)).toHaveLength(13);
+  it("labels every audit action", () => {
+    // Sourced from the enum so adding an action fails here until it is labelled,
+    // rather than drifting silently or needing a hand-updated count.
+    expect(Object.keys(AUDIT_ACTION_LABELS).sort()).toEqual(
+      [...auditActionEnum.enumValues].sort(),
+    );
+  });
+
+  it("labels the publishing actions", () => {
+    expect(AUDIT_ACTION_LABELS.platform_connected).toBe(
+      "Platform account connected",
+    );
+    expect(AUDIT_ACTION_LABELS.video_published).toBe(
+      "Video published to platform",
+    );
   });
 });

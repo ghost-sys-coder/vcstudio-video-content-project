@@ -212,6 +212,28 @@ export const usageOperationTypeEnum = pgEnum("usage_operation_type", [
   "thumbnail_generation",
 ]);
 
+export const platformConnectionStatusEnum = pgEnum(
+  "platform_connection_status",
+  ["active", "expired", "revoked"],
+);
+
+export const videoPublicationStatusEnum = pgEnum("video_publication_status", [
+  "pending",
+  "queued",
+  "uploading",
+  "succeeded",
+  "failed",
+  "cancelled",
+]);
+
+// Platform-neutral visibility. YouTube maps these to its privacyStatus values;
+// other platforms map them to their nearest equivalent at the provider edge.
+export const publicationVisibilityEnum = pgEnum("publication_visibility", [
+  "private",
+  "unlisted",
+  "public",
+]);
+
 // Whether a generated thumbnail bakes a short headline into the image or is
 // rendered text-free so a headline can be overlaid later.
 export const thumbnailTextModeEnum = pgEnum("thumbnail_text_mode", [
@@ -239,6 +261,9 @@ export const auditActionEnum = pgEnum("audit_action", [
   "export_deleted",
   "budget_changed",
   "limits_changed",
+  "platform_connected",
+  "platform_disconnected",
+  "video_published",
 ]);
 
 export const users = pgTable(
@@ -1051,6 +1076,67 @@ export const thumbnailGenerations = pgTable(
       foreignColumns: [projects.id, projects.workspaceId],
       name: "thumbnail_generations_tenant_project_fkey",
     }).onDelete("cascade"),
+  ],
+);
+
+/**
+ * A workspace's authorized account on an external platform (a YouTube channel
+ * today; a Facebook page, Instagram account, or TikTok account later).
+ *
+ * Tokens are stored sealed by `lib/crypto/secret-box` and are never selected
+ * into a view model — only the publish worker opens them. Connections are
+ * workspace-scoped, not user-scoped, so a channel stays connected when the
+ * member who linked it leaves.
+ */
+export const platformConnections = pgTable(
+  "platform_connections",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    platform: contentPlatformEnum("platform").notNull(),
+    /** The platform's own account identifier (YouTube channel id). */
+    externalAccountId: text("external_account_id").notNull(),
+    externalAccountName: text("external_account_name").notNull().default(""),
+    externalAccountUrl: text("external_account_url"),
+    accessTokenSealed: text("access_token_sealed").notNull(),
+    /** Null when the platform issues no refresh token (re-consent required). */
+    refreshTokenSealed: text("refresh_token_sealed"),
+    accessTokenExpiresAt: timestamp("access_token_expires_at", {
+      withTimezone: true,
+    }),
+    scopes: text("scopes").notNull().default(""),
+    status: platformConnectionStatusEnum("status").notNull().default("active"),
+    lastError: text("last_error"),
+    connectedByUserId: uuid("connected_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    disconnectedAt: timestamp("disconnected_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("platform_connections_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    // One live connection per external account per workspace; re-authorizing the
+    // same channel updates the row instead of accumulating duplicates.
+    uniqueIndex("platform_connections_workspace_account_unique").on(
+      table.workspaceId,
+      table.platform,
+      table.externalAccountId,
+    ),
+    index("platform_connections_workspace_platform_index").on(
+      table.workspaceId,
+      table.platform,
+      table.status,
+    ),
   ],
 );
 
@@ -2097,6 +2183,90 @@ export const videoRenders = pgTable(
   ],
 );
 
+/**
+ * One attempt to publish a finished render to a connected platform account.
+ * Uploads cost no money (platforms meter by API quota, not billing), so this
+ * deliberately does NOT participate in the `usage_reservations` ledger — adding
+ * a zero-cost reservation would pollute spend reporting.
+ */
+export const videoPublications = pgTable(
+  "video_publications",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").notNull(),
+    renderId: uuid("render_id").notNull(),
+    connectionId: uuid("connection_id")
+      .notNull()
+      .references(() => platformConnections.id, { onDelete: "restrict" }),
+    platform: contentPlatformEnum("platform").notNull(),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    tags: jsonb("tags").$type<string[]>().notNull().default([]),
+    visibility: publicationVisibilityEnum("visibility")
+      .notNull()
+      .default("private"),
+    status: videoPublicationStatusEnum("status").notNull().default("pending"),
+    progressPercent: integer("progress_percent").notNull().default(0),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    triggerRunId: text("trigger_run_id"),
+    idempotencyKey: text("idempotency_key").notNull(),
+    /** Platform's id for the created video, once it exists. */
+    externalVideoId: text("external_video_id"),
+    externalVideoUrl: text("external_video_url"),
+    uploadedBytes: integer("uploaded_bytes"),
+    errorCategory: text("error_category"),
+    safeErrorMessage: text("safe_error_message"),
+    requestedByUserId: uuid("requested_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("video_publications_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    uniqueIndex("video_publications_idempotency_unique").on(
+      table.idempotencyKey,
+    ),
+    index("video_publications_workspace_project_index").on(
+      table.workspaceId,
+      table.projectId,
+      table.createdAt,
+    ),
+    index("video_publications_render_index").on(table.renderId),
+    check(
+      "video_publications_progress_valid",
+      sql`${table.progressPercent} between 0 and 100`,
+    ),
+    check("video_publications_title_present", sql`length(${table.title}) > 0`),
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [projects.id, projects.workspaceId],
+      name: "video_publications_tenant_project_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.renderId, table.projectId, table.workspaceId],
+      foreignColumns: [
+        videoRenders.id,
+        videoRenders.projectId,
+        videoRenders.workspaceId,
+      ],
+      name: "video_publications_tenant_render_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
 export const usageReservations = pgTable(
   "usage_reservations",
   {
@@ -2468,6 +2638,14 @@ export type TitleGenerationRun = typeof titleGenerationRuns.$inferSelect;
 export type ProjectTitleSuggestion =
   typeof projectTitleSuggestions.$inferSelect;
 export type ThumbnailGeneration = typeof thumbnailGenerations.$inferSelect;
+export type PlatformConnection = typeof platformConnections.$inferSelect;
+export type PlatformConnectionStatus =
+  (typeof platformConnectionStatusEnum.enumValues)[number];
+export type VideoPublication = typeof videoPublications.$inferSelect;
+export type VideoPublicationStatus =
+  (typeof videoPublicationStatusEnum.enumValues)[number];
+export type PublicationVisibility =
+  (typeof publicationVisibilityEnum.enumValues)[number];
 export type ThumbnailTextMode =
   (typeof thumbnailTextModeEnum.enumValues)[number];
 export type SceneAnalysisRun = typeof sceneAnalysisRuns.$inferSelect;

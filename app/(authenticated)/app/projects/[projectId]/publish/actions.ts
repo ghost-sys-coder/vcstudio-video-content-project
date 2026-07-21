@@ -7,6 +7,22 @@ import {
   setThumbnailFavorite,
 } from "@/db/commands/thumbnail-generation-commands";
 import { findThumbnailGeneration } from "@/db/repositories/thumbnail-generation.repository";
+import { disconnectPlatformConnection } from "@/db/commands/platform-connection-commands";
+import { cancelVideoPublication } from "@/db/commands/video-publication-commands";
+import {
+  loadPublishingView,
+  type PublishActionResult,
+  type PublishingView,
+} from "@/lib/publishing/publishing-view";
+import {
+  startVideoPublication,
+  VideoPublicationRequestError,
+} from "@/lib/publishing/start-video-publication";
+import {
+  cancelPublicationSchema,
+  disconnectPlatformSchema,
+  publishVideoSchema,
+} from "@/lib/schemas/publishing";
 import {
   cancelTitleGeneration,
   setTitleSuggestionFavorite,
@@ -383,6 +399,120 @@ export async function loadThumbnailsViewAction(
     workspaceId: scope.workspaceId,
     project,
     brief,
+  });
+}
+
+export async function publishVideoAction(
+  formData: FormData,
+): Promise<PublishActionResult> {
+  const parsed = publishVideoSchema.safeParse({
+    projectId: formData.get("projectId"),
+    renderId: formData.get("renderId"),
+    connectionId: formData.get("connectionId"),
+    platform: formData.get("platform"),
+    title: formData.get("title"),
+    description: formData.get("description") ?? undefined,
+    tags: formData.get("tags") ?? undefined,
+    visibility: formData.get("visibility"),
+    requestNonce: formData.get("requestNonce"),
+  });
+  if (!parsed.success)
+    return { success: false, error: "The publish request is invalid." };
+  try {
+    const { context, project } = await requirePublishMutation(
+      parsed.data.projectId,
+    );
+    const { publicationId } = await startVideoPublication({
+      workspaceId: context.activeMembership.workspaceId,
+      project,
+      request: parsed.data,
+      requestedByUserId: context.user.id,
+    });
+    await recordAuditEvent({
+      workspaceId: context.activeMembership.workspaceId,
+      actorUserId: context.user.id,
+      projectId: parsed.data.projectId,
+      action: "video_published",
+      targetType: "video_publication",
+      targetId: publicationId,
+    });
+    revalidatePath(`/app/projects/${parsed.data.projectId}/publish`);
+    return { success: true, error: null };
+  } catch (error) {
+    if (error instanceof VideoPublicationRequestError)
+      return { success: false, error: error.message };
+    if (error instanceof RateLimitExceededError)
+      return { success: false, error: error.message };
+    return { success: false, error: "The video could not be published." };
+  }
+}
+
+export async function cancelPublicationAction(
+  formData: FormData,
+): Promise<PublishActionResult> {
+  const parsed = cancelPublicationSchema.safeParse({
+    projectId: formData.get("projectId"),
+    publicationId: formData.get("publicationId"),
+  });
+  if (!parsed.success)
+    return { success: false, error: "The cancel request is invalid." };
+  try {
+    const { context } = await requirePublishMutation(parsed.data.projectId);
+    await cancelVideoPublication({
+      workspaceId: context.activeMembership.workspaceId,
+      projectId: parsed.data.projectId,
+      publicationId: parsed.data.publicationId,
+    });
+    revalidatePath(`/app/projects/${parsed.data.projectId}/publish`);
+    return { success: true, error: null };
+  } catch {
+    return { success: false, error: "The upload could not be cancelled." };
+  }
+}
+
+export async function disconnectPlatformAction(
+  formData: FormData,
+): Promise<PublishActionResult> {
+  const projectId = formData.get("projectId");
+  const parsed = disconnectPlatformSchema.safeParse({
+    connectionId: formData.get("connectionId"),
+  });
+  if (!parsed.success || typeof projectId !== "string")
+    return { success: false, error: "The request is invalid." };
+  try {
+    const { context } = await requirePublishMutation(projectId);
+    const result = await disconnectPlatformConnection({
+      connectionId: parsed.data.connectionId,
+      workspaceId: context.activeMembership.workspaceId,
+    });
+    if (result.disconnected)
+      await recordAuditEvent({
+        workspaceId: context.activeMembership.workspaceId,
+        actorUserId: context.user.id,
+        action: "platform_disconnected",
+        targetType: "platform_connection",
+        targetId: parsed.data.connectionId,
+      });
+    revalidatePath(`/app/projects/${projectId}/publish`);
+    return { success: true, error: null };
+  } catch {
+    return { success: false, error: "The account could not be disconnected." };
+  }
+}
+
+export async function loadPublishingViewAction(
+  projectId: string,
+): Promise<PublishingView | null> {
+  const context = await getAuthenticatedWorkspaceContext();
+  if (!context) return null;
+  const project = await findProject({
+    workspaceId: context.activeMembership.workspaceId,
+    projectId,
+  });
+  if (!project) return null;
+  return loadPublishingView({
+    workspaceId: context.activeMembership.workspaceId,
+    project,
   });
 }
 
