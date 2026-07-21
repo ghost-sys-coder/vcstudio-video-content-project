@@ -89,10 +89,9 @@
       "Bash(git checkout *)",
       "Bash(curl -s -o /dev/null -w \"%{http_code} -> %{redirect_url}\\\\n\" \"http://localhost:3000/app/projects/11111111-1111-1111-1111-111111111111\")",
       "Bash(curl -s -o /dev/null -w \"%{http_code} -> %{redirect_url}\\\\n\" \"http://localhost:3000/app/projects/11111111-1111-1111-1111-111111111111/script\")",
-      "Bash(curl -s -o /dev/null -w \"%{http_code} -> %{redirect_url}\\\\n\" \"http://localhost:3000/app/projects/11111111-1111-1111-1111-111111111111/publish\")"
+      "Bash(curl -s -o /dev/null -w \"%{http_code} -> %{redirect_url}\\\\n\" \"http://localhost:3000/app/projects/11111111-1111-1111-1111-111111111111/publish\")",
+      "Bash(RUN_DATABASE_INTEGRATION_TESTS=true npx vitest run db/integration/thumbnail-generation-postgres.integration.test.ts)"
     ],
-    "additionalDirectories": [
-      "\\tmp"
-    ]
+    "additionalDirectories": ["\\tmp"]
   }
 }

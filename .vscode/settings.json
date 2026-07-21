@@ -1,0 +1,11 @@
+{
+  "//": "This project targets PostgreSQL (Neon) via Drizzle. The MSSQL extension parses .sql files as T-SQL and reports false syntax errors on valid Postgres — e.g. 'CREATE TYPE ... AS ENUM' in migrations/. Turn its error checking off; SQL highlighting and completions are unaffected.",
+  "mssql.intelliSense.enableErrorChecking": false,
+  "files.associations": {
+    "*.sql": "sql"
+  },
+  "search.exclude": {
+    "**/.next": true,
+    "**/.trigger": true
+  }
+}

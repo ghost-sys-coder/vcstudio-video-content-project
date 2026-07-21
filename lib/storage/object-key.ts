@@ -84,6 +84,31 @@ export function isVideoExportObjectKey(input: {
   );
 }
 
+export function createThumbnailObjectKey(input: {
+  workspaceId: string;
+  projectId: string;
+  platform: string;
+  thumbnailGenerationId: string;
+  outputFormat: SceneImageOutputFormat;
+}): string {
+  const safePlatform = input.platform.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  return `workspaces/${input.workspaceId}/projects/${input.projectId}/thumbnails/${safePlatform}/${input.thumbnailGenerationId}.${input.outputFormat}`;
+}
+
+export function isThumbnailObjectKey(input: {
+  workspaceId: string;
+  projectId: string;
+  platform: string;
+  thumbnailGenerationId: string;
+  outputFormat: SceneImageOutputFormat;
+  objectKey: string;
+}): boolean {
+  return (
+    input.objectKey === createThumbnailObjectKey(input) &&
+    !input.objectKey.includes("..")
+  );
+}
+
 export function createSceneImageObjectKey(input: {
   workspaceId: string;
   projectId: string;

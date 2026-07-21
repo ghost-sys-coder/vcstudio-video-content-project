@@ -75,6 +75,37 @@ export function createTitleGenerationIdempotencyKey(input: {
   ]);
 }
 
+export function createThumbnailGenerationIdempotencyKey(input: {
+  secret: string;
+  workspaceId: string;
+  projectId: string;
+  platform: string;
+  textMode: string;
+  headlineText: string;
+  briefFingerprint: string;
+  model: string;
+  quality: string;
+  size: string;
+  promptVersion: string;
+  /** Distinct per intentional "Generate" click so regeneration yields a new run. */
+  requestNonce: string;
+}): string {
+  return hash(input.secret, [
+    input.workspaceId,
+    input.projectId,
+    "thumbnail-generation",
+    input.platform,
+    input.textMode,
+    input.headlineText,
+    input.briefFingerprint,
+    input.model,
+    input.quality,
+    input.size,
+    input.promptVersion,
+    input.requestNonce,
+  ]);
+}
+
 export function createSceneImageIdempotencyKey(input: {
   secret: string;
   workspaceId: string;

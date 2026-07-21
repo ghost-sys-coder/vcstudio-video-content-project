@@ -209,6 +209,14 @@ export const usageOperationTypeEnum = pgEnum("usage_operation_type", [
   "video_render",
   "script_generation",
   "title_generation",
+  "thumbnail_generation",
+]);
+
+// Whether a generated thumbnail bakes a short headline into the image or is
+// rendered text-free so a headline can be overlaid later.
+export const thumbnailTextModeEnum = pgEnum("thumbnail_text_mode", [
+  "baked",
+  "clean",
 ]);
 
 export const usageEventTypeEnum = pgEnum("usage_event_type", [
@@ -940,6 +948,104 @@ export const projectTitleSuggestions = pgTable(
       columns: [table.titleGenerationRunId, table.workspaceId],
       foreignColumns: [titleGenerationRuns.id, titleGenerationRuns.workspaceId],
       name: "project_title_suggestions_tenant_run_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
+// One generated publish thumbnail. Project-scoped and billable, so it carries the
+// same reservation/idempotency/provider bookkeeping as scene images, plus the R2
+// asset pointer. `promptTemplateVersionId` pins the image prompt for
+// reproducibility (image prompts are source-hash gated, unlike text prompts).
+export const thumbnailGenerations = pgTable(
+  "thumbnail_generations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").notNull(),
+    requestedByUserId: uuid("requested_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    platform: contentPlatformEnum("platform").notNull(),
+    textMode: thumbnailTextModeEnum("text_mode").notNull(),
+    headlineText: text("headline_text"),
+    scriptVersionId: uuid("script_version_id").references(
+      () => projectScriptVersions.id,
+      { onDelete: "set null" },
+    ),
+    promptTemplateVersionId: uuid("prompt_template_version_id")
+      .notNull()
+      .references(() => promptTemplateVersions.id, { onDelete: "restrict" }),
+    promptTemplateVersion: text("prompt_template_version").notNull(),
+    finalPrompt: text("final_prompt").notNull(),
+    triggerRunId: text("trigger_run_id"),
+    idempotencyKey: text("idempotency_key").notNull(),
+    requestFingerprint: text("request_fingerprint").notNull(),
+    model: text("model").notNull(),
+    quality: imageQualityEnum("quality").notNull(),
+    size: text("size").notNull(),
+    outputFormat: imageOutputFormatEnum("output_format").notNull(),
+    outputCompression: integer("output_compression").notNull(),
+    background: text("background").notNull().default("opaque"),
+    status: imageGenerationStatusEnum("status").notNull().default("pending"),
+    progressPercent: integer("progress_percent").notNull().default(0),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    providerRequestId: text("provider_request_id"),
+    estimatedCostCents: integer("estimated_cost_cents").notNull(),
+    actualCostCents: integer("actual_cost_cents"),
+    assetObjectKey: text("asset_object_key"),
+    assetContentType: text("asset_content_type"),
+    assetSizeBytes: integer("asset_size_bytes"),
+    assetWidth: integer("asset_width"),
+    assetHeight: integer("asset_height"),
+    assetEtag: text("asset_etag"),
+    isFavorite: boolean("is_favorite").notNull().default(false),
+    errorCategory: text("error_category"),
+    safeErrorMessage: text("safe_error_message"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("thumbnail_generations_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    uniqueIndex("thumbnail_generations_idempotency_unique").on(
+      table.idempotencyKey,
+    ),
+    index("thumbnail_generations_workspace_project_platform_index").on(
+      table.workspaceId,
+      table.projectId,
+      table.platform,
+      table.createdAt,
+    ),
+    check(
+      "thumbnail_generations_progress_valid",
+      sql`${table.progressPercent} between 0 and 100`,
+    ),
+    check(
+      "thumbnail_generations_cost_nonnegative",
+      sql`${table.estimatedCostCents} >= 0 and (${table.actualCostCents} is null or ${table.actualCostCents} >= 0)`,
+    ),
+    check(
+      "thumbnail_generations_size_supported",
+      sql`${table.size} in ('1536x1024', '1024x1536', '1024x1024')`,
+    ),
+    check(
+      "thumbnail_generations_headline_matches_text_mode",
+      sql`(${table.textMode} = 'baked' and ${table.headlineText} is not null and length(btrim(${table.headlineText})) > 0) or (${table.textMode} = 'clean' and ${table.headlineText} is null)`,
+    ),
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [projects.id, projects.workspaceId],
+      name: "thumbnail_generations_tenant_project_fkey",
     }).onDelete("cascade"),
   ],
 );
@@ -2015,6 +2121,10 @@ export const usageReservations = pgTable(
       () => titleGenerationRuns.id,
       { onDelete: "cascade" },
     ),
+    thumbnailGenerationId: uuid("thumbnail_generation_id").references(
+      () => thumbnailGenerations.id,
+      { onDelete: "cascade" },
+    ),
     status: usageReservationStatusEnum("status").notNull().default("pending"),
     reservedCostCents: integer("reserved_cost_cents").notNull(),
     actualCostCents: integer("actual_cost_cents"),
@@ -2051,6 +2161,9 @@ export const usageReservations = pgTable(
     uniqueIndex("usage_reservations_title_generation_unique")
       .on(table.titleGenerationId)
       .where(sql`${table.titleGenerationId} is not null`),
+    uniqueIndex("usage_reservations_thumbnail_generation_unique")
+      .on(table.thumbnailGenerationId)
+      .where(sql`${table.thumbnailGenerationId} is not null`),
     index("usage_reservations_workspace_project_status_index").on(
       table.workspaceId,
       table.projectId,
@@ -2066,7 +2179,7 @@ export const usageReservations = pgTable(
     ),
     check(
       "usage_reservations_single_operation",
-      sql`(${table.operationType}::text = 'scene_analysis' and ${table.analysisRunId} is not null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null) or (${table.operationType}::text = 'scene_image_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is not null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null) or (${table.operationType}::text = 'scene_audio_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is not null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null) or (${table.operationType}::text = 'video_render' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is not null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null) or (${table.operationType}::text = 'script_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is not null and ${table.titleGenerationId} is null) or (${table.operationType}::text = 'title_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is not null)`,
+      sql`(${table.operationType}::text = 'scene_analysis' and ${table.analysisRunId} is not null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null) or (${table.operationType}::text = 'scene_image_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is not null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null) or (${table.operationType}::text = 'scene_audio_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is not null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null) or (${table.operationType}::text = 'video_render' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is not null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null) or (${table.operationType}::text = 'script_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is not null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null) or (${table.operationType}::text = 'title_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is not null and ${table.thumbnailGenerationId} is null) or (${table.operationType}::text = 'thumbnail_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is not null)`,
     ),
     foreignKey({
       columns: [table.imageGenerationId, table.projectId, table.workspaceId],
@@ -2350,6 +2463,9 @@ export type ScriptGenerationRun = typeof scriptGenerationRuns.$inferSelect;
 export type TitleGenerationRun = typeof titleGenerationRuns.$inferSelect;
 export type ProjectTitleSuggestion =
   typeof projectTitleSuggestions.$inferSelect;
+export type ThumbnailGeneration = typeof thumbnailGenerations.$inferSelect;
+export type ThumbnailTextMode =
+  (typeof thumbnailTextModeEnum.enumValues)[number];
 export type SceneAnalysisRun = typeof sceneAnalysisRuns.$inferSelect;
 export type Scene = typeof scenes.$inferSelect;
 export type SceneVersion = typeof sceneVersions.$inferSelect;

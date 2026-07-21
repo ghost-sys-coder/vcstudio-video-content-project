@@ -2,6 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import {
+  cancelThumbnailGeneration,
+  setThumbnailFavorite,
+} from "@/db/commands/thumbnail-generation-commands";
+import {
   cancelTitleGeneration,
   setTitleSuggestionFavorite,
 } from "@/db/commands/title-generation-commands";
@@ -28,6 +32,20 @@ import {
   generateTitlesSchema,
   toggleTitleFavoriteSchema,
 } from "@/lib/schemas/title-generation";
+import {
+  cancelThumbnailGenerationSchema,
+  generateThumbnailSchema,
+  toggleThumbnailFavoriteSchema,
+} from "@/lib/schemas/thumbnail";
+import {
+  startThumbnailGeneration,
+  ThumbnailGenerationRequestError,
+} from "@/lib/thumbnails/start-thumbnail-generation";
+import {
+  loadThumbnailsView,
+  type ThumbnailActionResult,
+  type ThumbnailsView,
+} from "@/lib/thumbnails/thumbnail-view";
 
 async function requirePublishMutation(projectId: string) {
   const context = await getAuthenticatedWorkspaceContext();
@@ -146,6 +164,135 @@ export async function toggleTitleFavoriteAction(
   } catch {
     return { success: false, error: "The favorite could not be updated." };
   }
+}
+
+export async function generateThumbnailAction(
+  formData: FormData,
+): Promise<ThumbnailActionResult> {
+  const parsed = generateThumbnailSchema.safeParse({
+    projectId: formData.get("projectId"),
+    platform: formData.get("platform"),
+    textMode: formData.get("textMode"),
+    headlineText: formData.get("headlineText") ?? undefined,
+    requestNonce: formData.get("requestNonce"),
+  });
+  if (!parsed.success)
+    return { success: false, error: "The thumbnail request is invalid." };
+  try {
+    const { context, project } = await requirePublishMutation(
+      parsed.data.projectId,
+    );
+    const brief = await findProjectBrief({
+      workspaceId: context.activeMembership.workspaceId,
+      projectId: parsed.data.projectId,
+    });
+    await startThumbnailGeneration({
+      workspaceId: context.activeMembership.workspaceId,
+      project,
+      brief,
+      platform: parsed.data.platform,
+      textMode: parsed.data.textMode,
+      headlineText: parsed.data.headlineText,
+      requestedByUserId: context.user.id,
+      requestNonce: parsed.data.requestNonce,
+    });
+    revalidatePath(`/app/projects/${parsed.data.projectId}/publish`);
+    return { success: true, error: null };
+  } catch (error) {
+    if (error instanceof ThumbnailGenerationRequestError)
+      return { success: false, error: error.message };
+    if (error instanceof RateLimitExceededError)
+      return { success: false, error: error.message };
+    if (error instanceof BudgetExceededError)
+      return {
+        success: false,
+        error:
+          error.scope === "project"
+            ? "This would exceed the project budget."
+            : error.scope === "workspace_daily"
+              ? "This would exceed the workspace daily budget."
+              : "This would exceed the workspace monthly budget.",
+      };
+    return { success: false, error: "The thumbnail could not be generated." };
+  }
+}
+
+export async function cancelThumbnailGenerationAction(
+  formData: FormData,
+): Promise<ThumbnailActionResult> {
+  const parsed = cancelThumbnailGenerationSchema.safeParse({
+    projectId: formData.get("projectId"),
+    thumbnailGenerationId: formData.get("thumbnailGenerationId"),
+  });
+  if (!parsed.success)
+    return { success: false, error: "The cancel request is invalid." };
+  try {
+    const { context } = await requirePublishMutation(parsed.data.projectId);
+    const result = await cancelThumbnailGeneration({
+      workspaceId: context.activeMembership.workspaceId,
+      projectId: parsed.data.projectId,
+      thumbnailGenerationId: parsed.data.thumbnailGenerationId,
+    });
+    if (result.cancelled)
+      await recordAuditEvent({
+        workspaceId: context.activeMembership.workspaceId,
+        actorUserId: context.user.id,
+        projectId: parsed.data.projectId,
+        action: "generation_cancelled",
+        targetType: "thumbnail_generation",
+        targetId: parsed.data.thumbnailGenerationId,
+      });
+    revalidatePath(`/app/projects/${parsed.data.projectId}/publish`);
+    return { success: true, error: null };
+  } catch {
+    return { success: false, error: "The generation could not be cancelled." };
+  }
+}
+
+export async function toggleThumbnailFavoriteAction(
+  formData: FormData,
+): Promise<ThumbnailActionResult> {
+  const parsed = toggleThumbnailFavoriteSchema.safeParse({
+    projectId: formData.get("projectId"),
+    thumbnailGenerationId: formData.get("thumbnailGenerationId"),
+    isFavorite: formData.get("isFavorite"),
+  });
+  if (!parsed.success)
+    return { success: false, error: "The request is invalid." };
+  try {
+    const { context } = await requirePublishMutation(parsed.data.projectId);
+    await setThumbnailFavorite({
+      workspaceId: context.activeMembership.workspaceId,
+      projectId: parsed.data.projectId,
+      thumbnailGenerationId: parsed.data.thumbnailGenerationId,
+      isFavorite: parsed.data.isFavorite === "true",
+    });
+    revalidatePath(`/app/projects/${parsed.data.projectId}/publish`);
+    return { success: true, error: null };
+  } catch {
+    return { success: false, error: "The favorite could not be updated." };
+  }
+}
+
+export async function loadThumbnailsViewAction(
+  projectId: string,
+): Promise<ThumbnailsView | null> {
+  const context = await getAuthenticatedWorkspaceContext();
+  if (!context) return null;
+  const scope = {
+    workspaceId: context.activeMembership.workspaceId,
+    projectId,
+  };
+  const [project, brief] = await Promise.all([
+    findProject(scope),
+    findProjectBrief(scope),
+  ]);
+  if (!project) return null;
+  return loadThumbnailsView({
+    workspaceId: scope.workspaceId,
+    project,
+    brief,
+  });
 }
 
 export async function loadTitlesViewAction(

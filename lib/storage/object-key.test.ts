@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   createCharacterReferenceObjectKey,
   createSceneImageObjectKey,
+  createThumbnailObjectKey,
   createVideoExportObjectKey,
   isCharacterReferenceObjectKey,
   isSceneImageObjectKey,
+  isThumbnailObjectKey,
   isVideoExportObjectKey,
   createWorkspaceLogoObjectKey,
   isWorkspaceLogoObjectKey,
@@ -147,6 +149,60 @@ describe("character reference object keys", () => {
         characterId,
         referenceType: "master",
         objectKey: `workspaces/${workspaceId}/characters/${characterId}/references/master/../file.png`,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("thumbnail object keys", () => {
+  const projectId = "00000000-0000-4000-8000-00000000000a";
+  const thumbnailGenerationId = "00000000-0000-4000-8000-00000000000b";
+  const base = {
+    workspaceId,
+    projectId,
+    platform: "youtube",
+    thumbnailGenerationId,
+    outputFormat: "webp",
+  } as const;
+
+  it("creates a workspace/project/platform scoped key", () => {
+    expect(createThumbnailObjectKey(base)).toBe(
+      `workspaces/${workspaceId}/projects/${projectId}/thumbnails/youtube/${thumbnailGenerationId}.webp`,
+    );
+  });
+
+  it("sanitizes the platform segment so it cannot escape the prefix", () => {
+    expect(createThumbnailObjectKey({ ...base, platform: "../../etc" })).toBe(
+      `workspaces/${workspaceId}/projects/${projectId}/thumbnails/-etc/${thumbnailGenerationId}.webp`,
+    );
+  });
+
+  it("accepts only the exact matching key", () => {
+    expect(
+      isThumbnailObjectKey({
+        ...base,
+        objectKey: createThumbnailObjectKey(base),
+      }),
+    ).toBe(true);
+  });
+
+  it("rejects cross-project, cross-platform, and traversal keys", () => {
+    expect(
+      isThumbnailObjectKey({
+        ...base,
+        objectKey: `workspaces/${workspaceId}/projects/other/thumbnails/youtube/${thumbnailGenerationId}.webp`,
+      }),
+    ).toBe(false);
+    expect(
+      isThumbnailObjectKey({
+        ...base,
+        objectKey: `workspaces/${workspaceId}/projects/${projectId}/thumbnails/tiktok/${thumbnailGenerationId}.webp`,
+      }),
+    ).toBe(false);
+    expect(
+      isThumbnailObjectKey({
+        ...base,
+        objectKey: `workspaces/${workspaceId}/projects/${projectId}/thumbnails/youtube/../${thumbnailGenerationId}.webp`,
       }),
     ).toBe(false);
   });

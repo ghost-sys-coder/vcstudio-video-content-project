@@ -16,6 +16,14 @@ export {
 } from "./title-generation";
 export type { TitleGenerationPromptInput } from "./title-generation";
 export {
+  renderThumbnailPrompt,
+  THUMBNAIL_PROMPT_TEMPLATE_KEY,
+  THUMBNAIL_PROMPT_TEMPLATE_SOURCE,
+  THUMBNAIL_PROMPT_TEMPLATE_SOURCE_HASH,
+  THUMBNAIL_PROMPT_VERSION,
+} from "./thumbnail";
+export type { ThumbnailPromptInput, ThumbnailTextMode } from "./thumbnail";
+export {
   renderSceneImagePrompt,
   SCENE_IMAGE_PROMPT_TEMPLATE_SOURCE,
   SCENE_IMAGE_PROMPT_TEMPLATE_SOURCE_HASH,

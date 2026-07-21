@@ -3,6 +3,7 @@ import {
   createSceneAnalysisIdempotencyKey,
   createSceneAnalysisRetryIdempotencyKey,
   createSceneImageIdempotencyKey,
+  createThumbnailGenerationIdempotencyKey,
   createTitleGenerationIdempotencyKey,
 } from "@/lib/domain/idempotency";
 
@@ -124,6 +125,74 @@ describe("createTitleGenerationIdempotencyKey", () => {
     ).not.toBe(first);
     expect(
       createTitleGenerationIdempotencyKey({
+        ...input,
+        requestNonce: "nonce-2",
+      }),
+    ).not.toBe(first);
+  });
+});
+
+describe("createThumbnailGenerationIdempotencyKey", () => {
+  const input = {
+    secret: "s".repeat(32),
+    workspaceId: "workspace-1",
+    projectId: "project-1",
+    platform: "youtube",
+    textMode: "clean",
+    headlineText: "",
+    briefFingerprint: "fingerprint-1",
+    model: "gpt-image-2",
+    quality: "medium",
+    size: "1536x1024",
+    promptVersion: "thumbnail-v1",
+    requestNonce: "nonce-1",
+  };
+
+  it("is deterministic for the same inputs", () => {
+    expect(createThumbnailGenerationIdempotencyKey(input)).toBe(
+      createThumbnailGenerationIdempotencyKey(input),
+    );
+  });
+
+  it("differs per platform so each platform is a distinct image", () => {
+    expect(
+      createThumbnailGenerationIdempotencyKey({
+        ...input,
+        platform: "tiktok",
+      }),
+    ).not.toBe(createThumbnailGenerationIdempotencyKey(input));
+  });
+
+  it("changes with the text mode and headline", () => {
+    const first = createThumbnailGenerationIdempotencyKey(input);
+    const baked = createThumbnailGenerationIdempotencyKey({
+      ...input,
+      textMode: "baked",
+      headlineText: "IT WAS RUSTING",
+    });
+    expect(baked).not.toBe(first);
+    expect(
+      createThumbnailGenerationIdempotencyKey({
+        ...input,
+        textMode: "baked",
+        headlineText: "IT WAS FINE",
+      }),
+    ).not.toBe(baked);
+  });
+
+  it("changes with quality, size, and the request nonce", () => {
+    const first = createThumbnailGenerationIdempotencyKey(input);
+    expect(
+      createThumbnailGenerationIdempotencyKey({ ...input, quality: "high" }),
+    ).not.toBe(first);
+    expect(
+      createThumbnailGenerationIdempotencyKey({
+        ...input,
+        size: "1024x1536",
+      }),
+    ).not.toBe(first);
+    expect(
+      createThumbnailGenerationIdempotencyKey({
         ...input,
         requestNonce: "nonce-2",
       }),
