@@ -74,7 +74,7 @@ export function ShortsEditor({
   );
 
   return (
-    <section className="space-y-4 rounded-xl border p-4">
+    <section className="min-w-0 max-w-full space-y-4 overflow-hidden rounded-xl border p-4">
       <div>
         <h2 className="text-sm font-semibold">Shorts editor</h2>
         <p className="mt-1 text-xs text-muted-foreground">
@@ -85,8 +85,8 @@ export function ShortsEditor({
       </div>
 
       {selectedScene && verticalOutputVariantId ? (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="space-y-3 rounded-lg border bg-muted/20 p-3">
+        <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+          <div className="min-w-0 space-y-3 rounded-lg border bg-muted/20 p-3">
             <label className="block space-y-1 text-xs font-medium">
               Source scene
               <select
@@ -190,7 +190,7 @@ export function ShortsEditor({
             </Button>
           </div>
 
-          <div className="space-y-3">
+          <div className="min-w-0 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Selected clips
@@ -200,7 +200,7 @@ export function ShortsEditor({
               </span>
             </div>
             {clips.length ? (
-              <ol className="max-h-72 space-y-2 overflow-y-auto pr-1">
+              <ol className="max-h-72 min-w-0 space-y-2 overflow-y-auto pr-1">
                 {clips.map((clip, index) => (
                   <ShortClipRow
                     clip={clip}
@@ -302,10 +302,10 @@ export function ShortsEditor({
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Saved shorts
           </h3>
-          <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {savedShorts.map((short) => (
-              <li className="rounded-lg border p-3" key={short.id}>
-                <p className="text-sm font-medium">{short.name}</p>
+              <li className="min-w-0 rounded-lg border p-3" key={short.id}>
+                <p className="truncate text-sm font-medium">{short.name}</p>
                 <p className="text-xs text-muted-foreground">
                   {short.clipCount} clips ·{" "}
                   {(short.durationMilliseconds / 1000).toFixed(1)}s

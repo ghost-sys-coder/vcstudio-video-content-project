@@ -21,18 +21,18 @@ export function ShortClipRow({
 }) {
   const duration = clip.sourceEndMilliseconds - clip.sourceStartMilliseconds;
   return (
-    <li className="flex items-center justify-between gap-3 rounded-lg border p-3">
-      <div>
-        <p className="text-sm font-medium">
+    <li className="flex min-w-0 items-center justify-between gap-3 rounded-lg border p-3">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium">
           {index + 1}. Scene {clip.sceneNumber}
         </p>
-        <p className="text-xs text-muted-foreground">
+        <p className="truncate text-xs text-muted-foreground">
           {(clip.sourceStartMilliseconds / 1000).toFixed(1)}s–
           {(clip.sourceEndMilliseconds / 1000).toFixed(1)}s ·{" "}
           {(duration / 1000).toFixed(1)}s
         </p>
       </div>
-      <div className="flex gap-1">
+      <div className="flex shrink-0 gap-1">
         <Button
           aria-label="Move clip earlier"
           disabled={disabled || index === 0}

@@ -129,10 +129,10 @@ export function VideoPreviewWorkspace({
   const timelineReady = data.timeline.status === "ready";
 
   return (
-    <div className="space-y-5">
+    <div className="min-w-0 max-w-full space-y-5 overflow-x-clip">
       <section className="rounded-xl border border-dashed bg-muted/30 p-4">
-        <div className="flex items-center justify-between gap-2">
-          <div>
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+          <div className="min-w-0">
             <h2 className="text-sm font-semibold">Preview &amp; render</h2>
             <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
               Preview the assembled video, then render it to a downloadable MP4.
@@ -152,8 +152,8 @@ export function VideoPreviewWorkspace({
         </div>
       </section>
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <div className="space-y-4">
+      <div className="grid min-w-0 gap-5 lg:grid-cols-2">
+        <div className="min-w-0 space-y-4">
           <VideoPreviewPlayer
             outputVariantId={
               previewShort?.outputVariantId ?? data.selectedOutputVariantId
@@ -185,7 +185,7 @@ export function VideoPreviewWorkspace({
           ) : null}
         </div>
 
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <TimelineSummary timeline={data.timeline} />
           {data.activeRender ? (
             <RenderProgressPanel

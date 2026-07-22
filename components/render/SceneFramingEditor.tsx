@@ -60,7 +60,7 @@ export function SceneFramingEditor({
 
   if (!selected)
     return (
-      <section className="rounded-xl border border-dashed p-4">
+      <section className="min-w-0 max-w-full rounded-xl border border-dashed p-4">
         <h2 className="text-sm font-semibold">Scene framing</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           Approve scene images before adapting this output format.
@@ -78,7 +78,7 @@ export function SceneFramingEditor({
   const imageUrl = `/api/projects/${projectId}/scene-images/${selected.sourceImageGenerationId}/asset`;
 
   return (
-    <section className="space-y-4 rounded-xl border p-4">
+    <section className="min-w-0 max-w-full space-y-4 overflow-hidden rounded-xl border p-4">
       <div>
         <h2 className="text-sm font-semibold">Scene framing</h2>
         <p className="mt-1 text-xs text-muted-foreground">
@@ -87,7 +87,10 @@ export function SceneFramingEditor({
         </p>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Scenes">
+      <div
+        className="flex min-w-0 max-w-full gap-2 overflow-x-auto pb-1"
+        aria-label="Scenes"
+      >
         {scenes.map((scene) => (
           <button
             aria-pressed={scene.sceneId === selected.sceneId}
@@ -114,7 +117,7 @@ export function SceneFramingEditor({
         ))}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+      <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,18rem)]">
         <div
           className="relative mx-auto w-full max-w-xl overflow-hidden rounded-lg border"
           style={{ aspectRatio: `${width} / ${height}`, backgroundColor }}
@@ -133,7 +136,7 @@ export function SceneFramingEditor({
           />
         </div>
 
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <fieldset className="space-y-2">
             <legend className="text-xs font-medium">Fit mode</legend>
             <div className="grid grid-cols-2 gap-2">

@@ -36,7 +36,7 @@ export function ApplicationShell({
         logoUrl={logoUrl}
         memberships={memberships}
       />
-      <SidebarInset>
+      <SidebarInset className="min-w-0 overflow-x-clip">
         <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur sm:px-6">
           <SidebarTrigger />
           <div className="min-w-0 flex-1">
@@ -46,7 +46,9 @@ export function ApplicationShell({
           </div>
           <UserAccountMenu displayName={user.displayName} />
         </header>
-        <main className="w-full flex-1 px-5 py-8 sm:px-8">{children}</main>
+        <main className="w-full min-w-0 max-w-full flex-1 px-5 py-8 sm:px-8">
+          {children}
+        </main>
       </SidebarInset>
     </SidebarProvider>
   );
