@@ -72,6 +72,24 @@ export async function findActivePlatformConnection(input: {
   return connection ?? null;
 }
 
+/** Exact token-free connection lookup for validating a user-selected account. */
+export async function findPlatformConnectionSummary(input: {
+  connectionId: string;
+  workspaceId: string;
+}): Promise<PlatformConnectionSummary | null> {
+  const [connection] = await getDatabase()
+    .select(connectionSummaryColumns)
+    .from(platformConnections)
+    .where(
+      and(
+        eq(platformConnections.id, input.connectionId),
+        eq(platformConnections.workspaceId, input.workspaceId),
+      ),
+    )
+    .limit(1);
+  return connection ?? null;
+}
+
 /**
  * Full row including sealed tokens. Server-only and used exclusively by the
  * publish worker — never call this from a view model or server action.

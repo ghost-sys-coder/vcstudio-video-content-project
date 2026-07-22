@@ -33,6 +33,8 @@ export type AuthorizationRequest = {
 
 export type PublishVideoRequest = {
   tokens: Pick<PlatformTokens, "accessToken">;
+  /** Destination account selected by the authorized workspace member. */
+  account: Pick<PlatformAccount, "externalAccountId">;
   /** Short-lived signed URL the provider streams from; never a local path. */
   sourceUrl: string;
   sizeBytes: number;

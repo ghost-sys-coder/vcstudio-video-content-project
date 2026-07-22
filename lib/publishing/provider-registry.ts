@@ -6,6 +6,7 @@ import {
   getPublishingWebEnvironment,
 } from "@/lib/env/server";
 import { YouTubeVideoPublishProvider } from "@/lib/publishing/providers/youtube-video-publish-provider";
+import { FacebookVideoPublishProvider } from "@/lib/publishing/providers/facebook-video-publish-provider";
 import type { VideoPublishProvider } from "@/lib/publishing/video-publish-provider";
 
 export class UnsupportedPlatformError extends Error {
@@ -22,7 +23,10 @@ export class UnsupportedPlatformError extends Error {
  * Adding a platform means implementing `VideoPublishProvider` and adding a case
  * to `createVideoPublishProvider`.
  */
-export const PUBLISHABLE_PLATFORMS: readonly ContentPlatform[] = ["youtube"];
+export const PUBLISHABLE_PLATFORMS: readonly ContentPlatform[] = [
+  "youtube",
+  "facebook",
+];
 
 export function isPublishablePlatform(platform: ContentPlatform): boolean {
   return PUBLISHABLE_PLATFORMS.includes(platform);
@@ -39,6 +43,9 @@ export function createVideoPublishProvider(
         clientSecret: environment.GOOGLE_OAUTH_CLIENT_SECRET,
       });
     case "facebook":
+      return new FacebookVideoPublishProvider({
+        apiVersion: environment.FACEBOOK_GRAPH_API_VERSION,
+      });
     case "instagram":
     case "tiktok":
       throw new UnsupportedPlatformError(platform);

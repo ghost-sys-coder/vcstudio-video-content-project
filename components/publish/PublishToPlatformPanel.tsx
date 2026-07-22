@@ -8,6 +8,7 @@ import {
   publishVideoAction,
 } from "@/app/(authenticated)/app/projects/[projectId]/publish/actions";
 import { ConnectYouTubeButton } from "@/components/publish/ConnectYouTubeButton";
+import { ConnectFacebookButton } from "@/components/publish/ConnectFacebookButton";
 import { PlatformConnectionRow } from "@/components/publish/PlatformConnectionRow";
 import { VideoPublicationRow } from "@/components/publish/VideoPublicationRow";
 import { Button } from "@/components/ui/button";
@@ -99,6 +100,12 @@ export function PublishToPlatformPanel({
     () => data.publications.some((entry) => isActiveStatus(entry.status)),
     [data.publications],
   );
+  const facebookSelected = activeConnection?.platform === "facebook";
+  const effectiveVisibility =
+    facebookSelected && visibility === "unlisted" ? "private" : visibility;
+  const selectedVisibilityItems = facebookSelected
+    ? { private: "Draft — not published", public: "Public — publish to Page" }
+    : visibilityItems;
 
   const refresh = useCallback(async () => {
     const view = await loadPublishingViewAction(projectId);
@@ -141,7 +148,7 @@ export function PublishToPlatformPanel({
       formData.set("title", title.trim());
       formData.set("description", description);
       formData.set("tags", tags);
-      formData.set("visibility", visibility);
+      formData.set("visibility", effectiveVisibility);
       formData.set("requestNonce", crypto.randomUUID());
       const result = await publishVideoAction(formData);
       if (!result.success) {
@@ -199,9 +206,8 @@ export function PublishToPlatformPanel({
       <div>
         <h2 className="text-sm font-semibold">Publish to a platform</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Upload a finished render straight to a connected account. YouTube is
-          available now; Facebook, Instagram, and TikTok use the same connection
-          and history once their integrations land.
+          Upload a finished render straight to a connected YouTube channel or
+          Facebook Page.
         </p>
       </div>
 
@@ -233,14 +239,20 @@ export function PublishToPlatformPanel({
           </p>
         )}
         {canManageConnections && data.enabled ? (
-          <ConnectYouTubeButton
-            className="mt-1"
-            label={
-              activeConnections.length > 0
-                ? "Connect another YouTube channel"
-                : "Connect a YouTube channel"
-            }
-          />
+          <div className="mt-1 flex flex-wrap gap-2">
+            <ConnectYouTubeButton
+              label={
+                activeConnections.length > 0 ? "Add YouTube" : "Connect YouTube"
+              }
+            />
+            <ConnectFacebookButton
+              label={
+                activeConnections.length > 0
+                  ? "Add Facebook"
+                  : "Connect Facebook"
+              }
+            />
+          </div>
         ) : null}
       </div>
 
@@ -303,20 +315,28 @@ export function PublishToPlatformPanel({
                   Visibility
                 </Label>
                 <Select
-                  items={visibilityItems}
+                  items={selectedVisibilityItems}
                   onValueChange={(value) => setVisibility(String(value))}
-                  value={visibility}
+                  value={effectiveVisibility}
                 >
                   <SelectTrigger id="publish-visibility">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="private">Private — only you</SelectItem>
-                    <SelectItem value="unlisted">
-                      Unlisted — anyone with the link
+                    <SelectItem value="private">
+                      {facebookSelected
+                        ? "Draft — not published"
+                        : "Private — only you"}
                     </SelectItem>
+                    {!facebookSelected ? (
+                      <SelectItem value="unlisted">
+                        Unlisted — anyone with the link
+                      </SelectItem>
+                    ) : null}
                     <SelectItem value="public">
-                      Public — listed and searchable
+                      {facebookSelected
+                        ? "Public — publish to Page"
+                        : "Public — listed and searchable"}
                     </SelectItem>
                   </SelectContent>
                 </Select>
@@ -385,9 +405,8 @@ export function PublishToPlatformPanel({
               ) : null}
             </div>
             <p className="text-xs text-muted-foreground">
-              Uploads go to the channel as {visibility}. Publishing does not
-              cost credits, but YouTube limits how many videos an account can
-              upload per day.
+              Uploads use {effectiveVisibility} visibility. Publishing does not
+              cost credits; each platform may enforce its own upload limits.
             </p>
           </div>
         )

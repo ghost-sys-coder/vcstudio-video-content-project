@@ -6,6 +6,7 @@ import {
   TriangleAlertIcon,
 } from "lucide-react";
 import { YouTubeMarkIcon } from "@/components/brand/YouTubeMarkIcon";
+import { FacebookMarkIcon } from "@/components/brand/FacebookMarkIcon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { WorkspaceChannelView } from "@/lib/publishing/workspace-connections-view";
@@ -31,8 +32,14 @@ export function WorkspaceChannelCard({
     <li className="rounded-xl border bg-background p-4 shadow-xs">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 items-start gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#e60000] text-white">
-            <YouTubeMarkIcon className="size-5" />
+          <div
+            className={`flex size-10 shrink-0 items-center justify-center rounded-lg text-white ${channel.platform === "facebook" ? "bg-[#1877f2]" : "bg-[#e60000]"}`}
+          >
+            {channel.platform === "facebook" ? (
+              <FacebookMarkIcon className="size-5" />
+            ) : (
+              <YouTubeMarkIcon className="size-5" />
+            )}
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
