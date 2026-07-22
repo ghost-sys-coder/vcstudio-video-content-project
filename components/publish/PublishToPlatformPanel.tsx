@@ -76,7 +76,6 @@ export function PublishToPlatformPanel({
   const [tiktokConsent, setTikTokConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const pollingRef = useRef(false);
   const touchedMetadataRef = useRef(new Set<ContentPlatform>());
   const hydratedMetadataRunsRef = useRef(
     createPublishingMetadataSignatures(initialData.generatedMetadata),
@@ -179,29 +178,30 @@ export function PublishToPlatformPanel({
     }));
   }
 
-  const poll = useCallback(async () => {
-    if (pollingRef.current) return;
-    pollingRef.current = true;
-    try {
-      for (let attempt = 0; attempt < 120; attempt++) {
+  useEffect(() => {
+    if (!hasActivePublications) return;
+    let cancelled = false;
+
+    async function pollUntilTerminal() {
+      while (!cancelled) {
         await new Promise((resolve) => setTimeout(resolve, 2500));
+        if (cancelled) return;
         const view = await refresh();
         if (
-          view &&
+          !view ||
           !view.publications.some((entry) =>
             isActivePublicationStatus(entry.status),
           )
         )
           return;
       }
-    } finally {
-      pollingRef.current = false;
     }
-  }, [refresh]);
 
-  useEffect(() => {
-    if (hasActivePublications) void poll();
-  }, [hasActivePublications, poll]);
+    void pollUntilTerminal();
+    return () => {
+      cancelled = true;
+    };
+  }, [hasActivePublications, refresh]);
 
   useEffect(() => {
     function handleMetadataUpdated(event: Event) {

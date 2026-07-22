@@ -27,6 +27,10 @@ export function VideoPublicationRow({
 }) {
   const isUploading =
     publication.status === "uploading" || publication.status === "processing";
+  const progressPercent = Math.min(
+    100,
+    Math.max(0, Math.round(publication.progressPercent)),
+  );
   const cancellable = publication.status === "queued";
   const statusLabel =
     publication.platform === "tiktok" &&
@@ -50,6 +54,7 @@ export function VideoPublicationRow({
         </div>
         <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs">
           {statusLabel}
+          {isUploading ? ` · ${progressPercent}%` : null}
         </span>
       </div>
 
@@ -58,13 +63,13 @@ export function VideoPublicationRow({
           aria-label="Upload progress"
           aria-valuemax={100}
           aria-valuemin={0}
-          aria-valuenow={publication.progressPercent}
+          aria-valuenow={progressPercent}
           className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
           role="progressbar"
         >
           <div
             className="h-full rounded-full bg-foreground/70 transition-[width]"
-            style={{ width: `${publication.progressPercent}%` }}
+            style={{ width: `${progressPercent}%` }}
           />
         </div>
       ) : null}
