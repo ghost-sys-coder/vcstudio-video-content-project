@@ -43,6 +43,14 @@ export type PublishVideoRequest = {
   description: string;
   tags: string[];
   visibility: PublicationVisibility;
+  caption: string | null;
+  shareToFeed: boolean | null;
+  /** Existing async operation/container id used to resume a previous attempt. */
+  providerOperationId: string | null;
+  onProviderOperationCreated?: (operationId: string) => void | Promise<void>;
+  onProcessingProgress?: (percent: number) => void | Promise<void>;
+  /** Injected by durable workers; tests may omit it for an immediate tick. */
+  waitForProcessing?: (milliseconds: number) => Promise<void>;
   /** Reports 0–100 so the UI can show real upload progress. */
   onProgress?: (percent: number) => void | Promise<void>;
 };

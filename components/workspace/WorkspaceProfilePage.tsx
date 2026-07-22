@@ -11,7 +11,11 @@ export function WorkspaceProfilePage({
 }: {
   channelsView: WorkspaceChannelsView;
   logoUrl: string | null;
-  oauthStatus: { facebook: string | null; youtube: string | null };
+  oauthStatus: {
+    facebook: string | null;
+    instagram: string | null;
+    youtube: string | null;
+  };
   workspaceId: string;
   workspaceName: string;
 }) {

@@ -7,6 +7,7 @@ import {
 } from "@/lib/env/server";
 import { YouTubeVideoPublishProvider } from "@/lib/publishing/providers/youtube-video-publish-provider";
 import { FacebookVideoPublishProvider } from "@/lib/publishing/providers/facebook-video-publish-provider";
+import { InstagramVideoPublishProvider } from "@/lib/publishing/providers/instagram-video-publish-provider";
 import type { VideoPublishProvider } from "@/lib/publishing/video-publish-provider";
 
 export class UnsupportedPlatformError extends Error {
@@ -26,6 +27,7 @@ export class UnsupportedPlatformError extends Error {
 export const PUBLISHABLE_PLATFORMS: readonly ContentPlatform[] = [
   "youtube",
   "facebook",
+  "instagram",
 ];
 
 export function isPublishablePlatform(platform: ContentPlatform): boolean {
@@ -47,6 +49,9 @@ export function createVideoPublishProvider(
         apiVersion: environment.FACEBOOK_GRAPH_API_VERSION,
       });
     case "instagram":
+      return new InstagramVideoPublishProvider({
+        apiVersion: environment.INSTAGRAM_GRAPH_API_VERSION,
+      });
     case "tiktok":
       throw new UnsupportedPlatformError(platform);
     default: {

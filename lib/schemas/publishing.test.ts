@@ -19,7 +19,7 @@ describe("publishVideoSchema", () => {
   it("accepts a minimal valid request and defaults optional fields", () => {
     const result = publishVideoSchema.safeParse(base);
     expect(result.success).toBe(true);
-    if (result.success) {
+    if (result.success && result.data.platform === "youtube") {
       expect(result.data.description).toBe("");
       expect(result.data.tags).toEqual([]);
     }
@@ -31,7 +31,7 @@ describe("publishVideoSchema", () => {
       tags: " focus , , productivity ,",
     });
     expect(result.success).toBe(true);
-    if (result.success)
+    if (result.success && result.data.platform === "youtube")
       expect(result.data.tags).toEqual(["focus", "productivity"]);
   });
 
@@ -102,5 +102,44 @@ describe("publishVideoSchema", () => {
     const withoutVisibility = { ...base };
     delete (withoutVisibility as Partial<typeof base>).visibility;
     expect(publishVideoSchema.safeParse(withoutVisibility).success).toBe(false);
+  });
+
+  it("accepts Instagram caption metadata and coerces share-to-feed", () => {
+    const result = publishVideoSchema.safeParse({
+      projectId: base.projectId,
+      renderId: base.renderId,
+      connectionId: base.connectionId,
+      platform: "instagram",
+      caption: "A vertical story #vcstudio",
+      shareToFeed: "true",
+      visibility: "public",
+      requestNonce: base.requestNonce,
+    });
+    expect(result.success).toBe(true);
+    if (result.success && result.data.platform === "instagram")
+      expect(result.data.shareToFeed).toBe(true);
+  });
+
+  it("rejects invalid Instagram visibility and oversized captions", () => {
+    const instagram = {
+      projectId: base.projectId,
+      renderId: base.renderId,
+      connectionId: base.connectionId,
+      platform: "instagram",
+      shareToFeed: "false",
+      visibility: "public",
+      requestNonce: base.requestNonce,
+    };
+    expect(
+      publishVideoSchema.safeParse({ ...instagram, caption: "x".repeat(2201) })
+        .success,
+    ).toBe(false);
+    expect(
+      publishVideoSchema.safeParse({
+        ...instagram,
+        caption: "Reel",
+        visibility: "private",
+      }).success,
+    ).toBe(false);
   });
 });

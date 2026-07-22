@@ -19,6 +19,7 @@ import {
   getSceneAnalysisEnvironment,
 } from "@/lib/env/server";
 import { isPublishablePlatform } from "@/lib/publishing/provider-registry";
+import { validateInstagramReelAsset } from "@/lib/publishing/instagram-reel-validation";
 import { enforceRateLimit } from "@/lib/rate-limit/enforce-rate-limit";
 import type { PublishVideoInput } from "@/lib/schemas/publishing";
 import type { videoPublishTask } from "@/trigger/video-publish";
@@ -77,6 +78,18 @@ export async function startVideoPublication(input: {
     throw new VideoPublicationRequestError(
       "That render is too large to publish.",
     );
+  if (input.request.platform === "instagram") {
+    const validation = validateInstagramReelAsset({
+      width: render.width,
+      height: render.height,
+      framesPerSecond: render.framesPerSecond,
+      durationMilliseconds: render.durationMilliseconds,
+      sizeBytes,
+      contentType: render.assetContentType,
+    });
+    if (!validation.eligible)
+      throw new VideoPublicationRequestError(validation.reason);
+  }
 
   const connection = await findPlatformConnectionSummary({
     workspaceId: input.workspaceId,
@@ -121,10 +134,19 @@ export async function startVideoPublication(input: {
     renderId: render.id,
     connectionId: connection.id,
     platform: input.request.platform,
-    title: input.request.title,
-    description: input.request.description,
-    tags: input.request.tags,
+    title:
+      input.request.platform === "instagram"
+        ? input.request.caption.trim().split(/\r?\n/, 1)[0]?.slice(0, 100) ||
+          "Instagram Reel"
+        : input.request.title,
+    description:
+      input.request.platform === "instagram" ? "" : input.request.description,
+    tags: input.request.platform === "instagram" ? [] : input.request.tags,
     visibility: input.request.visibility,
+    caption:
+      input.request.platform === "instagram" ? input.request.caption : null,
+    shareToFeed:
+      input.request.platform === "instagram" ? input.request.shareToFeed : null,
     idempotencyKey,
     requestedByUserId: input.requestedByUserId,
   });

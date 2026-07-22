@@ -49,7 +49,7 @@ describe("workspace channels view", () => {
     expect(view.platforms).toEqual([
       { platform: "youtube", label: "YouTube", available: true },
       { platform: "facebook", label: "Facebook", available: true },
-      { platform: "instagram", label: "Instagram", available: false },
+      { platform: "instagram", label: "Instagram", available: true },
       { platform: "tiktok", label: "TikTok", available: false },
     ]);
   });

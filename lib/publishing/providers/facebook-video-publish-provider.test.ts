@@ -96,6 +96,9 @@ describe("Facebook video publishing provider", () => {
         description: "Description",
         tags: [],
         visibility: "public",
+        caption: null,
+        shareToFeed: null,
+        providerOperationId: null,
       }),
     ).resolves.toEqual({
       externalVideoId: "video-1",

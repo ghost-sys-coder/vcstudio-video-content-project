@@ -20,6 +20,8 @@ export async function createVideoPublication(input: {
   description: string;
   tags: string[];
   visibility: PublicationVisibility;
+  caption: string | null;
+  shareToFeed: boolean | null;
   idempotencyKey: string;
   requestedByUserId: string;
 }): Promise<VideoPublication> {
@@ -36,6 +38,8 @@ export async function createVideoPublication(input: {
       description: input.description,
       tags: input.tags,
       visibility: input.visibility,
+      caption: input.caption,
+      shareToFeed: input.shareToFeed,
       idempotencyKey: input.idempotencyKey,
       requestedByUserId: input.requestedByUserId,
     })
@@ -74,6 +78,44 @@ export async function markVideoPublicationUploading(input: {
       updatedAt: now,
     })
     .where(eq(videoPublications.id, input.publicationId));
+}
+
+export async function markVideoPublicationProcessing(input: {
+  publicationId: string;
+  providerOperationId: string;
+  progressPercent?: number;
+}): Promise<void> {
+  await getDatabase()
+    .update(videoPublications)
+    .set({
+      status: "processing",
+      progressPercent: Math.min(89, Math.max(15, input.progressPercent ?? 20)),
+      providerOperationId: input.providerOperationId,
+      providerOperationStage: "processing",
+      updatedAt: new Date(),
+    })
+    .where(eq(videoPublications.id, input.publicationId));
+}
+
+export async function updateVideoPublicationProcessingProgress(input: {
+  publicationId: string;
+  progressPercent: number;
+}): Promise<void> {
+  await getDatabase()
+    .update(videoPublications)
+    .set({
+      progressPercent: Math.min(
+        94,
+        Math.max(20, Math.round(input.progressPercent)),
+      ),
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(videoPublications.id, input.publicationId),
+        eq(videoPublications.status, "processing"),
+      ),
+    );
 }
 
 /**
@@ -115,6 +157,7 @@ export async function completeVideoPublication(input: {
       progressPercent: 100,
       externalVideoId: input.externalVideoId,
       externalVideoUrl: input.externalVideoUrl,
+      providerOperationStage: "published",
       uploadedBytes: input.uploadedBytes,
       completedAt: now,
       updatedAt: now,
@@ -134,6 +177,7 @@ export async function failVideoPublication(input: {
       status: "failed",
       errorCategory: input.category,
       safeErrorMessage: input.message,
+      providerOperationStage: "failed",
       completedAt: now,
       updatedAt: now,
     })

@@ -188,6 +188,7 @@ export async function countActivePublicationsForRender(input: {
           "pending",
           "queued",
           "uploading",
+          "processing",
           "succeeded",
         ]),
       ),
