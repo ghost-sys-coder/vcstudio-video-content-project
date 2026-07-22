@@ -134,7 +134,9 @@ export class YouTubeVideoPublishProvider implements VideoPublishProvider {
     // without them Google omits it after the first grant and the connection
     // silently dies when the access token expires.
     url.searchParams.set("access_type", "offline");
-    url.searchParams.set("prompt", "consent");
+    // Account selection matters when a workspace connects more than one
+    // channel; consent alone may silently reuse the previous Google account.
+    url.searchParams.set("prompt", "consent select_account");
     url.searchParams.set("include_granted_scopes", "true");
     return url.toString();
   }

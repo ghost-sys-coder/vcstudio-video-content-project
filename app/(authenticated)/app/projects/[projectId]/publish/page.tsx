@@ -6,7 +6,10 @@ import { loadPublishingView } from "@/lib/publishing/publishing-view";
 import { findProject } from "@/db/repositories/projects.repository";
 import { findProjectBrief } from "@/db/repositories/project-briefs.repository";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
-import { canEditProject } from "@/lib/policies/workspace-policy";
+import {
+  canEditProject,
+  canManageWorkspace,
+} from "@/lib/policies/workspace-policy";
 import { loadThumbnailsView } from "@/lib/thumbnails/thumbnail-view";
 import { loadTitlesView } from "@/lib/titles/title-view";
 
@@ -48,6 +51,7 @@ export default async function ProjectPublishPage({
         projectId={project.id}
       />
       <PublishToPlatformPanel
+        canManageConnections={canManageWorkspace(context.activeMembership.role)}
         canPublish={canGenerate}
         initialData={publishingView}
         projectId={project.id}

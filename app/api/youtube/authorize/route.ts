@@ -27,7 +27,7 @@ export async function GET() {
     return new NextResponse(null, { status: 403, headers: noStore });
 
   // Connecting an account is a workspace-level change, not a read.
-  if (!can(context.activeMembership.role, "mutateWorkspaceData"))
+  if (!can(context.activeMembership.role, "manageSettings"))
     return new NextResponse(null, { status: 403, headers: noStore });
 
   const environment = getPublishingEnvironment();

@@ -481,6 +481,7 @@ export async function disconnectPlatformAction(
     return { success: false, error: "The request is invalid." };
   try {
     const { context } = await requirePublishMutation(projectId);
+    requireCapability(context.activeMembership.role, "manageSettings");
     const result = await disconnectPlatformConnection({
       connectionId: parsed.data.connectionId,
       workspaceId: context.activeMembership.workspaceId,

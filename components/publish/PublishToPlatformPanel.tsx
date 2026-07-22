@@ -40,16 +40,22 @@ function formatBytes(bytes: number): string {
 
 export function PublishToPlatformPanel({
   projectId,
+  canManageConnections,
   canPublish,
   initialData,
 }: {
   projectId: string;
+  canManageConnections: boolean;
   canPublish: boolean;
   initialData: PublishingView;
 }) {
   const [data, setData] = useState<PublishingView>(initialData);
   const [renderId, setRenderId] = useState<string>(
     initialData.renders[0]?.id ?? "",
+  );
+  const [connectionId, setConnectionId] = useState<string>(
+    initialData.connections.find((entry) => entry.status === "active")?.id ??
+      "",
   );
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -59,9 +65,26 @@ export function PublishToPlatformPanel({
   const [busy, setBusy] = useState(false);
   const pollingRef = useRef(false);
 
-  const activeConnection = useMemo(
-    () => data.connections.find((entry) => entry.status === "active") ?? null,
+  const activeConnections = useMemo(
+    () => data.connections.filter((entry) => entry.status === "active"),
     [data.connections],
+  );
+  const activeConnection = useMemo(
+    () =>
+      activeConnections.find((entry) => entry.id === connectionId) ??
+      activeConnections[0] ??
+      null,
+    [activeConnections, connectionId],
+  );
+  const connectionItems = useMemo(
+    () =>
+      Object.fromEntries(
+        activeConnections.map((entry) => [
+          entry.id,
+          `${entry.accountName} · ${entry.platformLabel}`,
+        ]),
+      ),
+    [activeConnections],
   );
   const renderItems = useMemo(
     () =>
@@ -197,7 +220,7 @@ export function PublishToPlatformPanel({
             {data.connections.map((connection) => (
               <PlatformConnectionRow
                 busy={busy}
-                canManage={canPublish}
+                canManage={canManageConnections}
                 connection={connection}
                 key={connection.id}
                 onDisconnect={disconnect}
@@ -209,8 +232,15 @@ export function PublishToPlatformPanel({
             No accounts connected yet.
           </p>
         )}
-        {canPublish && data.enabled && !activeConnection ? (
-          <ConnectYouTubeButton className="mt-1" />
+        {canManageConnections && data.enabled ? (
+          <ConnectYouTubeButton
+            className="mt-1"
+            label={
+              activeConnections.length > 0
+                ? "Connect another YouTube channel"
+                : "Connect a YouTube channel"
+            }
+          />
         ) : null}
       </div>
 
@@ -221,7 +251,28 @@ export function PublishToPlatformPanel({
           </p>
         ) : (
           <div className="space-y-3 border-t pt-4">
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs" htmlFor="publish-channel">
+                  Channel
+                </Label>
+                <Select
+                  items={connectionItems}
+                  onValueChange={(value) => setConnectionId(String(value))}
+                  value={activeConnection?.id ?? ""}
+                >
+                  <SelectTrigger id="publish-channel">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeConnections.map((connection) => (
+                      <SelectItem key={connection.id} value={connection.id}>
+                        {connection.accountName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-1.5">
                 <Label className="text-xs" htmlFor="publish-render">
                   Render

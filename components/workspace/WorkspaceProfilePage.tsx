@@ -1,16 +1,22 @@
 import { WorkspaceProfileForm } from "@/components/workspace/WorkspaceProfileForm";
+import { WorkspaceChannelsSection } from "@/components/workspace/WorkspaceChannelsSection";
+import type { WorkspaceChannelsView } from "@/lib/publishing/workspace-connections-view";
 
 export function WorkspaceProfilePage({
+  channelsView,
   logoUrl,
+  oauthStatus,
   workspaceId,
   workspaceName,
 }: {
+  channelsView: WorkspaceChannelsView;
   logoUrl: string | null;
+  oauthStatus: string | null;
   workspaceId: string;
   workspaceName: string;
 }) {
   return (
-    <section className="mx-auto max-w-3xl">
+    <section className="mx-auto max-w-4xl">
       <div className="mb-8">
         <p className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
           Workspace settings
@@ -27,6 +33,12 @@ export function WorkspaceProfilePage({
           logoUrl={logoUrl}
           workspaceId={workspaceId}
           workspaceName={workspaceName}
+        />
+      </div>
+      <div className="mt-6">
+        <WorkspaceChannelsSection
+          initialData={channelsView}
+          oauthStatus={oauthStatus}
         />
       </div>
     </section>

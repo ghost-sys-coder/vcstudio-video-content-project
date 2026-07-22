@@ -50,7 +50,7 @@ export async function GET(request: Request) {
   // the flow started here, but authorization is still resolved from the real
   // session, never from a value that arrived in the query string.
   const context = await getAuthenticatedWorkspaceContext();
-  if (!context || !can(context.activeMembership.role, "mutateWorkspaceData"))
+  if (!context || !can(context.activeMembership.role, "manageSettings"))
     return redirectWithStatus(APP_BASE_URL, "forbidden");
 
   let statePayload;

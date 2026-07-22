@@ -12,7 +12,13 @@ import { cn } from "@/lib/utils";
  * A plain anchor, not a button: the OAuth flow is a full-page navigation to
  * Google, so it must behave like a link (middle-click, open in new tab).
  */
-export function ConnectYouTubeButton({ className }: { className?: string }) {
+export function ConnectYouTubeButton({
+  className,
+  label = "Connect a YouTube channel",
+}: {
+  className?: string;
+  label?: string;
+}) {
   return (
     <a
       className={cn(
@@ -26,7 +32,7 @@ export function ConnectYouTubeButton({ className }: { className?: string }) {
       href="/api/youtube/authorize"
     >
       <YouTubeMarkIcon className="size-5 shrink-0" />
-      Connect a YouTube channel
+      {label}
     </a>
   );
 }
