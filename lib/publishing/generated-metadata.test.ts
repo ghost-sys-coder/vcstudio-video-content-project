@@ -50,7 +50,7 @@ describe("generated publishing metadata", () => {
     );
   });
 
-  it("hydrates new generated metadata without overwriting edited platforms", () => {
+  it("loads every field from a new generation even when stale fields were touched", () => {
     const original = {
       generationRunId: "run-1",
       platform: "youtube" as const,
@@ -59,7 +59,11 @@ describe("generated publishing metadata", () => {
       tags: ["original"],
     };
     const drafts = createPublishingMetadataDraftMap([original]);
-    drafts.facebook.title = "User-edited Facebook title";
+    drafts.facebook = {
+      title: "Stale Facebook title",
+      description: "",
+      tags: "",
+    };
     const generatedMetadata = [
       { ...original, generationRunId: "run-2", title: "New YouTube title" },
       {
@@ -72,11 +76,44 @@ describe("generated publishing metadata", () => {
     const hydrated = hydrateUntouchedPublishingMetadata({
       drafts,
       generatedMetadata,
-      touchedPlatforms: new Set(["facebook" as const]),
+      touchedPlatforms: new Set(["youtube" as const, "facebook" as const]),
       hydratedSignatures: createPublishingMetadataSignatures([original]),
     });
 
     expect(hydrated.drafts.youtube.title).toBe("New YouTube title");
-    expect(hydrated.drafts.facebook.title).toBe("User-edited Facebook title");
+    expect(hydrated.drafts.facebook).toEqual({
+      title: "New Facebook title",
+      description: "Original description",
+      tags: "original",
+    });
+  });
+
+  it("preserves edits when the preferred title changes within the same run", () => {
+    const original = {
+      generationRunId: "run-1",
+      platform: "youtube" as const,
+      title: "Original title",
+      description: "Original description",
+      tags: ["original"],
+    };
+    const drafts = createPublishingMetadataDraftMap([original]);
+    drafts.youtube = {
+      title: "User-edited title",
+      description: "User-edited description",
+      tags: "edited",
+    };
+
+    const hydrated = hydrateUntouchedPublishingMetadata({
+      drafts,
+      generatedMetadata: [{ ...original, title: "New favorite title" }],
+      touchedPlatforms: new Set(["youtube" as const]),
+      hydratedSignatures: createPublishingMetadataSignatures([original]),
+    });
+
+    expect(hydrated.drafts.youtube).toEqual({
+      title: "User-edited title",
+      description: "User-edited description",
+      tags: "edited",
+    });
   });
 });

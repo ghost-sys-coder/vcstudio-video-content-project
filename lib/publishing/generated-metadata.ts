@@ -108,8 +108,15 @@ export function hydrateUntouchedPublishingMetadata(input: {
   const hydratedSignatures = new Map(input.hydratedSignatures);
   for (const metadata of input.generatedMetadata) {
     const signature = `${metadata.generationRunId}:${metadata.title}`;
-    if (input.touchedPlatforms.has(metadata.platform)) continue;
-    if (hydratedSignatures.get(metadata.platform) === signature) continue;
+    const previousSignature = hydratedSignatures.get(metadata.platform);
+    if (previousSignature === signature) continue;
+
+    const isNewGenerationRun =
+      previousSignature === undefined ||
+      !previousSignature.startsWith(`${metadata.generationRunId}:`);
+    if (input.touchedPlatforms.has(metadata.platform) && !isNewGenerationRun)
+      continue;
+
     drafts[metadata.platform] = toPublishingMetadataDraft(metadata);
     hydratedSignatures.set(metadata.platform, signature);
   }
