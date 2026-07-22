@@ -174,6 +174,7 @@ export const videoPublishTask = task({
     try {
       const result = await provider.publishVideo({
         tokens: { accessToken },
+        account: { externalAccountId: connection.externalAccountId },
         sourceUrl,
         sizeBytes: render.assetSizeBytes,
         contentType: render.assetContentType ?? "video/mp4",

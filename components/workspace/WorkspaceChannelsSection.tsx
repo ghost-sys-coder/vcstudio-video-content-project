@@ -4,11 +4,12 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { disconnectWorkspaceChannelAction } from "@/app/(authenticated)/app/settings/workspace/actions";
 import { ConnectYouTubeButton } from "@/components/publish/ConnectYouTubeButton";
+import { ConnectFacebookButton } from "@/components/publish/ConnectFacebookButton";
 import { FutureChannelPlatformCard } from "@/components/workspace/FutureChannelPlatformCard";
 import { WorkspaceChannelCard } from "@/components/workspace/WorkspaceChannelCard";
 import type { WorkspaceChannelsView } from "@/lib/publishing/workspace-connections-view";
 
-const OAUTH_MESSAGES: Record<string, string> = {
+const YOUTUBE_OAUTH_MESSAGES: Record<string, string> = {
   connected: "The YouTube channel is now connected to this workspace.",
   cancelled: "YouTube connection was cancelled.",
   failed: "The YouTube channel could not be connected. Please try again.",
@@ -16,12 +17,21 @@ const OAUTH_MESSAGES: Record<string, string> = {
   invalid: "The YouTube authorization response was invalid or expired.",
 };
 
+const FACEBOOK_OAUTH_MESSAGES: Record<string, string> = {
+  connected: "The Facebook Page is now connected to this workspace.",
+  cancelled: "Facebook connection was cancelled.",
+  expired: "The Facebook Page selection expired. Connect again.",
+  failed: "The Facebook Page could not be connected. Please try again.",
+  forbidden: "You do not have permission to connect that Page.",
+  invalid: "The Facebook authorization response was invalid or expired.",
+};
+
 export function WorkspaceChannelsSection({
   initialData,
   oauthStatus,
 }: {
   initialData: WorkspaceChannelsView;
-  oauthStatus: string | null;
+  oauthStatus: { facebook: string | null; youtube: string | null };
 }) {
   const router = useRouter();
   const [pendingConnectionId, setPendingConnectionId] = useState<string | null>(
@@ -49,7 +59,10 @@ export function WorkspaceChannelsSection({
     });
   }
 
-  const oauthMessage = oauthStatus ? OAUTH_MESSAGES[oauthStatus] : null;
+  const oauthMessages = [
+    oauthStatus.youtube ? YOUTUBE_OAUTH_MESSAGES[oauthStatus.youtube] : null,
+    oauthStatus.facebook ? FACEBOOK_OAUTH_MESSAGES[oauthStatus.facebook] : null,
+  ].filter((message): message is string => Boolean(message));
 
   return (
     <section
@@ -73,24 +86,26 @@ export function WorkspaceChannelsSection({
           </p>
         </div>
         {initialData.enabled ? (
-          <ConnectYouTubeButton
-            label={
-              activeCount > 0
-                ? "Connect another YouTube channel"
-                : "Connect a YouTube channel"
-            }
-          />
+          <div className="flex flex-wrap gap-2">
+            <ConnectYouTubeButton
+              label={activeCount > 0 ? "Add YouTube" : "Connect YouTube"}
+            />
+            <ConnectFacebookButton
+              label={activeCount > 0 ? "Add Facebook" : "Connect Facebook"}
+            />
+          </div>
         ) : null}
       </div>
 
-      {oauthMessage ? (
+      {oauthMessages.map((message) => (
         <p
           className="mt-4 rounded-lg border bg-muted/40 px-3 py-2 text-sm"
+          key={message}
           role="status"
         >
-          {oauthMessage}
+          {message}
         </p>
-      ) : null}
+      ))}
       {error ? (
         <p
           className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
@@ -121,7 +136,8 @@ export function WorkspaceChannelsSection({
           <div className="rounded-xl border border-dashed p-6 text-center">
             <p className="text-sm font-medium">No channels connected</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Connect YouTube to publish completed videos from VCStudio.
+              Connect YouTube or a Facebook Page to publish completed videos
+              from VCStudio.
             </p>
           </div>
         )}

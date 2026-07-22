@@ -81,6 +81,23 @@ describe("publishVideoSchema", () => {
     ).toBe(false);
   });
 
+  it("rejects unlisted Facebook Page videos", () => {
+    expect(
+      publishVideoSchema.safeParse({
+        ...base,
+        platform: "facebook",
+        visibility: "unlisted",
+      }).success,
+    ).toBe(false);
+    expect(
+      publishVideoSchema.safeParse({
+        ...base,
+        platform: "facebook",
+        visibility: "public",
+      }).success,
+    ).toBe(true);
+  });
+
   it("never defaults to public — visibility must be stated explicitly", () => {
     const withoutVisibility = { ...base };
     delete (withoutVisibility as Partial<typeof base>).visibility;

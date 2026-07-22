@@ -11,7 +11,7 @@ export function WorkspaceProfilePage({
 }: {
   channelsView: WorkspaceChannelsView;
   logoUrl: string | null;
-  oauthStatus: string | null;
+  oauthStatus: { facebook: string | null; youtube: string | null };
   workspaceId: string;
   workspaceName: string;
 }) {

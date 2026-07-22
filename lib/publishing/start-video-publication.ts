@@ -9,7 +9,7 @@ import {
 } from "@/db/commands/video-publication-commands";
 import {
   countActivePublicationsForRender,
-  findActivePlatformConnection,
+  findPlatformConnectionSummary,
   findVideoPublicationByIdempotencyKey,
 } from "@/db/repositories/publishing.repository";
 import { findVideoRender } from "@/db/repositories/video-render.repository";
@@ -78,11 +78,15 @@ export async function startVideoPublication(input: {
       "That render is too large to publish.",
     );
 
-  const connection = await findActivePlatformConnection({
+  const connection = await findPlatformConnectionSummary({
     workspaceId: input.workspaceId,
-    platform: input.request.platform,
+    connectionId: input.request.connectionId,
   });
-  if (!connection || connection.id !== input.request.connectionId)
+  if (
+    !connection ||
+    connection.status !== "active" ||
+    connection.platform !== input.request.platform
+  )
     throw new VideoPublicationRequestError(
       "Connect the account again before publishing.",
     );

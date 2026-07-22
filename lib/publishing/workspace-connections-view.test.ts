@@ -40,7 +40,7 @@ describe("workspace channels view", () => {
     expect(view.channels[0]).not.toHaveProperty("accessTokenSealed");
   });
 
-  it("exposes only YouTube as currently connectable", () => {
+  it("exposes implemented platforms as connectable", () => {
     const view = buildWorkspaceChannelsView({
       enabled: true,
       connections: [],
@@ -48,7 +48,7 @@ describe("workspace channels view", () => {
 
     expect(view.platforms).toEqual([
       { platform: "youtube", label: "YouTube", available: true },
-      { platform: "facebook", label: "Facebook", available: false },
+      { platform: "facebook", label: "Facebook", available: true },
       { platform: "instagram", label: "Instagram", available: false },
       { platform: "tiktok", label: "TikTok", available: false },
     ]);

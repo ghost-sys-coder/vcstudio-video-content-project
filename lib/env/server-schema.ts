@@ -450,6 +450,11 @@ export const publishingEnvironmentSchema = z.object({
   GOOGLE_OAUTH_CLIENT_SECRET: z
     .string()
     .min(1, "GOOGLE_OAUTH_CLIENT_SECRET is required"),
+  /** Versioned Graph API path shared by the web OAuth flow and publish worker. */
+  FACEBOOK_GRAPH_API_VERSION: z
+    .string()
+    .regex(/^v\d+\.\d+$/, "FACEBOOK_GRAPH_API_VERSION must look like v25.0")
+    .default("v25.0"),
   ENABLE_VIDEO_PUBLISHING: z
     .enum(["true", "false"])
     .default("true")
@@ -488,6 +493,9 @@ export const publishingWebEnvironmentSchema = z.object({
     .min(60)
     .max(3600)
     .default(600),
+  /** Meta app credentials are web-only; Trigger.dev receives Page tokens instead. */
+  FACEBOOK_APP_ID: z.string().min(1, "FACEBOOK_APP_ID is required"),
+  FACEBOOK_APP_SECRET: z.string().min(1, "FACEBOOK_APP_SECRET is required"),
 });
 
 export const usageEnvironmentSchema = z.object({

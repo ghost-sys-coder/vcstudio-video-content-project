@@ -9,7 +9,7 @@ import { createWorkspaceLogoDownloadUrl } from "@/lib/storage/workspace-logo-sto
 export default async function WorkspaceSettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ youtube?: string }>;
+  searchParams: Promise<{ facebook?: string; youtube?: string }>;
 }) {
   const context = await getAuthenticatedWorkspaceContext();
   if (!context) redirect("/onboarding");
@@ -17,7 +17,7 @@ export default async function WorkspaceSettingsPage({
     redirect("/app/access-denied");
   }
 
-  const [{ youtube }, logo, channelsView] = await Promise.all([
+  const [{ facebook, youtube }, logo, channelsView] = await Promise.all([
     searchParams,
     findWorkspaceLogo(context.activeMembership.workspaceId),
     loadWorkspaceChannelsView({
@@ -32,7 +32,7 @@ export default async function WorkspaceSettingsPage({
     <WorkspaceProfilePage
       channelsView={channelsView}
       logoUrl={logoUrl}
-      oauthStatus={youtube ?? null}
+      oauthStatus={{ facebook: facebook ?? null, youtube: youtube ?? null }}
       workspaceId={context.activeMembership.workspaceId}
       workspaceName={context.activeMembership.workspaceName}
     />

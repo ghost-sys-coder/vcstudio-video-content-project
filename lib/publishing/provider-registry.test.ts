@@ -8,15 +8,17 @@ import {
 } from "@/lib/publishing/provider-registry";
 
 describe("publishable platform gating", () => {
-  it("allows YouTube today", () => {
+  it("allows implemented publishing platforms", () => {
     expect(isPublishablePlatform("youtube")).toBe(true);
+    expect(isPublishablePlatform("facebook")).toBe(true);
     expect(PUBLISHABLE_PLATFORMS).toContain("youtube");
+    expect(PUBLISHABLE_PLATFORMS).toContain("facebook");
   });
 
   it("blocks platforms whose integration does not exist yet", () => {
     // These are valid content_platform values (briefs/titles/thumbnails support
     // them), so the registry — not the enum — must gate publishing.
-    for (const platform of ["facebook", "instagram", "tiktok"] as const)
+    for (const platform of ["instagram", "tiktok"] as const)
       expect(isPublishablePlatform(platform)).toBe(false);
   });
 });

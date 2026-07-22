@@ -67,7 +67,10 @@ export async function GET(request: Request) {
 
   // The signed workspace must match the session's active workspace, so a state
   // minted for one workspace cannot attach a channel to another.
-  if (statePayload.workspaceId !== context.activeMembership.workspaceId)
+  if (
+    statePayload.workspaceId !== context.activeMembership.workspaceId ||
+    statePayload.userId !== context.user.id
+  )
     return redirectWithStatus(APP_BASE_URL, "forbidden");
 
   try {
