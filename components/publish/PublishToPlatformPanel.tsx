@@ -34,21 +34,17 @@ import {
   PUBLISHING_METADATA_UPDATED_EVENT,
 } from "@/lib/publishing/generated-metadata";
 import type { PublishingView } from "@/lib/publishing/publishing-view";
+import {
+  findActivePublicationForTarget,
+  isActivePublicationStatus,
+  selectInitialPublishingTarget,
+} from "@/lib/publishing/publishing-selection";
 
 const visibilityItems = {
   private: "Private — only you",
   unlisted: "Unlisted — anyone with the link",
   public: "Public — listed and searchable",
 };
-
-function isActiveStatus(status: string): boolean {
-  return (
-    status === "pending" ||
-    status === "queued" ||
-    status === "uploading" ||
-    status === "processing"
-  );
-}
 
 function formatBytes(bytes: number): string {
   if (bytes >= 1_073_741_824) return `${(bytes / 1_073_741_824).toFixed(1)} GB`;
@@ -66,13 +62,11 @@ export function PublishToPlatformPanel({
   canPublish: boolean;
   initialData: PublishingView;
 }) {
+  const initialTarget = selectInitialPublishingTarget(initialData);
   const [data, setData] = useState<PublishingView>(initialData);
-  const [renderId, setRenderId] = useState<string>(
-    initialData.renders[0]?.id ?? "",
-  );
+  const [renderId, setRenderId] = useState<string>(initialTarget.renderId);
   const [connectionId, setConnectionId] = useState<string>(
-    initialData.connections.find((entry) => entry.status === "active")?.id ??
-      "",
+    initialTarget.connectionId,
   );
   const [metadataDrafts, setMetadataDrafts] = useState(() =>
     createPublishingMetadataDraftMap(initialData.generatedMetadata),
@@ -118,9 +112,20 @@ export function PublishToPlatformPanel({
     () => data.renders.find((entry) => entry.id === renderId) ?? null,
     [data.renders, renderId],
   );
-  const uploading = useMemo(
-    () => data.publications.some((entry) => isActiveStatus(entry.status)),
+  const hasActivePublications = useMemo(
+    () =>
+      data.publications.some((entry) =>
+        isActivePublicationStatus(entry.status),
+      ),
     [data.publications],
+  );
+  const selectedTargetPublication = useMemo(
+    () =>
+      findActivePublicationForTarget(data.publications, {
+        connectionId: activeConnection?.id ?? "",
+        renderId: selectedRender?.id ?? "",
+      }),
+    [activeConnection?.id, data.publications, selectedRender?.id],
   );
   const facebookSelected = activeConnection?.platform === "facebook";
   const instagramSelected = activeConnection?.platform === "instagram";
@@ -183,7 +188,9 @@ export function PublishToPlatformPanel({
         const view = await refresh();
         if (
           view &&
-          !view.publications.some((entry) => isActiveStatus(entry.status))
+          !view.publications.some((entry) =>
+            isActivePublicationStatus(entry.status),
+          )
         )
           return;
       }
@@ -193,8 +200,8 @@ export function PublishToPlatformPanel({
   }, [refresh]);
 
   useEffect(() => {
-    if (uploading) void poll();
-  }, [uploading, poll]);
+    if (hasActivePublications) void poll();
+  }, [hasActivePublications, poll]);
 
   useEffect(() => {
     function handleMetadataUpdated(event: Event) {
@@ -289,6 +296,7 @@ export function PublishToPlatformPanel({
   const canSubmit =
     canPublish &&
     !busy &&
+    selectedTargetPublication === null &&
     data.enabled &&
     activeConnection !== null &&
     selectedRender !== null &&
@@ -721,7 +729,7 @@ export function PublishToPlatformPanel({
                 onClick={publish}
                 type="button"
               >
-                {uploading || busy ? (
+                {selectedTargetPublication || busy ? (
                   <LoaderCircle aria-hidden className="animate-spin" />
                 ) : tiktokSelected ? (
                   <span className="flex size-6 items-center justify-center rounded-full bg-white/10">
@@ -731,10 +739,10 @@ export function PublishToPlatformPanel({
                   <Send aria-hidden />
                 )}
                 <span>
-                  {uploading
+                  {selectedTargetPublication
                     ? tiktokSelected
                       ? "Uploading to TikTok…"
-                      : "Uploading…"
+                      : `Publishing to ${activeConnection.platformLabel}…`
                     : busy
                       ? "Preparing upload…"
                       : tiktokSelected

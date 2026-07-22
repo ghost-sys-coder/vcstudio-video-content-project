@@ -53,6 +53,8 @@ export type PublishableRenderView = {
 
 export type PublicationView = {
   id: string;
+  connectionId: string;
+  renderId: string;
   platform: ContentPlatform;
   platformLabel: string;
   title: string;
@@ -205,6 +207,8 @@ export async function loadPublishingView(input: {
       }),
     publications: publications.map((publication) => ({
       id: publication.id,
+      connectionId: publication.connectionId,
+      renderId: publication.renderId,
       platform: publication.platform,
       platformLabel: CONTENT_PLATFORM_LABELS[publication.platform],
       title: publication.title,

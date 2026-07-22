@@ -113,4 +113,53 @@ describe("publishing view generated metadata", () => {
       titleGenerationRunIds: ["run-id"],
     });
   });
+
+  it("exposes the persisted connection and render for active-state restoration", async () => {
+    mocks.listPublications.mockResolvedValue([
+      {
+        id: "publication-id",
+        connectionId: "youtube-connection",
+        renderId: "render-id",
+        platform: "youtube",
+        title: "Published title",
+        status: "uploading",
+        visibility: "public",
+        progressPercent: 42,
+        externalVideoUrl: null,
+        safeErrorMessage: null,
+        providerOperationStage: "uploading",
+        createdAt: new Date("2026-07-22T01:00:00Z"),
+      },
+    ]);
+
+    const view = await loadPublishingView({
+      workspaceId: "workspace-id",
+      project: {
+        id: "project-id",
+        workspaceId: "workspace-id",
+        name: "Project",
+        description: "",
+        status: "draft",
+        aspectRatio: "16:9",
+        width: 1920,
+        height: 1080,
+        framesPerSecond: 30,
+        language: "English",
+        maximumBudgetCents: 1000,
+        createdByUserId: "user-id",
+        archivedAt: null,
+        createdAt: new Date("2026-07-22T00:00:00Z"),
+        updatedAt: new Date("2026-07-22T00:00:00Z"),
+      },
+    });
+
+    expect(view.publications[0]).toEqual(
+      expect.objectContaining({
+        id: "publication-id",
+        connectionId: "youtube-connection",
+        renderId: "render-id",
+        status: "uploading",
+      }),
+    );
+  });
 });
