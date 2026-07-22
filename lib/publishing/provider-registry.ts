@@ -8,6 +8,7 @@ import {
 import { YouTubeVideoPublishProvider } from "@/lib/publishing/providers/youtube-video-publish-provider";
 import { FacebookVideoPublishProvider } from "@/lib/publishing/providers/facebook-video-publish-provider";
 import { InstagramVideoPublishProvider } from "@/lib/publishing/providers/instagram-video-publish-provider";
+import { TikTokVideoUploadProvider } from "@/lib/publishing/providers/tiktok-video-upload-provider";
 import type { VideoPublishProvider } from "@/lib/publishing/video-publish-provider";
 
 export class UnsupportedPlatformError extends Error {
@@ -28,6 +29,7 @@ export const PUBLISHABLE_PLATFORMS: readonly ContentPlatform[] = [
   "youtube",
   "facebook",
   "instagram",
+  "tiktok",
 ];
 
 export function isPublishablePlatform(platform: ContentPlatform): boolean {
@@ -53,7 +55,10 @@ export function createVideoPublishProvider(
         apiVersion: environment.INSTAGRAM_GRAPH_API_VERSION,
       });
     case "tiktok":
-      throw new UnsupportedPlatformError(platform);
+      return new TikTokVideoUploadProvider({
+        clientKey: environment.TIKTOK_API_CLIENT_KEY,
+        clientSecret: environment.TIKTOK_API_CLIENT_SECRET,
+      });
     default: {
       // Exhaustiveness guard: a new content_platform value must be handled here.
       const unreachable: never = platform;

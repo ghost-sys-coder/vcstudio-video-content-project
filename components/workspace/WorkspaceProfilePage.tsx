@@ -14,6 +14,7 @@ export function WorkspaceProfilePage({
   oauthStatus: {
     facebook: string | null;
     instagram: string | null;
+    tiktok: string | null;
     youtube: string | null;
   };
   workspaceId: string;

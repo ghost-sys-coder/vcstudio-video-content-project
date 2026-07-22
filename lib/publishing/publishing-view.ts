@@ -8,6 +8,7 @@ import {
 import { listVideoRenders } from "@/db/repositories/video-render.repository";
 import { getPublishingEnvironment } from "@/lib/env/server";
 import { PUBLISHABLE_PLATFORMS } from "@/lib/publishing/provider-registry";
+import { validateTikTokUploadAsset } from "@/lib/publishing/tiktok-upload-validation";
 import { CONTENT_PLATFORM_LABELS } from "@/lib/titles/title-view";
 
 export const PUBLICATION_HISTORY_LIMIT = 20;
@@ -32,6 +33,8 @@ export type PublishableRenderView = {
   tooLarge: boolean;
   instagramEligible: boolean;
   instagramIneligibilityReason: string | null;
+  tiktokEligible: boolean;
+  tiktokIneligibilityReason: string | null;
 };
 
 export type PublicationView = {
@@ -44,6 +47,7 @@ export type PublicationView = {
   progressPercent: number;
   externalVideoUrl: string | null;
   safeErrorMessage: string | null;
+  providerOperationStage: string | null;
   createdAtLabel: string;
 };
 
@@ -106,41 +110,53 @@ export async function loadPublishingView(input: {
           render.assetObjectKey !== null &&
           (render.assetSizeBytes ?? 0) > 0,
       )
-      .map((render) => ({
-        id: render.id,
-        label: `${render.width}×${render.height} · ${Math.round(
-          render.durationMilliseconds / 1000,
-        )}s · ${formatUtc(render.createdAt)}`,
-        sizeBytes: render.assetSizeBytes ?? 0,
-        durationSeconds: Math.round(render.durationMilliseconds / 1000),
-        createdAtLabel: formatUtc(render.createdAt),
-        tooLarge:
-          (render.assetSizeBytes ?? 0) > environment.MAX_PUBLISH_VIDEO_BYTES,
-        instagramEligible:
-          render.width * 16 === render.height * 9 &&
-          render.framesPerSecond >= 23 &&
-          render.framesPerSecond <= 60 &&
-          render.durationMilliseconds >= 3000 &&
-          render.durationMilliseconds <= 900_000 &&
-          (render.assetSizeBytes ?? 0) <= 1_073_741_824 &&
-          render.width <= 1920 &&
-          render.assetContentType === "video/mp4",
-        instagramIneligibilityReason:
-          render.width * 16 !== render.height * 9
-            ? "Instagram requires a vertical 9:16 render."
-            : render.framesPerSecond < 23 || render.framesPerSecond > 60
-              ? "Instagram requires 23–60 FPS."
-              : render.durationMilliseconds < 3000 ||
-                  render.durationMilliseconds > 900_000
-                ? "Instagram Reels must be 3 seconds to 15 minutes."
-                : (render.assetSizeBytes ?? 0) > 1_073_741_824
-                  ? "Instagram Reels cannot exceed 1 GB."
-                  : render.width > 1920
-                    ? "Instagram cannot accept more than 1920 horizontal pixels."
-                    : render.assetContentType !== "video/mp4"
-                      ? "Instagram requires an MP4 render."
-                      : null,
-      })),
+      .map((render) => {
+        const tiktokValidation = validateTikTokUploadAsset({
+          width: render.width,
+          height: render.height,
+          framesPerSecond: render.framesPerSecond,
+          durationMilliseconds: render.durationMilliseconds,
+          sizeBytes: render.assetSizeBytes ?? 0,
+          contentType: render.assetContentType,
+        });
+        return {
+          id: render.id,
+          label: `${render.width}×${render.height} · ${Math.round(
+            render.durationMilliseconds / 1000,
+          )}s · ${formatUtc(render.createdAt)}`,
+          sizeBytes: render.assetSizeBytes ?? 0,
+          durationSeconds: Math.round(render.durationMilliseconds / 1000),
+          createdAtLabel: formatUtc(render.createdAt),
+          tooLarge:
+            (render.assetSizeBytes ?? 0) > environment.MAX_PUBLISH_VIDEO_BYTES,
+          instagramEligible:
+            render.width * 16 === render.height * 9 &&
+            render.framesPerSecond >= 23 &&
+            render.framesPerSecond <= 60 &&
+            render.durationMilliseconds >= 3000 &&
+            render.durationMilliseconds <= 900_000 &&
+            (render.assetSizeBytes ?? 0) <= 1_073_741_824 &&
+            render.width <= 1920 &&
+            render.assetContentType === "video/mp4",
+          instagramIneligibilityReason:
+            render.width * 16 !== render.height * 9
+              ? "Instagram requires a vertical 9:16 render."
+              : render.framesPerSecond < 23 || render.framesPerSecond > 60
+                ? "Instagram requires 23–60 FPS."
+                : render.durationMilliseconds < 3000 ||
+                    render.durationMilliseconds > 900_000
+                  ? "Instagram Reels must be 3 seconds to 15 minutes."
+                  : (render.assetSizeBytes ?? 0) > 1_073_741_824
+                    ? "Instagram Reels cannot exceed 1 GB."
+                    : render.width > 1920
+                      ? "Instagram cannot accept more than 1920 horizontal pixels."
+                      : render.assetContentType !== "video/mp4"
+                        ? "Instagram requires an MP4 render."
+                        : null,
+          tiktokEligible: tiktokValidation.eligible,
+          tiktokIneligibilityReason: tiktokValidation.reason,
+        };
+      }),
     publications: publications.map((publication) => ({
       id: publication.id,
       platform: publication.platform,
@@ -151,6 +167,7 @@ export async function loadPublishingView(input: {
       progressPercent: publication.progressPercent,
       externalVideoUrl: publication.externalVideoUrl,
       safeErrorMessage: publication.safeErrorMessage,
+      providerOperationStage: publication.providerOperationStage,
       createdAtLabel: formatUtc(publication.createdAt),
     })),
   };

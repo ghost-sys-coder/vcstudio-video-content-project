@@ -35,10 +35,12 @@ export function DataDeletionPage() {
             </h2>
             <p>
               A workspace owner can open Workspace settings in VCStudio and
-              disconnect a supported YouTube, Facebook, or Instagram
+              disconnect a supported YouTube, Facebook, Instagram, or TikTok
               destination. This destroys the stored authorization credentials
-              and stops future VCStudio API access for that connection. You can
-              also revoke access in the provider&apos;s account settings.
+              and stops future VCStudio API access for that connection.
+              Disconnecting TikTok also attempts to revoke the token through
+              TikTok&apos;s API. You can separately revoke access in the
+              provider&apos;s account settings.
             </p>
           </section>
           <section className="space-y-3">

@@ -28,6 +28,12 @@ export function VideoPublicationRow({
   const isUploading =
     publication.status === "uploading" || publication.status === "processing";
   const cancellable = publication.status === "queued";
+  const statusLabel =
+    publication.platform === "tiktok" &&
+    publication.status === "succeeded" &&
+    publication.providerOperationStage === "inbox_delivered"
+      ? "Delivered to inbox"
+      : statusLabels[publication.status];
 
   return (
     <li className="space-y-2 rounded-lg border bg-background p-3">
@@ -35,12 +41,15 @@ export function VideoPublicationRow({
         <div className="min-w-0">
           <p className="truncate text-sm font-medium">{publication.title}</p>
           <p className="text-xs text-muted-foreground">
-            {publication.platformLabel} · {publication.visibility} ·{" "}
-            {publication.createdAtLabel}
+            {publication.platformLabel}
+            {publication.platform === "tiktok"
+              ? " · Creator completes posting in TikTok"
+              : ` · ${publication.visibility}`}{" "}
+            · {publication.createdAtLabel}
           </p>
         </div>
         <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs">
-          {statusLabels[publication.status]}
+          {statusLabel}
         </span>
       </div>
 
@@ -77,7 +86,10 @@ export function VideoPublicationRow({
             target="_blank"
           >
             <ExternalLinkIcon aria-hidden className="size-3.5" />
-            View on {publication.platformLabel}
+            {publication.platform === "tiktok" &&
+            publication.providerOperationStage === "inbox_delivered"
+              ? "Open TikTok"
+              : `View on ${publication.platformLabel}`}
           </a>
         ) : null}
         {canManage && cancellable ? (

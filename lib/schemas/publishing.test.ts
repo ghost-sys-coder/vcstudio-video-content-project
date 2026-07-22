@@ -142,4 +142,22 @@ describe("publishVideoSchema", () => {
       }).success,
     ).toBe(false);
   });
+  it("requires explicit consent for a TikTok inbox upload", () => {
+    const request = {
+      projectId: base.projectId,
+      renderId: base.renderId,
+      connectionId: base.connectionId,
+      platform: "tiktok",
+      visibility: "platform_default",
+      requestNonce: base.requestNonce,
+    };
+    expect(
+      publishVideoSchema.safeParse({ ...request, consentConfirmed: "true" })
+        .success,
+    ).toBe(true);
+    expect(
+      publishVideoSchema.safeParse({ ...request, consentConfirmed: "false" })
+        .success,
+    ).toBe(false);
+  });
 });

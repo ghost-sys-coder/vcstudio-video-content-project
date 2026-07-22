@@ -460,6 +460,11 @@ export const publishingEnvironmentSchema = z.object({
     .string()
     .regex(/^v\d+\.\d+$/, "INSTAGRAM_GRAPH_API_VERSION must look like v25.0")
     .default("v25.0"),
+  /** TikTok OAuth client is required by the worker to rotate user tokens. */
+  TIKTOK_API_CLIENT_KEY: z.string().min(1, "TIKTOK_API_CLIENT_KEY is required"),
+  TIKTOK_API_CLIENT_SECRET: z
+    .string()
+    .min(1, "TIKTOK_API_CLIENT_SECRET is required"),
   ENABLE_VIDEO_PUBLISHING: z
     .enum(["true", "false"])
     .default("true")

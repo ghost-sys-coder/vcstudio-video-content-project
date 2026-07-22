@@ -12,6 +12,7 @@ export const publicationVisibilitySchema = z.enum([
   "private",
   "unlisted",
   "public",
+  "platform_default",
 ]);
 
 /**
@@ -68,6 +69,11 @@ export const publishVideoSchema = z.discriminatedUnion("platform", [
       .enum(["true", "false"])
       .transform((value) => value === "true"),
     visibility: z.literal("public"),
+  }),
+  publishBaseSchema.extend({
+    platform: z.literal("tiktok"),
+    consentConfirmed: z.literal("true").transform(() => true as const),
+    visibility: z.literal("platform_default"),
   }),
 ]);
 

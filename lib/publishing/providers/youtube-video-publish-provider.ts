@@ -326,6 +326,7 @@ export class YouTubeVideoPublishProvider implements VideoPublishProvider {
           externalVideoId: payload.id,
           externalVideoUrl: `https://www.youtube.com/watch?v=${payload.id}`,
           uploadedBytes: request.sizeBytes,
+          completionStage: "published",
         };
       }
       fail(failureForStatus(response.status, await response.text()));

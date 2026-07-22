@@ -61,10 +61,7 @@ export function buildWorkspaceChannelsView(input: {
     platforms: PLATFORM_ORDER.map((platform) => ({
       platform,
       label: CONTENT_PLATFORM_LABELS[platform],
-      available:
-        platform === "youtube" ||
-        platform === "facebook" ||
-        platform === "instagram",
+      available: true,
     })),
   };
 }

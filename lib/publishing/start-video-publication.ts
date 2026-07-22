@@ -20,6 +20,7 @@ import {
 } from "@/lib/env/server";
 import { isPublishablePlatform } from "@/lib/publishing/provider-registry";
 import { validateInstagramReelAsset } from "@/lib/publishing/instagram-reel-validation";
+import { validateTikTokUploadAsset } from "@/lib/publishing/tiktok-upload-validation";
 import { enforceRateLimit } from "@/lib/rate-limit/enforce-rate-limit";
 import type { PublishVideoInput } from "@/lib/schemas/publishing";
 import type { videoPublishTask } from "@/trigger/video-publish";
@@ -90,6 +91,18 @@ export async function startVideoPublication(input: {
     if (!validation.eligible)
       throw new VideoPublicationRequestError(validation.reason);
   }
+  if (input.request.platform === "tiktok") {
+    const validation = validateTikTokUploadAsset({
+      width: render.width,
+      height: render.height,
+      framesPerSecond: render.framesPerSecond,
+      durationMilliseconds: render.durationMilliseconds,
+      sizeBytes,
+      contentType: render.assetContentType,
+    });
+    if (!validation.eligible)
+      throw new VideoPublicationRequestError(validation.reason);
+  }
 
   const connection = await findPlatformConnectionSummary({
     workspaceId: input.workspaceId,
@@ -138,15 +151,25 @@ export async function startVideoPublication(input: {
       input.request.platform === "instagram"
         ? input.request.caption.trim().split(/\r?\n/, 1)[0]?.slice(0, 100) ||
           "Instagram Reel"
-        : input.request.title,
+        : input.request.platform === "tiktok"
+          ? "TikTok inbox upload"
+          : input.request.title,
     description:
-      input.request.platform === "instagram" ? "" : input.request.description,
-    tags: input.request.platform === "instagram" ? [] : input.request.tags,
+      input.request.platform === "instagram" ||
+      input.request.platform === "tiktok"
+        ? ""
+        : input.request.description,
+    tags:
+      input.request.platform === "instagram" ||
+      input.request.platform === "tiktok"
+        ? []
+        : input.request.tags,
     visibility: input.request.visibility,
     caption:
       input.request.platform === "instagram" ? input.request.caption : null,
     shareToFeed:
       input.request.platform === "instagram" ? input.request.shareToFeed : null,
+    consentConfirmedAt: input.request.platform === "tiktok" ? new Date() : null,
     idempotencyKey,
     requestedByUserId: input.requestedByUserId,
   });

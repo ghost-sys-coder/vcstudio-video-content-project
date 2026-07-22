@@ -233,6 +233,7 @@ export const publicationVisibilityEnum = pgEnum("publication_visibility", [
   "private",
   "unlisted",
   "public",
+  "platform_default",
 ]);
 
 // Whether a generated thumbnail bakes a short headline into the image or is
@@ -2223,7 +2224,13 @@ export const videoPublications = pgTable(
     externalVideoUrl: text("external_video_url"),
     /** Resumable/asynchronous provider operation id, e.g. IG media container. */
     providerOperationId: text("provider_operation_id"),
+    /** Encrypted ephemeral provider credential, e.g. a TikTok upload URL. */
+    providerOperationSecretSealed: text("provider_operation_secret_sealed"),
     providerOperationStage: text("provider_operation_stage"),
+    /** Required evidence of explicit consent for TikTok inbox delivery. */
+    consentConfirmedAt: timestamp("consent_confirmed_at", {
+      withTimezone: true,
+    }),
     uploadedBytes: integer("uploaded_bytes"),
     errorCategory: text("error_category"),
     safeErrorMessage: text("safe_error_message"),
@@ -2269,6 +2276,18 @@ export const videoPublications = pgTable(
         ${table.platform} <> 'instagram'
         and ${table.caption} is null
         and ${table.shareToFeed} is null
+      )`,
+    ),
+    check(
+      "video_publications_tiktok_metadata_valid",
+      sql`(
+        ${table.platform} = 'tiktok'
+        and ${table.visibility} = 'platform_default'
+        and ${table.consentConfirmedAt} is not null
+      ) or (
+        ${table.platform} <> 'tiktok'
+        and ${table.visibility} <> 'platform_default'
+        and ${table.consentConfirmedAt} is null
       )`,
     ),
     foreignKey({

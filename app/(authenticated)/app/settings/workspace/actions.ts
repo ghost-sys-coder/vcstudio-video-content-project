@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { disconnectPlatformConnection } from "@/db/commands/platform-connection-commands";
 import { updateWorkspaceName } from "@/db/commands/update-workspace.command";
 import { recordAuditEvent } from "@/lib/audit/record-audit-event";
 import { requireAuthenticatedUser } from "@/lib/auth/require-authenticated-user";
@@ -10,6 +9,7 @@ import {
   requireWorkspaceMembership,
 } from "@/lib/auth/workspace-context";
 import { requireCapability } from "@/lib/policies/workspace-policy";
+import { disconnectPlatformAuthorization } from "@/lib/publishing/disconnect-platform-connection";
 import { disconnectPlatformSchema } from "@/lib/schemas/publishing";
 import { updateWorkspaceProfileSchema } from "@/lib/schemas/workspace";
 
@@ -36,7 +36,7 @@ export async function disconnectWorkspaceChannelAction(
     const context = await getAuthenticatedWorkspaceContext();
     if (!context) throw new Error("WORKSPACE_CONTEXT_MISSING");
     requireCapability(context.activeMembership.role, "manageSettings");
-    const result = await disconnectPlatformConnection({
+    const result = await disconnectPlatformAuthorization({
       connectionId: parsed.data.connectionId,
       workspaceId: context.activeMembership.workspaceId,
     });
