@@ -9,20 +9,35 @@ export function LandingFooter() {
         <Link aria-label="VCStudio home" href="/">
           <BrandLogo />
         </Link>
-        <div className="flex items-center gap-6">
-          <a
+        <nav
+          aria-label="Footer"
+          className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3"
+        >
+          <Link
             className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-            href="#workflow"
+            href="/#workflow"
           >
             Workflow
-          </a>
-          <a
+          </Link>
+          <Link
             className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-            href="#features"
+            href="/#features"
           >
             Features
-          </a>
-        </div>
+          </Link>
+          <Link
+            className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+            href="/privacy"
+          >
+            Privacy Policy
+          </Link>
+          <Link
+            className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+            href="/terms"
+          >
+            Terms of Service
+          </Link>
+        </nav>
         <p className="text-xs text-muted-foreground">
           © {year} VCStudio. Review-driven AI video production.
         </p>
