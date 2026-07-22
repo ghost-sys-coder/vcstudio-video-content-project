@@ -3,6 +3,8 @@ import { task } from "@trigger.dev/sdk";
 import {
   SCENE_IMAGE_PROMPT_TEMPLATE_SOURCE_HASH,
   SCENE_IMAGE_PROMPT_VERSION,
+  SCENE_OUTPAINT_PROMPT_TEMPLATE_SOURCE_HASH,
+  SCENE_OUTPAINT_PROMPT_VERSION,
 } from "@studio/prompts";
 import { z } from "zod";
 import {
@@ -40,6 +42,7 @@ import {
   recoverStoredSceneImage,
 } from "@/lib/trigger/scene-image-recovery";
 import {
+  downloadStoredSceneImageReference,
   downloadSceneImageReferences,
   putSceneImage,
 } from "@/lib/storage/scene-image-storage";
@@ -187,15 +190,22 @@ export const sceneImageGenerationTask = task({
       return { generationId: generation.id, status: "failed" as const };
     }
 
+    const isOutpaint = generation.purpose === "variant_outpaint";
+    const expectedPromptVersion = isOutpaint
+      ? SCENE_OUTPAINT_PROMPT_VERSION
+      : SCENE_IMAGE_PROMPT_VERSION;
+    const expectedPromptHash = isOutpaint
+      ? SCENE_OUTPAINT_PROMPT_TEMPLATE_SOURCE_HASH
+      : SCENE_IMAGE_PROMPT_TEMPLATE_SOURCE_HASH;
     const promptTemplate = await findPromptTemplateVersion({
-      templateKey: "scene-image",
+      templateKey: isOutpaint ? "scene-outpaint" : "scene-image",
       version: generation.promptTemplateVersion,
     });
     if (
       !promptTemplate ||
       promptTemplate.id !== generation.promptTemplateVersionId ||
-      promptTemplate.version !== SCENE_IMAGE_PROMPT_VERSION ||
-      promptTemplate.sourceHash !== SCENE_IMAGE_PROMPT_TEMPLATE_SOURCE_HASH
+      promptTemplate.version !== expectedPromptVersion ||
+      promptTemplate.sourceHash !== expectedPromptHash
     ) {
       await failSceneImageGeneration({
         ...scope,
@@ -209,6 +219,10 @@ export const sceneImageGenerationTask = task({
     const referenceIds = references.map(
       ({ referenceAssetIdSnapshot }) => referenceAssetIdSnapshot,
     );
+    if (generation.sourceImageGenerationId)
+      referenceIds.push(generation.sourceImageGenerationId);
+    if (generation.outputVariantId)
+      referenceIds.push(generation.outputVariantId);
     const expectedInputFidelity = getOpenAiReferenceInputFidelitySnapshot({
       model: generation.model,
       hasReferences: referenceIds.length > 0,
@@ -307,6 +321,30 @@ export const sceneImageGenerationTask = task({
         references,
         maximumTotalBytes: environment.MAX_REFERENCE_BYTES_PER_GENERATION,
       });
+      if (generation.sourceImageGenerationId) {
+        const source = await findSceneImageGenerationWorkflowContext({
+          workspaceId: generation.workspaceId,
+          projectId: generation.projectId,
+          generationId: generation.sourceImageGenerationId,
+        });
+        if (
+          !source?.generation.assetObjectKey ||
+          !source.generation.assetContentType ||
+          !source.generation.assetEtag ||
+          source.generation.status !== "succeeded" ||
+          source.generation.reviewStatus !== "approved"
+        )
+          throw new Error("OUTPAINT_SOURCE_NOT_AVAILABLE");
+        providerReferences.push(
+          await downloadStoredSceneImageReference({
+            generationId: source.generation.id,
+            objectKey: source.generation.assetObjectKey,
+            contentType: source.generation.assetContentType,
+            etag: source.generation.assetEtag,
+            maximumBytes: environment.MAX_REFERENCE_BYTES_PER_GENERATION,
+          }),
+        );
+      }
     } catch {
       await failSceneImageProviderAttempt({
         ...scope,

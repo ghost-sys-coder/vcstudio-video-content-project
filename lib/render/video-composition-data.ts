@@ -22,7 +22,15 @@ export type VideoCompositionScene = {
   cameraMotion: RenderCameraMotion;
   transition: RenderSceneTransition;
   imageUrl: string;
+  imageFraming?: {
+    mode: "cover" | "contain" | "outpaint";
+    focalPointXBps: number;
+    focalPointYBps: number;
+    scaleBps: number;
+    backgroundColor: string;
+  };
   audioUrl: string;
+  audioTrimBeforeFrames?: number;
   captions: RenderCaptionData[];
 };
 

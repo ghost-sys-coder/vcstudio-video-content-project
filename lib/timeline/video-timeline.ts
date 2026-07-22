@@ -1,5 +1,6 @@
 import { millisecondsToFrames } from "@/lib/timeline/scene-timeline";
 import type { RemotionCaption } from "@/lib/subtitles/remotion-captions";
+import type { SceneFramingData } from "@/lib/output-variants/scene-framing";
 
 export type CameraMotion =
   "none" | "zoomIn" | "zoomOut" | "panLeft" | "panRight" | "panUp" | "panDown";
@@ -18,6 +19,7 @@ export interface TimelineImageAsset {
   objectKey: string;
   width: number | null;
   height: number | null;
+  framing?: SceneFramingData;
 }
 
 export interface TimelineAudioAsset {
@@ -53,6 +55,7 @@ export interface VideoTimelineScene {
   image: TimelineImageAsset;
   audio: Required<Pick<TimelineAudioAsset, "durationMilliseconds">> &
     TimelineAudioAsset;
+  audioTrimBeforeFrames?: number;
   cameraMotion: CameraMotion;
   transition: SceneTransition;
   captions: RemotionCaption[];

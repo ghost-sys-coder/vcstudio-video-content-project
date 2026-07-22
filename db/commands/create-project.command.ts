@@ -3,11 +3,13 @@ import "server-only";
 import { getDatabase } from "@/db/drizzle";
 import {
   projectBriefs,
+  projectOutputVariants,
   projectScriptDrafts,
   projects,
   type ProjectAspectRatio,
 } from "@/db/schema";
 import { getProjectDimensions } from "@/lib/schemas/project";
+import { OUTPUT_VARIANT_DEFINITIONS } from "@/lib/output-variants/output-variant";
 
 export async function createProject(input: {
   workspaceId: string;
@@ -48,6 +50,23 @@ export async function createProject(input: {
       projectId,
       updatedByUserId: input.userId,
     }),
+    getDatabase()
+      .insert(projectOutputVariants)
+      .values(
+        OUTPUT_VARIANT_DEFINITIONS.map((variant) => ({
+          workspaceId: input.workspaceId,
+          projectId,
+          name: variant.name,
+          aspectRatio: variant.aspectRatio,
+          width: variant.width,
+          height: variant.height,
+          status:
+            variant.aspectRatio === input.aspectRatio
+              ? ("ready" as const)
+              : ("draft" as const),
+          createdByUserId: input.userId,
+        })),
+      ),
   ]);
   const project = created[0];
   if (!project) throw new Error("Project creation returned no project.");

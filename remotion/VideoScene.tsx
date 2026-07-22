@@ -37,12 +37,19 @@ export function VideoScene({
           motion={scene.cameraMotion}
           durationInFrames={visibleDurationFrames}
         >
-          <SceneImage src={scene.imageUrl} sceneId={scene.sceneId} />
+          <SceneImage
+            framing={scene.imageFraming}
+            src={scene.imageUrl}
+            sceneId={scene.sceneId}
+          />
         </CameraMotion>
       </SceneTransition>
 
       <Sequence durationInFrames={scene.durationFrames} name="Narration">
-        <SceneAudioTrack src={scene.audioUrl} />
+        <SceneAudioTrack
+          src={scene.audioUrl}
+          trimBeforeFrames={scene.audioTrimBeforeFrames}
+        />
       </Sequence>
 
       {includeCaptions ? (

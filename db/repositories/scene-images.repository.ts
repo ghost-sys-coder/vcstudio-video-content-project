@@ -324,6 +324,25 @@ export async function findSceneImageGeneration(input: {
   return generation ?? null;
 }
 
+export async function listSucceededSceneImageGenerationsByIds(input: {
+  workspaceId: string;
+  projectId: string;
+  generationIds: string[];
+}) {
+  if (input.generationIds.length === 0) return [];
+  return getDatabase()
+    .select()
+    .from(sceneImageGenerations)
+    .where(
+      and(
+        eq(sceneImageGenerations.workspaceId, input.workspaceId),
+        eq(sceneImageGenerations.projectId, input.projectId),
+        inArray(sceneImageGenerations.id, input.generationIds),
+        eq(sceneImageGenerations.status, "succeeded"),
+      ),
+    );
+}
+
 export async function findSceneImageGenerationByRequestNonce(input: {
   workspaceId: string;
   projectId: string;

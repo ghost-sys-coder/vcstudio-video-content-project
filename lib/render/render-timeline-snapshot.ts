@@ -32,12 +32,20 @@ export interface RenderSceneImageData {
   objectKey: string;
   width: number | null;
   height: number | null;
+  framing?: {
+    mode: "cover" | "contain" | "outpaint";
+    focalPointXBps: number;
+    focalPointYBps: number;
+    scaleBps: number;
+    backgroundColor: string;
+  };
 }
 
 export interface RenderSceneAudioData {
   objectKey: string;
   durationMilliseconds: number;
   format: string;
+  trimBeforeFrames?: number;
 }
 
 export interface RenderSceneData {

@@ -1,11 +1,13 @@
 import "server-only";
 
 import type { Project } from "@/db/schema";
+import type { SceneVariantFraming } from "@/db/schema";
 import {
   getProjectSubtitleSettings,
   listApprovedSceneAudioAssets,
   listApprovedSceneImageAssets,
 } from "@/db/repositories/subtitle.repository";
+import { listSucceededSceneImageGenerationsByIds } from "@/db/repositories/scene-images.repository";
 import { listCurrentScenes } from "@/db/repositories/scenes.repository";
 import {
   getSceneAudioEnvironment,
@@ -15,6 +17,7 @@ import {
   coerceCaptionStyle,
   DEFAULT_CAPTION_STYLE,
 } from "@/lib/subtitles/caption-style";
+import { DEFAULT_SCENE_FRAMING } from "@/lib/output-variants/scene-framing";
 import type {
   CaptionStyleData,
   SubtitleGranularity,
@@ -75,6 +78,12 @@ export interface SubtitleContext {
 export async function buildSubtitleContext(input: {
   workspaceId: string;
   project: Project;
+  output?: {
+    width: number;
+    height: number;
+    captionStyle: CaptionStyleData | null;
+    framings: SceneVariantFraming[];
+  };
 }): Promise<SubtitleContext> {
   const scope = { workspaceId: input.workspaceId, projectId: input.project.id };
   const subtitleEnv = getSubtitleEnvironment();
@@ -83,11 +92,18 @@ export async function buildSubtitleContext(input: {
   const currentScenes = await listCurrentScenes(scope);
   const sceneVersionIds = currentScenes.map((row) => row.version.id);
 
-  const [settings, approvedImages, approvedAudios] = await Promise.all([
-    getProjectSubtitleSettings(scope),
-    listApprovedSceneImageAssets({ ...scope, sceneVersionIds }),
-    listApprovedSceneAudioAssets({ ...scope, sceneVersionIds }),
-  ]);
+  const [settings, approvedImages, approvedAudios, variantImages] =
+    await Promise.all([
+      getProjectSubtitleSettings(scope),
+      listApprovedSceneImageAssets({ ...scope, sceneVersionIds }),
+      listApprovedSceneAudioAssets({ ...scope, sceneVersionIds }),
+      listSucceededSceneImageGenerationsByIds({
+        ...scope,
+        generationIds: (input.output?.framings ?? []).map(
+          (framing) => framing.sourceImageGenerationId,
+        ),
+      }),
+    ]);
 
   const imageByVersion = new Map<string, ApprovedImage>(
     approvedImages.map((row) => [row.sceneVersionId, row] as const),
@@ -97,14 +113,25 @@ export async function buildSubtitleContext(input: {
   );
 
   const granularity: SubtitleGranularity = settings?.granularity ?? "sentence";
-  const captionStyle: CaptionStyleData = settings
-    ? coerceCaptionStyle(settings.captionStyle)
-    : {
-        ...DEFAULT_CAPTION_STYLE,
-        maxLineCharacters: subtitleEnv.SUBTITLE_MAX_LINE_CHARACTERS,
-      };
+  const captionStyle: CaptionStyleData = input.output?.captionStyle
+    ? coerceCaptionStyle(input.output.captionStyle)
+    : settings
+      ? coerceCaptionStyle(settings.captionStyle)
+      : {
+          ...DEFAULT_CAPTION_STYLE,
+          maxLineCharacters: subtitleEnv.SUBTITLE_MAX_LINE_CHARACTERS,
+        };
   const overrides: SubtitleSegmentTextOverrides =
     settings?.segmentTextOverrides ?? {};
+  const framingByVersion = new Map(
+    (input.output?.framings ?? []).map((framing) => [
+      framing.sceneVersionId,
+      framing,
+    ]),
+  );
+  const variantImageById = new Map(
+    variantImages.map((image) => [image.id, image] as const),
+  );
 
   // Absolute scene slots come from approved-audio durations plus configured
   // padding, matching the audio-review timeline exactly.
@@ -157,8 +184,8 @@ export async function buildSubtitleContext(input: {
 
   const timeline = buildVideoTimeline({
     renderSettings: {
-      width: input.project.width,
-      height: input.project.height,
+      width: input.output?.width ?? input.project.width,
+      height: input.output?.height ?? input.project.height,
       framesPerSecond: input.project.framesPerSecond,
       paddingMilliseconds: audioEnv.AUDIO_SCENE_PADDING_MILLISECONDS,
     },
@@ -166,7 +193,19 @@ export async function buildSubtitleContext(input: {
       subtitleEnv.SUBTITLE_DURATION_MISMATCH_TOLERANCE_MILLISECONDS,
     captionsBySceneId,
     scenes: currentScenes.map(({ scene, version }) => {
-      const image = imageByVersion.get(version.id) ?? null;
+      const approvedImage = imageByVersion.get(version.id) ?? null;
+      const framing = framingByVersion.get(version.id);
+      const variantImage = framing
+        ? variantImageById.get(framing.sourceImageGenerationId)
+        : null;
+      const image = variantImage?.assetObjectKey
+        ? {
+            generationId: variantImage.id,
+            assetObjectKey: variantImage.assetObjectKey,
+            assetWidth: variantImage.assetWidth,
+            assetHeight: variantImage.assetHeight,
+          }
+        : approvedImage;
       const audio = audioByVersion.get(version.id) ?? null;
       return {
         sceneId: scene.id,
@@ -181,6 +220,21 @@ export async function buildSubtitleContext(input: {
                 objectKey: image.assetObjectKey,
                 width: image.assetWidth,
                 height: image.assetHeight,
+                framing: (() => {
+                  const framing = framingByVersion.get(version.id);
+                  if (
+                    !framing ||
+                    framing.sourceImageGenerationId !== image.generationId
+                  )
+                    return DEFAULT_SCENE_FRAMING;
+                  return {
+                    mode: framing.mode === "outpaint" ? "cover" : framing.mode,
+                    focalPointXBps: framing.focalPointXBps,
+                    focalPointYBps: framing.focalPointYBps,
+                    scaleBps: framing.scaleBps,
+                    backgroundColor: framing.backgroundColor,
+                  };
+                })(),
               }
             : null,
         audio:

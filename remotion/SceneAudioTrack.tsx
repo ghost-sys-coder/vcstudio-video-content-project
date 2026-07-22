@@ -9,6 +9,12 @@ import { Audio } from "remotion";
  * preview, playback pauses (rather than skips) whenever the audio has not
  * buffered enough to play the current frame.
  */
-export function SceneAudioTrack({ src }: { src: string }) {
-  return <Audio src={src} pauseWhenBuffering />;
+export function SceneAudioTrack({
+  src,
+  trimBeforeFrames = 0,
+}: {
+  src: string;
+  trimBeforeFrames?: number;
+}) {
+  return <Audio src={src} pauseWhenBuffering trimBefore={trimBeforeFrames} />;
 }

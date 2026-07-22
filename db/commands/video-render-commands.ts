@@ -87,6 +87,8 @@ export async function createVideoRenderReservation(input: {
   reservationId: string;
   workspaceId: string;
   projectId: string;
+  outputVariantId?: string;
+  shortCompositionId?: string;
   requestNonce: string;
   idempotencyKey: string;
   requestFingerprint: string;
@@ -198,7 +200,7 @@ export async function createVideoRenderReservation(input: {
       ),
       inserted_render as (
         insert into video_renders (
-          id, workspace_id, project_id, request_nonce, idempotency_key,
+          id, workspace_id, project_id, output_variant_id, short_composition_id, request_nonce, idempotency_key,
           request_fingerprint, preset, aspect_ratio, width, height,
           frames_per_second, include_captions, include_watermark, scene_count,
           caption_count, duration_milliseconds, total_frames, timeline_snapshot,
@@ -208,6 +210,8 @@ export async function createVideoRenderReservation(input: {
           ${input.renderId}::uuid,
           ${input.workspaceId}::uuid,
           ${input.projectId}::uuid,
+          ${input.outputVariantId ?? null}::uuid,
+          ${input.shortCompositionId ?? null}::uuid,
           ${input.requestNonce}::uuid,
           ${input.idempotencyKey},
           ${input.requestFingerprint},

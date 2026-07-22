@@ -8,6 +8,11 @@ export const renderRouteParamsSchema = z.object({
   projectId: z.uuid(),
 });
 
+export const renderOutputQuerySchema = z.object({
+  outputVariantId: z.uuid().optional(),
+  shortCompositionId: z.uuid().optional(),
+});
+
 export const renderDownloadParamsSchema = z.object({
   projectId: z.uuid(),
   renderId: z.uuid(),
@@ -15,6 +20,8 @@ export const renderDownloadParamsSchema = z.object({
 
 export const startRenderSchema = z.object({
   projectId: z.uuid(),
+  outputVariantId: z.uuid(),
+  shortCompositionId: z.uuid().optional(),
   presetId: z.string().trim().min(1).max(64),
   includeCaptions: booleanFlagSchema,
   includeWatermark: booleanFlagSchema,

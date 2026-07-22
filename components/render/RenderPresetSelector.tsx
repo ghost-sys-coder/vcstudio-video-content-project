@@ -5,9 +5,7 @@ import { cn } from "@/lib/utils";
 import type { RenderPresetView } from "@/lib/render/render-view";
 
 /**
- * Presents the supported output formats. Only the preset matching the project's
- * aspect ratio is selectable, because scene images are generated at that ratio;
- * other formats are shown but disabled with an explanation.
+ * Presents every reusable output variant for the source project.
  */
 export function RenderPresetSelector({
   presets,
@@ -54,7 +52,7 @@ export function RenderPresetSelector({
               </span>
               {preset.disabled ? (
                 <span className="text-[10px] font-medium text-muted-foreground">
-                  Requires a {preset.aspectRatio} project
+                  Output variant unavailable
                 </span>
               ) : null}
             </button>

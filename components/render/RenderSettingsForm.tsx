@@ -3,44 +3,13 @@
 import { useState } from "react";
 import { RenderPresetSelector } from "@/components/render/RenderPresetSelector";
 import { StartRenderButton } from "@/components/render/StartRenderButton";
+import { RenderToggleRow } from "@/components/render/RenderToggleRow";
 import { formatUsdCents } from "@/lib/format/currency";
 import type {
   RenderConfigurationView,
   RenderPresetView,
   StartRenderInput,
 } from "@/lib/render/render-view";
-
-function ToggleRow({
-  label,
-  description,
-  checked,
-  disabled,
-  onChange,
-}: {
-  label: string;
-  description: string;
-  checked: boolean;
-  disabled: boolean;
-  onChange: (checked: boolean) => void;
-}) {
-  return (
-    <label className="flex items-start gap-3 rounded-lg border p-3">
-      <input
-        checked={checked}
-        className="mt-0.5 size-4 accent-primary"
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.checked)}
-        type="checkbox"
-      />
-      <span>
-        <span className="block text-sm font-medium">{label}</span>
-        <span className="block text-xs text-muted-foreground">
-          {description}
-        </span>
-      </span>
-    </label>
-  );
-}
 
 export function RenderSettingsForm({
   presets,
@@ -51,6 +20,8 @@ export function RenderSettingsForm({
   watermarkAvailable,
   pending,
   onStart,
+  selectedOutputVariantId,
+  onOutputVariantChange,
 }: {
   presets: RenderPresetView[];
   configuration: RenderConfigurationView;
@@ -60,10 +31,13 @@ export function RenderSettingsForm({
   watermarkAvailable: boolean;
   pending: boolean;
   onStart: (input: StartRenderInput) => void;
+  selectedOutputVariantId: string;
+  onOutputVariantChange: (outputVariantId: string) => void;
 }) {
-  const projectPreset =
-    presets.find((preset) => preset.isProjectDefault) ?? presets[0];
-  const [presetId, setPresetId] = useState(projectPreset?.id ?? "");
+  const selectedPreset =
+    presets.find(
+      (preset) => preset.outputVariantId === selectedOutputVariantId,
+    ) ?? presets[0];
   const [includeCaptions, setIncludeCaptions] = useState(true);
   const [includeWatermark, setIncludeWatermark] = useState(false);
 
@@ -88,20 +62,23 @@ export function RenderSettingsForm({
     >
       <RenderPresetSelector
         disabled={!canRender || pending}
-        onSelect={setPresetId}
+        onSelect={(presetId) => {
+          const preset = presets.find((candidate) => candidate.id === presetId);
+          if (preset) onOutputVariantChange(preset.outputVariantId);
+        }}
         presets={presets}
-        selectedPresetId={presetId}
+        selectedPresetId={selectedPreset?.id ?? ""}
       />
 
       <div className="grid gap-2 sm:grid-cols-2">
-        <ToggleRow
+        <RenderToggleRow
           checked={includeCaptions}
           description="Burn the reviewed captions into the video."
           disabled={!canRender || pending}
           label="Captions"
           onChange={setIncludeCaptions}
         />
-        <ToggleRow
+        <RenderToggleRow
           checked={includeWatermark && watermarkAvailable}
           description={
             watermarkAvailable
@@ -129,7 +106,12 @@ export function RenderSettingsForm({
           disabled={disabledReason !== null}
           estimatedCostCents={configuration.estimatedCostCents}
           onStart={() =>
-            onStart({ presetId, includeCaptions, includeWatermark })
+            onStart({
+              presetId: selectedPreset?.id ?? "",
+              outputVariantId: selectedOutputVariantId,
+              includeCaptions,
+              includeWatermark,
+            })
           }
           pending={pending}
         />

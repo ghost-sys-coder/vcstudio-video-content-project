@@ -21,9 +21,13 @@ type PreviewState =
  */
 export function VideoPreviewPlayer({
   projectId,
+  outputVariantId,
+  shortCompositionId,
   refreshToken,
 }: {
   projectId: string;
+  outputVariantId: string;
+  shortCompositionId?: string | null;
   refreshToken: number;
 }) {
   const [state, setState] = useState<PreviewState>({ status: "loading" });
@@ -31,7 +35,10 @@ export function VideoPreviewPlayer({
   const fetchPreview = useCallback(async (): Promise<PreviewState> => {
     try {
       const response = await fetch(
-        `/api/projects/${projectId}/renders/preview`,
+        `/api/projects/${projectId}/renders/preview?${new URLSearchParams({
+          outputVariantId,
+          ...(shortCompositionId ? { shortCompositionId } : {}),
+        }).toString()}`,
         { cache: "no-store" },
       );
       const payload: unknown = await response.json();
@@ -52,7 +59,7 @@ export function VideoPreviewPlayer({
     } catch {
       return { status: "error" };
     }
-  }, [projectId]);
+  }, [outputVariantId, projectId, shortCompositionId]);
 
   // Fetch happens in the effect; state is only set after the await resolves, so
   // the previous preview stays visible while a refresh loads.

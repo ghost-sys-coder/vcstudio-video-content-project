@@ -102,7 +102,18 @@ describe("buildVideoCompositionInput", () => {
         durationFrames: 60,
         cameraMotion: "panLeft",
         transition: "cut",
-        image: { objectKey: "img-key", width: 1080, height: 1920 },
+        image: {
+          objectKey: "img-key",
+          width: 1536,
+          height: 1024,
+          framing: {
+            mode: "cover",
+            focalPointXBps: 2500,
+            focalPointYBps: 6000,
+            scaleBps: 11000,
+            backgroundColor: "#000000",
+          },
+        },
         audio: {
           objectKey: "aud-key",
           durationMilliseconds: 2000,
@@ -123,6 +134,10 @@ describe("buildVideoCompositionInput", () => {
       watermarkText: "STUDIO",
     });
     expect(input.scenes[0]!.imageUrl).toBe("https://cdn.example.com/i.webp");
+    expect(input.scenes[0]!.imageFraming).toMatchObject({
+      focalPointXBps: 2500,
+      scaleBps: 11000,
+    });
     expect(input.durationInFrames).toBe(60);
     expect(input.watermarkText).toBe("STUDIO");
     expect(videoCompositionInputSchema.safeParse(input).success).toBe(true);

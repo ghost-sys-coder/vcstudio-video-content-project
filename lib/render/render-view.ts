@@ -47,12 +47,14 @@ export interface RenderTimelineSummaryView {
 
 export interface RenderPresetView {
   id: string;
+  outputVariantId: string;
   label: string;
   description: string;
   aspectRatio: RenderAspectRatio;
   width: number;
   height: number;
   isProjectDefault: boolean;
+  isSelected: boolean;
   disabled: boolean;
 }
 
@@ -62,12 +64,53 @@ export interface RenderConfigurationView {
   estimatedCostCents: number;
   withinDurationLimit: boolean;
   watermarkAvailable: boolean;
+  outpaintEstimatedCostCents: number;
+}
+
+export interface RenderSceneFramingView {
+  sceneId: string;
+  sceneVersionId: string;
+  sceneNumber: number;
+  sourceImageGenerationId: string;
+  approvedSourceImageGenerationId: string;
+  mode: "cover" | "contain" | "outpaint";
+  focalPointXBps: number;
+  focalPointYBps: number;
+  scaleBps: number;
+  backgroundColor: string;
+  customized: boolean;
+  outpaintStatus: "idle" | "queued" | "running" | "succeeded" | "failed";
+  outpaintError: string | null;
+}
+
+export interface ShortSourceSceneView {
+  sceneId: string;
+  sceneVersionId: string;
+  sceneNumber: number;
+  startMilliseconds: number;
+  endMilliseconds: number;
+  captionBoundariesMilliseconds: number[];
+}
+
+export interface ShortCompositionView {
+  id: string;
+  name: string;
+  status: "draft" | "ready" | "archived";
+  outputVariantId: string;
+  clipCount: number;
+  durationMilliseconds: number;
+  estimatedRenderCostCents: number;
+  createdAt: string;
 }
 
 export interface RenderWorkspaceView {
+  selectedOutputVariantId: string;
   timeline: RenderTimelineSummaryView;
   presets: RenderPresetView[];
   configuration: RenderConfigurationView;
+  sceneFramings: RenderSceneFramingView[];
+  shortSourceScenes: ShortSourceSceneView[];
+  shorts: ShortCompositionView[];
   exports: RenderExportView[];
   activeRender: RenderExportView | null;
   availableBudgetCents: number;
@@ -91,6 +134,8 @@ export interface RenderActionResult {
 
 export interface StartRenderInput {
   presetId: string;
+  outputVariantId: string;
+  shortCompositionId?: string;
   includeCaptions: boolean;
   includeWatermark: boolean;
 }
