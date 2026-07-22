@@ -7,6 +7,11 @@ import {
   SCENE_IMAGE_PROMPT_TEMPLATE_SOURCE_HASH,
   SCENE_IMAGE_PROMPT_VERSION,
 } from "@studio/prompts";
+import {
+  SCENE_OUTPAINT_PROMPT_TEMPLATE_SOURCE,
+  SCENE_OUTPAINT_PROMPT_TEMPLATE_SOURCE_HASH,
+  SCENE_OUTPAINT_PROMPT_VERSION,
+} from "@studio/prompts";
 import { getDatabase } from "@/db/drizzle";
 import {
   promptTemplateVersions,
@@ -47,6 +52,18 @@ export async function ensureSceneImagePromptTemplate(): Promise<void> {
       version: SCENE_IMAGE_PROMPT_VERSION,
       sourceHash: SCENE_IMAGE_PROMPT_TEMPLATE_SOURCE_HASH,
       templateSource: SCENE_IMAGE_PROMPT_TEMPLATE_SOURCE,
+    })
+    .onConflictDoNothing();
+}
+
+export async function ensureSceneOutpaintPromptTemplate(): Promise<void> {
+  await getDatabase()
+    .insert(promptTemplateVersions)
+    .values({
+      templateKey: "scene-outpaint",
+      version: SCENE_OUTPAINT_PROMPT_VERSION,
+      sourceHash: SCENE_OUTPAINT_PROMPT_TEMPLATE_SOURCE_HASH,
+      templateSource: SCENE_OUTPAINT_PROMPT_TEMPLATE_SOURCE,
     })
     .onConflictDoNothing();
 }
@@ -129,6 +146,9 @@ export async function createSceneImageGenerationReservation(input: {
   projectId: string;
   sceneId: string;
   sceneVersionId: string;
+  purpose?: "scene" | "variant_outpaint";
+  outputVariantId?: string | null;
+  sourceImageGenerationId?: string | null;
   stylePresetVersionId: string;
   promptTemplateVersionId: string;
   generationVersion: number;
@@ -348,6 +368,7 @@ export async function createSceneImageGenerationReservation(input: {
       inserted_generation as (
         insert into scene_image_generations (
           id, workspace_id, project_id, scene_id, scene_version_id,
+          purpose, output_variant_id, source_image_generation_id,
           style_preset_version_id, prompt_template_version_id,
           generation_version, request_nonce, idempotency_key,
           request_fingerprint, model, quality, size, output_format,
@@ -361,6 +382,9 @@ export async function createSceneImageGenerationReservation(input: {
           ${input.projectId}::uuid,
           ${input.sceneId}::uuid,
           ${input.sceneVersionId}::uuid,
+          ${input.purpose ?? "scene"}::image_generation_purpose,
+          ${input.outputVariantId ?? null}::uuid,
+          ${input.sourceImageGenerationId ?? null}::uuid,
           ${input.stylePresetVersionId}::uuid,
           ${input.promptTemplateVersionId}::uuid,
           ${input.generationVersion},

@@ -5,6 +5,7 @@ import type {
   VideoCompositionInput,
   VideoCompositionScene,
 } from "@/lib/render/video-composition-data";
+import { DEFAULT_SCENE_FRAMING } from "@/lib/output-variants/scene-framing";
 
 export const renderCameraMotionSchema = z.enum([
   "none",
@@ -17,6 +18,14 @@ export const renderCameraMotionSchema = z.enum([
 ]);
 
 export const renderSceneTransitionSchema = z.enum(["cut", "fade"]);
+
+export const renderImageFramingSchema = z.object({
+  mode: z.enum(["cover", "contain", "outpaint"]),
+  focalPointXBps: z.number().int().min(0).max(10000),
+  focalPointYBps: z.number().int().min(0).max(10000),
+  scaleBps: z.number().int().min(10000).max(30000),
+  backgroundColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+});
 
 export const renderCaptionSchema = z
   .object({
@@ -39,7 +48,9 @@ const videoCompositionSceneSchema = z
     cameraMotion: renderCameraMotionSchema,
     transition: renderSceneTransitionSchema,
     imageUrl: z.url(),
+    imageFraming: renderImageFramingSchema.optional(),
     audioUrl: z.url(),
+    audioTrimBeforeFrames: z.number().int().nonnegative().optional(),
     captions: z.array(renderCaptionSchema),
   })
   .strict();
@@ -104,7 +115,9 @@ export function buildVideoCompositionInput(input: {
       cameraMotion: scene.cameraMotion,
       transition: scene.transition,
       imageUrl,
+      imageFraming: scene.image.framing ?? DEFAULT_SCENE_FRAMING,
       audioUrl,
+      audioTrimBeforeFrames: scene.audio.trimBeforeFrames ?? 0,
       captions: input.snapshot.includeCaptions ? scene.captions : [],
     };
   });

@@ -58,16 +58,19 @@ const timelineSummarySchema = z.object({
 
 const presetSchema = z.object({
   id: z.string(),
+  outputVariantId: z.string(),
   label: z.string(),
   description: z.string(),
   aspectRatio: aspectRatioSchema,
   width: z.number(),
   height: z.number(),
   isProjectDefault: z.boolean(),
+  isSelected: z.boolean(),
   disabled: z.boolean(),
 });
 
 const workspaceViewSchema = z.object({
+  selectedOutputVariantId: z.string(),
   timeline: timelineSummarySchema,
   presets: z.array(presetSchema),
   configuration: z.object({
@@ -76,7 +79,53 @@ const workspaceViewSchema = z.object({
     estimatedCostCents: z.number(),
     withinDurationLimit: z.boolean(),
     watermarkAvailable: z.boolean(),
+    outpaintEstimatedCostCents: z.number(),
   }),
+  sceneFramings: z.array(
+    z.object({
+      sceneId: z.string(),
+      sceneVersionId: z.string(),
+      sceneNumber: z.number(),
+      sourceImageGenerationId: z.string(),
+      approvedSourceImageGenerationId: z.string(),
+      mode: z.enum(["cover", "contain", "outpaint"]),
+      focalPointXBps: z.number(),
+      focalPointYBps: z.number(),
+      scaleBps: z.number(),
+      backgroundColor: z.string(),
+      customized: z.boolean(),
+      outpaintStatus: z.enum([
+        "idle",
+        "queued",
+        "running",
+        "succeeded",
+        "failed",
+      ]),
+      outpaintError: z.string().nullable(),
+    }),
+  ),
+  shortSourceScenes: z.array(
+    z.object({
+      sceneId: z.string(),
+      sceneVersionId: z.string(),
+      sceneNumber: z.number(),
+      startMilliseconds: z.number(),
+      endMilliseconds: z.number(),
+      captionBoundariesMilliseconds: z.array(z.number()),
+    }),
+  ),
+  shorts: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      status: z.enum(["draft", "ready", "archived"]),
+      outputVariantId: z.string(),
+      clipCount: z.number(),
+      durationMilliseconds: z.number(),
+      estimatedRenderCostCents: z.number(),
+      createdAt: z.string(),
+    }),
+  ),
   exports: z.array(renderExportSchema),
   activeRender: renderExportSchema.nullable(),
   availableBudgetCents: z.number(),

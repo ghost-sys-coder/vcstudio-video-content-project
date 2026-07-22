@@ -5,6 +5,7 @@ import {
   deriveSceneTransition,
 } from "@/lib/render/scene-motion";
 import type { RenderTimelineSnapshot } from "@/lib/render/render-timeline-snapshot";
+import { DEFAULT_SCENE_FRAMING } from "@/lib/output-variants/scene-framing";
 
 /**
  * Freezes a ready {@link VideoTimeline} into the serializable render snapshot,
@@ -42,6 +43,7 @@ export function buildRenderTimelineSnapshot(input: {
         objectKey: scene.image.objectKey,
         width: scene.image.width,
         height: scene.image.height,
+        framing: scene.image.framing ?? DEFAULT_SCENE_FRAMING,
       },
       audio: {
         objectKey: scene.audio.objectKey,
@@ -50,6 +52,7 @@ export function buildRenderTimelineSnapshot(input: {
         durationMilliseconds:
           scene.audio.durationMilliseconds ?? scene.durationMilliseconds,
         format: scene.audio.format,
+        trimBeforeFrames: scene.audioTrimBeforeFrames ?? 0,
       },
       captions: input.includeCaptions
         ? scene.captions.map((caption) => ({

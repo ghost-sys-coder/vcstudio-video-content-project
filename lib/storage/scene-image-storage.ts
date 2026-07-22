@@ -118,6 +118,29 @@ export async function downloadSceneImageReferences(input: {
   return results;
 }
 
+export async function downloadStoredSceneImageReference(input: {
+  generationId: string;
+  objectKey: string;
+  contentType: string;
+  etag: string;
+  maximumBytes: number;
+}): Promise<ImageGenerationReference> {
+  const mimeType = requireSupportedContentType(input.contentType);
+  const response = await getR2Client().send(
+    new GetObjectCommand({
+      Bucket: getStorageEnvironment().R2_BUCKET_NAME,
+      Key: input.objectKey,
+      IfMatch: input.etag,
+    }),
+  );
+  if (!response.Body) throw new Error("REFERENCE_BODY_MISSING");
+  const bytes = new Uint8Array(await response.Body.transformToByteArray());
+  if (response.ETag !== input.etag) throw new Error("REFERENCE_ETAG_MISMATCH");
+  if (bytes.byteLength <= 0 || bytes.byteLength > input.maximumBytes)
+    throw new Error("REFERENCE_TOTAL_SIZE_EXCEEDED");
+  return { assetId: input.generationId, bytes, mimeType };
+}
+
 export async function putSceneImage(input: {
   objectKey: string;
   generationId: string;

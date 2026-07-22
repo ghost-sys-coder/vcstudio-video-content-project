@@ -30,6 +30,12 @@ export {
   SCENE_IMAGE_PROMPT_VERSION,
   sortSceneImagePromptReferences,
 } from "./scene-image";
+export {
+  renderSceneOutpaintPrompt,
+  SCENE_OUTPAINT_PROMPT_TEMPLATE_SOURCE,
+  SCENE_OUTPAINT_PROMPT_TEMPLATE_SOURCE_HASH,
+  SCENE_OUTPAINT_PROMPT_VERSION,
+} from "./scene-outpaint";
 export type {
   SceneImagePromptCharacter,
   SceneImagePromptInput,

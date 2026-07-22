@@ -86,6 +86,24 @@ export const projectAspectRatioEnum = pgEnum("project_aspect_ratio", [
   "1:1",
 ]);
 
+export const outputVariantStatusEnum = pgEnum("output_variant_status", [
+  "draft",
+  "ready",
+  "archived",
+]);
+
+export const sceneFramingModeEnum = pgEnum("scene_framing_mode", [
+  "cover",
+  "contain",
+  "outpaint",
+]);
+
+export const shortCompositionStatusEnum = pgEnum("short_composition_status", [
+  "draft",
+  "ready",
+  "archived",
+]);
+
 export const scriptVersionStatusEnum = pgEnum("script_version_status", [
   "draft",
   "approved",
@@ -131,6 +149,11 @@ export const imageGenerationStatusEnum = pgEnum("image_generation_status", [
   "succeeded",
   "failed",
   "cancelled",
+]);
+
+export const imageGenerationPurposeEnum = pgEnum("image_generation_purpose", [
+  "scene",
+  "variant_outpaint",
 ]);
 
 export const imageReviewStatusEnum = pgEnum("image_review_status", [
@@ -635,6 +658,65 @@ export const projects = pgTable(
       sql`${table.framesPerSecond} between 1 and 120`,
     ),
     check("projects_budget_nonnegative", sql`${table.maximumBudgetCents} >= 0`),
+  ],
+);
+
+/**
+ * A format-specific view of one source project. Variants deliberately reference
+ * the same script, scenes, approved audio, captions, and source images; only
+ * presentation decisions that differ by output format live here.
+ */
+export const projectOutputVariants = pgTable(
+  "project_output_variants",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").notNull(),
+    name: text("name").notNull(),
+    aspectRatio: projectAspectRatioEnum("aspect_ratio").notNull(),
+    width: integer("width").notNull(),
+    height: integer("height").notNull(),
+    status: outputVariantStatusEnum("status").notNull().default("draft"),
+    captionStyle: jsonb("caption_style").$type<CaptionStyleData>(),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("project_output_variants_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    uniqueIndex("project_output_variants_project_aspect_unique").on(
+      table.projectId,
+      table.aspectRatio,
+    ),
+    index("project_output_variants_workspace_project_index").on(
+      table.workspaceId,
+      table.projectId,
+      table.updatedAt,
+    ),
+    check("project_output_variants_width_positive", sql`${table.width} > 0`),
+    check("project_output_variants_height_positive", sql`${table.height} > 0`),
+    check(
+      "project_output_variants_dimensions_match_aspect",
+      sql`(${table.aspectRatio} = '16:9' and ${table.width} = 1920 and ${table.height} = 1080)
+        or (${table.aspectRatio} = '9:16' and ${table.width} = 1080 and ${table.height} = 1920)
+        or (${table.aspectRatio} = '1:1' and ${table.width} = 1080 and ${table.height} = 1080)`,
+    ),
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [projects.id, projects.workspaceId],
+      name: "project_output_variants_tenant_project_fkey",
+    }).onDelete("cascade"),
   ],
 );
 
@@ -1575,6 +1657,9 @@ export const sceneImageGenerations = pgTable(
     projectId: uuid("project_id").notNull(),
     sceneId: uuid("scene_id").notNull(),
     sceneVersionId: uuid("scene_version_id").notNull(),
+    purpose: imageGenerationPurposeEnum("purpose").notNull().default("scene"),
+    outputVariantId: uuid("output_variant_id"),
+    sourceImageGenerationId: uuid("source_image_generation_id"),
     stylePresetVersionId: uuid("style_preset_version_id").notNull(),
     promptTemplateVersionId: uuid("prompt_template_version_id")
       .notNull()
@@ -1693,6 +1778,10 @@ export const sceneImageGenerations = pgTable(
       "scene_image_generations_approved_succeeded",
       sql`${table.reviewStatus} <> 'approved' or ${table.status} = 'succeeded'`,
     ),
+    check(
+      "scene_image_generations_variant_outpaint_fields",
+      sql`(${table.purpose} = 'scene' and ${table.outputVariantId} is null and ${table.sourceImageGenerationId} is null) or (${table.purpose} = 'variant_outpaint' and ${table.outputVariantId} is not null and ${table.sourceImageGenerationId} is not null and ${table.reviewStatus} = 'pending')`,
+    ),
     foreignKey({
       columns: [table.projectId, table.workspaceId],
       foreignColumns: [projects.id, projects.workspaceId],
@@ -1723,6 +1812,23 @@ export const sceneImageGenerations = pgTable(
       foreignColumns: [stylePresetVersions.id, stylePresetVersions.workspaceId],
       name: "scene_image_generations_tenant_style_fkey",
     }).onDelete("restrict"),
+    foreignKey({
+      columns: [table.outputVariantId, table.workspaceId],
+      foreignColumns: [
+        projectOutputVariants.id,
+        projectOutputVariants.workspaceId,
+      ],
+      name: "scene_image_generations_tenant_output_variant_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [
+        table.sourceImageGenerationId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [table.id, table.projectId, table.workspaceId],
+      name: "scene_image_generations_tenant_source_generation_fkey",
+    }).onDelete("restrict"),
     index("scene_image_generations_batch_index").on(
       table.workspaceId,
       table.batchId,
@@ -1732,6 +1838,228 @@ export const sceneImageGenerations = pgTable(
       foreignColumns: [sceneImageBatches.id, sceneImageBatches.workspaceId],
       name: "scene_image_generations_tenant_batch_fkey",
     }).onDelete("set null"),
+  ],
+);
+
+/**
+ * Non-destructive framing instructions for displaying an approved source image
+ * in one output variant. Percentages use basis points (0..10000) to avoid
+ * floating-point drift across browser previews and deterministic renders.
+ */
+export const sceneVariantFramings = pgTable(
+  "scene_variant_framings",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").notNull(),
+    outputVariantId: uuid("output_variant_id").notNull(),
+    sceneId: uuid("scene_id").notNull(),
+    sceneVersionId: uuid("scene_version_id").notNull(),
+    sourceImageGenerationId: uuid("source_image_generation_id").notNull(),
+    mode: sceneFramingModeEnum("mode").notNull().default("cover"),
+    focalPointXBps: integer("focal_point_x_bps").notNull().default(5000),
+    focalPointYBps: integer("focal_point_y_bps").notNull().default(5000),
+    scaleBps: integer("scale_bps").notNull().default(10000),
+    backgroundColor: text("background_color").notNull().default("#000000"),
+    updatedByUserId: uuid("updated_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("scene_variant_framings_variant_scene_version_unique").on(
+      table.outputVariantId,
+      table.sceneVersionId,
+    ),
+    index("scene_variant_framings_workspace_project_variant_index").on(
+      table.workspaceId,
+      table.projectId,
+      table.outputVariantId,
+    ),
+    check(
+      "scene_variant_framings_focal_x_range",
+      sql`${table.focalPointXBps} between 0 and 10000`,
+    ),
+    check(
+      "scene_variant_framings_focal_y_range",
+      sql`${table.focalPointYBps} between 0 and 10000`,
+    ),
+    check(
+      "scene_variant_framings_scale_range",
+      sql`${table.scaleBps} between 10000 and 30000`,
+    ),
+    check(
+      "scene_variant_framings_background_color_hex",
+      sql`${table.backgroundColor} ~ '^#[0-9a-fA-F]{6}$'`,
+    ),
+    foreignKey({
+      columns: [table.outputVariantId, table.workspaceId],
+      foreignColumns: [
+        projectOutputVariants.id,
+        projectOutputVariants.workspaceId,
+      ],
+      name: "scene_variant_framings_tenant_variant_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.sceneId, table.projectId, table.workspaceId],
+      foreignColumns: [scenes.id, scenes.projectId, scenes.workspaceId],
+      name: "scene_variant_framings_tenant_scene_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [
+        table.sceneVersionId,
+        table.sceneId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        sceneVersions.id,
+        sceneVersions.sceneId,
+        sceneVersions.projectId,
+        sceneVersions.workspaceId,
+      ],
+      name: "scene_variant_framings_tenant_scene_version_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [
+        table.sourceImageGenerationId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        sceneImageGenerations.id,
+        sceneImageGenerations.projectId,
+        sceneImageGenerations.workspaceId,
+      ],
+      name: "scene_variant_framings_tenant_source_image_fkey",
+    }).onDelete("restrict"),
+  ],
+);
+
+export const shortCompositions = pgTable(
+  "short_compositions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").notNull(),
+    outputVariantId: uuid("output_variant_id").notNull(),
+    name: text("name").notNull(),
+    status: shortCompositionStatusEnum("status").notNull().default("draft"),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("short_compositions_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    index("short_compositions_workspace_project_index").on(
+      table.workspaceId,
+      table.projectId,
+      table.updatedAt,
+    ),
+    check(
+      "short_compositions_name_not_blank",
+      sql`length(trim(${table.name})) > 0`,
+    ),
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [projects.id, projects.workspaceId],
+      name: "short_compositions_tenant_project_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.outputVariantId, table.workspaceId],
+      foreignColumns: [
+        projectOutputVariants.id,
+        projectOutputVariants.workspaceId,
+      ],
+      name: "short_compositions_tenant_variant_fkey",
+    }).onDelete("restrict"),
+  ],
+);
+
+export const shortClips = pgTable(
+  "short_clips",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").notNull(),
+    shortCompositionId: uuid("short_composition_id").notNull(),
+    sourceSceneId: uuid("source_scene_id").notNull(),
+    sourceSceneVersionId: uuid("source_scene_version_id").notNull(),
+    position: integer("position").notNull(),
+    sourceStartMilliseconds: integer("source_start_milliseconds").notNull(),
+    sourceEndMilliseconds: integer("source_end_milliseconds").notNull(),
+    transition: text("transition").notNull().default("cut"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("short_clips_composition_position_unique").on(
+      table.shortCompositionId,
+      table.position,
+    ),
+    index("short_clips_workspace_project_composition_index").on(
+      table.workspaceId,
+      table.projectId,
+      table.shortCompositionId,
+    ),
+    check("short_clips_position_positive", sql`${table.position} > 0`),
+    check(
+      "short_clips_range_valid",
+      sql`${table.sourceStartMilliseconds} >= 0 and ${table.sourceEndMilliseconds} > ${table.sourceStartMilliseconds}`,
+    ),
+    check(
+      "short_clips_transition_supported",
+      sql`${table.transition} in ('cut', 'fade')`,
+    ),
+    foreignKey({
+      columns: [table.shortCompositionId, table.workspaceId],
+      foreignColumns: [shortCompositions.id, shortCompositions.workspaceId],
+      name: "short_clips_tenant_composition_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.sourceSceneId, table.projectId, table.workspaceId],
+      foreignColumns: [scenes.id, scenes.projectId, scenes.workspaceId],
+      name: "short_clips_tenant_scene_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [
+        table.sourceSceneVersionId,
+        table.sourceSceneId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        sceneVersions.id,
+        sceneVersions.sceneId,
+        sceneVersions.projectId,
+        sceneVersions.workspaceId,
+      ],
+      name: "short_clips_tenant_scene_version_fkey",
+    }).onDelete("restrict"),
   ],
 );
 
@@ -2084,6 +2412,8 @@ export const videoRenders = pgTable(
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
     projectId: uuid("project_id").notNull(),
+    outputVariantId: uuid("output_variant_id"),
+    shortCompositionId: uuid("short_composition_id"),
     requestNonce: uuid("request_nonce").notNull(),
     status: renderStatusEnum("status").notNull().default("pending"),
     triggerRunId: text("trigger_run_id"),
@@ -2184,6 +2514,19 @@ export const videoRenders = pgTable(
       foreignColumns: [projects.id, projects.workspaceId],
       name: "video_renders_tenant_project_fkey",
     }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.outputVariantId, table.workspaceId],
+      foreignColumns: [
+        projectOutputVariants.id,
+        projectOutputVariants.workspaceId,
+      ],
+      name: "video_renders_tenant_output_variant_fkey",
+    }).onDelete("restrict"),
+    foreignKey({
+      columns: [table.shortCompositionId, table.workspaceId],
+      foreignColumns: [shortCompositions.id, shortCompositions.workspaceId],
+      name: "video_renders_tenant_short_composition_fkey",
+    }).onDelete("restrict"),
   ],
 );
 
@@ -2671,6 +3014,9 @@ export type Project = typeof projects.$inferSelect;
 export type ProjectStatus = (typeof projectStatusEnum.enumValues)[number];
 export type ProjectAspectRatio =
   (typeof projectAspectRatioEnum.enumValues)[number];
+export type ProjectOutputVariant = typeof projectOutputVariants.$inferSelect;
+export type OutputVariantStatus =
+  (typeof outputVariantStatusEnum.enumValues)[number];
 export type ProjectScriptDraft = typeof projectScriptDrafts.$inferSelect;
 export type ProjectScriptVersion = typeof projectScriptVersions.$inferSelect;
 export type ProjectBrief = typeof projectBriefs.$inferSelect;
@@ -2699,6 +3045,12 @@ export type StylePreset = typeof stylePresets.$inferSelect;
 export type StylePresetVersion = typeof stylePresetVersions.$inferSelect;
 export type PromptTemplateVersion = typeof promptTemplateVersions.$inferSelect;
 export type SceneImageGeneration = typeof sceneImageGenerations.$inferSelect;
+export type SceneVariantFraming = typeof sceneVariantFramings.$inferSelect;
+export type SceneFramingMode = (typeof sceneFramingModeEnum.enumValues)[number];
+export type ShortComposition = typeof shortCompositions.$inferSelect;
+export type ShortClip = typeof shortClips.$inferSelect;
+export type ShortCompositionStatus =
+  (typeof shortCompositionStatusEnum.enumValues)[number];
 export type SceneImageBatch = typeof sceneImageBatches.$inferSelect;
 export type SceneImageBatchStatus =
   (typeof sceneImageBatchStatusEnum.enumValues)[number];

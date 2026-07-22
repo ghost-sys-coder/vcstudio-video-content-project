@@ -7,6 +7,12 @@ import {
   useCurrentFrame,
 } from "remotion";
 import { recordPreviewEvent } from "@/lib/render/preview-telemetry";
+import {
+  DEFAULT_SCENE_FRAMING,
+  framingObjectPosition,
+  framingScale,
+  type SceneFramingData,
+} from "@/lib/output-variants/scene-framing";
 
 /**
  * Renders a scene's approved still, cover-fitted to the frame so it fills the
@@ -19,7 +25,16 @@ import { recordPreviewEvent } from "@/lib/render/preview-telemetry";
  * it never stalls the headless render and never pauses the outgoing scene while
  * this one is only premounting (premounted frames are negative).
  */
-export function SceneImage({ src, sceneId }: { src: string; sceneId: string }) {
+export function SceneImage({
+  src,
+  sceneId,
+  framing,
+}: {
+  src: string;
+  sceneId: string;
+  framing?: SceneFramingData;
+}) {
+  const effectiveFraming = framing ?? DEFAULT_SCENE_FRAMING;
   const frame = useCurrentFrame();
   const { delayPlayback } = useBufferState();
   const [loaded, setLoaded] = useState(false);
@@ -42,7 +57,7 @@ export function SceneImage({ src, sceneId }: { src: string; sceneId: string }) {
   }, [isPlayer, isActive, loaded, delayPlayback]);
 
   return (
-    <AbsoluteFill>
+    <AbsoluteFill style={{ backgroundColor: effectiveFraming.backgroundColor }}>
       <Img
         src={src}
         onLoad={() => {
@@ -67,7 +82,13 @@ export function SceneImage({ src, sceneId }: { src: string; sceneId: string }) {
               detail: "image failed to load",
             });
         }}
-        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: effectiveFraming.mode === "contain" ? "contain" : "cover",
+          objectPosition: framingObjectPosition(effectiveFraming),
+          transform: `scale(${framingScale(effectiveFraming.scaleBps)})`,
+        }}
       />
     </AbsoluteFill>
   );

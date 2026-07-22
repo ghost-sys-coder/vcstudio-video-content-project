@@ -9,7 +9,12 @@ import {
   type ValidatedVideoCompositionInput,
 } from "@/lib/render/render-composition-input";
 import { createRenderAssetDownloadUrls } from "@/lib/storage/video-export-storage";
-import { buildSubtitleContext } from "@/lib/subtitles/subtitle-workspace-details";
+import {
+  buildOutputVariantTimelineContext,
+  resolveProjectOutputVariant,
+} from "@/lib/output-variants/output-variant-context";
+import { findShortCompositionWithClips } from "@/db/repositories/shorts.repository";
+import { buildShortTimeline } from "@/lib/shorts/short-timeline";
 
 export type RenderPreviewResult =
   | { status: "ready"; input: ValidatedVideoCompositionInput }
@@ -24,16 +29,45 @@ export type RenderPreviewResult =
 export async function loadRenderPreview(input: {
   workspaceId: string;
   project: Project;
+  outputVariantId?: string | null;
+  shortCompositionId?: string | null;
 }): Promise<RenderPreviewResult> {
   const environment = getRenderEnvironment();
-  const context = await buildSubtitleContext({
+  const outputVariant = await resolveProjectOutputVariant(input);
+  const context = await buildOutputVariantTimelineContext({
     workspaceId: input.workspaceId,
     project: input.project,
+    outputVariant,
   });
   if (context.timeline.status !== "ready") return { status: "invalid" };
 
+  let renderTimeline = context.timeline.timeline;
+  if (input.shortCompositionId) {
+    const short = await findShortCompositionWithClips({
+      workspaceId: input.workspaceId,
+      projectId: input.project.id,
+      shortCompositionId: input.shortCompositionId,
+    });
+    if (!short || short.composition.outputVariantId !== outputVariant.id)
+      return { status: "invalid" };
+    renderTimeline = buildShortTimeline({
+      source: renderTimeline,
+      clips: short.clips.map((clip) => ({
+        id: clip.id,
+        sourceSceneId: clip.sourceSceneId,
+        sourceSceneVersionId: clip.sourceSceneVersionId,
+        position: clip.position,
+        sourceStartMilliseconds: clip.sourceStartMilliseconds,
+        sourceEndMilliseconds: clip.sourceEndMilliseconds,
+        transition: clip.transition === "fade" ? "fade" : "cut",
+      })),
+      width: outputVariant.width,
+      height: outputVariant.height,
+    }).timeline;
+  }
+
   const snapshot = buildRenderTimelineSnapshot({
-    timeline: context.timeline.timeline,
+    timeline: renderTimeline,
     captionStyle: context.captionStyle,
     includeCaptions: true,
     includeWatermark: environment.VIDEO_WATERMARK_TEXT.length > 0,

@@ -31,8 +31,13 @@ import { loadEffectiveWorkspaceBudget } from "@/lib/budgets/workspace-budget";
 import { loadEffectiveWorkspaceLimits } from "@/lib/budgets/current-settings";
 import { recordAuditEvent } from "@/lib/audit/record-audit-event";
 import { enforceRateLimit } from "@/lib/rate-limit/enforce-rate-limit";
-import { buildSubtitleContext } from "@/lib/subtitles/subtitle-workspace-details";
 import type { videoRenderTask } from "@/trigger/video-render";
+import {
+  buildOutputVariantTimelineContext,
+  resolveProjectOutputVariant,
+} from "@/lib/output-variants/output-variant-context";
+import { findShortCompositionWithClips } from "@/db/repositories/shorts.repository";
+import { buildShortTimeline } from "@/lib/shorts/short-timeline";
 
 export class VideoRenderRequestError extends Error {
   constructor(message: string) {
@@ -74,6 +79,8 @@ export async function startVideoRender(input: {
   workspaceId: string;
   requestedByUserId: string;
   project: Project;
+  outputVariantId: string;
+  shortCompositionId?: string;
   presetId?: string;
   includeCaptions: boolean;
   includeWatermark: boolean;
@@ -89,15 +96,21 @@ export async function startVideoRender(input: {
     now: input.now,
   });
 
-  const preset = defaultPresetForAspectRatio(input.project.aspectRatio);
-  if (input.presetId && input.presetId !== preset.id)
-    throw new VideoRenderRequestError(
-      `This project renders at ${input.project.aspectRatio}; choose the ${preset.label} preset.`,
-    );
-
-  const context = await buildSubtitleContext({
+  const outputVariant = await resolveProjectOutputVariant({
     workspaceId: input.workspaceId,
     project: input.project,
+    outputVariantId: input.outputVariantId,
+  });
+  const preset = defaultPresetForAspectRatio(outputVariant.aspectRatio);
+  if (input.presetId && input.presetId !== preset.id)
+    throw new VideoRenderRequestError(
+      `This output renders at ${outputVariant.aspectRatio}; choose the ${preset.label} preset.`,
+    );
+
+  const context = await buildOutputVariantTimelineContext({
+    workspaceId: input.workspaceId,
+    project: input.project,
+    outputVariant,
   });
   if (context.timeline.status !== "ready")
     throw new VideoRenderTimelineInvalidError(
@@ -109,8 +122,33 @@ export async function startVideoRender(input: {
         })),
     );
 
+  let renderTimeline = context.timeline.timeline;
+  if (input.shortCompositionId) {
+    const short = await findShortCompositionWithClips({
+      workspaceId: input.workspaceId,
+      projectId: input.project.id,
+      shortCompositionId: input.shortCompositionId,
+    });
+    if (!short || short.composition.outputVariantId !== outputVariant.id)
+      throw new VideoRenderRequestError("The selected short was not found.");
+    renderTimeline = buildShortTimeline({
+      source: renderTimeline,
+      clips: short.clips.map((clip) => ({
+        id: clip.id,
+        sourceSceneId: clip.sourceSceneId,
+        sourceSceneVersionId: clip.sourceSceneVersionId,
+        position: clip.position,
+        sourceStartMilliseconds: clip.sourceStartMilliseconds,
+        sourceEndMilliseconds: clip.sourceEndMilliseconds,
+        transition: clip.transition === "fade" ? "fade" : "cut",
+      })),
+      width: outputVariant.width,
+      height: outputVariant.height,
+    }).timeline;
+  }
+
   const snapshot = buildRenderTimelineSnapshot({
-    timeline: context.timeline.timeline,
+    timeline: renderTimeline,
     captionStyle: context.captionStyle,
     includeCaptions: input.includeCaptions,
     includeWatermark: input.includeWatermark,
@@ -215,11 +253,13 @@ export async function startVideoRender(input: {
       reservationId,
       workspaceId: input.workspaceId,
       projectId: input.project.id,
+      outputVariantId: outputVariant.id,
+      shortCompositionId: input.shortCompositionId,
       requestNonce: input.requestNonce,
       idempotencyKey,
       requestFingerprint: timelineFingerprint,
       preset: preset.id,
-      aspectRatio: input.project.aspectRatio,
+      aspectRatio: outputVariant.aspectRatio,
       width: snapshot.width,
       height: snapshot.height,
       framesPerSecond: snapshot.framesPerSecond,

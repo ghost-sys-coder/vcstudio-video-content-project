@@ -1,0 +1,2 @@
+ALTER TABLE "video_renders" ADD COLUMN "output_variant_id" uuid;--> statement-breakpoint
+ALTER TABLE "video_renders" ADD CONSTRAINT "video_renders_tenant_output_variant_fkey" FOREIGN KEY ("output_variant_id","workspace_id") REFERENCES "project_output_variants"("id","workspace_id") ON DELETE RESTRICT;

@@ -4,7 +4,10 @@ import { findProject } from "@/db/repositories/projects.repository";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import { loadRenderWorkspace } from "@/lib/render/render-workspace-details";
 import type { RenderWorkspaceResponse } from "@/lib/render/render-view";
-import { renderRouteParamsSchema } from "@/lib/schemas/render";
+import {
+  renderOutputQuerySchema,
+  renderRouteParamsSchema,
+} from "@/lib/schemas/render";
 
 type Params = { projectId: string };
 
@@ -19,7 +22,7 @@ function jsonResponse(
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<Params> },
 ) {
   const authentication = await auth();
@@ -33,6 +36,14 @@ export async function GET(
   if (!parsedParams.success)
     return jsonResponse(
       { success: false, error: "The render request is invalid." },
+      400,
+    );
+  const parsedQuery = renderOutputQuerySchema.safeParse(
+    Object.fromEntries(new URL(request.url).searchParams),
+  );
+  if (!parsedQuery.success)
+    return jsonResponse(
+      { success: false, error: "The output format is invalid." },
       400,
     );
 
@@ -55,6 +66,7 @@ export async function GET(
     const data = await loadRenderWorkspace({
       workspaceId: workspaceContext.activeMembership.workspaceId,
       project,
+      outputVariantId: parsedQuery.data.outputVariantId,
     });
     return jsonResponse({ success: true, data });
   } catch {

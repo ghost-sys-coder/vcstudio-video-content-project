@@ -6,6 +6,19 @@ import {
   getWorkspaceCommittedCostCents,
 } from "@/db/repositories/scenes.repository";
 import { listVideoRenders } from "@/db/repositories/video-render.repository";
+import { listProjectOutputVariants } from "@/db/repositories/output-variants.repository";
+import {
+  listSceneVariantFramings,
+  listSceneVariantOutpaints,
+} from "@/db/repositories/output-variants.repository";
+import { listSucceededSceneImageGenerationsByIds } from "@/db/repositories/scene-images.repository";
+import { listCurrentScenes } from "@/db/repositories/scenes.repository";
+import { listApprovedSceneImageAssets } from "@/db/repositories/subtitle.repository";
+import {
+  listProjectShortClips,
+  listShortCompositions,
+} from "@/db/repositories/shorts.repository";
+import { DEFAULT_SCENE_FRAMING } from "@/lib/output-variants/scene-framing";
 import { getRenderEnvironment } from "@/lib/env/server";
 import {
   defaultPresetForAspectRatio,
@@ -20,7 +33,12 @@ import {
 } from "@/lib/scenes/scene-image-budget";
 import { loadEffectiveWorkspaceBudget } from "@/lib/budgets/workspace-budget";
 import { loadEffectiveWorkspaceLimits } from "@/lib/budgets/current-settings";
-import { buildSubtitleContext } from "@/lib/subtitles/subtitle-workspace-details";
+import { estimateSceneOutpaintCost } from "@/lib/output-variants/start-scene-outpaint";
+import { renderSceneOutpaintPrompt } from "@studio/prompts";
+import {
+  buildOutputVariantTimelineContext,
+  resolveProjectOutputVariant,
+} from "@/lib/output-variants/output-variant-context";
 import type {
   RenderExportView,
   RenderPresetView,
@@ -33,6 +51,17 @@ const ACTIVE_STATUSES: ReadonlySet<VideoRender["status"]> = new Set([
   "queued",
   "running",
 ]);
+
+function toOutpaintStatus(
+  status:
+    | (typeof import("@/db/schema").sceneImageGenerations.$inferSelect)["status"]
+    | undefined,
+): "idle" | "queued" | "running" | "succeeded" | "failed" {
+  if (!status) return "idle";
+  if (status === "pending") return "queued";
+  if (status === "cancelled") return "failed";
+  return status;
+}
 
 function toExportView(render: VideoRender): RenderExportView {
   return {
@@ -69,6 +98,7 @@ function toExportView(render: VideoRender): RenderExportView {
 export async function loadRenderWorkspace(input: {
   workspaceId: string;
   project: Project;
+  outputVariantId?: string | null;
   now?: Date;
 }): Promise<RenderWorkspaceView> {
   const environment = getRenderEnvironment();
@@ -77,13 +107,45 @@ export async function loadRenderWorkspace(input: {
     workspaceId: input.workspaceId,
   });
 
-  const [context, renders] = await Promise.all([
-    buildSubtitleContext({
-      workspaceId: input.workspaceId,
-      project: input.project,
-    }),
+  const [
+    selectedVariant,
+    variants,
+    renders,
+    currentScenes,
+    shortRows,
+    shortClipRows,
+  ] = await Promise.all([
+    resolveProjectOutputVariant(input),
+    listProjectOutputVariants(scope),
     listVideoRenders(scope),
+    listCurrentScenes(scope),
+    listShortCompositions(scope),
+    listProjectShortClips(scope),
   ]);
+  const sceneVersionIds = currentScenes.map(({ version }) => version.id);
+  const [context, approvedImages, storedFramings, outpaints] =
+    await Promise.all([
+      buildOutputVariantTimelineContext({
+        workspaceId: input.workspaceId,
+        project: input.project,
+        outputVariant: selectedVariant,
+      }),
+      listApprovedSceneImageAssets({ ...scope, sceneVersionIds }),
+      listSceneVariantFramings({
+        ...scope,
+        outputVariantId: selectedVariant.id,
+      }),
+      listSceneVariantOutpaints({
+        ...scope,
+        outputVariantId: selectedVariant.id,
+      }),
+    ]);
+  const adaptedImages = await listSucceededSceneImageGenerationsByIds({
+    ...scope,
+    generationIds: storedFramings.map(
+      (framing) => framing.sourceImageGenerationId,
+    ),
+  });
 
   const report = context.timeline.report;
   const readyTimeline =
@@ -95,8 +157,8 @@ export async function loadRenderWorkspace(input: {
 
   const timeline: RenderTimelineSummaryView = {
     status: context.timeline.status,
-    width: input.project.width,
-    height: input.project.height,
+    width: selectedVariant.width,
+    height: selectedVariant.height,
     framesPerSecond: input.project.framesPerSecond,
     sceneCount: readyTimeline
       ? readyTimeline.scenes.length
@@ -117,6 +179,9 @@ export async function loadRenderWorkspace(input: {
     input.project.aspectRatio as RenderAspectRatio,
   );
   const presets: RenderPresetView[] = RENDER_PRESETS.map((preset) => ({
+    outputVariantId:
+      variants.find((variant) => variant.aspectRatio === preset.aspectRatio)
+        ?.id ?? "",
     id: preset.id,
     label: preset.label,
     description: preset.description,
@@ -124,7 +189,10 @@ export async function loadRenderWorkspace(input: {
     width: preset.width,
     height: preset.height,
     isProjectDefault: preset.id === projectPreset.id,
-    disabled: preset.id !== projectPreset.id,
+    isSelected: preset.aspectRatio === selectedVariant.aspectRatio,
+    disabled: !variants.some(
+      (variant) => variant.aspectRatio === preset.aspectRatio,
+    ),
   }));
 
   const estimatedCostCents = ready
@@ -136,6 +204,14 @@ export async function loadRenderWorkspace(input: {
         },
       })
     : 0;
+  const outpaintEstimatedCostCents = estimateSceneOutpaintCost({
+    prompt: renderSceneOutpaintPrompt({
+      aspectRatio: selectedVariant.aspectRatio,
+      width: selectedVariant.width,
+      height: selectedVariant.height,
+    }),
+    aspectRatio: selectedVariant.aspectRatio,
+  });
   const withinDurationLimit =
     ready &&
     validateRenderDuration({
@@ -176,8 +252,104 @@ export async function loadRenderWorkspace(input: {
   const exports = renders.map(toExportView);
   const activeRender =
     exports.find((render) => ACTIVE_STATUSES.has(render.status)) ?? null;
+  const imageByVersion = new Map(
+    approvedImages.map((image) => [image.sceneVersionId, image]),
+  );
+  const framingByVersion = new Map(
+    storedFramings.map((framing) => [framing.sceneVersionId, framing]),
+  );
+  const adaptedImageById = new Map(
+    adaptedImages.map((image) => [image.id, image] as const),
+  );
+  const latestOutpaintByVersion = new Map<string, (typeof outpaints)[number]>();
+  for (const outpaint of outpaints)
+    if (!latestOutpaintByVersion.has(outpaint.sceneVersionId))
+      latestOutpaintByVersion.set(outpaint.sceneVersionId, outpaint);
+  const sceneFramings = currentScenes.flatMap(({ scene, version }) => {
+    const image = imageByVersion.get(version.id);
+    if (!image?.assetObjectKey) return [];
+    const stored = framingByVersion.get(version.id);
+    const adapted = stored
+      ? adaptedImageById.get(stored.sourceImageGenerationId)
+      : null;
+    const framing =
+      stored &&
+      (stored.sourceImageGenerationId === image.generationId || adapted)
+        ? stored
+        : DEFAULT_SCENE_FRAMING;
+    const displayedGenerationId = adapted?.id ?? image.generationId;
+    const latestOutpaint = latestOutpaintByVersion.get(version.id);
+    return [
+      {
+        sceneId: scene.id,
+        sceneVersionId: version.id,
+        sceneNumber: scene.sceneNumber,
+        sourceImageGenerationId: displayedGenerationId,
+        approvedSourceImageGenerationId: image.generationId,
+        mode: framing.mode,
+        focalPointXBps: framing.focalPointXBps,
+        focalPointYBps: framing.focalPointYBps,
+        scaleBps: framing.scaleBps,
+        backgroundColor: framing.backgroundColor,
+        customized: Boolean(stored),
+        outpaintStatus: toOutpaintStatus(latestOutpaint?.status),
+        outpaintError: latestOutpaint?.safeErrorMessage ?? null,
+      },
+    ];
+  });
+  const shortSourceScenes = readyTimeline
+    ? readyTimeline.scenes.map((scene) => ({
+        sceneId: scene.sceneId,
+        sceneVersionId: scene.sceneVersionId,
+        sceneNumber: scene.sceneNumber,
+        startMilliseconds: scene.startMilliseconds,
+        endMilliseconds: scene.endMilliseconds,
+        captionBoundariesMilliseconds: Array.from(
+          new Set(
+            scene.captions.flatMap((caption) => [
+              caption.startMs,
+              caption.endMs,
+            ]),
+          ),
+        ).sort((left, right) => left - right),
+      }))
+    : [];
+  const clipsByShort = new Map<string, typeof shortClipRows>();
+  for (const clip of shortClipRows) {
+    const clips = clipsByShort.get(clip.shortCompositionId) ?? [];
+    clips.push(clip);
+    clipsByShort.set(clip.shortCompositionId, clips);
+  }
+  const shorts = shortRows.map((short) => {
+    const clips = clipsByShort.get(short.id) ?? [];
+    return {
+      id: short.id,
+      name: short.name,
+      status: short.status,
+      outputVariantId: short.outputVariantId,
+      clipCount: clips.length,
+      durationMilliseconds: clips.reduce(
+        (total, clip) =>
+          total + (clip.sourceEndMilliseconds - clip.sourceStartMilliseconds),
+        0,
+      ),
+      estimatedRenderCostCents: estimateRenderCostCents({
+        durationMilliseconds: clips.reduce(
+          (total, clip) =>
+            total + (clip.sourceEndMilliseconds - clip.sourceStartMilliseconds),
+          0,
+        ),
+        rates: {
+          costPerMinuteCents: environment.VIDEO_RENDER_COST_PER_MINUTE_CENTS,
+          minimumEstimateCents: environment.VIDEO_RENDER_MINIMUM_ESTIMATE_CENTS,
+        },
+      }),
+      createdAt: short.createdAt.toISOString(),
+    };
+  });
 
   return {
+    selectedOutputVariantId: selectedVariant.id,
     timeline,
     presets,
     configuration: {
@@ -186,7 +358,11 @@ export async function loadRenderWorkspace(input: {
       estimatedCostCents,
       withinDurationLimit,
       watermarkAvailable: environment.VIDEO_WATERMARK_TEXT.length > 0,
+      outpaintEstimatedCostCents,
     },
+    sceneFramings,
+    shortSourceScenes,
+    shorts,
     exports,
     activeRender,
     availableBudgetCents,

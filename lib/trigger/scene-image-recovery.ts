@@ -5,6 +5,7 @@ import {
   completeSceneImageGeneration,
   failSceneImageGeneration,
 } from "@/db/commands/scene-image-commands";
+import { saveSceneVariantFraming } from "@/db/commands/output-variant-commands";
 import { createSceneImageObjectKey } from "@/lib/storage/object-key";
 import {
   findStoredSceneImage,
@@ -129,6 +130,24 @@ export async function completeStoredSceneImage(input: {
       costBasis: stored.costBasis,
     },
   });
+  if (
+    input.generation.purpose === "variant_outpaint" &&
+    input.generation.outputVariantId
+  )
+    await saveSceneVariantFraming({
+      workspaceId: input.generation.workspaceId,
+      projectId: input.generation.projectId,
+      outputVariantId: input.generation.outputVariantId,
+      sceneId: input.generation.sceneId,
+      sceneVersionId: input.generation.sceneVersionId,
+      sourceImageGenerationId: input.generation.id,
+      mode: "outpaint",
+      focalPointXBps: 5000,
+      focalPointYBps: 5000,
+      scaleBps: 10000,
+      backgroundColor: "#000000",
+      updatedByUserId: input.generation.requestedByUserId,
+    });
 }
 
 export async function failSceneImageWithConservativeProviderOutcome(input: {
