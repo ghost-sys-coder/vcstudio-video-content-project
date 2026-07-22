@@ -1,14 +1,28 @@
 import "server-only";
 
-import type { ContentPlatform, Project, VideoPublication } from "@/db/schema";
+import type {
+  ContentPlatform,
+  Project,
+  TitleGenerationRun,
+  VideoPublication,
+} from "@/db/schema";
 import {
   listPlatformConnections,
   listProjectVideoPublications,
 } from "@/db/repositories/publishing.repository";
 import { listVideoRenders } from "@/db/repositories/video-render.repository";
+import {
+  findLatestCompletedTitleGenerationRunForPlatform,
+  listTitleSuggestionsForRuns,
+} from "@/db/repositories/title-generation.repository";
 import { getPublishingEnvironment } from "@/lib/env/server";
 import { PUBLISHABLE_PLATFORMS } from "@/lib/publishing/provider-registry";
 import { validateTikTokUploadAsset } from "@/lib/publishing/tiktok-upload-validation";
+import {
+  normalizeGeneratedTags,
+  selectPreferredGeneratedTitle,
+  type GeneratedPublishingMetadata,
+} from "@/lib/publishing/generated-metadata";
 import { CONTENT_PLATFORM_LABELS } from "@/lib/titles/title-view";
 
 export const PUBLICATION_HISTORY_LIMIT = 20;
@@ -58,6 +72,7 @@ export type PublishingView = {
   connections: ConnectionView[];
   renders: PublishableRenderView[];
   publications: PublicationView[];
+  generatedMetadata: GeneratedPublishingMetadata[];
   maxVideoBytes: number;
 };
 
@@ -72,7 +87,7 @@ export async function loadPublishingView(input: {
   project: Project;
 }): Promise<PublishingView> {
   const environment = getPublishingEnvironment();
-  const [connections, renders, publications] = await Promise.all([
+  const [connections, renders, publications, metadataRuns] = await Promise.all([
     listPlatformConnections({ workspaceId: input.workspaceId }),
     listVideoRenders({
       workspaceId: input.workspaceId,
@@ -84,7 +99,27 @@ export async function loadPublishingView(input: {
       projectId: input.project.id,
       limit: PUBLICATION_HISTORY_LIMIT,
     }),
+    Promise.all(
+      PUBLISHABLE_PLATFORMS.map((platform) =>
+        findLatestCompletedTitleGenerationRunForPlatform({
+          workspaceId: input.workspaceId,
+          projectId: input.project.id,
+          platform,
+        }),
+      ),
+    ),
   ]);
+  const completeMetadataRuns = metadataRuns.filter(
+    (run): run is TitleGenerationRun =>
+      run !== null &&
+      run.generatedDescription !== null &&
+      run.generatedTags !== null,
+  );
+  const metadataSuggestions = await listTitleSuggestionsForRuns({
+    workspaceId: input.workspaceId,
+    projectId: input.project.id,
+    titleGenerationRunIds: completeMetadataRuns.map((run) => run.id),
+  });
 
   return {
     enabled: environment.ENABLE_VIDEO_PUBLISHING,
@@ -93,6 +128,17 @@ export async function loadPublishingView(input: {
       label: CONTENT_PLATFORM_LABELS[platform],
     })),
     maxVideoBytes: environment.MAX_PUBLISH_VIDEO_BYTES,
+    generatedMetadata: completeMetadataRuns.map((run) => ({
+      generationRunId: run.id,
+      platform: run.platform,
+      title: selectPreferredGeneratedTitle(
+        metadataSuggestions.filter(
+          (suggestion) => suggestion.titleGenerationRunId === run.id,
+        ),
+      ),
+      description: run.generatedDescription ?? "",
+      tags: normalizeGeneratedTags(run.generatedTags ?? []),
+    })),
     connections: connections.map((connection) => ({
       id: connection.id,
       platform: connection.platform,

@@ -159,6 +159,8 @@ describeDatabase("title generation ledger (postgres)", () => {
             hookType: "number",
           },
         ],
+        description: "A complete, publication-ready YouTube description.",
+        tags: ["personal finance", "money habits"],
         inputTokens: 400,
         outputTokens: 120,
         actualCostCents: 8,
@@ -171,6 +173,8 @@ describeDatabase("title generation ledger (postgres)", () => {
         .where(eq(titleGenerationRuns.id, input.id));
       expect(run?.status).toBe("completed");
       expect(run?.resultOptionCount).toBe(2);
+      expect(run?.generatedDescription).toContain("publication-ready");
+      expect(run?.generatedTags).toEqual(["personal finance", "money habits"]);
 
       const [settled] = await getDatabase()
         .select()

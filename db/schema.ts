@@ -886,6 +886,8 @@ export const titleGenerationRuns = pgTable(
     estimatedCostCents: integer("estimated_cost_cents").notNull(),
     actualCostCents: integer("actual_cost_cents"),
     resultOptionCount: integer("result_option_count"),
+    generatedDescription: text("generated_description"),
+    generatedTags: jsonb("generated_tags").$type<string[]>(),
     errorCategory: text("error_category"),
     safeErrorMessage: text("safe_error_message"),
     startedAt: timestamp("started_at", { withTimezone: true }),

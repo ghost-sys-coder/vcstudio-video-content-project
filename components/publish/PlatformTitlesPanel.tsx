@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { TitleSuggestionCard } from "@/components/publish/TitleSuggestionCard";
+import { PUBLISHING_METADATA_UPDATED_EVENT } from "@/lib/publishing/generated-metadata";
 import type { TitlesView } from "@/lib/titles/title-view";
 
 function formatCents(cents: number): string {
@@ -87,12 +88,20 @@ export function PlatformTitlesPanel({
         const entry = view?.platforms.find(
           (item) => item.platform === platform,
         );
-        if (entry?.latestRun && !isActiveStatus(entry.latestRun.status)) return;
+        if (entry?.latestRun && !isActiveStatus(entry.latestRun.status)) {
+          if (entry.latestRun.status === "completed")
+            window.dispatchEvent(
+              new CustomEvent(PUBLISHING_METADATA_UPDATED_EVENT, {
+                detail: { projectId },
+              }),
+            );
+          return;
+        }
       }
     } finally {
       pollingRef.current = false;
     }
-  }, [platform, refresh]);
+  }, [platform, projectId, refresh]);
 
   useEffect(() => {
     if (generating) void poll();
@@ -163,6 +172,12 @@ export function PlatformTitlesPanel({
     if (!result.success) {
       setError(result.error);
       await refresh();
+    } else {
+      window.dispatchEvent(
+        new CustomEvent(PUBLISHING_METADATA_UPDATED_EVENT, {
+          detail: { projectId },
+        }),
+      );
     }
   }
 
@@ -175,11 +190,11 @@ export function PlatformTitlesPanel({
   return (
     <section className="space-y-4 rounded-xl border bg-card p-4">
       <div>
-        <h2 className="text-sm font-semibold">Platform titles</h2>
+        <h2 className="text-sm font-semibold">Publishing metadata</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Generate title options tuned to each platform from your brief and
-          approved script. These use proven click-through patterns — strong
-          starting points to A/B test, not guaranteed performers.
+          Generate ranked titles, a publication-ready description or caption,
+          and relevant tags from your brief and approved script. Selecting a
+          connected channel below loads the latest set as editable drafts.
         </p>
       </div>
 
@@ -219,7 +234,7 @@ export function PlatformTitlesPanel({
               ? "Generating…"
               : busy
                 ? "Starting…"
-                : `Generate ${data.optionCount} titles (~${formatCents(current?.estimatedCostCents ?? 0)})`}
+                : `Generate metadata (~${formatCents(current?.estimatedCostCents ?? 0)})`}
           </Button>
         ) : null}
 
@@ -249,13 +264,14 @@ export function PlatformTitlesPanel({
 
       {generating ? (
         <p className="text-sm text-muted-foreground" role="status">
-          Generating {current?.label} titles… this usually takes a few seconds.
+          Generating {current?.label} publishing metadata… this usually takes a
+          few seconds.
         </p>
       ) : null}
       {failedNotCancelled ? (
         <p className="text-sm text-destructive">
           {run?.safeErrorMessage ??
-            "The last title generation failed. Try again."}
+            "The last metadata generation failed. Try again."}
         </p>
       ) : null}
       {cancelledRun ? (
@@ -277,7 +293,8 @@ export function PlatformTitlesPanel({
         </ul>
       ) : !generating ? (
         <p className="text-sm text-muted-foreground">
-          No {current?.label} titles yet. Generate a set to get started.
+          No {current?.label} publishing metadata yet. Generate a set to get
+          started.
         </p>
       ) : null}
     </section>

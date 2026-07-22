@@ -14,6 +14,7 @@ import { createRequestFingerprint } from "@/lib/domain/idempotency";
 import { getSceneAnalysisEnvironment } from "@/lib/env/server";
 import { classifyOpenAiError } from "@/lib/openai/openai-error";
 import { OpenAiTextGenerationProvider } from "@/lib/openai/openai-text-generation-provider";
+import { normalizeGeneratedTags } from "@/lib/publishing/generated-metadata";
 
 export const titleGenerationTaskPayloadSchema = z.object({
   titleGenerationRunId: z.uuid(),
@@ -87,6 +88,10 @@ export const titleGenerationTask = task({
         outputCostPerMillionCents:
           environment.OPENAI_TEXT_OUTPUT_COST_PER_MILLION_CENTS,
       });
+      const description = result.output.description.trim();
+      const tags = normalizeGeneratedTags(result.output.tags);
+      if (description === "" || tags.length === 0)
+        throw new Error("OPENAI_INVALID_RESPONSE");
       await completeTitleGeneration({
         titleGenerationRunId: run.id,
         workspaceId: input.workspaceId,
@@ -97,6 +102,8 @@ export const titleGenerationTask = task({
           rationale: title.rationale,
           hookType: title.hookType,
         })),
+        description,
+        tags,
         inputTokens: result.inputTokens,
         outputTokens: result.outputTokens,
         actualCostCents,

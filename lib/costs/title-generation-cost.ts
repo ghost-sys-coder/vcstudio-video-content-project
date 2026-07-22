@@ -9,7 +9,9 @@ import {
  * tiny, so — unlike scene analysis — there is no large output-token floor.
  */
 const TOKENS_PER_OPTION = 60;
-const OUTPUT_TOKEN_OVERHEAD = 40;
+// Covers the platform description/caption and tag array in addition to titles.
+// Deliberately conservative so the reservation is not routinely under-sized.
+const OUTPUT_TOKEN_OVERHEAD = 500;
 
 /**
  * Estimate platform-title-generation cost. Output size tracks the number of

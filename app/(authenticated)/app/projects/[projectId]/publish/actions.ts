@@ -90,7 +90,7 @@ export async function generateTitlesAction(
     optionCount: formData.get("optionCount") ?? undefined,
   });
   if (!parsed.success)
-    return { success: false, error: "The title request is invalid." };
+    return { success: false, error: "The metadata request is invalid." };
   try {
     const { context, project } = await requirePublishMutation(
       parsed.data.projectId,
@@ -125,7 +125,7 @@ export async function generateTitlesAction(
               ? "This would exceed the workspace daily budget."
               : "This would exceed the workspace monthly budget.",
       };
-    return { success: false, error: "The titles could not be generated." };
+    return { success: false, error: "The metadata could not be generated." };
   }
 }
 

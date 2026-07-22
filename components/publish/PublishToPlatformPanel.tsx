@@ -25,6 +25,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import type { ContentPlatform } from "@/db/schema";
+import {
+  composeHashtagCaption,
+  createPublishingMetadataDraftMap,
+  createPublishingMetadataSignatures,
+  hydrateUntouchedPublishingMetadata,
+  PUBLISHING_METADATA_UPDATED_EVENT,
+} from "@/lib/publishing/generated-metadata";
 import type { PublishingView } from "@/lib/publishing/publishing-view";
 
 const visibilityItems = {
@@ -66,16 +74,19 @@ export function PublishToPlatformPanel({
     initialData.connections.find((entry) => entry.status === "active")?.id ??
       "",
   );
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [tags, setTags] = useState("");
+  const [metadataDrafts, setMetadataDrafts] = useState(() =>
+    createPublishingMetadataDraftMap(initialData.generatedMetadata),
+  );
   const [visibility, setVisibility] = useState<string>("private");
-  const [caption, setCaption] = useState("");
   const [shareToFeed, setShareToFeed] = useState(true);
   const [tiktokConsent, setTikTokConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const pollingRef = useRef(false);
+  const touchedMetadataRef = useRef(new Set<ContentPlatform>());
+  const hydratedMetadataRunsRef = useRef(
+    createPublishingMetadataSignatures(initialData.generatedMetadata),
+  );
 
   const activeConnections = useMemo(
     () => data.connections.filter((entry) => entry.status === "active"),
@@ -114,6 +125,15 @@ export function PublishToPlatformPanel({
   const facebookSelected = activeConnection?.platform === "facebook";
   const instagramSelected = activeConnection?.platform === "instagram";
   const tiktokSelected = activeConnection?.platform === "tiktok";
+  const activePlatform = activeConnection?.platform ?? "youtube";
+  const activeMetadataDraft = metadataDrafts[activePlatform];
+  const activeGeneratedMetadata = data.generatedMetadata.find(
+    (entry) => entry.platform === activePlatform,
+  );
+  const socialCaption = composeHashtagCaption(activeMetadataDraft);
+  const standardDescription = facebookSelected
+    ? socialCaption
+    : activeMetadataDraft.description;
   const effectiveVisibility = tiktokSelected
     ? "platform_default"
     : instagramSelected
@@ -127,9 +147,32 @@ export function PublishToPlatformPanel({
 
   const refresh = useCallback(async () => {
     const view = await loadPublishingViewAction(projectId);
-    if (view) setData(view);
+    if (view) {
+      setData(view);
+      setMetadataDrafts((previous) => {
+        const hydrated = hydrateUntouchedPublishingMetadata({
+          drafts: previous,
+          generatedMetadata: view.generatedMetadata,
+          touchedPlatforms: touchedMetadataRef.current,
+          hydratedSignatures: hydratedMetadataRunsRef.current,
+        });
+        hydratedMetadataRunsRef.current = hydrated.hydratedSignatures;
+        return hydrated.drafts;
+      });
+    }
     return view;
   }, [projectId]);
+
+  function updateMetadataDraft(
+    field: "title" | "description" | "tags",
+    value: string,
+  ) {
+    touchedMetadataRef.current.add(activePlatform);
+    setMetadataDrafts((previous) => ({
+      ...previous,
+      [activePlatform]: { ...previous[activePlatform], [field]: value },
+    }));
+  }
 
   const poll = useCallback(async () => {
     if (pollingRef.current) return;
@@ -153,6 +196,29 @@ export function PublishToPlatformPanel({
     if (uploading) void poll();
   }, [uploading, poll]);
 
+  useEffect(() => {
+    function handleMetadataUpdated(event: Event) {
+      if (!(event instanceof CustomEvent)) return;
+      const detail: unknown = event.detail;
+      if (
+        typeof detail === "object" &&
+        detail !== null &&
+        "projectId" in detail &&
+        detail.projectId === projectId
+      )
+        void refresh();
+    }
+    window.addEventListener(
+      PUBLISHING_METADATA_UPDATED_EVENT,
+      handleMetadataUpdated,
+    );
+    return () =>
+      window.removeEventListener(
+        PUBLISHING_METADATA_UPDATED_EVENT,
+        handleMetadataUpdated,
+      );
+  }, [projectId, refresh]);
+
   async function publish() {
     if (!activeConnection || !selectedRender) return;
     setBusy(true);
@@ -164,14 +230,14 @@ export function PublishToPlatformPanel({
       formData.set("connectionId", activeConnection.id);
       formData.set("platform", activeConnection.platform);
       if (instagramSelected) {
-        formData.set("caption", caption);
+        formData.set("caption", socialCaption);
         formData.set("shareToFeed", String(shareToFeed));
       } else if (tiktokSelected) {
         formData.set("consentConfirmed", String(tiktokConsent));
       } else {
-        formData.set("title", title.trim());
-        formData.set("description", description);
-        formData.set("tags", tags);
+        formData.set("title", activeMetadataDraft.title.trim());
+        formData.set("description", standardDescription);
+        formData.set("tags", activeMetadataDraft.tags);
       }
       formData.set("visibility", effectiveVisibility);
       formData.set("requestNonce", crypto.randomUUID());
@@ -217,7 +283,9 @@ export function PublishToPlatformPanel({
   }
 
   const titleMissing =
-    !instagramSelected && !tiktokSelected && title.trim() === "";
+    !instagramSelected &&
+    !tiktokSelected &&
+    activeMetadataDraft.title.trim() === "";
   const canSubmit =
     canPublish &&
     !busy &&
@@ -226,6 +294,10 @@ export function PublishToPlatformPanel({
     selectedRender !== null &&
     !selectedRender.tooLarge &&
     (!instagramSelected || selectedRender.instagramEligible) &&
+    (!instagramSelected || socialCaption.length <= 2200) &&
+    (instagramSelected ||
+      tiktokSelected ||
+      standardDescription.length <= 5000) &&
     (!tiktokSelected || selectedRender.tiktokEligible) &&
     (!tiktokSelected || tiktokConsent) &&
     !titleMissing;
@@ -311,7 +383,11 @@ export function PublishToPlatformPanel({
                 </Label>
                 <Select
                   items={connectionItems}
-                  onValueChange={(value) => setConnectionId(String(value))}
+                  onValueChange={(value) => {
+                    setError(null);
+                    setConnectionId(String(value));
+                    void refresh();
+                  }}
                   value={activeConnection?.id ?? ""}
                 >
                   <SelectTrigger id="publish-channel">
@@ -406,26 +482,76 @@ export function PublishToPlatformPanel({
               )}
             </div>
 
+            <div
+              className={
+                activeGeneratedMetadata
+                  ? "rounded-lg border border-emerald-500/25 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-800 dark:text-emerald-300"
+                  : "rounded-lg border border-dashed bg-muted/20 px-3 py-2 text-xs text-muted-foreground"
+              }
+            >
+              {activeGeneratedMetadata
+                ? `Loaded the latest generated ${activeConnection.platformLabel} metadata. Every field remains editable.`
+                : `No generated ${activeConnection.platformLabel} metadata yet. Generate a set in Publishing metadata above, then reselect this channel.`}
+            </div>
+
             {instagramSelected ? (
               <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs" htmlFor="publish-instagram-title">
+                    Creative title
+                  </Label>
+                  <Input
+                    id="publish-instagram-title"
+                    maxLength={100}
+                    onChange={(event) =>
+                      updateMetadataDraft("title", event.target.value)
+                    }
+                    placeholder="Internal title suggestion"
+                    value={activeMetadataDraft.title}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Instagram receives the caption below, not a separate title.
+                  </p>
+                </div>
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between gap-3">
                     <Label className="text-xs" htmlFor="publish-caption">
                       Caption
                     </Label>
                     <span className="text-xs text-muted-foreground">
-                      {caption.length}/2200
+                      {socialCaption.length}/2200 including hashtags
                     </span>
                   </div>
                   <Textarea
                     id="publish-caption"
                     maxLength={2200}
-                    onChange={(event) => setCaption(event.target.value)}
-                    placeholder="Write a caption and include hashtags if needed"
+                    onChange={(event) =>
+                      updateMetadataDraft("description", event.target.value)
+                    }
+                    placeholder="Write the Reel caption"
                     rows={6}
-                    value={caption}
+                    value={activeMetadataDraft.description}
                   />
                 </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs" htmlFor="publish-instagram-tags">
+                    Hashtags
+                  </Label>
+                  <Input
+                    id="publish-instagram-tags"
+                    onChange={(event) =>
+                      updateMetadataDraft("tags", event.target.value)
+                    }
+                    placeholder="Comma separated, without # symbols"
+                    value={activeMetadataDraft.tags}
+                  />
+                </div>
+                {socialCaption.length > 2200 ? (
+                  <p className="text-xs text-destructive">
+                    Shorten the caption or hashtags to fit Instagram&apos;s
+                    2200-character limit.
+                  </p>
+                ) : null}
                 <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-3">
                   <input
                     checked={shareToFeed}
@@ -452,6 +578,50 @@ export function PublishToPlatformPanel({
                   open TikTok to edit the post, choose visibility and
                   interactions, and complete publishing.
                 </p>
+                <div className="space-y-1.5">
+                  <Label className="text-xs" htmlFor="publish-tiktok-title">
+                    Suggested TikTok title
+                  </Label>
+                  <Input
+                    id="publish-tiktok-title"
+                    maxLength={100}
+                    onChange={(event) =>
+                      updateMetadataDraft("title", event.target.value)
+                    }
+                    value={activeMetadataDraft.title}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs" htmlFor="publish-tiktok-caption">
+                    Suggested caption
+                  </Label>
+                  <Textarea
+                    id="publish-tiktok-caption"
+                    maxLength={2200}
+                    onChange={(event) =>
+                      updateMetadataDraft("description", event.target.value)
+                    }
+                    rows={4}
+                    value={activeMetadataDraft.description}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs" htmlFor="publish-tiktok-tags">
+                    Suggested hashtags
+                  </Label>
+                  <Input
+                    id="publish-tiktok-tags"
+                    onChange={(event) =>
+                      updateMetadataDraft("tags", event.target.value)
+                    }
+                    placeholder="Comma separated, without # symbols"
+                    value={activeMetadataDraft.tags}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Inbox upload cannot transmit metadata. Edit or copy these
+                    suggestions when completing the post in TikTok.
+                  </p>
+                </div>
                 <label className="flex cursor-pointer items-start gap-3">
                   <input
                     checked={tiktokConsent}
@@ -474,9 +644,11 @@ export function PublishToPlatformPanel({
                   <Input
                     id="publish-title"
                     maxLength={100}
-                    onChange={(event) => setTitle(event.target.value)}
+                    onChange={(event) =>
+                      updateMetadataDraft("title", event.target.value)
+                    }
                     placeholder="Video title"
-                    value={title}
+                    value={activeMetadataDraft.title}
                   />
                 </div>
 
@@ -487,10 +659,12 @@ export function PublishToPlatformPanel({
                   <Textarea
                     id="publish-description"
                     maxLength={5000}
-                    onChange={(event) => setDescription(event.target.value)}
+                    onChange={(event) =>
+                      updateMetadataDraft("description", event.target.value)
+                    }
                     placeholder="Description shown under the video"
                     rows={3}
-                    value={description}
+                    value={activeMetadataDraft.description}
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -499,9 +673,11 @@ export function PublishToPlatformPanel({
                   </Label>
                   <Input
                     id="publish-tags"
-                    onChange={(event) => setTags(event.target.value)}
+                    onChange={(event) =>
+                      updateMetadataDraft("tags", event.target.value)
+                    }
                     placeholder="Comma separated, e.g. focus, productivity"
-                    value={tags}
+                    value={activeMetadataDraft.tags}
                   />
                 </div>
               </>
@@ -525,6 +701,12 @@ export function PublishToPlatformPanel({
             !selectedRender.tiktokEligible ? (
               <p className="text-xs text-destructive">
                 {selectedRender.tiktokIneligibilityReason}
+              </p>
+            ) : null}
+            {facebookSelected && standardDescription.length > 5000 ? (
+              <p className="text-xs text-destructive">
+                Shorten the description or tags to fit Facebook&apos;s
+                5000-character limit.
               </p>
             ) : null}
 

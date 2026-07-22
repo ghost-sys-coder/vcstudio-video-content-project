@@ -16,14 +16,18 @@ export type ContentPlatformValue = z.infer<typeof contentPlatformSchema>;
 
 /** A single generated title option (drives `zodTextFormat`). */
 export const titleOptionSchema = z.object({
-  text: z.string().min(1).max(200),
+  text: z.string().min(1).max(100),
   rationale: z.string().max(400),
   hookType: z.string().max(60),
 });
 
-/** Structured output for AI platform-title generation. */
+export const generatedMetadataTagSchema = z.string().min(1).max(30);
+
+/** Structured output for complete AI publishing-metadata generation. */
 export const titleGenerationOutputSchema = z.object({
   titles: z.array(titleOptionSchema).min(1).max(MAX_TITLE_OPTIONS),
+  description: z.string().min(1).max(5000),
+  tags: z.array(generatedMetadataTagSchema).min(1).max(15),
 });
 
 export type TitleOption = z.infer<typeof titleOptionSchema>;

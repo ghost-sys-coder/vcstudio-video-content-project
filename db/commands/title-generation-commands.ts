@@ -231,6 +231,8 @@ export async function completeTitleGeneration(input: {
   projectId: string;
   platform: ContentPlatform;
   options: { text: string; rationale: string; hookType: string }[];
+  description: string;
+  tags: string[];
   inputTokens: number;
   outputTokens: number;
   actualCostCents: number;
@@ -244,6 +246,8 @@ export async function completeTitleGeneration(input: {
       status: "completed",
       progressPercent: 100,
       resultOptionCount: input.options.length,
+      generatedDescription: input.description,
+      generatedTags: input.tags,
       inputTokens: input.inputTokens,
       outputTokens: input.outputTokens,
       actualCostCents: input.actualCostCents,

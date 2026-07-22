@@ -75,7 +75,7 @@ export async function startTitleGeneration(input: {
   const hasTopic = Boolean(brief && brief.topic.trim() !== "");
   if (!hasTopic && !approvedScript)
     throw new TitleGenerationRequestError(
-      "Add a topic to the brief or approve a script before generating titles.",
+      "Add a topic to the brief or approve a script before generating publishing metadata.",
     );
 
   const prompt = renderTitleGenerationPrompt({

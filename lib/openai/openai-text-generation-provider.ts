@@ -70,12 +70,15 @@ export class OpenAiTextGenerationProvider implements TextGenerationProvider {
         {
           role: "system",
           content:
-            "You are an expert video title strategist. Return platform-tuned title options that earn honest clicks.",
+            "You are an expert video publishing strategist. Return accurate, platform-tuned titles, description copy, and discovery tags.",
         },
         { role: "user", content: input.prompt },
       ],
       text: {
-        format: zodTextFormat(titleGenerationOutputSchema, "generated_titles"),
+        format: zodTextFormat(
+          titleGenerationOutputSchema,
+          "generated_publishing_metadata",
+        ),
       },
     });
     if (!response.output_parsed) throw new Error("OPENAI_INVALID_RESPONSE");

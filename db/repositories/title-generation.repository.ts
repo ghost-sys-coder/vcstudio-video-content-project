@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
 import {
   projectTitleSuggestions,
@@ -94,6 +94,49 @@ export async function findLatestTitleGenerationRunForPlatform(input: {
     .orderBy(desc(titleGenerationRuns.createdAt))
     .limit(1);
   return run ?? null;
+}
+
+export async function findLatestCompletedTitleGenerationRunForPlatform(input: {
+  workspaceId: string;
+  projectId: string;
+  platform: ContentPlatform;
+}): Promise<TitleGenerationRun | null> {
+  const [run] = await getDatabase()
+    .select()
+    .from(titleGenerationRuns)
+    .where(
+      and(
+        eq(titleGenerationRuns.workspaceId, input.workspaceId),
+        eq(titleGenerationRuns.projectId, input.projectId),
+        eq(titleGenerationRuns.platform, input.platform),
+        eq(titleGenerationRuns.status, "completed"),
+      ),
+    )
+    .orderBy(desc(titleGenerationRuns.createdAt))
+    .limit(1);
+  return run ?? null;
+}
+
+export async function listTitleSuggestionsForRuns(input: {
+  workspaceId: string;
+  projectId: string;
+  titleGenerationRunIds: string[];
+}): Promise<ProjectTitleSuggestion[]> {
+  if (input.titleGenerationRunIds.length === 0) return [];
+  return getDatabase()
+    .select()
+    .from(projectTitleSuggestions)
+    .where(
+      and(
+        eq(projectTitleSuggestions.workspaceId, input.workspaceId),
+        eq(projectTitleSuggestions.projectId, input.projectId),
+        inArray(
+          projectTitleSuggestions.titleGenerationRunId,
+          input.titleGenerationRunIds,
+        ),
+      ),
+    )
+    .orderBy(projectTitleSuggestions.position);
 }
 
 export async function listProjectTitleSuggestions(input: {

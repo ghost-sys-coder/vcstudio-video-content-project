@@ -18,7 +18,7 @@ const input: TitleGenerationPromptInput = {
 
 describe("title generation prompt", () => {
   it("pins the version and renders deterministically", () => {
-    expect(TITLE_GENERATION_PROMPT_VERSION).toBe("title-generation-v1");
+    expect(TITLE_GENERATION_PROMPT_VERSION).toBe("publishing-metadata-v2");
     expect(renderTitleGenerationPrompt(input)).toBe(
       renderTitleGenerationPrompt(input),
     );
@@ -31,7 +31,9 @@ describe("title generation prompt", () => {
     expect(prompt).toContain("challenge a common belief");
     expect(prompt).toContain("YouTube");
     expect(prompt).toContain("5 distinct");
-    expect(prompt).toContain("no bait the video cannot pay off");
+    expect(prompt).toContain("description/caption");
+    expect(prompt).toContain("tags without # symbols");
+    expect(prompt).toContain("Do not promise a payoff the video lacks");
   });
 
   it("varies guidance and hook types per platform", () => {
@@ -41,11 +43,13 @@ describe("title generation prompt", () => {
     });
     expect(tiktok).toContain("TikTok");
     expect(tiktok).toContain("scroll");
+    expect(tiktok).toContain("creator can paste after inbox delivery");
     const facebook = renderTitleGenerationPrompt({
       ...input,
       platform: "facebook",
     });
     expect(facebook).toContain("Facebook");
+    expect(facebook).toContain("conversation prompt");
   });
 
   it("bounds the script context excerpt", () => {
