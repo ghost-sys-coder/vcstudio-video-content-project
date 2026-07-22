@@ -314,6 +314,7 @@ export class InstagramVideoPublishProvider implements VideoPublishProvider {
           ? permalink.data.permalink
           : "https://www.instagram.com/",
       uploadedBytes: request.sizeBytes,
+      completionStage: "published",
     };
   }
 

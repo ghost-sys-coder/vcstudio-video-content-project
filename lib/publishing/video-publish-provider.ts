@@ -47,7 +47,12 @@ export type PublishVideoRequest = {
   shareToFeed: boolean | null;
   /** Existing async operation/container id used to resume a previous attempt. */
   providerOperationId: string | null;
-  onProviderOperationCreated?: (operationId: string) => void | Promise<void>;
+  /** Decrypted, short-lived provider checkpoint credential. Never exposed to UI. */
+  providerOperationSecret: string | null;
+  onProviderOperationCreated?: (
+    operationId: string,
+    operationSecret?: string,
+  ) => void | Promise<void>;
   onProcessingProgress?: (percent: number) => void | Promise<void>;
   /** Injected by durable workers; tests may omit it for an immediate tick. */
   waitForProcessing?: (milliseconds: number) => Promise<void>;
@@ -59,6 +64,7 @@ export type PublishVideoResult = {
   externalVideoId: string;
   externalVideoUrl: string;
   uploadedBytes: number;
+  completionStage: "published" | "inbox_delivered";
 };
 
 /** Stable, platform-independent failure taxonomy the task maps to user copy. */
@@ -102,5 +108,6 @@ export interface VideoPublishProvider {
     redirectUri: string;
   }): Promise<{ tokens: PlatformTokens; account: PlatformAccount }>;
   refreshTokens(input: { refreshToken: string }): Promise<PlatformTokens>;
+  revokeAuthorization?(input: { accessToken: string }): Promise<void>;
   publishVideo(request: PublishVideoRequest): Promise<PublishVideoResult>;
 }

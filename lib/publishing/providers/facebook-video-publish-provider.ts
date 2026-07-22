@@ -383,6 +383,7 @@ export class FacebookVideoPublishProvider implements VideoPublishProvider {
       externalVideoId: start.data.video_id,
       externalVideoUrl: `https://www.facebook.com/${encodeURIComponent(request.account.externalAccountId)}/videos/${encodeURIComponent(start.data.video_id)}`,
       uploadedBytes: request.sizeBytes,
+      completionStage: "published",
     };
   }
 }

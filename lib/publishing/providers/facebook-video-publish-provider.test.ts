@@ -99,11 +99,13 @@ describe("Facebook video publishing provider", () => {
         caption: null,
         shareToFeed: null,
         providerOperationId: null,
+        providerOperationSecret: null,
       }),
     ).resolves.toEqual({
       externalVideoId: "video-1",
       externalVideoUrl: "https://www.facebook.com/page-42/videos/video-1",
       uploadedBytes: 4,
+      completionStage: "published",
     });
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain("/page-42/videos");
     expect(fetchMock.mock.calls[3]?.[1]?.body?.toString()).toContain(

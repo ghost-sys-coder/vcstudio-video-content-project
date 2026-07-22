@@ -1,5 +1,6 @@
 "use client";
 
+import { LoaderCircle, Music2, Send } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   cancelPublicationAction,
@@ -10,6 +11,7 @@ import {
 import { ConnectYouTubeButton } from "@/components/publish/ConnectYouTubeButton";
 import { ConnectFacebookButton } from "@/components/publish/ConnectFacebookButton";
 import { ConnectInstagramButton } from "@/components/publish/ConnectInstagramButton";
+import { ConnectTikTokButton } from "@/components/publish/ConnectTikTokButton";
 import { PlatformConnectionRow } from "@/components/publish/PlatformConnectionRow";
 import { VideoPublicationRow } from "@/components/publish/VideoPublicationRow";
 import { Button } from "@/components/ui/button";
@@ -70,6 +72,7 @@ export function PublishToPlatformPanel({
   const [visibility, setVisibility] = useState<string>("private");
   const [caption, setCaption] = useState("");
   const [shareToFeed, setShareToFeed] = useState(true);
+  const [tiktokConsent, setTikTokConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const pollingRef = useRef(false);
@@ -110,11 +113,14 @@ export function PublishToPlatformPanel({
   );
   const facebookSelected = activeConnection?.platform === "facebook";
   const instagramSelected = activeConnection?.platform === "instagram";
-  const effectiveVisibility = instagramSelected
-    ? "public"
-    : facebookSelected && visibility === "unlisted"
-      ? "private"
-      : visibility;
+  const tiktokSelected = activeConnection?.platform === "tiktok";
+  const effectiveVisibility = tiktokSelected
+    ? "platform_default"
+    : instagramSelected
+      ? "public"
+      : facebookSelected && visibility === "unlisted"
+        ? "private"
+        : visibility;
   const selectedVisibilityItems = facebookSelected
     ? { private: "Draft — not published", public: "Public — publish to Page" }
     : visibilityItems;
@@ -160,6 +166,8 @@ export function PublishToPlatformPanel({
       if (instagramSelected) {
         formData.set("caption", caption);
         formData.set("shareToFeed", String(shareToFeed));
+      } else if (tiktokSelected) {
+        formData.set("consentConfirmed", String(tiktokConsent));
       } else {
         formData.set("title", title.trim());
         formData.set("description", description);
@@ -208,7 +216,8 @@ export function PublishToPlatformPanel({
     }
   }
 
-  const titleMissing = !instagramSelected && title.trim() === "";
+  const titleMissing =
+    !instagramSelected && !tiktokSelected && title.trim() === "";
   const canSubmit =
     canPublish &&
     !busy &&
@@ -217,6 +226,8 @@ export function PublishToPlatformPanel({
     selectedRender !== null &&
     !selectedRender.tooLarge &&
     (!instagramSelected || selectedRender.instagramEligible) &&
+    (!tiktokSelected || selectedRender.tiktokEligible) &&
+    (!tiktokSelected || tiktokConsent) &&
     !titleMissing;
 
   return (
@@ -224,8 +235,8 @@ export function PublishToPlatformPanel({
       <div>
         <h2 className="text-sm font-semibold">Publish to a platform</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Upload a finished render straight to a connected YouTube channel or
-          Facebook Page.
+          Publish to YouTube, Facebook, or Instagram, or deliver a video to a
+          creator&apos;s TikTok inbox.
         </p>
       </div>
 
@@ -275,6 +286,11 @@ export function PublishToPlatformPanel({
                 activeConnections.length > 0
                   ? "Add Instagram"
                   : "Connect Instagram"
+              }
+            />
+            <ConnectTikTokButton
+              label={
+                activeConnections.length > 0 ? "Add TikTok" : "Connect TikTok"
               }
             />
           </div>
@@ -329,7 +345,8 @@ export function PublishToPlatformPanel({
                     {data.renders.map((render) => (
                       <SelectItem
                         disabled={
-                          instagramSelected && !render.instagramEligible
+                          (instagramSelected && !render.instagramEligible) ||
+                          (tiktokSelected && !render.tiktokEligible)
                         }
                         key={render.id}
                         value={render.id}
@@ -337,14 +354,16 @@ export function PublishToPlatformPanel({
                         {render.label}
                         {instagramSelected && !render.instagramEligible
                           ? " · Not Reel-compatible"
-                          : ""}
+                          : tiktokSelected && !render.tiktokEligible
+                            ? " · Not TikTok-compatible"
+                            : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
-              {!instagramSelected ? (
+              {!instagramSelected && !tiktokSelected ? (
                 <div className="space-y-1.5">
                   <Label className="text-xs" htmlFor="publish-visibility">
                     Visibility
@@ -376,9 +395,13 @@ export function PublishToPlatformPanel({
                     </SelectContent>
                   </Select>
                 </div>
-              ) : (
+              ) : instagramSelected ? (
                 <div className="rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
                   Instagram Reels publish publicly.
+                </div>
+              ) : (
+                <div className="rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                  TikTok visibility and metadata are selected in TikTok.
                 </div>
               )}
             </div>
@@ -418,6 +441,27 @@ export function PublishToPlatformPanel({
                       Show this Reel in the account&apos;s main profile feed
                       too.
                     </span>
+                  </span>
+                </label>
+              </div>
+            ) : tiktokSelected ? (
+              <div className="space-y-3 rounded-lg border p-4">
+                <p className="text-sm font-medium">Deliver to TikTok inbox</p>
+                <p className="text-xs text-muted-foreground">
+                  TikTok will notify the connected creator. The creator must
+                  open TikTok to edit the post, choose visibility and
+                  interactions, and complete publishing.
+                </p>
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input
+                    checked={tiktokConsent}
+                    className="mt-0.5 size-4 accent-primary"
+                    onChange={(event) => setTikTokConsent(event.target.checked)}
+                    type="checkbox"
+                  />
+                  <span className="text-sm">
+                    I confirm that I reviewed this video and expressly consent
+                    to sending it to the connected TikTok account.
                   </span>
                 </label>
               </div>
@@ -476,14 +520,45 @@ export function PublishToPlatformPanel({
                 {selectedRender.instagramIneligibilityReason}
               </p>
             ) : null}
+            {tiktokSelected &&
+            selectedRender &&
+            !selectedRender.tiktokEligible ? (
+              <p className="text-xs text-destructive">
+                {selectedRender.tiktokIneligibilityReason}
+              </p>
+            ) : null}
 
             <div className="flex flex-wrap items-center gap-3">
-              <Button disabled={!canSubmit} onClick={publish} type="button">
-                {uploading
-                  ? "Uploading…"
-                  : busy
-                    ? "Starting…"
-                    : `Publish to ${activeConnection.platformLabel}`}
+              <Button
+                className={
+                  tiktokSelected
+                    ? "h-11 gap-2.5 border-black/80 bg-black px-5 text-white shadow-[3px_3px_0_#25f4ee,-3px_-3px_0_#fe2c55] hover:bg-zinc-900 hover:shadow-[4px_4px_0_#25f4ee,-4px_-4px_0_#fe2c55] focus-visible:ring-[#25f4ee] disabled:shadow-none"
+                    : "h-10 px-4"
+                }
+                disabled={!canSubmit}
+                onClick={publish}
+                type="button"
+              >
+                {uploading || busy ? (
+                  <LoaderCircle aria-hidden className="animate-spin" />
+                ) : tiktokSelected ? (
+                  <span className="flex size-6 items-center justify-center rounded-full bg-white/10">
+                    <Music2 aria-hidden className="size-4" />
+                  </span>
+                ) : (
+                  <Send aria-hidden />
+                )}
+                <span>
+                  {uploading
+                    ? tiktokSelected
+                      ? "Uploading to TikTok…"
+                      : "Uploading…"
+                    : busy
+                      ? "Preparing upload…"
+                      : tiktokSelected
+                        ? "Send to TikTok inbox"
+                        : `Publish to ${activeConnection.platformLabel}`}
+                </span>
               </Button>
               {selectedRender ? (
                 <span className="text-xs text-muted-foreground">
@@ -495,7 +570,9 @@ export function PublishToPlatformPanel({
             <p className="text-xs text-muted-foreground">
               {instagramSelected
                 ? "Instagram will process this vertical Reel before publishing it."
-                : `Uploads use ${effectiveVisibility} visibility.`}{" "}
+                : tiktokSelected
+                  ? "Delivery is not publication. Complete the post from TikTok's inbox notification."
+                  : `Uploads use ${effectiveVisibility} visibility.`}{" "}
               Publishing does not cost credits; each platform may enforce its
               own upload limits.
             </p>

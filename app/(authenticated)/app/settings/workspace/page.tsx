@@ -12,6 +12,7 @@ export default async function WorkspaceSettingsPage({
   searchParams: Promise<{
     facebook?: string;
     instagram?: string;
+    tiktok?: string;
     youtube?: string;
   }>;
 }) {
@@ -21,7 +22,7 @@ export default async function WorkspaceSettingsPage({
     redirect("/app/access-denied");
   }
 
-  const [{ facebook, instagram, youtube }, logo, channelsView] =
+  const [{ facebook, instagram, tiktok, youtube }, logo, channelsView] =
     await Promise.all([
       searchParams,
       findWorkspaceLogo(context.activeMembership.workspaceId),
@@ -40,6 +41,7 @@ export default async function WorkspaceSettingsPage({
       oauthStatus={{
         facebook: facebook ?? null,
         instagram: instagram ?? null,
+        tiktok: tiktok ?? null,
         youtube: youtube ?? null,
       }}
       workspaceId={context.activeMembership.workspaceId}

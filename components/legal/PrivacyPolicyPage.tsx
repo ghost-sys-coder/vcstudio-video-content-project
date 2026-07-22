@@ -159,26 +159,29 @@ export function PrivacyPolicyPage() {
               <section className={sectionClassName}>
                 <h2 className={headingClassName}>5. TikTok data</h2>
                 <p>
-                  VCStudio can currently prepare TikTok-targeted titles and
-                  thumbnails, but TikTok account connection and direct
-                  publishing are not enabled in the current application.
-                  VCStudio therefore does not currently request TikTok account
-                  scopes or store TikTok authorization tokens.
+                  VCStudio uses TikTok Login Kit with the approved
+                  <code>user.info.basic</code> and <code>video.upload</code>
+                  scopes. It may receive the creator&apos;s app-scoped account
+                  identifier, display name, granted scopes, access and refresh
+                  tokens, token expiry information, upload identifiers, byte
+                  progress, processing status, and delivery results.
                 </p>
                 <p>
-                  If TikTok integration is enabled later, VCStudio will use only
-                  approved scopes to authenticate the account, display
-                  connected-account information, and publish when the user takes
-                  an explicit action or configures an available scheduling
-                  instruction. Users will be able to disconnect TikTok and
-                  request deletion through the methods described below.
+                  TikTok data is used to authenticate the creator, display the
+                  connected account, and deliver a selected video to the
+                  creator&apos;s TikTok inbox only after an authorized user
+                  gives explicit consent. VCStudio does not use Direct Post and
+                  does not publish the video automatically. The creator must
+                  open TikTok, review or edit the post, choose publishing
+                  settings, and complete publication.
                 </p>
-                <aside className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm text-foreground">
-                  Developer review note: before enabling TikTok Login Kit or
-                  Content Posting API access, document the exact approved
-                  scopes, data fields, revocation route, and retention behavior
-                  here.
-                </aside>
+                <p>
+                  Workspace owners can disconnect TikTok in VCStudio. VCStudio
+                  attempts to revoke the authorization with TikTok and always
+                  destroys its locally stored encrypted tokens. Users may also
+                  revoke access in TikTok&apos;s own account settings or request
+                  deletion as described below.
+                </p>
               </section>
 
               <section className={sectionClassName}>
@@ -301,11 +304,11 @@ export function PrivacyPolicyPage() {
                   hosting, Neon for PostgreSQL, Clerk for authentication,
                   Cloudflare R2 for private object storage, Trigger.dev for
                   background job processing, OpenAI for requested AI generation,
-                  and Google, YouTube, Meta, Facebook, and Instagram APIs for
-                  authorized publishing features. These providers process data
-                  according to their roles, configurations, and terms. VCStudio
-                  does not claim unverified certifications or protections for
-                  these providers.
+                  and Google, YouTube, Meta, Facebook, Instagram, and TikTok
+                  APIs for authorized publishing features. These providers
+                  process data according to their roles, configurations, and
+                  terms. VCStudio does not claim unverified certifications or
+                  protections for these providers.
                 </p>
               </section>
 
@@ -452,14 +455,12 @@ export function PrivacyPolicyPage() {
                 </h2>
                 <p>
                   Workspace owners can disconnect supported Google/YouTube,
-                  Meta/Facebook, and Instagram destinations through workspace
-                  settings. Access can also be revoked in the relevant
-                  provider&apos;s account or security settings. If TikTok is
-                  enabled, equivalent disconnection instructions will be added.
-                  Revocation stops future API access after it takes effect, but
-                  does not necessarily remove data already stored under
-                  VCStudio&apos;s retention rules or content already published
-                  externally.
+                  Meta/Facebook, Instagram, and TikTok destinations through
+                  workspace settings. Access can also be revoked in the relevant
+                  provider&apos;s account or security settings. Revocation stops
+                  future API access after it takes effect, but does not
+                  necessarily remove data already stored under VCStudio&apos;s
+                  retention rules or content already published externally.
                 </p>
               </section>
 

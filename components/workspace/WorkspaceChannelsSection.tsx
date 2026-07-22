@@ -6,6 +6,7 @@ import { disconnectWorkspaceChannelAction } from "@/app/(authenticated)/app/sett
 import { ConnectYouTubeButton } from "@/components/publish/ConnectYouTubeButton";
 import { ConnectFacebookButton } from "@/components/publish/ConnectFacebookButton";
 import { ConnectInstagramButton } from "@/components/publish/ConnectInstagramButton";
+import { ConnectTikTokButton } from "@/components/publish/ConnectTikTokButton";
 import { FutureChannelPlatformCard } from "@/components/workspace/FutureChannelPlatformCard";
 import { WorkspaceChannelCard } from "@/components/workspace/WorkspaceChannelCard";
 import type { WorkspaceChannelsView } from "@/lib/publishing/workspace-connections-view";
@@ -35,6 +36,14 @@ const INSTAGRAM_OAUTH_MESSAGES: Record<string, string> = {
   invalid: "The Instagram authorization response was invalid or expired.",
 };
 
+const TIKTOK_OAUTH_MESSAGES: Record<string, string> = {
+  connected: "The TikTok account is now connected to this workspace.",
+  cancelled: "TikTok connection was cancelled.",
+  failed: "The TikTok account could not be connected. Please try again.",
+  forbidden: "You do not have permission to connect that account.",
+  invalid: "The TikTok authorization response was invalid or expired.",
+};
+
 export function WorkspaceChannelsSection({
   initialData,
   oauthStatus,
@@ -43,6 +52,7 @@ export function WorkspaceChannelsSection({
   oauthStatus: {
     facebook: string | null;
     instagram: string | null;
+    tiktok: string | null;
     youtube: string | null;
   };
 }) {
@@ -78,6 +88,7 @@ export function WorkspaceChannelsSection({
     oauthStatus.instagram
       ? INSTAGRAM_OAUTH_MESSAGES[oauthStatus.instagram]
       : null,
+    oauthStatus.tiktok ? TIKTOK_OAUTH_MESSAGES[oauthStatus.tiktok] : null,
   ].filter((message): message is string => Boolean(message));
 
   return (
@@ -111,6 +122,9 @@ export function WorkspaceChannelsSection({
             />
             <ConnectInstagramButton
               label={activeCount > 0 ? "Add Instagram" : "Connect Instagram"}
+            />
+            <ConnectTikTokButton
+              label={activeCount > 0 ? "Add TikTok" : "Connect TikTok"}
             />
           </div>
         ) : null}
@@ -155,7 +169,7 @@ export function WorkspaceChannelsSection({
           <div className="rounded-xl border border-dashed p-6 text-center">
             <p className="text-sm font-medium">No channels connected</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Connect YouTube, a Facebook Page, or Instagram to publish
+              Connect YouTube, a Facebook Page, Instagram, or TikTok to deliver
               completed videos from VCStudio.
             </p>
           </div>

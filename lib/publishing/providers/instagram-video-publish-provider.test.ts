@@ -25,6 +25,7 @@ const request = () => ({
   caption: "A caption #vcstudio",
   shareToFeed: true,
   providerOperationId: null,
+  providerOperationSecret: null,
 });
 
 afterEach(() => vi.restoreAllMocks());

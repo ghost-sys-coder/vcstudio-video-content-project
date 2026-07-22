@@ -192,10 +192,20 @@ export const videoPublishTask = task({
         caption: publication.caption,
         shareToFeed: publication.shareToFeed,
         providerOperationId: publication.providerOperationId,
-        onProviderOperationCreated: async (providerOperationId) => {
+        providerOperationSecret: publication.providerOperationSecretSealed
+          ? openSecret({
+              sealed: publication.providerOperationSecretSealed,
+              key: environment.PLATFORM_TOKEN_ENCRYPTION_KEY,
+            })
+          : null,
+        onProviderOperationCreated: async (
+          providerOperationId,
+          providerOperationSecret,
+        ) => {
           await markVideoPublicationProcessing({
             publicationId: publication.id,
             providerOperationId,
+            providerOperationSecret,
           });
         },
         onProcessingProgress: async (percent) => {
@@ -225,6 +235,7 @@ export const videoPublishTask = task({
         externalVideoId: result.externalVideoId,
         externalVideoUrl: result.externalVideoUrl,
         uploadedBytes: result.uploadedBytes,
+        completionStage: result.completionStage,
       });
       return { publicationId: publication.id, status: "succeeded" as const };
     } catch (error) {

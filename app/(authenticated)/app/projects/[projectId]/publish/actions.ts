@@ -7,13 +7,13 @@ import {
   setThumbnailFavorite,
 } from "@/db/commands/thumbnail-generation-commands";
 import { findThumbnailGeneration } from "@/db/repositories/thumbnail-generation.repository";
-import { disconnectPlatformConnection } from "@/db/commands/platform-connection-commands";
 import { cancelVideoPublication } from "@/db/commands/video-publication-commands";
 import {
   loadPublishingView,
   type PublishActionResult,
   type PublishingView,
 } from "@/lib/publishing/publishing-view";
+import { disconnectPlatformAuthorization } from "@/lib/publishing/disconnect-platform-connection";
 import {
   startVideoPublication,
   VideoPublicationRequestError,
@@ -415,6 +415,7 @@ export async function publishVideoAction(
     tags: formData.get("tags") ?? undefined,
     caption: formData.get("caption") ?? undefined,
     shareToFeed: formData.get("shareToFeed") ?? undefined,
+    consentConfirmed: formData.get("consentConfirmed") ?? undefined,
     visibility: formData.get("visibility"),
     requestNonce: formData.get("requestNonce"),
   });
@@ -484,7 +485,7 @@ export async function disconnectPlatformAction(
   try {
     const { context } = await requirePublishMutation(projectId);
     requireCapability(context.activeMembership.role, "manageSettings");
-    const result = await disconnectPlatformConnection({
+    const result = await disconnectPlatformAuthorization({
       connectionId: parsed.data.connectionId,
       workspaceId: context.activeMembership.workspaceId,
     });

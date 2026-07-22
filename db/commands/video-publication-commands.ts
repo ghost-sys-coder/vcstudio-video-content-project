@@ -2,6 +2,8 @@ import "server-only";
 
 import { and, eq } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
+import { sealSecret } from "@/lib/crypto/secret-box";
+import { getPublishingEnvironment } from "@/lib/env/server";
 import {
   videoPublications,
   type ContentPlatform,
@@ -22,6 +24,7 @@ export async function createVideoPublication(input: {
   visibility: PublicationVisibility;
   caption: string | null;
   shareToFeed: boolean | null;
+  consentConfirmedAt: Date | null;
   idempotencyKey: string;
   requestedByUserId: string;
 }): Promise<VideoPublication> {
@@ -40,6 +43,7 @@ export async function createVideoPublication(input: {
       visibility: input.visibility,
       caption: input.caption,
       shareToFeed: input.shareToFeed,
+      consentConfirmedAt: input.consentConfirmedAt,
       idempotencyKey: input.idempotencyKey,
       requestedByUserId: input.requestedByUserId,
     })
@@ -83,14 +87,24 @@ export async function markVideoPublicationUploading(input: {
 export async function markVideoPublicationProcessing(input: {
   publicationId: string;
   providerOperationId: string;
+  providerOperationSecret?: string;
   progressPercent?: number;
 }): Promise<void> {
+  const providerOperationSecretSealed = input.providerOperationSecret
+    ? sealSecret({
+        plaintext: input.providerOperationSecret,
+        key: getPublishingEnvironment().PLATFORM_TOKEN_ENCRYPTION_KEY,
+      })
+    : undefined;
   await getDatabase()
     .update(videoPublications)
     .set({
       status: "processing",
       progressPercent: Math.min(89, Math.max(15, input.progressPercent ?? 20)),
       providerOperationId: input.providerOperationId,
+      ...(providerOperationSecretSealed
+        ? { providerOperationSecretSealed }
+        : {}),
       providerOperationStage: "processing",
       updatedAt: new Date(),
     })
@@ -148,6 +162,7 @@ export async function completeVideoPublication(input: {
   externalVideoId: string;
   externalVideoUrl: string;
   uploadedBytes: number;
+  completionStage: "published" | "inbox_delivered";
 }): Promise<void> {
   const now = new Date();
   await getDatabase()
@@ -157,7 +172,8 @@ export async function completeVideoPublication(input: {
       progressPercent: 100,
       externalVideoId: input.externalVideoId,
       externalVideoUrl: input.externalVideoUrl,
-      providerOperationStage: "published",
+      providerOperationStage: input.completionStage,
+      providerOperationSecretSealed: null,
       uploadedBytes: input.uploadedBytes,
       completedAt: now,
       updatedAt: now,
@@ -178,6 +194,7 @@ export async function failVideoPublication(input: {
       errorCategory: input.category,
       safeErrorMessage: input.message,
       providerOperationStage: "failed",
+      providerOperationSecretSealed: null,
       completedAt: now,
       updatedAt: now,
     })
