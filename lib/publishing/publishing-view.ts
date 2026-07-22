@@ -30,6 +30,8 @@ export type PublishableRenderView = {
   durationSeconds: number;
   createdAtLabel: string;
   tooLarge: boolean;
+  instagramEligible: boolean;
+  instagramIneligibilityReason: string | null;
 };
 
 export type PublicationView = {
@@ -114,6 +116,30 @@ export async function loadPublishingView(input: {
         createdAtLabel: formatUtc(render.createdAt),
         tooLarge:
           (render.assetSizeBytes ?? 0) > environment.MAX_PUBLISH_VIDEO_BYTES,
+        instagramEligible:
+          render.width * 16 === render.height * 9 &&
+          render.framesPerSecond >= 23 &&
+          render.framesPerSecond <= 60 &&
+          render.durationMilliseconds >= 3000 &&
+          render.durationMilliseconds <= 900_000 &&
+          (render.assetSizeBytes ?? 0) <= 1_073_741_824 &&
+          render.width <= 1920 &&
+          render.assetContentType === "video/mp4",
+        instagramIneligibilityReason:
+          render.width * 16 !== render.height * 9
+            ? "Instagram requires a vertical 9:16 render."
+            : render.framesPerSecond < 23 || render.framesPerSecond > 60
+              ? "Instagram requires 23–60 FPS."
+              : render.durationMilliseconds < 3000 ||
+                  render.durationMilliseconds > 900_000
+                ? "Instagram Reels must be 3 seconds to 15 minutes."
+                : (render.assetSizeBytes ?? 0) > 1_073_741_824
+                  ? "Instagram Reels cannot exceed 1 GB."
+                  : render.width > 1920
+                    ? "Instagram cannot accept more than 1920 horizontal pixels."
+                    : render.assetContentType !== "video/mp4"
+                      ? "Instagram requires an MP4 render."
+                      : null,
       })),
     publications: publications.map((publication) => ({
       id: publication.id,

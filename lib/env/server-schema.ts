@@ -455,6 +455,11 @@ export const publishingEnvironmentSchema = z.object({
     .string()
     .regex(/^v\d+\.\d+$/, "FACEBOOK_GRAPH_API_VERSION must look like v25.0")
     .default("v25.0"),
+  /** Instagram Graph version shared by OAuth profile calls and the worker. */
+  INSTAGRAM_GRAPH_API_VERSION: z
+    .string()
+    .regex(/^v\d+\.\d+$/, "INSTAGRAM_GRAPH_API_VERSION must look like v25.0")
+    .default("v25.0"),
   ENABLE_VIDEO_PUBLISHING: z
     .enum(["true", "false"])
     .default("true")
@@ -496,6 +501,9 @@ export const publishingWebEnvironmentSchema = z.object({
   /** Meta app credentials are web-only; Trigger.dev receives Page tokens instead. */
   FACEBOOK_APP_ID: z.string().min(1, "FACEBOOK_APP_ID is required"),
   FACEBOOK_APP_SECRET: z.string().min(1, "FACEBOOK_APP_SECRET is required"),
+  /** Direct Instagram Login credentials; no Facebook Page is required. */
+  INSTAGRAM_APP_ID: z.string().min(1, "INSTAGRAM_APP_ID is required"),
+  INSTAGRAM_APP_SECRET: z.string().min(1, "INSTAGRAM_APP_SECRET is required"),
 });
 
 export const usageEnvironmentSchema = z.object({

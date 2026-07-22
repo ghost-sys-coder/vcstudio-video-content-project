@@ -9,6 +9,7 @@ import {
 } from "@/app/(authenticated)/app/projects/[projectId]/publish/actions";
 import { ConnectYouTubeButton } from "@/components/publish/ConnectYouTubeButton";
 import { ConnectFacebookButton } from "@/components/publish/ConnectFacebookButton";
+import { ConnectInstagramButton } from "@/components/publish/ConnectInstagramButton";
 import { PlatformConnectionRow } from "@/components/publish/PlatformConnectionRow";
 import { VideoPublicationRow } from "@/components/publish/VideoPublicationRow";
 import { Button } from "@/components/ui/button";
@@ -31,7 +32,12 @@ const visibilityItems = {
 };
 
 function isActiveStatus(status: string): boolean {
-  return status === "pending" || status === "queued" || status === "uploading";
+  return (
+    status === "pending" ||
+    status === "queued" ||
+    status === "uploading" ||
+    status === "processing"
+  );
 }
 
 function formatBytes(bytes: number): string {
@@ -62,6 +68,8 @@ export function PublishToPlatformPanel({
   const [description, setDescription] = useState("");
   const [tags, setTags] = useState("");
   const [visibility, setVisibility] = useState<string>("private");
+  const [caption, setCaption] = useState("");
+  const [shareToFeed, setShareToFeed] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const pollingRef = useRef(false);
@@ -101,8 +109,12 @@ export function PublishToPlatformPanel({
     [data.publications],
   );
   const facebookSelected = activeConnection?.platform === "facebook";
-  const effectiveVisibility =
-    facebookSelected && visibility === "unlisted" ? "private" : visibility;
+  const instagramSelected = activeConnection?.platform === "instagram";
+  const effectiveVisibility = instagramSelected
+    ? "public"
+    : facebookSelected && visibility === "unlisted"
+      ? "private"
+      : visibility;
   const selectedVisibilityItems = facebookSelected
     ? { private: "Draft — not published", public: "Public — publish to Page" }
     : visibilityItems;
@@ -145,9 +157,14 @@ export function PublishToPlatformPanel({
       formData.set("renderId", selectedRender.id);
       formData.set("connectionId", activeConnection.id);
       formData.set("platform", activeConnection.platform);
-      formData.set("title", title.trim());
-      formData.set("description", description);
-      formData.set("tags", tags);
+      if (instagramSelected) {
+        formData.set("caption", caption);
+        formData.set("shareToFeed", String(shareToFeed));
+      } else {
+        formData.set("title", title.trim());
+        formData.set("description", description);
+        formData.set("tags", tags);
+      }
       formData.set("visibility", effectiveVisibility);
       formData.set("requestNonce", crypto.randomUUID());
       const result = await publishVideoAction(formData);
@@ -191,7 +208,7 @@ export function PublishToPlatformPanel({
     }
   }
 
-  const titleMissing = title.trim() === "";
+  const titleMissing = !instagramSelected && title.trim() === "";
   const canSubmit =
     canPublish &&
     !busy &&
@@ -199,6 +216,7 @@ export function PublishToPlatformPanel({
     activeConnection !== null &&
     selectedRender !== null &&
     !selectedRender.tooLarge &&
+    (!instagramSelected || selectedRender.instagramEligible) &&
     !titleMissing;
 
   return (
@@ -252,6 +270,13 @@ export function PublishToPlatformPanel({
                   : "Connect Facebook"
               }
             />
+            <ConnectInstagramButton
+              label={
+                activeConnections.length > 0
+                  ? "Add Instagram"
+                  : "Connect Instagram"
+              }
+            />
           </div>
         ) : null}
       </div>
@@ -302,90 +327,153 @@ export function PublishToPlatformPanel({
                   </SelectTrigger>
                   <SelectContent>
                     {data.renders.map((render) => (
-                      <SelectItem key={render.id} value={render.id}>
+                      <SelectItem
+                        disabled={
+                          instagramSelected && !render.instagramEligible
+                        }
+                        key={render.id}
+                        value={render.id}
+                      >
                         {render.label}
+                        {instagramSelected && !render.instagramEligible
+                          ? " · Not Reel-compatible"
+                          : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="space-y-1.5">
-                <Label className="text-xs" htmlFor="publish-visibility">
-                  Visibility
-                </Label>
-                <Select
-                  items={selectedVisibilityItems}
-                  onValueChange={(value) => setVisibility(String(value))}
-                  value={effectiveVisibility}
-                >
-                  <SelectTrigger id="publish-visibility">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="private">
-                      {facebookSelected
-                        ? "Draft — not published"
-                        : "Private — only you"}
-                    </SelectItem>
-                    {!facebookSelected ? (
-                      <SelectItem value="unlisted">
-                        Unlisted — anyone with the link
+              {!instagramSelected ? (
+                <div className="space-y-1.5">
+                  <Label className="text-xs" htmlFor="publish-visibility">
+                    Visibility
+                  </Label>
+                  <Select
+                    items={selectedVisibilityItems}
+                    onValueChange={(value) => setVisibility(String(value))}
+                    value={effectiveVisibility}
+                  >
+                    <SelectTrigger id="publish-visibility">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="private">
+                        {facebookSelected
+                          ? "Draft — not published"
+                          : "Private — only you"}
                       </SelectItem>
-                    ) : null}
-                    <SelectItem value="public">
-                      {facebookSelected
-                        ? "Public — publish to Page"
-                        : "Public — listed and searchable"}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                      {!facebookSelected ? (
+                        <SelectItem value="unlisted">
+                          Unlisted — anyone with the link
+                        </SelectItem>
+                      ) : null}
+                      <SelectItem value="public">
+                        {facebookSelected
+                          ? "Public — publish to Page"
+                          : "Public — listed and searchable"}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                  Instagram Reels publish publicly.
+                </div>
+              )}
+            </div>
+
+            {instagramSelected ? (
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <Label className="text-xs" htmlFor="publish-caption">
+                      Caption
+                    </Label>
+                    <span className="text-xs text-muted-foreground">
+                      {caption.length}/2200
+                    </span>
+                  </div>
+                  <Textarea
+                    id="publish-caption"
+                    maxLength={2200}
+                    onChange={(event) => setCaption(event.target.value)}
+                    placeholder="Write a caption and include hashtags if needed"
+                    rows={6}
+                    value={caption}
+                  />
+                </div>
+                <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-3">
+                  <input
+                    checked={shareToFeed}
+                    className="mt-0.5 size-4 accent-primary"
+                    onChange={(event) => setShareToFeed(event.target.checked)}
+                    type="checkbox"
+                  />
+                  <span>
+                    <span className="block text-sm font-medium">
+                      Share to feed
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      Show this Reel in the account&apos;s main profile feed
+                      too.
+                    </span>
+                  </span>
+                </label>
               </div>
-            </div>
+            ) : (
+              <>
+                <div className="space-y-1.5">
+                  <Label className="text-xs" htmlFor="publish-title">
+                    Title
+                  </Label>
+                  <Input
+                    id="publish-title"
+                    maxLength={100}
+                    onChange={(event) => setTitle(event.target.value)}
+                    placeholder="Video title"
+                    value={title}
+                  />
+                </div>
 
-            <div className="space-y-1.5">
-              <Label className="text-xs" htmlFor="publish-title">
-                Title
-              </Label>
-              <Input
-                id="publish-title"
-                maxLength={100}
-                onChange={(event) => setTitle(event.target.value)}
-                placeholder="Video title"
-                value={title}
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-xs" htmlFor="publish-description">
-                Description
-              </Label>
-              <Textarea
-                id="publish-description"
-                maxLength={5000}
-                onChange={(event) => setDescription(event.target.value)}
-                placeholder="Description shown under the video"
-                rows={3}
-                value={description}
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-xs" htmlFor="publish-tags">
-                Tags
-              </Label>
-              <Input
-                id="publish-tags"
-                onChange={(event) => setTags(event.target.value)}
-                placeholder="Comma separated, e.g. focus, productivity"
-                value={tags}
-              />
-            </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs" htmlFor="publish-description">
+                    Description
+                  </Label>
+                  <Textarea
+                    id="publish-description"
+                    maxLength={5000}
+                    onChange={(event) => setDescription(event.target.value)}
+                    placeholder="Description shown under the video"
+                    rows={3}
+                    value={description}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs" htmlFor="publish-tags">
+                    Tags
+                  </Label>
+                  <Input
+                    id="publish-tags"
+                    onChange={(event) => setTags(event.target.value)}
+                    placeholder="Comma separated, e.g. focus, productivity"
+                    value={tags}
+                  />
+                </div>
+              </>
+            )}
 
             {selectedRender?.tooLarge ? (
               <p className="text-xs text-destructive">
                 That render is {formatBytes(selectedRender.sizeBytes)}, above
                 the {formatBytes(data.maxVideoBytes)} publishing limit.
+              </p>
+            ) : null}
+            {instagramSelected &&
+            selectedRender &&
+            !selectedRender.instagramEligible ? (
+              <p className="text-xs text-destructive">
+                {selectedRender.instagramIneligibilityReason}
               </p>
             ) : null}
 
@@ -405,8 +493,11 @@ export function PublishToPlatformPanel({
               ) : null}
             </div>
             <p className="text-xs text-muted-foreground">
-              Uploads use {effectiveVisibility} visibility. Publishing does not
-              cost credits; each platform may enforce its own upload limits.
+              {instagramSelected
+                ? "Instagram will process this vertical Reel before publishing it."
+                : `Uploads use ${effectiveVisibility} visibility.`}{" "}
+              Publishing does not cost credits; each platform may enforce its
+              own upload limits.
             </p>
           </div>
         )

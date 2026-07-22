@@ -413,6 +413,8 @@ export async function publishVideoAction(
     title: formData.get("title"),
     description: formData.get("description") ?? undefined,
     tags: formData.get("tags") ?? undefined,
+    caption: formData.get("caption") ?? undefined,
+    shareToFeed: formData.get("shareToFeed") ?? undefined,
     visibility: formData.get("visibility"),
     requestNonce: formData.get("requestNonce"),
   });

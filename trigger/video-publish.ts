@@ -1,4 +1,4 @@
-import { task } from "@trigger.dev/sdk";
+import { task, wait } from "@trigger.dev/sdk";
 import { z } from "zod";
 import { markPlatformConnectionUnusable } from "@/db/commands/platform-connection-commands";
 import { updatePlatformConnectionTokens } from "@/db/commands/platform-connection-commands";
@@ -6,7 +6,9 @@ import {
   completeVideoPublication,
   failVideoPublication,
   markVideoPublicationUploading,
+  markVideoPublicationProcessing,
   updateVideoPublicationProgress,
+  updateVideoPublicationProcessingProgress,
 } from "@/db/commands/video-publication-commands";
 import {
   findPlatformConnectionWithTokens,
@@ -164,6 +166,11 @@ export const videoPublishTask = task({
       publicationId: publication.id,
       attemptCount: ctx.attempt.number,
     });
+    if (publication.providerOperationId)
+      await markVideoPublicationProcessing({
+        publicationId: publication.id,
+        providerOperationId: publication.providerOperationId,
+      });
 
     // TTL deliberately exceeds this task's maxDuration.
     const sourceUrl = await createVideoExportDownloadUrl(
@@ -182,6 +189,26 @@ export const videoPublishTask = task({
         description: publication.description,
         tags: publication.tags,
         visibility: publication.visibility,
+        caption: publication.caption,
+        shareToFeed: publication.shareToFeed,
+        providerOperationId: publication.providerOperationId,
+        onProviderOperationCreated: async (providerOperationId) => {
+          await markVideoPublicationProcessing({
+            publicationId: publication.id,
+            providerOperationId,
+          });
+        },
+        onProcessingProgress: async (percent) => {
+          await updateVideoPublicationProcessingProgress({
+            publicationId: publication.id,
+            progressPercent: percent,
+          });
+        },
+        waitForProcessing: async (milliseconds) => {
+          await wait.for({
+            seconds: Math.max(1, Math.ceil(milliseconds / 1000)),
+          });
+        },
         onProgress: async (percent) => {
           await updateVideoPublicationProgress({
             publicationId: publication.id,

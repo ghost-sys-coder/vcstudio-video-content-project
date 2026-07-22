@@ -8,6 +8,7 @@ const statusLabels: Record<PublicationView["status"], string> = {
   pending: "Preparing",
   queued: "Queued",
   uploading: "Uploading",
+  processing: "Processing",
   succeeded: "Published",
   failed: "Failed",
   cancelled: "Cancelled",
@@ -24,7 +25,8 @@ export function VideoPublicationRow({
   busy: boolean;
   onCancel: (publicationId: string) => void;
 }) {
-  const isUploading = publication.status === "uploading";
+  const isUploading =
+    publication.status === "uploading" || publication.status === "processing";
   const cancellable = publication.status === "queued";
 
   return (

@@ -221,6 +221,7 @@ export const videoPublicationStatusEnum = pgEnum("video_publication_status", [
   "pending",
   "queued",
   "uploading",
+  "processing",
   "succeeded",
   "failed",
   "cancelled",
@@ -2208,6 +2209,10 @@ export const videoPublications = pgTable(
     visibility: publicationVisibilityEnum("visibility")
       .notNull()
       .default("private"),
+    /** Instagram's exact caption. Null for platforms with separate metadata. */
+    caption: text("caption"),
+    /** Whether an Instagram Reel also appears in the account's main feed. */
+    shareToFeed: boolean("share_to_feed"),
     status: videoPublicationStatusEnum("status").notNull().default("pending"),
     progressPercent: integer("progress_percent").notNull().default(0),
     attemptCount: integer("attempt_count").notNull().default(0),
@@ -2216,6 +2221,9 @@ export const videoPublications = pgTable(
     /** Platform's id for the created video, once it exists. */
     externalVideoId: text("external_video_id"),
     externalVideoUrl: text("external_video_url"),
+    /** Resumable/asynchronous provider operation id, e.g. IG media container. */
+    providerOperationId: text("provider_operation_id"),
+    providerOperationStage: text("provider_operation_stage"),
     uploadedBytes: integer("uploaded_bytes"),
     errorCategory: text("error_category"),
     safeErrorMessage: text("safe_error_message"),
@@ -2250,6 +2258,19 @@ export const videoPublications = pgTable(
       sql`${table.progressPercent} between 0 and 100`,
     ),
     check("video_publications_title_present", sql`length(${table.title}) > 0`),
+    check(
+      "video_publications_instagram_metadata_valid",
+      sql`(
+        ${table.platform} = 'instagram'
+        and ${table.caption} is not null
+        and ${table.shareToFeed} is not null
+        and ${table.visibility} = 'public'
+      ) or (
+        ${table.platform} <> 'instagram'
+        and ${table.caption} is null
+        and ${table.shareToFeed} is null
+      )`,
+    ),
     foreignKey({
       columns: [table.projectId, table.workspaceId],
       foreignColumns: [projects.id, projects.workspaceId],

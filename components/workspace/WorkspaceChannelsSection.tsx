@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { disconnectWorkspaceChannelAction } from "@/app/(authenticated)/app/settings/workspace/actions";
 import { ConnectYouTubeButton } from "@/components/publish/ConnectYouTubeButton";
 import { ConnectFacebookButton } from "@/components/publish/ConnectFacebookButton";
+import { ConnectInstagramButton } from "@/components/publish/ConnectInstagramButton";
 import { FutureChannelPlatformCard } from "@/components/workspace/FutureChannelPlatformCard";
 import { WorkspaceChannelCard } from "@/components/workspace/WorkspaceChannelCard";
 import type { WorkspaceChannelsView } from "@/lib/publishing/workspace-connections-view";
@@ -26,12 +27,24 @@ const FACEBOOK_OAUTH_MESSAGES: Record<string, string> = {
   invalid: "The Facebook authorization response was invalid or expired.",
 };
 
+const INSTAGRAM_OAUTH_MESSAGES: Record<string, string> = {
+  connected: "The Instagram account is now connected to this workspace.",
+  cancelled: "Instagram connection was cancelled.",
+  failed: "The Instagram account could not be connected. Please try again.",
+  forbidden: "You do not have permission to connect that account.",
+  invalid: "The Instagram authorization response was invalid or expired.",
+};
+
 export function WorkspaceChannelsSection({
   initialData,
   oauthStatus,
 }: {
   initialData: WorkspaceChannelsView;
-  oauthStatus: { facebook: string | null; youtube: string | null };
+  oauthStatus: {
+    facebook: string | null;
+    instagram: string | null;
+    youtube: string | null;
+  };
 }) {
   const router = useRouter();
   const [pendingConnectionId, setPendingConnectionId] = useState<string | null>(
@@ -62,6 +75,9 @@ export function WorkspaceChannelsSection({
   const oauthMessages = [
     oauthStatus.youtube ? YOUTUBE_OAUTH_MESSAGES[oauthStatus.youtube] : null,
     oauthStatus.facebook ? FACEBOOK_OAUTH_MESSAGES[oauthStatus.facebook] : null,
+    oauthStatus.instagram
+      ? INSTAGRAM_OAUTH_MESSAGES[oauthStatus.instagram]
+      : null,
   ].filter((message): message is string => Boolean(message));
 
   return (
@@ -92,6 +108,9 @@ export function WorkspaceChannelsSection({
             />
             <ConnectFacebookButton
               label={activeCount > 0 ? "Add Facebook" : "Connect Facebook"}
+            />
+            <ConnectInstagramButton
+              label={activeCount > 0 ? "Add Instagram" : "Connect Instagram"}
             />
           </div>
         ) : null}
@@ -136,8 +155,8 @@ export function WorkspaceChannelsSection({
           <div className="rounded-xl border border-dashed p-6 text-center">
             <p className="text-sm font-medium">No channels connected</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Connect YouTube or a Facebook Page to publish completed videos
-              from VCStudio.
+              Connect YouTube, a Facebook Page, or Instagram to publish
+              completed videos from VCStudio.
             </p>
           </div>
         )}

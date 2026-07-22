@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { YouTubeMarkIcon } from "@/components/brand/YouTubeMarkIcon";
 import { FacebookMarkIcon } from "@/components/brand/FacebookMarkIcon";
+import { InstagramMarkIcon } from "@/components/brand/InstagramMarkIcon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { WorkspaceChannelView } from "@/lib/publishing/workspace-connections-view";
@@ -33,10 +34,18 @@ export function WorkspaceChannelCard({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 items-start gap-3">
           <div
-            className={`flex size-10 shrink-0 items-center justify-center rounded-lg text-white ${channel.platform === "facebook" ? "bg-[#1877f2]" : "bg-[#e60000]"}`}
+            className={`flex size-10 shrink-0 items-center justify-center rounded-lg text-white ${
+              channel.platform === "facebook"
+                ? "bg-[#1877f2]"
+                : channel.platform === "instagram"
+                  ? "bg-gradient-to-br from-[#833ab4] via-[#e1306c] to-[#f77737]"
+                  : "bg-[#e60000]"
+            }`}
           >
             {channel.platform === "facebook" ? (
               <FacebookMarkIcon className="size-5" />
+            ) : channel.platform === "instagram" ? (
+              <InstagramMarkIcon className="size-5" />
             ) : (
               <YouTubeMarkIcon className="size-5" />
             )}
