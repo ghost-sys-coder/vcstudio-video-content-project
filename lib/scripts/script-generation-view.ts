@@ -3,6 +3,7 @@ import "server-only";
 import type { Project, ProjectBrief, ScriptGenerationRun } from "@/db/schema";
 import { renderScriptGenerationPrompt } from "@studio/prompts";
 import { estimateScriptGenerationCost } from "@/lib/costs/script-generation-cost";
+import { isHistoricalContent } from "@/lib/domain/historical-content";
 import { getSceneAnalysisEnvironment } from "@/lib/env/server";
 import { findLatestScriptGenerationRun } from "@/db/repositories/script-generation.repository";
 
@@ -22,6 +23,7 @@ export type ScriptGenerationView = {
   model: string;
   hasBriefTopic: boolean;
   estimatedCostCents: number;
+  requireHistoricalAccuracy: boolean;
   latestRun: ScriptGenerationRunView | null;
 };
 
@@ -49,6 +51,13 @@ export async function loadScriptGenerationView(input: {
 }): Promise<ScriptGenerationView> {
   const environment = getSceneAnalysisEnvironment();
   const hasBriefTopic = Boolean(input.brief && input.brief.topic.trim() !== "");
+  const requireHistoricalAccuracy = input.brief
+    ? isHistoricalContent({
+        niche: input.brief.niche,
+        topic: input.brief.topic,
+        hookAngle: input.brief.hookAngle,
+      })
+    : false;
   let estimatedCostCents = 0;
   if (input.brief && hasBriefTopic) {
     const prompt = renderScriptGenerationPrompt({
@@ -59,6 +68,7 @@ export async function loadScriptGenerationView(input: {
       primaryPlatform: input.brief.primaryPlatform,
       hookAngle: input.brief.hookAngle,
       language: input.project.language,
+      requireHistoricalAccuracy,
     });
     estimatedCostCents = estimateScriptGenerationCost({
       prompt,
@@ -77,6 +87,7 @@ export async function loadScriptGenerationView(input: {
     model: environment.OPENAI_TEXT_MODEL,
     hasBriefTopic,
     estimatedCostCents,
+    requireHistoricalAccuracy,
     latestRun: latestRun ? toRunView(latestRun) : null,
   };
 }

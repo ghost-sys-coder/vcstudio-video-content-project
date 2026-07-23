@@ -95,10 +95,30 @@ describe("generateIdeas", () => {
         actualCostCents: 1,
         resultCount: 1,
         providerRequestId: "req-1",
-        promptVersion: "idea-generation-v1",
+        promptVersion: "idea-generation-v2",
       }),
     );
     expect(recordFailedIdeaGenerationRun).not.toHaveBeenCalled();
+  });
+
+  it("renders the historical-accuracy directive into the recorded prompt for a history niche", async () => {
+    await generateIdeas(
+      { ...input, niche: "History in short stories" },
+      provider(async () => ({
+        output: { ideas: [idea] },
+        requestId: "req-1",
+        inputTokens: 800,
+        outputTokens: 600,
+      })),
+    );
+
+    expect(recordIdeaGenerationRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        finalPrompt: expect.stringContaining(
+          "Historical accuracy is mandatory",
+        ),
+      }),
+    );
   });
 
   it("records a failed run and throws a safe error on provider failure", async () => {

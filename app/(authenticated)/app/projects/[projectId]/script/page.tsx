@@ -58,6 +58,9 @@ export default async function ProjectScriptPage({
         initialLatestRun={scriptGenerationView.latestRun}
         model={scriptGenerationView.model}
         projectId={project.id}
+        requireHistoricalAccuracy={
+          scriptGenerationView.requireHistoricalAccuracy
+        }
       />
       <ScriptEditor
         canEdit={canEdit}

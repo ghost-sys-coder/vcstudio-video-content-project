@@ -17,6 +17,7 @@ export async function saveProjectBrief(input: {
   targetDurationSeconds: number | null;
   primaryPlatform: ContentPlatform;
   hookAngle: string;
+  niche: string;
   userId: string;
 }): Promise<void> {
   const now = new Date();
@@ -31,6 +32,7 @@ export async function saveProjectBrief(input: {
       targetDurationSeconds: input.targetDurationSeconds,
       primaryPlatform: input.primaryPlatform,
       hookAngle: input.hookAngle,
+      niche: input.niche,
       updatedByUserId: input.userId,
       updatedAt: now,
     })
@@ -43,6 +45,7 @@ export async function saveProjectBrief(input: {
         targetDurationSeconds: input.targetDurationSeconds,
         primaryPlatform: input.primaryPlatform,
         hookAngle: input.hookAngle,
+        niche: input.niche,
         updatedByUserId: input.userId,
         updatedAt: now,
       },

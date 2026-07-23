@@ -43,6 +43,7 @@ export async function applyIdeaToBrief(input: {
     targetDurationSeconds: idea.targetDurationSeconds,
     primaryPlatform: idea.primaryPlatform,
     hookAngle: idea.hookAngle,
+    niche: idea.niche,
     userId: input.userId,
   });
   return { topic: idea.topic };

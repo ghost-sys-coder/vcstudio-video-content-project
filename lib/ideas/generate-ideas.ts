@@ -10,6 +10,7 @@ import {
   recordIdeaGenerationRun,
 } from "@/db/commands/idea-commands";
 import { calculateTextCostCents } from "@/lib/costs/scene-analysis-cost";
+import { isHistoricalContent } from "@/lib/domain/historical-content";
 import { getSceneAnalysisEnvironment } from "@/lib/env/server";
 import { classifyOpenAiError } from "@/lib/openai/openai-error";
 import { OpenAiTextGenerationProvider } from "@/lib/openai/openai-text-generation-provider";
@@ -55,6 +56,7 @@ export async function generateIdeas(
     platform: input.platform,
     tonePreference: input.tonePreference,
     language: input.language,
+    requireHistoricalAccuracy: isHistoricalContent({ niche: input.niche }),
   });
 
   const runSnapshot = {

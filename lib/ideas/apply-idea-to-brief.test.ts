@@ -28,6 +28,7 @@ const input = {
 
 const idea = {
   id: "idea-1",
+  niche: "history",
   topic: "topic",
   targetAudience: "audience",
   tone: "tone",
@@ -54,6 +55,7 @@ describe("applyIdeaToBrief", () => {
         topic: "topic",
         primaryPlatform: "tiktok",
         targetDurationSeconds: 45,
+        niche: "history",
         userId: "user-1",
       }),
     );

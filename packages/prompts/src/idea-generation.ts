@@ -1,4 +1,4 @@
-export const IDEA_GENERATION_PROMPT_VERSION = "idea-generation-v1";
+export const IDEA_GENERATION_PROMPT_VERSION = "idea-generation-v2";
 
 const IDEA_PLATFORMS = ["youtube", "tiktok", "facebook", "instagram"] as const;
 export type IdeaGenerationPlatform = (typeof IDEA_PLATFORMS)[number];
@@ -13,7 +13,14 @@ export type IdeaGenerationPromptInput = {
   /** Optional tone/style steer (e.g. "dry and witty", "warm and encouraging"). */
   tonePreference: string | null;
   language: string;
+  /** True for a historical niche — every idea's premise must be real and verifiable. */
+  requireHistoricalAccuracy: boolean;
 };
+
+const HISTORICAL_ACCURACY_DIRECTIVE = `Historical accuracy is mandatory for this niche:
+- Every idea's premise, topic, and hookAngle must be grounded in a real, verifiable historical event, figure, or record.
+- Do not invent events, "secret" or "untold" claims, quotes, or statistics to make an idea sound more dramatic.
+- rationale and hookAngle may frame a real event compellingly, but must not assert anything as fact that is not historically supportable.`;
 
 const platformLabels: Record<IdeaGenerationPlatform, string> = {
   youtube: "YouTube",
@@ -55,7 +62,7 @@ Brief:
 ${steer}
 
 ${platformDirective(input.platform)}
-
+${input.requireHistoricalAccuracy ? `\n${HISTORICAL_ACCURACY_DIRECTIVE}\n` : ""}
 For each idea, return these fields:
 - topic: the specific video idea in one clear sentence. Concrete and narrow beats broad. This becomes the project topic.
 - targetAudience: who this is for, specifically (their situation or skill level), not "everyone".

@@ -847,6 +847,11 @@ export const projectBriefs = pgTable(
       .notNull()
       .default("youtube"),
     hookAngle: text("hook_angle").notNull().default(""),
+    // Free-text content niche (e.g. "History", "Personal finance"), carried
+    // over from an applied Idea Lab idea or set directly. Drives generation
+    // heuristics — e.g. a historical niche requires factual-accuracy mode in
+    // script generation — so it stays on the project, not just the idea.
+    niche: text("niche").notNull().default(""),
     updatedByUserId: uuid("updated_by_user_id").references(() => users.id, {
       onDelete: "restrict",
     }),

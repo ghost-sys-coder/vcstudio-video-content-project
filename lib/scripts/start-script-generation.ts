@@ -23,6 +23,7 @@ import {
   createScriptGenerationIdempotencyKey,
 } from "@/lib/domain/idempotency";
 import { BudgetExceededError } from "@/lib/domain/errors";
+import { isHistoricalContent } from "@/lib/domain/historical-content";
 import { getSceneAnalysisEnvironment } from "@/lib/env/server";
 import { enforceRateLimit } from "@/lib/rate-limit/enforce-rate-limit";
 import type { scriptGenerationTask } from "@/trigger/script-generation";
@@ -45,6 +46,7 @@ function briefFingerprintPayload(
     targetDurationSeconds: brief.targetDurationSeconds,
     primaryPlatform: brief.primaryPlatform,
     hookAngle: brief.hookAngle,
+    niche: brief.niche,
     language,
   });
 }
@@ -76,6 +78,11 @@ export async function startScriptGeneration(input: {
     primaryPlatform: brief.primaryPlatform,
     hookAngle: brief.hookAngle,
     language: input.project.language,
+    requireHistoricalAccuracy: isHistoricalContent({
+      niche: brief.niche,
+      topic: brief.topic,
+      hookAngle: brief.hookAngle,
+    }),
   });
   const estimate = estimateScriptGenerationCost({
     prompt,

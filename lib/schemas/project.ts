@@ -50,6 +50,7 @@ export const briefSchema = z.object({
   targetDurationSeconds: z.coerce.number().int().min(1).max(7200).nullish(),
   primaryPlatform: contentPlatformSchema,
   hookAngle: z.string().trim().max(1000).default(""),
+  niche: z.string().trim().max(120).default(""),
 });
 
 export const scriptMutationSchema = z.object({

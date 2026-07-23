@@ -1,4 +1,4 @@
-export const SCRIPT_GENERATION_PROMPT_VERSION = "script-generation-v1";
+export const SCRIPT_GENERATION_PROMPT_VERSION = "script-generation-v2";
 
 export type ScriptGenerationPlatform =
   "youtube" | "tiktok" | "facebook" | "instagram";
@@ -11,7 +11,16 @@ export type ScriptGenerationPromptInput = {
   primaryPlatform: ScriptGenerationPlatform;
   hookAngle: string;
   language: string;
+  /** True for a historical niche/topic/hook — enforces strict factual accuracy. */
+  requireHistoricalAccuracy: boolean;
 };
+
+const HISTORICAL_ACCURACY_DIRECTIVE = `Historical accuracy is mandatory for this script:
+- Base every claim on the well-documented, verifiable historical record. Do not invent events, dates, quotes, dialogue, statistics, or figures.
+- Never attribute invented or paraphrased words to a real historical person as if they are a direct quote.
+- When a detail is disputed or uncertain among historians, say so explicitly (e.g. "historians believe" or "accounts differ") rather than stating it as settled fact.
+- Do not dramatize or embellish beyond what the historical record supports — narrative color must never introduce information that is not true.
+- If you are not confident a specific detail is accurate, omit it rather than guess.`;
 
 const platformGuidance: Record<ScriptGenerationPlatform, string> = {
   youtube:
@@ -61,7 +70,7 @@ ${platformGuidance[input.primaryPlatform]}
 
 Length:
 ${targetLengthLine(input.targetDurationSeconds)}
-
+${input.requireHistoricalAccuracy ? `\n${HISTORICAL_ACCURACY_DIRECTIVE}\n` : ""}
 Proven structure to follow (adapt, do not label the sections in the output):
 - Hook: open with a curiosity gap, bold claim, surprising fact, or a stakes-raising question.
 - Setup: quickly frame why it matters to this audience.

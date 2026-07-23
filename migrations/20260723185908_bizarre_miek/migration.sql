@@ -1,0 +1,1 @@
+ALTER TABLE "project_briefs" ADD COLUMN "niche" text DEFAULT '' NOT NULL;

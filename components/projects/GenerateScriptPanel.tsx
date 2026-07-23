@@ -27,6 +27,7 @@ export function GenerateScriptPanel({
   model,
   estimatedCostCents,
   hasBriefTopic,
+  requireHistoricalAccuracy,
   initialLatestRun,
 }: {
   projectId: string;
@@ -34,6 +35,7 @@ export function GenerateScriptPanel({
   model: string;
   estimatedCostCents: number;
   hasBriefTopic: boolean;
+  requireHistoricalAccuracy: boolean;
   initialLatestRun: ScriptGenerationRunView | null;
 }) {
   const [latestRun, setLatestRun] = useState(initialLatestRun);
@@ -119,6 +121,13 @@ export function GenerateScriptPanel({
             edit before saving — these are AI suggestions, not guaranteed
             performers.
           </p>
+          {requireHistoricalAccuracy ? (
+            <p className="mt-1 text-xs font-medium text-amber-600 dark:text-amber-400">
+              Historical niche detected — factual-accuracy mode is on. The
+              storyline will stick to verifiable events; still review before
+              publishing.
+            </p>
+          ) : null}
         </div>
         {canEdit ? (
           <Button

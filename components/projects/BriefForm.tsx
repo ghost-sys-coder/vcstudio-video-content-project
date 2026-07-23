@@ -52,6 +52,22 @@ export function BriefForm({
           placeholder="e.g. Why most people fail at saving money — and the one habit that fixes it"
         />
       </div>
+      <div className="space-y-2">
+        <Label htmlFor="brief-niche">Niche (optional)</Label>
+        <Input
+          defaultValue={brief?.niche ?? ""}
+          disabled={!canEdit}
+          id="brief-niche"
+          maxLength={120}
+          name="niche"
+          placeholder="e.g. History, Personal finance, Health & fitness"
+        />
+        <p className="text-xs text-muted-foreground">
+          A history-related niche (or topic) automatically switches AI script
+          generation into a strict factual-accuracy mode — no invented events,
+          quotes, or statistics.
+        </p>
+      </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="brief-audience">Target audience</Label>

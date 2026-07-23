@@ -111,6 +111,7 @@ export async function createProjectAction(
             targetDurationSeconds: idea.targetDurationSeconds,
             primaryPlatform: idea.primaryPlatform,
             hookAngle: idea.hookAngle,
+            niche: idea.niche,
           }
         : null,
     });
@@ -172,6 +173,7 @@ export async function saveProjectBriefAction(
     targetDurationSeconds: rawDuration === "" ? undefined : rawDuration,
     primaryPlatform: formData.get("primaryPlatform"),
     hookAngle: formData.get("hookAngle") ?? "",
+    niche: formData.get("niche") ?? "",
   });
   if (!parsed.success)
     return {
@@ -189,6 +191,7 @@ export async function saveProjectBriefAction(
       targetDurationSeconds: parsed.data.targetDurationSeconds ?? null,
       primaryPlatform: parsed.data.primaryPlatform,
       hookAngle: parsed.data.hookAngle,
+      niche: parsed.data.niche,
       userId: context.user.id,
     });
     revalidatePath(`/app/projects/${parsed.data.projectId}/script`);

@@ -10,11 +10,12 @@ const base = {
   platform: null,
   tonePreference: null,
   language: "English",
+  requireHistoricalAccuracy: false,
 } as const;
 
 describe("renderIdeaGenerationPrompt", () => {
   it("pins the prompt version so previous runs stay reproducible", () => {
-    expect(IDEA_GENERATION_PROMPT_VERSION).toBe("idea-generation-v1");
+    expect(IDEA_GENERATION_PROMPT_VERSION).toBe("idea-generation-v2");
   });
 
   it("includes the niche, count, and language", () => {
@@ -50,5 +51,23 @@ describe("renderIdeaGenerationPrompt", () => {
       tonePreference: "dry and witty",
     });
     expect(prompt).toContain("dry and witty");
+  });
+
+  it("omits the historical-accuracy directive by default", () => {
+    const prompt = renderIdeaGenerationPrompt(base);
+    expect(prompt).not.toContain("Historical accuracy is mandatory");
+  });
+
+  it("requires factual, verifiable premises when historical accuracy is on", () => {
+    const prompt = renderIdeaGenerationPrompt({
+      ...base,
+      niche: "History in short stories",
+      requireHistoricalAccuracy: true,
+    });
+    expect(prompt).toContain("Historical accuracy is mandatory for this niche");
+    expect(prompt).toContain(
+      "grounded in a real, verifiable historical event, figure, or record",
+    );
+    expect(prompt).toContain("Do not invent events");
   });
 });

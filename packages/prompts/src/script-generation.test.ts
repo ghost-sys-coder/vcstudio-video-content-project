@@ -13,11 +13,12 @@ const input: ScriptGenerationPromptInput = {
   primaryPlatform: "youtube",
   hookAngle: "open with a surprising statistic",
   language: "English",
+  requireHistoricalAccuracy: false,
 };
 
 describe("script generation prompt", () => {
   it("pins the version and renders deterministically", () => {
-    expect(SCRIPT_GENERATION_PROMPT_VERSION).toBe("script-generation-v1");
+    expect(SCRIPT_GENERATION_PROMPT_VERSION).toBe("script-generation-v2");
     expect(renderScriptGenerationPrompt(input)).toBe(
       renderScriptGenerationPrompt(input),
     );
@@ -41,5 +42,24 @@ describe("script generation prompt", () => {
     });
     expect(tiktok).toContain("TikTok");
     expect(tiktok).not.toContain("Target about");
+  });
+
+  it("omits the historical-accuracy directive by default", () => {
+    expect(renderScriptGenerationPrompt(input)).not.toContain(
+      "Historical accuracy is mandatory",
+    );
+  });
+
+  it("adds a strict factual-accuracy directive for historical content", () => {
+    const prompt = renderScriptGenerationPrompt({
+      ...input,
+      topic: "The rise and fall of the Roman Empire",
+      requireHistoricalAccuracy: true,
+    });
+    expect(prompt).toContain(
+      "Historical accuracy is mandatory for this script",
+    );
+    expect(prompt).toContain("Do not invent events, dates, quotes");
+    expect(prompt).toContain("Never attribute invented or paraphrased words");
   });
 });

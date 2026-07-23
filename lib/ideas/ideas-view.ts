@@ -97,6 +97,7 @@ export async function loadIdeaLabView(input: {
     platform: null,
     tonePreference: null,
     language: "English",
+    requireHistoricalAccuracy: false,
   });
   const estimate = estimateIdeaGenerationCost({
     prompt: samplePrompt,

@@ -34,6 +34,7 @@ export async function createProject(input: {
     targetDurationSeconds: number | null;
     primaryPlatform: ContentPlatform;
     hookAngle: string;
+    niche: string;
   } | null;
 }) {
   const projectId = crypto.randomUUID();
