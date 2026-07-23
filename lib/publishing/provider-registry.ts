@@ -9,6 +9,7 @@ import { YouTubeVideoPublishProvider } from "@/lib/publishing/providers/youtube-
 import { FacebookVideoPublishProvider } from "@/lib/publishing/providers/facebook-video-publish-provider";
 import { InstagramVideoPublishProvider } from "@/lib/publishing/providers/instagram-video-publish-provider";
 import { TikTokVideoUploadProvider } from "@/lib/publishing/providers/tiktok-video-upload-provider";
+import { SimulatedVideoPublishProvider } from "@/lib/publishing/providers/simulated-video-publish-provider";
 import type { VideoPublishProvider } from "@/lib/publishing/video-publish-provider";
 
 export class UnsupportedPlatformError extends Error {
@@ -40,6 +41,13 @@ export function createVideoPublishProvider(
   platform: ContentPlatform,
 ): VideoPublishProvider {
   const environment = getPublishingEnvironment();
+  // Testing/demo: one simulator stands in for every platform, so the publish
+  // flow completes without any real API call. Off in production.
+  if (environment.ENABLE_PUBLISH_SIMULATION)
+    return new SimulatedVideoPublishProvider({
+      platform,
+      stepDelayMs: environment.PUBLISH_SIMULATION_STEP_MS,
+    });
   switch (platform) {
     case "youtube":
       return new YouTubeVideoPublishProvider({

@@ -469,6 +469,24 @@ export const publishingEnvironmentSchema = z.object({
     .enum(["true", "false"])
     .default("true")
     .transform((value) => value === "true"),
+  /**
+   * Testing/demo switch. When true, every platform is served by a simulator
+   * that ramps upload progress and returns a synthetic success WITHOUT calling
+   * any real platform API — so the end-to-end publish flow can be exercised
+   * without live accounts, tokens, or a publicly reachable video. Must be off in
+   * production (a "published" video would never actually exist).
+   */
+  ENABLE_PUBLISH_SIMULATION: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
+  /** Per-step delay of the simulated upload ramp, in milliseconds. */
+  PUBLISH_SIMULATION_STEP_MS: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(10_000)
+    .default(600),
   /** Hard ceiling on the upload payload, independent of what a render produced. */
   MAX_PUBLISH_VIDEO_BYTES: z.coerce
     .number()
