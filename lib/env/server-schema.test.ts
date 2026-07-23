@@ -6,6 +6,7 @@ import {
   characterEnvironmentSchema,
   sceneImageEnvironmentSchema,
   usageEnvironmentSchema,
+  publishingEnvironmentSchema,
 } from "@/lib/env/server-schema";
 
 const validEnvironment = {
@@ -138,5 +139,26 @@ describe("scene image environment validation", () => {
         MAX_REFERENCE_ASSETS_PER_GENERATION: "17",
       }),
     ).toThrow();
+  });
+});
+
+describe("publishing environment validation", () => {
+  const base = {
+    PLATFORM_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64"),
+  };
+
+  it("parses with NO platform app credentials set (a missing platform must not fail the whole subsystem)", () => {
+    const result = publishingEnvironmentSchema.safeParse(base);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.TIKTOK_API_CLIENT_KEY).toBeUndefined();
+      expect(result.data.GOOGLE_OAUTH_CLIENT_ID).toBeUndefined();
+      // Simulation defaults off so production is real by default.
+      expect(result.data.ENABLE_PUBLISH_SIMULATION).toBe(false);
+    }
+  });
+
+  it("still requires the token encryption key (needed by every platform)", () => {
+    expect(publishingEnvironmentSchema.safeParse({}).success).toBe(false);
   });
 });

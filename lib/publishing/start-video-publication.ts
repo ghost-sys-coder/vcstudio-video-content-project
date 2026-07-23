@@ -18,7 +18,10 @@ import {
   getPublishingEnvironment,
   getSceneAnalysisEnvironment,
 } from "@/lib/env/server";
-import { isPublishablePlatform } from "@/lib/publishing/provider-registry";
+import {
+  isPlatformConfigured,
+  isPublishablePlatform,
+} from "@/lib/publishing/provider-registry";
 import { validateInstagramReelAsset } from "@/lib/publishing/instagram-reel-validation";
 import { validateTikTokUploadAsset } from "@/lib/publishing/tiktok-upload-validation";
 import { enforceRateLimit } from "@/lib/rate-limit/enforce-rate-limit";
@@ -52,6 +55,12 @@ export async function startVideoPublication(input: {
   if (!isPublishablePlatform(input.request.platform))
     throw new VideoPublicationRequestError(
       "Publishing to that platform is not available yet.",
+    );
+  // Fail fast with a clear message rather than dispatching a job that would
+  // crash in the worker for a missing server credential.
+  if (!isPlatformConfigured(input.request.platform))
+    throw new VideoPublicationRequestError(
+      "Publishing to that platform isn't configured yet. Contact an administrator.",
     );
 
   await enforceRateLimit({

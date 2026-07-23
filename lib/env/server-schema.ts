@@ -444,12 +444,13 @@ export const publishingEnvironmentSchema = z.object({
         });
       }
     }),
-  GOOGLE_OAUTH_CLIENT_ID: z
-    .string()
-    .min(1, "GOOGLE_OAUTH_CLIENT_ID is required"),
-  GOOGLE_OAUTH_CLIENT_SECRET: z
-    .string()
-    .min(1, "GOOGLE_OAUTH_CLIENT_SECRET is required"),
+  // Per-platform app credentials are OPTIONAL at the schema level so a platform
+  // that isn't configured yet cannot fail validation for the whole publishing
+  // subsystem (a missing TikTok key must not break YouTube/Instagram). Each
+  // platform's credentials are validated lazily in `createVideoPublishProvider`
+  // only when that platform is actually used — see `PlatformNotConfiguredError`.
+  GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
+  GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
   /** Versioned Graph API path shared by the web OAuth flow and publish worker. */
   FACEBOOK_GRAPH_API_VERSION: z
     .string()
@@ -460,11 +461,9 @@ export const publishingEnvironmentSchema = z.object({
     .string()
     .regex(/^v\d+\.\d+$/, "INSTAGRAM_GRAPH_API_VERSION must look like v25.0")
     .default("v25.0"),
-  /** TikTok OAuth client is required by the worker to rotate user tokens. */
-  TIKTOK_API_CLIENT_KEY: z.string().min(1, "TIKTOK_API_CLIENT_KEY is required"),
-  TIKTOK_API_CLIENT_SECRET: z
-    .string()
-    .min(1, "TIKTOK_API_CLIENT_SECRET is required"),
+  /** TikTok OAuth client — used by the worker to rotate user tokens. */
+  TIKTOK_API_CLIENT_KEY: z.string().optional(),
+  TIKTOK_API_CLIENT_SECRET: z.string().optional(),
   ENABLE_VIDEO_PUBLISHING: z
     .enum(["true", "false"])
     .default("true")

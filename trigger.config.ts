@@ -1,8 +1,11 @@
 import { defineConfig } from "@trigger.dev/sdk";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   additionalFiles,
   aptGet,
   ffmpeg,
+  syncEnvVars,
 } from "@trigger.dev/build/extensions/core";
 import { esbuildPlugin } from "@trigger.dev/build/extensions";
 import type { Plugin } from "esbuild";
@@ -47,6 +50,50 @@ const stubServerOnlyBoundary: Plugin = {
   },
 };
 
+// Env vars the deploy tooling owns — never sync these into the runtime env.
+const DEPLOY_CONTROL_ENV_KEYS = new Set([
+  "TRIGGER_SECRET_KEY",
+  "TRIGGER_PROJECT_REF",
+  "TRIGGER_API_URL",
+  "NODE_ENV",
+]);
+
+/**
+ * Reads the worker's env file so it can be pushed to the Trigger.dev environment
+ * on deploy. This is what keeps the deployed worker's variables in parity with
+ * the repo's source of truth — the outage that motivated it was a required
+ * variable (`TIKTOK_API_CLIENT_*`) that existed in this file but was never set
+ * in the Trigger.dev dashboard, so every publish crashed at env validation.
+ *
+ * Only additive/updating — it never deletes dashboard-managed vars. Returns an
+ * empty set if the (gitignored) file is absent, e.g. in CI.
+ */
+function readWorkerEnvFile(): Record<string, string> {
+  try {
+    const raw = readFileSync(join(process.cwd(), ".env.trigger.dev"), "utf8");
+    const result: Record<string, string> = {};
+    for (const line of raw.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (trimmed === "" || trimmed.startsWith("#")) continue;
+      const separator = trimmed.indexOf("=");
+      if (separator <= 0) continue;
+      const key = trimmed.slice(0, separator).trim();
+      if (DEPLOY_CONTROL_ENV_KEYS.has(key)) continue;
+      let value = trimmed.slice(separator + 1).trim();
+      if (
+        value.length >= 2 &&
+        ((value.startsWith('"') && value.endsWith('"')) ||
+          (value.startsWith("'") && value.endsWith("'")))
+      )
+        value = value.slice(1, -1);
+      result[key] = value;
+    }
+    return result;
+  } catch {
+    return {};
+  }
+}
+
 export default defineConfig({
   project: process.env.TRIGGER_PROJECT_REF ?? "",
   dirs: ["./trigger"],
@@ -76,6 +123,12 @@ export default defineConfig({
       }),
       aptGet({ packages: REMOTION_CHROMIUM_PACKAGES }),
       esbuildPlugin(stubServerOnlyBoundary),
+      // Push the worker env file to the deployed environment so a variable can
+      // never exist in the repo but be missing from the running worker. Skipped
+      // for `dev`, which reads the local environment directly.
+      syncEnvVars((ctx) =>
+        ctx.environment === "dev" ? {} : readWorkerEnvFile(),
+      ),
     ],
   },
   maxDuration: 300,

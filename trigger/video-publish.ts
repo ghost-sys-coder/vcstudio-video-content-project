@@ -21,7 +21,10 @@ import {
   PublishProviderError,
   type PublishFailure,
 } from "@/lib/publishing/video-publish-provider";
-import { createVideoPublishProvider } from "@/lib/publishing/provider-registry";
+import {
+  createVideoPublishProvider,
+  PlatformNotConfiguredError,
+} from "@/lib/publishing/provider-registry";
 import { createVideoExportDownloadUrl } from "@/lib/storage/video-export-storage";
 
 export const videoPublishTaskPayloadSchema = z.object({
@@ -52,226 +55,254 @@ export const videoPublishTask = task({
     { ctx },
   ) => {
     const input = videoPublishTaskPayloadSchema.parse(payload);
-    const publication = await findVideoPublicationById(input.publicationId);
-    if (!publication) throw new Error("Video publication not found.");
-    if (
-      publication.status === "succeeded" ||
-      publication.status === "failed" ||
-      publication.status === "cancelled"
-    )
-      return { publicationId: publication.id, status: publication.status };
-
-    const environment = getPublishingEnvironment();
+    // Scoped from the payload (not the fetched row) so the publication can still
+    // be marked failed even if a very early step throws.
     const scope = {
-      publicationId: publication.id,
+      publicationId: input.publicationId,
       workspaceId: input.workspaceId,
     };
 
-    const render = await findVideoRender({
-      workspaceId: input.workspaceId,
-      projectId: input.projectId,
-      renderId: publication.renderId,
-    });
-    if (
-      !render ||
-      render.status !== "succeeded" ||
-      !render.assetObjectKey ||
-      !render.assetSizeBytes
-    ) {
-      await failVideoPublication({
-        ...scope,
-        category: "asset_unavailable",
-        message: "The rendered video is no longer available.",
-      });
-      return { publicationId: publication.id, status: "failed" as const };
-    }
-
-    const connection = await findPlatformConnectionWithTokens({
-      connectionId: publication.connectionId,
-      workspaceId: input.workspaceId,
-    });
-    if (!connection || connection.status !== "active") {
-      await failVideoPublication({
-        ...scope,
-        category: "authorization_expired",
-        message:
-          "The account connection is no longer active. Reconnect it and publish again.",
-      });
-      return { publicationId: publication.id, status: "failed" as const };
-    }
-
-    const provider = createVideoPublishProvider(publication.platform);
-
-    // Resolve a usable access token, refreshing when it is expired or close to it.
-    let accessToken: string;
     try {
-      accessToken = openSecret({
-        sealed: connection.accessTokenSealed,
-        key: environment.PLATFORM_TOKEN_ENCRYPTION_KEY,
+      const publication = await findVideoPublicationById(input.publicationId);
+      if (!publication) throw new Error("Video publication not found.");
+      if (
+        publication.status === "succeeded" ||
+        publication.status === "failed" ||
+        publication.status === "cancelled"
+      )
+        return { publicationId: publication.id, status: publication.status };
+
+      const environment = getPublishingEnvironment();
+
+      const render = await findVideoRender({
+        workspaceId: input.workspaceId,
+        projectId: input.projectId,
+        renderId: publication.renderId,
       });
-      const expiresAt = connection.accessTokenExpiresAt?.getTime() ?? 0;
-      const needsRefresh =
-        expiresAt > 0 && expiresAt - TOKEN_REFRESH_SKEW_MS < Date.now();
-      if (needsRefresh) {
-        if (!connection.refreshTokenSealed)
-          throw new PublishProviderError({
-            category: "authorization_expired",
-            safeMessage:
-              "The account authorization expired. Reconnect the account and publish again.",
-            retriable: false,
-            mayHavePublished: false,
-          });
-        const refreshed = await provider.refreshTokens({
-          refreshToken: openSecret({
-            sealed: connection.refreshTokenSealed,
-            key: environment.PLATFORM_TOKEN_ENCRYPTION_KEY,
-          }),
+      if (
+        !render ||
+        render.status !== "succeeded" ||
+        !render.assetObjectKey ||
+        !render.assetSizeBytes
+      ) {
+        await failVideoPublication({
+          ...scope,
+          category: "asset_unavailable",
+          message: "The rendered video is no longer available.",
         });
-        await updatePlatformConnectionTokens({
-          connectionId: connection.id,
-          workspaceId: input.workspaceId,
-          tokens: {
-            ...refreshed,
-            refreshToken: refreshed.refreshToken ?? null,
-          },
-        });
-        accessToken = refreshed.accessToken;
+        return { publicationId: publication.id, status: "failed" as const };
       }
-    } catch (error) {
-      const failure: PublishFailure =
-        error instanceof PublishProviderError
-          ? error.failure
-          : {
+
+      const connection = await findPlatformConnectionWithTokens({
+        connectionId: publication.connectionId,
+        workspaceId: input.workspaceId,
+      });
+      if (!connection || connection.status !== "active") {
+        await failVideoPublication({
+          ...scope,
+          category: "authorization_expired",
+          message:
+            "The account connection is no longer active. Reconnect it and publish again.",
+        });
+        return { publicationId: publication.id, status: "failed" as const };
+      }
+
+      const provider = createVideoPublishProvider(publication.platform);
+
+      // Resolve a usable access token, refreshing when it is expired or close to it.
+      let accessToken: string;
+      try {
+        accessToken = openSecret({
+          sealed: connection.accessTokenSealed,
+          key: environment.PLATFORM_TOKEN_ENCRYPTION_KEY,
+        });
+        const expiresAt = connection.accessTokenExpiresAt?.getTime() ?? 0;
+        const needsRefresh =
+          expiresAt > 0 && expiresAt - TOKEN_REFRESH_SKEW_MS < Date.now();
+        if (needsRefresh) {
+          if (!connection.refreshTokenSealed)
+            throw new PublishProviderError({
               category: "authorization_expired",
               safeMessage:
-                "The stored authorization could not be used. Reconnect the account.",
+                "The account authorization expired. Reconnect the account and publish again.",
               retriable: false,
               mayHavePublished: false,
-            };
-      await markPlatformConnectionUnusable({
-        connectionId: connection.id,
-        workspaceId: input.workspaceId,
-        status: "expired",
-        safeError: failure.safeMessage,
-      });
-      await failVideoPublication({
-        ...scope,
-        category: failure.category,
-        message: failure.safeMessage,
-      });
-      return { publicationId: publication.id, status: "failed" as const };
-    }
-
-    await markVideoPublicationUploading({
-      publicationId: publication.id,
-      attemptCount: ctx.attempt.number,
-    });
-    if (publication.providerOperationId)
-      await markVideoPublicationProcessing({
-        publicationId: publication.id,
-        providerOperationId: publication.providerOperationId,
-      });
-
-    // TTL deliberately exceeds this task's maxDuration.
-    const sourceUrl = await createVideoExportDownloadUrl(
-      render.assetObjectKey,
-      environment.PUBLISH_ASSET_URL_TTL_SECONDS,
-    );
-
-    try {
-      const result = await provider.publishVideo({
-        tokens: { accessToken },
-        account: { externalAccountId: connection.externalAccountId },
-        sourceUrl,
-        sizeBytes: render.assetSizeBytes,
-        contentType: render.assetContentType ?? "video/mp4",
-        title: publication.title,
-        description: publication.description,
-        tags: publication.tags,
-        visibility: publication.visibility,
-        caption: publication.caption,
-        shareToFeed: publication.shareToFeed,
-        providerOperationId: publication.providerOperationId,
-        providerOperationSecret: publication.providerOperationSecretSealed
-          ? openSecret({
-              sealed: publication.providerOperationSecretSealed,
+            });
+          const refreshed = await provider.refreshTokens({
+            refreshToken: openSecret({
+              sealed: connection.refreshTokenSealed,
               key: environment.PLATFORM_TOKEN_ENCRYPTION_KEY,
-            })
-          : null,
-        onProviderOperationCreated: async (
-          providerOperationId,
-          providerOperationSecret,
-        ) => {
-          await markVideoPublicationProcessing({
-            publicationId: publication.id,
-            providerOperationId,
-            providerOperationSecret,
+            }),
           });
-        },
-        onProcessingProgress: async (percent) => {
-          await updateVideoPublicationProcessingProgress({
-            publicationId: publication.id,
-            progressPercent: percent,
+          await updatePlatformConnectionTokens({
+            connectionId: connection.id,
+            workspaceId: input.workspaceId,
+            tokens: {
+              ...refreshed,
+              refreshToken: refreshed.refreshToken ?? null,
+            },
           });
-        },
-        waitForProcessing: async (milliseconds) => {
-          await wait.for({
-            seconds: Math.max(1, Math.ceil(milliseconds / 1000)),
-          });
-        },
-        onProgress: async (percent) => {
-          await updateVideoPublicationProgress({
-            publicationId: publication.id,
-            progressPercent: percent,
-            uploadedBytes: Math.floor(
-              ((render.assetSizeBytes ?? 0) * percent) / 100,
-            ),
-          });
-        },
-      });
-
-      await completeVideoPublication({
-        publicationId: publication.id,
-        externalVideoId: result.externalVideoId,
-        externalVideoUrl: result.externalVideoUrl,
-        uploadedBytes: result.uploadedBytes,
-        completionStage: result.completionStage,
-      });
-      return { publicationId: publication.id, status: "succeeded" as const };
-    } catch (error) {
-      const failure: PublishFailure =
-        error instanceof PublishProviderError
-          ? error.failure
-          : {
-              category: "provider_error",
-              safeMessage: "The video could not be published.",
-              retriable: false,
-              mayHavePublished: false,
-            };
-
-      if (failure.category === "authorization_expired")
+          accessToken = refreshed.accessToken;
+        }
+      } catch (error) {
+        const failure: PublishFailure =
+          error instanceof PublishProviderError
+            ? error.failure
+            : {
+                category: "authorization_expired",
+                safeMessage:
+                  "The stored authorization could not be used. Reconnect the account.",
+                retriable: false,
+                mayHavePublished: false,
+              };
         await markPlatformConnectionUnusable({
           connectionId: connection.id,
           workspaceId: input.workspaceId,
           status: "expired",
           safeError: failure.safeMessage,
         });
+        await failVideoPublication({
+          ...scope,
+          category: failure.category,
+          message: failure.safeMessage,
+        });
+        return { publicationId: publication.id, status: "failed" as const };
+      }
 
-      // Only retry when the platform is confidently retriable AND the upload
-      // cannot already have created a video — re-running an ambiguous upload
-      // would publish the same video twice to a real channel.
-      const canRetry =
-        failure.retriable &&
-        !failure.mayHavePublished &&
-        ctx.attempt.number < (ctx.run.maxAttempts ?? 3);
-      if (canRetry) throw error;
+      await markVideoPublicationUploading({
+        publicationId: publication.id,
+        attemptCount: ctx.attempt.number,
+      });
+      if (publication.providerOperationId)
+        await markVideoPublicationProcessing({
+          publicationId: publication.id,
+          providerOperationId: publication.providerOperationId,
+        });
 
+      // TTL deliberately exceeds this task's maxDuration.
+      const sourceUrl = await createVideoExportDownloadUrl(
+        render.assetObjectKey,
+        environment.PUBLISH_ASSET_URL_TTL_SECONDS,
+      );
+
+      try {
+        const result = await provider.publishVideo({
+          tokens: { accessToken },
+          account: { externalAccountId: connection.externalAccountId },
+          sourceUrl,
+          sizeBytes: render.assetSizeBytes,
+          contentType: render.assetContentType ?? "video/mp4",
+          title: publication.title,
+          description: publication.description,
+          tags: publication.tags,
+          visibility: publication.visibility,
+          caption: publication.caption,
+          shareToFeed: publication.shareToFeed,
+          providerOperationId: publication.providerOperationId,
+          providerOperationSecret: publication.providerOperationSecretSealed
+            ? openSecret({
+                sealed: publication.providerOperationSecretSealed,
+                key: environment.PLATFORM_TOKEN_ENCRYPTION_KEY,
+              })
+            : null,
+          onProviderOperationCreated: async (
+            providerOperationId,
+            providerOperationSecret,
+          ) => {
+            await markVideoPublicationProcessing({
+              publicationId: publication.id,
+              providerOperationId,
+              providerOperationSecret,
+            });
+          },
+          onProcessingProgress: async (percent) => {
+            await updateVideoPublicationProcessingProgress({
+              publicationId: publication.id,
+              progressPercent: percent,
+            });
+          },
+          waitForProcessing: async (milliseconds) => {
+            await wait.for({
+              seconds: Math.max(1, Math.ceil(milliseconds / 1000)),
+            });
+          },
+          onProgress: async (percent) => {
+            await updateVideoPublicationProgress({
+              publicationId: publication.id,
+              progressPercent: percent,
+              uploadedBytes: Math.floor(
+                ((render.assetSizeBytes ?? 0) * percent) / 100,
+              ),
+            });
+          },
+        });
+
+        await completeVideoPublication({
+          publicationId: publication.id,
+          externalVideoId: result.externalVideoId,
+          externalVideoUrl: result.externalVideoUrl,
+          uploadedBytes: result.uploadedBytes,
+          completionStage: result.completionStage,
+        });
+        return { publicationId: publication.id, status: "succeeded" as const };
+      } catch (error) {
+        const failure: PublishFailure =
+          error instanceof PublishProviderError
+            ? error.failure
+            : {
+                category: "provider_error",
+                safeMessage: "The video could not be published.",
+                retriable: false,
+                mayHavePublished: false,
+              };
+
+        if (failure.category === "authorization_expired")
+          await markPlatformConnectionUnusable({
+            connectionId: connection.id,
+            workspaceId: input.workspaceId,
+            status: "expired",
+            safeError: failure.safeMessage,
+          });
+
+        // Only retry when the platform is confidently retriable AND the upload
+        // cannot already have created a video — re-running an ambiguous upload
+        // would publish the same video twice to a real channel.
+        const canRetry =
+          failure.retriable &&
+          !failure.mayHavePublished &&
+          ctx.attempt.number < (ctx.run.maxAttempts ?? 3);
+        if (canRetry) throw error;
+
+        await failVideoPublication({
+          ...scope,
+          category: failure.category,
+          message: failure.safeMessage,
+        });
+        return { publicationId: publication.id, status: "failed" as const };
+      }
+    } catch (error) {
+      // Outer guard for anything the granular handlers above did not already
+      // turn into a terminal state — env/config parse errors, a missing
+      // credential, a DB blip. Without this, an early throw leaves the row at
+      // `queued` and the Publish button spins forever.
+      const nonRetriable =
+        error instanceof PlatformNotConfiguredError ||
+        (error instanceof Error && error.name === "ZodError");
+      const isLastAttempt = ctx.attempt.number >= (ctx.run.maxAttempts ?? 3);
+      // Retry genuinely transient failures; config errors never fix on retry.
+      if (!nonRetriable && !isLastAttempt) throw error;
       await failVideoPublication({
         ...scope,
-        category: failure.category,
-        message: failure.safeMessage,
+        category:
+          error instanceof PlatformNotConfiguredError
+            ? "platform_not_configured"
+            : "unexpected_error",
+        message:
+          error instanceof PlatformNotConfiguredError
+            ? error.message
+            : "Publishing failed unexpectedly. Please try again.",
       });
-      return { publicationId: publication.id, status: "failed" as const };
+      return { publicationId: input.publicationId, status: "failed" as const };
     }
   },
 });

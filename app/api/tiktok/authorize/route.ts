@@ -6,8 +6,10 @@ import {
 } from "@/lib/env/server";
 import { can } from "@/lib/policies/workspace-policy";
 import { createOAuthState } from "@/lib/publishing/oauth-state";
-import { createRedirectUri } from "@/lib/publishing/provider-registry";
-import { TikTokVideoUploadProvider } from "@/lib/publishing/providers/tiktok-video-upload-provider";
+import {
+  createRedirectUri,
+  createVideoPublishProvider,
+} from "@/lib/publishing/provider-registry";
 
 const noStore = { "Cache-Control": "private, no-store" };
 
@@ -20,10 +22,7 @@ export async function GET() {
   if (!environment.ENABLE_VIDEO_PUBLISHING)
     return new NextResponse(null, { status: 404, headers: noStore });
   try {
-    const provider = new TikTokVideoUploadProvider({
-      clientKey: environment.TIKTOK_API_CLIENT_KEY,
-      clientSecret: environment.TIKTOK_API_CLIENT_SECRET,
-    });
+    const provider = createVideoPublishProvider("tiktok");
     return NextResponse.redirect(
       provider.createAuthorizationUrl({
         redirectUri: createRedirectUri("tiktok"),

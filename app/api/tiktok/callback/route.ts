@@ -8,8 +8,10 @@ import {
 } from "@/lib/env/server";
 import { can } from "@/lib/policies/workspace-policy";
 import { verifyOAuthState } from "@/lib/publishing/oauth-state";
-import { createRedirectUri } from "@/lib/publishing/provider-registry";
-import { TikTokVideoUploadProvider } from "@/lib/publishing/providers/tiktok-video-upload-provider";
+import {
+  createRedirectUri,
+  createVideoPublishProvider,
+} from "@/lib/publishing/provider-registry";
 
 const noStore = { "Cache-Control": "private, no-store" };
 
@@ -45,10 +47,7 @@ export async function GET(request: Request) {
       statePayload.userId !== context.user.id
     )
       return redirectWithStatus(web.APP_BASE_URL, "forbidden");
-    const provider = new TikTokVideoUploadProvider({
-      clientKey: environment.TIKTOK_API_CLIENT_KEY,
-      clientSecret: environment.TIKTOK_API_CLIENT_SECRET,
-    });
+    const provider = createVideoPublishProvider("tiktok");
     const { tokens, account } = await provider.exchangeCode({
       code,
       redirectUri: createRedirectUri("tiktok"),
