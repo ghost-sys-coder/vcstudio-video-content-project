@@ -3,19 +3,16 @@ import {
   filterStoryboardScenes,
   sceneMatchesStoryboardFilter,
 } from "@/lib/scenes/storyboard-filter";
-import type { StoryboardSceneView } from "@/lib/scenes/storyboard-view";
+import type {
+  StoryboardSceneImageView,
+  StoryboardSceneView,
+} from "@/lib/scenes/storyboard-view";
 
-function scene(
-  overrides: Partial<StoryboardSceneView> & { sceneNumber: number },
-): StoryboardSceneView {
+function image(
+  overrides: Partial<StoryboardSceneImageView> = {},
+): StoryboardSceneImageView {
   return {
-    sceneId: `scene-${overrides.sceneNumber}`,
-    sceneStatus: "approved",
-    sceneVersionId: `version-${overrides.sceneNumber}`,
-    narrationText: "Narration.",
-    characterNames: [],
-    durationMilliseconds: 4000,
-    eligibility: "eligible",
+    size: "1536x1024",
     approvedImageUrl: null,
     latestImageUrl: null,
     latestGenerationId: null,
@@ -30,28 +27,74 @@ function scene(
   };
 }
 
+function scene(
+  overrides: Partial<StoryboardSceneView> & { sceneNumber: number },
+): StoryboardSceneView {
+  return {
+    sceneId: `scene-${overrides.sceneNumber}`,
+    sceneStatus: "approved",
+    sceneVersionId: `version-${overrides.sceneNumber}`,
+    narrationText: "Narration.",
+    characterNames: [],
+    durationMilliseconds: 4000,
+    eligibility: "eligible",
+    images: [],
+    ...overrides,
+  };
+}
+
 const scenes: StoryboardSceneView[] = [
   scene({ sceneNumber: 1, eligibility: "eligible" }),
   scene({
     sceneNumber: 2,
     eligibility: "inProgress",
-    latestStatus: "running",
+    images: [image({ latestStatus: "running" })],
   }),
   scene({
     sceneNumber: 3,
     eligibility: "eligible",
-    latestStatus: "succeeded",
-    latestReviewStatus: "pending",
-    latestGenerationId: "gen-3",
+    images: [
+      image({
+        latestStatus: "succeeded",
+        latestReviewStatus: "pending",
+        latestGenerationId: "gen-3",
+      }),
+    ],
   }),
   scene({
     sceneNumber: 4,
     eligibility: "hasApprovedImage",
-    latestStatus: "succeeded",
-    latestReviewStatus: "approved",
-    approvedImageUrl: "/image",
+    images: [
+      image({
+        latestStatus: "succeeded",
+        latestReviewStatus: "approved",
+        approvedImageUrl: "/image",
+      }),
+    ],
   }),
-  scene({ sceneNumber: 5, eligibility: "eligible", latestStatus: "failed" }),
+  scene({
+    sceneNumber: 5,
+    eligibility: "eligible",
+    images: [image({ latestStatus: "failed" })],
+  }),
+  scene({
+    sceneNumber: 6,
+    eligibility: "hasApprovedImage",
+    images: [
+      image({
+        size: "1536x1024",
+        latestStatus: "succeeded",
+        latestReviewStatus: "approved",
+        approvedImageUrl: "/landscape",
+      }),
+      image({
+        size: "1024x1536",
+        latestStatus: "succeeded",
+        latestReviewStatus: "pending",
+        latestGenerationId: "gen-6-portrait",
+      }),
+    ],
+  }),
 ];
 
 describe("sceneMatchesStoryboardFilter", () => {
@@ -67,16 +110,16 @@ describe("sceneMatchesStoryboardFilter", () => {
     ).toEqual([2]);
   });
 
-  it("selects only scenes needing review", () => {
+  it("selects scenes needing review, including a size that still needs review on an otherwise-approved scene", () => {
     expect(
       filterStoryboardScenes(scenes, "needsReview").map((s) => s.sceneNumber),
-    ).toEqual([3]);
+    ).toEqual([3, 6]);
   });
 
   it("selects only approved scenes", () => {
     expect(
       filterStoryboardScenes(scenes, "approved").map((s) => s.sceneNumber),
-    ).toEqual([4]);
+    ).toEqual([4, 6]);
   });
 
   it("selects only failed scenes", () => {

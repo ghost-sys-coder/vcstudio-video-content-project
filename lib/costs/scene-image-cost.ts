@@ -97,14 +97,19 @@ export function estimateSceneImageCost(input: {
 export function estimateBulkSceneImageCostCents(input: {
   sceneCount: number;
   quality: SceneImageQuality;
-  size: SceneImageApiSize;
+  sizes: SceneImageApiSize[];
   outputCostMatrix: SceneImageOutputCostMatrix;
 }): number {
   if (!Number.isInteger(input.sceneCount) || input.sceneCount < 0)
     throw new RangeError("Scene count must be a nonnegative integer.");
-  const perSceneCents = input.outputCostMatrix[input.quality][input.size];
-  assertNonnegativeFinite(perSceneCents, "Output cost");
-  return input.sceneCount * perSceneCents;
+  if (input.sizes.length === 0)
+    throw new RangeError("At least one size must be selected.");
+  const perSizeCents = input.sizes.reduce((total, size) => {
+    const cents = input.outputCostMatrix[input.quality][size];
+    assertNonnegativeFinite(cents, "Output cost");
+    return total + cents;
+  }, 0);
+  return input.sceneCount * perSizeCents;
 }
 
 export function calculateActualSceneImageCostCents(input: {

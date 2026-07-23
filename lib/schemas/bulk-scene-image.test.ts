@@ -13,6 +13,7 @@ const VALID = {
     "44444444-4444-4444-8444-444444444444",
     "55555555-5555-4555-8555-555555555555",
   ],
+  sizes: ["1536x1024"],
 };
 
 describe("startBulkSceneImageGenerationSchema", () => {
@@ -54,6 +55,30 @@ describe("startBulkSceneImageGenerationSchema", () => {
     const parsed = startBulkSceneImageGenerationSchema.safeParse({
       ...VALID,
       quality: "ultra",
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("accepts multiple distinct sizes", () => {
+    const parsed = startBulkSceneImageGenerationSchema.safeParse({
+      ...VALID,
+      sizes: ["1536x1024", "1024x1536", "1024x1024"],
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it("rejects an empty size selection", () => {
+    const parsed = startBulkSceneImageGenerationSchema.safeParse({
+      ...VALID,
+      sizes: [],
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("rejects duplicate sizes", () => {
+    const parsed = startBulkSceneImageGenerationSchema.safeParse({
+      ...VALID,
+      sizes: ["1536x1024", "1536x1024"],
     });
     expect(parsed.success).toBe(false);
   });

@@ -1,8 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import type { SceneImageActionResult } from "@/lib/scenes/scene-image-view";
+import type {
+  SceneImageActionResult,
+  SceneImageApiSize,
+} from "@/lib/scenes/scene-image-view";
 import { formatUsdCents } from "@/lib/format/currency";
+import { getSceneImageSizeLabel } from "@/lib/scenes/scene-image-size-options";
 import { runSceneImageAction } from "@/lib/scenes/run-scene-image-action";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,7 +26,7 @@ export function GenerateSceneImageButton({
   estimatedCostCents,
   model,
   qualityLabel,
-  size,
+  sizes,
   stylePresetLabel,
   referenceCount,
   onConfirm,
@@ -32,7 +36,7 @@ export function GenerateSceneImageButton({
   estimatedCostCents: number;
   model: string;
   qualityLabel: string;
-  size: string;
+  sizes: SceneImageApiSize[];
   stylePresetLabel: string;
   referenceCount: number;
   onConfirm: (requestNonce: string) => Promise<SceneImageActionResult>;
@@ -60,14 +64,18 @@ export function GenerateSceneImageButton({
         </DialogTrigger>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirm paid image generation</DialogTitle>
+            <DialogTitle>
+              Confirm paid image generation
+              {sizes.length > 1 ? ` — ${sizes.length} images` : ""}
+            </DialogTitle>
             <DialogDescription>
-              Each confirmation creates a new generation version and a new
-              billable provider request. Older results remain available.
+              {sizes.length > 1
+                ? "Each selected size is an independent, separately-billed generation. Every confirmation creates new generation versions; older results remain available."
+                : "Each confirmation creates a new generation version and a new billable provider request. Older results remain available."}
             </DialogDescription>
           </DialogHeader>
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded-xl border bg-muted/30 p-4 text-sm">
-            <dt className="text-muted-foreground">Estimate</dt>
+            <dt className="text-muted-foreground">Total estimate</dt>
             <dd className="text-right font-semibold tabular-nums">
               {formatUsdCents(estimatedCostCents)}
             </dd>
@@ -77,8 +85,10 @@ export function GenerateSceneImageButton({
             <dd className="text-right">{stylePresetLabel}</dd>
             <dt className="text-muted-foreground">Quality</dt>
             <dd className="text-right">{qualityLabel}</dd>
-            <dt className="text-muted-foreground">Size</dt>
-            <dd className="text-right">{size}</dd>
+            <dt className="text-muted-foreground">Sizes</dt>
+            <dd className="text-right">
+              {sizes.map((size) => getSceneImageSizeLabel(size)).join(", ")}
+            </dd>
             <dt className="text-muted-foreground">References</dt>
             <dd className="text-right">{referenceCount}</dd>
           </dl>
@@ -107,7 +117,11 @@ export function GenerateSceneImageButton({
               }
               type="button"
             >
-              {pending ? "Creating generation..." : "Confirm paid generation"}
+              {pending
+                ? "Creating generation..."
+                : sizes.length > 1
+                  ? `Confirm ${sizes.length} paid generations`
+                  : "Confirm paid generation"}
             </Button>
           </DialogFooter>
         </DialogContent>

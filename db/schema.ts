@@ -1706,7 +1706,11 @@ export const sceneImageBatches = pgTable(
     requestNonce: uuid("request_nonce").notNull(),
     stylePresetVersionId: uuid("style_preset_version_id").notNull(),
     quality: imageQualityEnum("quality").notNull(),
-    size: text("size").notNull(),
+    // The distinct sizes requested across this batch (one generation row per
+    // scene x size is created; this records which sizes the batch spans).
+    sizes: text("sizes").array().notNull(),
+    // Total images requested/reserved across the batch (scenes x sizes), not
+    // the scene count alone, once a batch can span multiple sizes.
     requestedSceneCount: integer("requested_scene_count").notNull(),
     reservedSceneCount: integer("reserved_scene_count").notNull().default(0),
     estimatedCostCents: integer("estimated_cost_cents").notNull(),
@@ -1749,8 +1753,8 @@ export const sceneImageBatches = pgTable(
       sql`${table.estimatedCostCents} >= 0`,
     ),
     check(
-      "scene_image_batches_size_supported",
-      sql`${table.size} in ('1536x1024', '1024x1536', '1024x1024')`,
+      "scene_image_batches_sizes_supported",
+      sql`array_length(${table.sizes}, 1) > 0 and ${table.sizes} <@ array['1536x1024', '1024x1536', '1024x1024']::text[]`,
     ),
     foreignKey({
       columns: [table.projectId, table.workspaceId],
@@ -1851,8 +1855,10 @@ export const sceneImageGenerations = pgTable(
       table.workspaceId,
       table.requestNonce,
     ),
-    uniqueIndex("scene_image_generations_approved_scene_version_unique")
-      .on(table.sceneVersionId)
+    // One approved image PER SIZE per scene version — a scene can have up to
+    // three simultaneously-approved images (one per size), not just one.
+    uniqueIndex("scene_image_generations_approved_scene_version_size_unique")
+      .on(table.sceneVersionId, table.size)
       .where(sql`${table.reviewStatus} = 'approved'`),
     index("scene_image_generations_workspace_project_scene_index").on(
       table.workspaceId,

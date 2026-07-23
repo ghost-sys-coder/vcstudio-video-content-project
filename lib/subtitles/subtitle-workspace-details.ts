@@ -17,7 +17,8 @@ import {
   coerceCaptionStyle,
   DEFAULT_CAPTION_STYLE,
 } from "@/lib/subtitles/caption-style";
-import { DEFAULT_SCENE_FRAMING } from "@/lib/output-variants/scene-framing";
+import { getSceneImageSizeForAspectRatio } from "@/lib/schemas/scene-image";
+import { resolveSceneImage } from "@/lib/subtitles/resolve-scene-image";
 import type {
   CaptionStyleData,
   SubtitleGranularity,
@@ -81,6 +82,7 @@ export async function buildSubtitleContext(input: {
   output?: {
     width: number;
     height: number;
+    aspectRatio?: "16:9" | "9:16" | "1:1";
     captionStyle: CaptionStyleData | null;
     framings: SceneVariantFraming[];
   };
@@ -92,22 +94,57 @@ export async function buildSubtitleContext(input: {
   const currentScenes = await listCurrentScenes(scope);
   const sceneVersionIds = currentScenes.map((row) => row.version.id);
 
-  const [settings, approvedImages, approvedAudios, variantImages] =
-    await Promise.all([
-      getProjectSubtitleSettings(scope),
-      listApprovedSceneImageAssets({ ...scope, sceneVersionIds }),
-      listApprovedSceneAudioAssets({ ...scope, sceneVersionIds }),
-      listSucceededSceneImageGenerationsByIds({
-        ...scope,
-        generationIds: (input.output?.framings ?? []).map(
-          (framing) => framing.sourceImageGenerationId,
-        ),
-      }),
-    ]);
+  // The canonical size is the project's own approved-image size (used for the
+  // free crop/outpaint fallback below); the native size is what THIS render
+  // target (an output variant, or the project itself when none is given)
+  // actually needs. When they match, a natively-generated image IS the
+  // canonical image — no separate query is needed.
+  const canonicalSize = getSceneImageSizeForAspectRatio(
+    input.project.aspectRatio,
+  );
+  const nativeSize = getSceneImageSizeForAspectRatio(
+    input.output?.aspectRatio ?? input.project.aspectRatio,
+  );
+
+  const [
+    settings,
+    approvedImages,
+    nativeImages,
+    approvedAudios,
+    variantImages,
+  ] = await Promise.all([
+    getProjectSubtitleSettings(scope),
+    listApprovedSceneImageAssets({
+      ...scope,
+      sceneVersionIds,
+      size: canonicalSize,
+    }),
+    nativeSize !== canonicalSize
+      ? listApprovedSceneImageAssets({
+          ...scope,
+          sceneVersionIds,
+          size: nativeSize,
+        })
+      : Promise.resolve([]),
+    listApprovedSceneAudioAssets({ ...scope, sceneVersionIds }),
+    listSucceededSceneImageGenerationsByIds({
+      ...scope,
+      generationIds: (input.output?.framings ?? []).map(
+        (framing) => framing.sourceImageGenerationId,
+      ),
+    }),
+  ]);
 
   const imageByVersion = new Map<string, ApprovedImage>(
     approvedImages.map((row) => [row.sceneVersionId, row] as const),
   );
+  // Same identity-match rule as the query above: when the render target's
+  // native size equals the project's canonical size, the canonical approved
+  // image already IS the native match.
+  const nativeByVersion: Map<string, ApprovedImage> =
+    nativeSize === canonicalSize
+      ? imageByVersion
+      : new Map(nativeImages.map((row) => [row.sceneVersionId, row] as const));
   const audioByVersion = new Map<string, ApprovedAudio>(
     approvedAudios.map((row) => [row.sceneVersionId, row] as const),
   );
@@ -193,19 +230,25 @@ export async function buildSubtitleContext(input: {
       subtitleEnv.SUBTITLE_DURATION_MISMATCH_TOLERANCE_MILLISECONDS,
     captionsBySceneId,
     scenes: currentScenes.map(({ scene, version }) => {
+      const native = nativeByVersion.get(version.id) ?? null;
       const approvedImage = imageByVersion.get(version.id) ?? null;
-      const framing = framingByVersion.get(version.id);
-      const variantImage = framing
-        ? variantImageById.get(framing.sourceImageGenerationId)
+      const storedFraming = framingByVersion.get(version.id) ?? null;
+      const variantImage = storedFraming
+        ? (variantImageById.get(storedFraming.sourceImageGenerationId) ?? null)
         : null;
-      const image = variantImage?.assetObjectKey
-        ? {
-            generationId: variantImage.id,
-            assetObjectKey: variantImage.assetObjectKey,
-            assetWidth: variantImage.assetWidth,
-            assetHeight: variantImage.assetHeight,
-          }
-        : approvedImage;
+      const resolved = resolveSceneImage({
+        native,
+        variantImage: variantImage?.assetObjectKey
+          ? {
+              generationId: variantImage.id,
+              assetObjectKey: variantImage.assetObjectKey,
+              assetWidth: variantImage.assetWidth,
+              assetHeight: variantImage.assetHeight,
+            }
+          : null,
+        approvedImage,
+        storedFraming,
+      });
       const audio = audioByVersion.get(version.id) ?? null;
       return {
         sceneId: scene.id,
@@ -213,30 +256,15 @@ export async function buildSubtitleContext(input: {
         sceneVersionId: version.id,
         sceneApproved: scene.status === "approved",
         expectedDurationMilliseconds: version.estimatedDurationMilliseconds,
-        image:
-          image && image.assetObjectKey
-            ? {
-                generationId: image.generationId,
-                objectKey: image.assetObjectKey,
-                width: image.assetWidth,
-                height: image.assetHeight,
-                framing: (() => {
-                  const framing = framingByVersion.get(version.id);
-                  if (
-                    !framing ||
-                    framing.sourceImageGenerationId !== image.generationId
-                  )
-                    return DEFAULT_SCENE_FRAMING;
-                  return {
-                    mode: framing.mode === "outpaint" ? "cover" : framing.mode,
-                    focalPointXBps: framing.focalPointXBps,
-                    focalPointYBps: framing.focalPointYBps,
-                    scaleBps: framing.scaleBps,
-                    backgroundColor: framing.backgroundColor,
-                  };
-                })(),
-              }
-            : null,
+        image: resolved
+          ? {
+              generationId: resolved.image.generationId,
+              objectKey: resolved.image.assetObjectKey,
+              width: resolved.image.assetWidth,
+              height: resolved.image.assetHeight,
+              framing: resolved.framing,
+            }
+          : null,
         audio:
           audio && audio.assetObjectKey
             ? {

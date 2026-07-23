@@ -16,6 +16,10 @@ export const STORYBOARD_FILTERS: ReadonlyArray<{
   { value: "failed", label: "Failed" },
 ];
 
+/**
+ * A scene matches a status filter when ANY of its per-size images match —
+ * a scene can now have several sizes in different states at once.
+ */
 export function sceneMatchesStoryboardFilter(
   scene: StoryboardSceneView,
   filter: StoryboardFilter,
@@ -26,19 +30,21 @@ export function sceneMatchesStoryboardFilter(
     case "eligible":
       return scene.eligibility === "eligible";
     case "inProgress":
-      return (
-        scene.latestStatus !== null &&
-        isActiveImageGenerationStatus(scene.latestStatus)
+      return scene.images.some(
+        (image) =>
+          image.latestStatus !== null &&
+          isActiveImageGenerationStatus(image.latestStatus),
       );
     case "needsReview":
-      return (
-        scene.latestStatus === "succeeded" &&
-        scene.latestReviewStatus === "pending"
+      return scene.images.some(
+        (image) =>
+          image.latestStatus === "succeeded" &&
+          image.latestReviewStatus === "pending",
       );
     case "approved":
-      return scene.approvedImageUrl !== null;
+      return scene.images.some((image) => image.approvedImageUrl !== null);
     case "failed":
-      return scene.latestStatus === "failed";
+      return scene.images.some((image) => image.latestStatus === "failed");
     default:
       return true;
   }

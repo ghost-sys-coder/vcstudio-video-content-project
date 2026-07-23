@@ -12,10 +12,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { BulkGenerationSummary } from "@/components/storyboard/BulkGenerationSummary";
+import { ImageSizeMultiSelect } from "@/components/scenes/ImageSizeMultiSelect";
 import { ManualConfirmationField } from "@/components/budgets/ManualConfirmationField";
 import { requiresManualConfirmation } from "@/lib/budgets/budget-settings";
 import { estimateBulkSceneImageCostCents } from "@/lib/costs/scene-image-cost";
-import type { SceneImageQuality } from "@/lib/scenes/scene-image-view";
+import type {
+  SceneImageApiSize,
+  SceneImageQuality,
+} from "@/lib/scenes/scene-image-view";
 import type {
   BulkGenerateHandler,
   StoryboardConfigurationView,
@@ -53,28 +57,27 @@ export function BulkGenerateDialog({
   const [quality, setQuality] = useState<SceneImageQuality>(
     configuration.draftQuality,
   );
+  const [sizes, setSizes] = useState<SceneImageApiSize[]>([
+    configuration.defaultSize,
+  ]);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [confirmedHighCost, setConfirmedHighCost] = useState(false);
 
+  const requestedImageCount = sceneIds.length * sizes.length;
   const estimatedCostCents = useMemo(
     () =>
       estimateBulkSceneImageCostCents({
         sceneCount: sceneIds.length,
         quality,
-        size: configuration.defaultSize,
+        sizes,
         outputCostMatrix: configuration.outputCostMatrix,
       }),
-    [
-      configuration.defaultSize,
-      configuration.outputCostMatrix,
-      quality,
-      sceneIds.length,
-    ],
+    [configuration.outputCostMatrix, quality, sceneIds.length, sizes],
   );
 
   const overBudget = estimatedCostCents > availableBudgetCents;
-  const overLimit = sceneIds.length > configuration.maximumImagesPerBatch;
+  const overLimit = requestedImageCount > configuration.maximumImagesPerBatch;
   const needsConfirmation = requiresManualConfirmation(
     estimatedCostCents,
     configuration.manualConfirmationThresholdCents,
@@ -143,11 +146,20 @@ export function BulkGenerateDialog({
           </div>
         </fieldset>
 
+        <ImageSizeMultiSelect
+          disabled={pending}
+          id="bulk-image-sizes"
+          onChange={setSizes}
+          value={sizes}
+        />
+
         <BulkGenerationSummary
           availableBudgetCents={availableBudgetCents}
           estimatedCostCents={estimatedCostCents}
           maximumImagesPerBatch={configuration.maximumImagesPerBatch}
+          requestedImageCount={requestedImageCount}
           sceneCount={sceneIds.length}
+          sizeCount={sizes.length}
         />
 
         <ManualConfirmationField
@@ -177,6 +189,7 @@ export function BulkGenerateDialog({
                   sceneIds,
                   stylePresetVersionId,
                   quality,
+                  sizes,
                 });
                 if (result.success) onOpenChange(false);
                 else setError(result.error);
@@ -186,7 +199,7 @@ export function BulkGenerateDialog({
           >
             {pending
               ? "Starting…"
-              : `Generate ${sceneIds.length} ${sceneIds.length === 1 ? "scene" : "scenes"}`}
+              : `Generate ${requestedImageCount} ${requestedImageCount === 1 ? "image" : "images"}`}
           </Button>
         </DialogFooter>
       </DialogContent>

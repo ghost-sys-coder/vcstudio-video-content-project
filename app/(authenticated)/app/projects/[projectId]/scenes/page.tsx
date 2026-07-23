@@ -131,7 +131,6 @@ export default async function ProjectScenesPage({
       availableCharacters={availableCharacters}
       cast={castEntries}
       castAvailableCharacters={castAvailableCharacters}
-      projectAspectRatio={project.aspectRatio}
       canGenerateImages={
         can(context.activeMembership.role, "generateSceneImages") &&
         project.status !== "archived"

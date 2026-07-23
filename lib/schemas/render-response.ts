@@ -102,6 +102,7 @@ const workspaceViewSchema = z.object({
         "failed",
       ]),
       outpaintError: z.string().nullable(),
+      hasNativeMatch: z.boolean(),
     }),
   ),
   shortSourceScenes: z.array(

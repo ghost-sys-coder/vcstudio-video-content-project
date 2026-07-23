@@ -10,6 +10,7 @@ import {
 } from "@/app/(authenticated)/app/projects/[projectId]/scenes/image-actions";
 import { SceneImagePanel } from "@/components/scenes/SceneImagePanel";
 import { estimateSceneImageCost } from "@/lib/costs/scene-image-cost";
+import { getAspectRatioForSceneImageSize } from "@/lib/schemas/scene-image";
 import { sceneImageDetailsResponseSchema } from "@/lib/schemas/scene-image-details";
 import { createSceneImagePromptPreview } from "@/lib/scenes/scene-image-prompt";
 import type {
@@ -24,14 +25,12 @@ function appendReferenceIds(formData: FormData, ids: string[]): void {
 }
 
 export function SceneImageWorkspace({
-  projectAspectRatio,
   scene,
   sceneVersion,
   assignedCharacters,
   canGenerate,
   canReview,
 }: {
-  projectAspectRatio: "16:9" | "9:16" | "1:1";
   scene: Scene;
   sceneVersion: SceneVersion;
   assignedCharacters: Character[];
@@ -42,6 +41,7 @@ export function SceneImageWorkspace({
   const [selection, setSelection] = useState<SceneImageSelection | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
 
   const fetchDetails = useCallback(async (): Promise<SceneImageDetailsView> => {
     const response = await fetch(
@@ -74,7 +74,7 @@ export function SceneImageWorkspace({
             ? current.stylePresetVersionId
             : (defaultPreset?.versionId ?? ""),
         quality: current?.quality ?? nextDetails.configuration.draftQuality,
-        size: current?.size ?? nextDetails.configuration.defaultSize,
+        sizes: current?.sizes ?? [nextDetails.configuration.defaultSize],
         // First load (no prior selection) pre-selects the canonical references
         // for the scene's assigned characters; later refreshes keep the user's
         // choice. Always drop ids no longer eligible.
@@ -122,46 +122,47 @@ export function SceneImageWorkspace({
     const references = details.references.filter((reference) =>
       selection.referenceAssetIds.includes(reference.id),
     );
-    const prompt = createSceneImagePromptPreview({
-      stylePreset,
-      characters: assignedCharacters,
-      references,
-      sceneVersion,
-      size: selection.size,
-      aspectRatio: projectAspectRatio,
-    });
-    const estimate = estimateSceneImageCost({
-      prompt,
-      quality: selection.quality,
-      size: selection.size,
-      referenceAssetCount: references.length,
-      outputCostMatrix: details.configuration.outputCostMatrix,
-      textInputCostPerMillionCents:
-        details.configuration.textInputCostPerMillionCents,
-      referenceInputReserveCents:
-        details.configuration.referenceInputReserveCents,
-      safetyMarginBasisPoints: 0,
+    const perSize = selection.sizes.map((size) => {
+      const prompt = createSceneImagePromptPreview({
+        stylePreset,
+        characters: assignedCharacters,
+        references,
+        sceneVersion,
+        size,
+        aspectRatio: getAspectRatioForSceneImageSize(size),
+      });
+      const estimate = estimateSceneImageCost({
+        prompt,
+        quality: selection.quality,
+        size,
+        referenceAssetCount: references.length,
+        outputCostMatrix: details.configuration.outputCostMatrix,
+        textInputCostPerMillionCents:
+          details.configuration.textInputCostPerMillionCents,
+        referenceInputReserveCents:
+          details.configuration.referenceInputReserveCents,
+        safetyMarginBasisPoints: 0,
+      });
+      return { size, prompt, estimatedCostCents: estimate.estimatedCostCents };
     });
     const compression =
       selection.quality === "low"
         ? details.configuration.draftCompression
         : details.configuration.finalCompression;
     return {
-      prompt,
-      estimatedCostCents: estimate.estimatedCostCents,
+      promptPreviews: perSize.map(({ size, prompt }) => ({ size, prompt })),
+      estimatedCostCents: perSize.reduce(
+        (total, item) => total + item.estimatedCostCents,
+        0,
+      ),
       compression,
     };
-  }, [
-    assignedCharacters,
-    details,
-    projectAspectRatio,
-    sceneVersion,
-    selection,
-  ]);
+  }, [assignedCharacters, details, sceneVersion, selection]);
 
   const refreshAfterAction = useCallback(
     async (result: SceneImageActionResult): Promise<SceneImageActionResult> => {
       if (result.success) await loadDetails();
+      setWarning(result.warning ?? null);
       return result;
     },
     [loadDetails],
@@ -178,7 +179,7 @@ export function SceneImageWorkspace({
       formData.set("stylePresetVersionId", request.stylePresetVersionId);
       formData.set("requestNonce", request.requestNonce);
       formData.set("quality", request.quality);
-      formData.set("size", request.size);
+      request.sizes.forEach((size) => formData.append("sizes", size));
       appendReferenceIds(formData, request.referenceAssetIds);
       return refreshAfterAction(
         await startSceneImageGenerationAction(formData),
@@ -248,42 +249,52 @@ export function SceneImageWorkspace({
     );
 
   return (
-    <SceneImagePanel
-      budgetAvailable={
-        derived.estimatedCostCents <= details.availableBudgetCents
-      }
-      canGenerate={canGenerate && details.configuration.enabled}
-      canReview={canReview}
-      compression={derived.compression}
-      draftQuality={details.configuration.draftQuality}
-      disabledReason={
-        details.configuration.enabled
-          ? undefined
-          : "Scene image generation is disabled by server configuration."
-      }
-      estimatedCostCents={derived.estimatedCostCents}
-      generations={details.generations}
-      finalQuality={details.configuration.finalQuality}
-      idPrefix={`scene-${scene.id}`}
-      maximumReferenceAssets={details.configuration.maximumReferenceAssets}
-      model={details.configuration.model}
-      onApprove={(generationId) =>
-        handleReview(generationId, approveGeneratedImageAction)
-      }
-      onGenerate={handleGenerate}
-      onPoll={handlePoll}
-      onReject={(generationId) =>
-        handleReview(generationId, rejectGeneratedImageAction)
-      }
-      onSelectionChange={setSelection}
-      outputFormat={details.configuration.outputFormat}
-      promptPreview={derived.prompt}
-      promptTemplateVersion={details.promptTemplateVersion}
-      references={details.references}
-      sceneApproved={scene.status === "approved"}
-      sceneNumber={scene.sceneNumber}
-      selection={selection}
-      stylePresets={details.stylePresets}
-    />
+    <div className="space-y-3">
+      {warning ? (
+        <p
+          className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
+          role="status"
+        >
+          {warning}
+        </p>
+      ) : null}
+      <SceneImagePanel
+        budgetAvailable={
+          derived.estimatedCostCents <= details.availableBudgetCents
+        }
+        canGenerate={canGenerate && details.configuration.enabled}
+        canReview={canReview}
+        compression={derived.compression}
+        draftQuality={details.configuration.draftQuality}
+        disabledReason={
+          details.configuration.enabled
+            ? undefined
+            : "Scene image generation is disabled by server configuration."
+        }
+        estimatedCostCents={derived.estimatedCostCents}
+        generations={details.generations}
+        finalQuality={details.configuration.finalQuality}
+        idPrefix={`scene-${scene.id}`}
+        maximumReferenceAssets={details.configuration.maximumReferenceAssets}
+        model={details.configuration.model}
+        onApprove={(generationId) =>
+          handleReview(generationId, approveGeneratedImageAction)
+        }
+        onGenerate={handleGenerate}
+        onPoll={handlePoll}
+        onReject={(generationId) =>
+          handleReview(generationId, rejectGeneratedImageAction)
+        }
+        onSelectionChange={setSelection}
+        outputFormat={details.configuration.outputFormat}
+        promptPreviews={derived.promptPreviews}
+        promptTemplateVersion={details.promptTemplateVersion}
+        references={details.references}
+        sceneApproved={scene.status === "approved"}
+        sceneNumber={scene.sceneNumber}
+        selection={selection}
+        stylePresets={details.stylePresets}
+      />
+    </div>
   );
 }

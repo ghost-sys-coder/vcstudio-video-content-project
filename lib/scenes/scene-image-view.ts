@@ -71,7 +71,7 @@ export type SceneImageDetailsResponse =
 export interface SceneImageSelection {
   stylePresetVersionId: string;
   quality: SceneImageQuality;
-  size: SceneImageApiSize;
+  sizes: SceneImageApiSize[];
   referenceAssetIds: string[];
 }
 
@@ -82,6 +82,10 @@ export interface SceneImageGenerationRequest extends SceneImageSelection {
 export interface SceneImageActionResult {
   success: boolean;
   error: string | null;
+  // Set when the request partially succeeded (e.g. one of several selected
+  // sizes was skipped due to budget or the per-scene-version generation cap)
+  // — success stays true so the started sizes aren't reported as a failure.
+  warning?: string | null;
 }
 
 export interface SceneImageGenerationView {

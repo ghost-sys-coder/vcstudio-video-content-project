@@ -15,15 +15,8 @@ import type {
 } from "@/lib/scenes/scene-image-view";
 import type { SceneImageOutputCostMatrix } from "@/lib/costs/scene-image-cost";
 
-export interface StoryboardSceneView {
-  sceneId: string;
-  sceneNumber: number;
-  sceneStatus: SceneStatus;
-  sceneVersionId: string;
-  narrationText: string;
-  characterNames: string[];
-  durationMilliseconds: number;
-  eligibility: SceneBulkEligibility;
+export interface StoryboardSceneImageView {
+  size: SceneImageApiSize;
   approvedImageUrl: string | null;
   latestImageUrl: string | null;
   latestGenerationId: string | null;
@@ -34,6 +27,20 @@ export interface StoryboardSceneView {
   estimatedCostCents: number | null;
   actualCostCents: number | null;
   safeErrorMessage: string | null;
+}
+
+export interface StoryboardSceneView {
+  sceneId: string;
+  sceneNumber: number;
+  sceneStatus: SceneStatus;
+  sceneVersionId: string;
+  narrationText: string;
+  characterNames: string[];
+  durationMilliseconds: number;
+  eligibility: SceneBulkEligibility;
+  // One entry per size that has at least one generation for this scene
+  // version — a scene can have an approved image per size now, not just one.
+  images: StoryboardSceneImageView[];
 }
 
 export interface StoryboardBatchView {
@@ -78,6 +85,7 @@ export interface BulkGenerateInput {
   sceneIds: string[];
   stylePresetVersionId: string;
   quality: SceneImageQuality;
+  sizes: SceneImageApiSize[];
 }
 
 export type BulkGenerateHandler = (

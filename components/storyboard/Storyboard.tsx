@@ -66,10 +66,12 @@ export function Storyboard({
   const hasActiveWork = useMemo(
     () =>
       data.latestBatch?.displayStatus === "processing" ||
-      data.scenes.some(
-        (scene) =>
-          scene.latestStatus !== null &&
-          isActiveImageGenerationStatus(scene.latestStatus),
+      data.scenes.some((scene) =>
+        scene.images.some(
+          (image) =>
+            image.latestStatus !== null &&
+            isActiveImageGenerationStatus(image.latestStatus),
+        ),
       ),
     [data],
   );
@@ -107,14 +109,17 @@ export function Storyboard({
   const approvableGenerationIds = useMemo(
     () =>
       data.scenes
-        .filter(
-          (scene) =>
-            selected.has(scene.sceneId) &&
-            scene.latestStatus === "succeeded" &&
-            scene.latestReviewStatus === "pending" &&
-            scene.latestGenerationId !== null,
-        )
-        .map((scene) => scene.latestGenerationId as string),
+        .filter((scene) => selected.has(scene.sceneId))
+        .flatMap((scene) =>
+          scene.images
+            .filter(
+              (image) =>
+                image.latestStatus === "succeeded" &&
+                image.latestReviewStatus === "pending" &&
+                image.latestGenerationId !== null,
+            )
+            .map((image) => image.latestGenerationId as string),
+        ),
     [data.scenes, selected],
   );
 
@@ -141,6 +146,7 @@ export function Storyboard({
       formData.set("quality", input.quality);
       formData.set("requestNonce", crypto.randomUUID());
       input.sceneIds.forEach((id) => formData.append("sceneIds", id));
+      input.sizes.forEach((size) => formData.append("sizes", size));
       const result = await startBulkSceneImageGenerationAction(formData);
       if (result.success) {
         clearSelection();

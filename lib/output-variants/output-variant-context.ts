@@ -57,6 +57,7 @@ export async function buildOutputVariantTimelineContext(input: {
     output: {
       width: input.outputVariant.width,
       height: input.outputVariant.height,
+      aspectRatio: input.outputVariant.aspectRatio,
       captionStyle: input.outputVariant.captionStyle,
       framings,
     },

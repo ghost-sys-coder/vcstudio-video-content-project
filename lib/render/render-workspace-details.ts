@@ -34,6 +34,7 @@ import {
 import { loadEffectiveWorkspaceBudget } from "@/lib/budgets/workspace-budget";
 import { loadEffectiveWorkspaceLimits } from "@/lib/budgets/current-settings";
 import { estimateSceneOutpaintCost } from "@/lib/output-variants/start-scene-outpaint";
+import { getSceneImageSizeForAspectRatio } from "@/lib/schemas/scene-image";
 import { renderSceneOutpaintPrompt } from "@studio/prompts";
 import {
   buildOutputVariantTimelineContext,
@@ -123,14 +124,31 @@ export async function loadRenderWorkspace(input: {
     listProjectShortClips(scope),
   ]);
   const sceneVersionIds = currentScenes.map(({ version }) => version.id);
-  const [context, approvedImages, storedFramings, outpaints] =
+  const canonicalSize = getSceneImageSizeForAspectRatio(
+    input.project.aspectRatio,
+  );
+  const nativeSize = getSceneImageSizeForAspectRatio(
+    selectedVariant.aspectRatio,
+  );
+  const [context, approvedImages, nativeImages, storedFramings, outpaints] =
     await Promise.all([
       buildOutputVariantTimelineContext({
         workspaceId: input.workspaceId,
         project: input.project,
         outputVariant: selectedVariant,
       }),
-      listApprovedSceneImageAssets({ ...scope, sceneVersionIds }),
+      listApprovedSceneImageAssets({
+        ...scope,
+        sceneVersionIds,
+        size: canonicalSize,
+      }),
+      nativeSize !== canonicalSize
+        ? listApprovedSceneImageAssets({
+            ...scope,
+            sceneVersionIds,
+            size: nativeSize,
+          })
+        : Promise.resolve([]),
       listSceneVariantFramings({
         ...scope,
         outputVariantId: selectedVariant.id,
@@ -255,6 +273,21 @@ export async function loadRenderWorkspace(input: {
   const imageByVersion = new Map(
     approvedImages.map((image) => [image.sceneVersionId, image]),
   );
+  // When the output variant's target size equals the project's own canonical
+  // size, the primary approved image already IS the native match (no extra
+  // query was made above) — otherwise use the separately-fetched native set.
+  const nativeVersionIds =
+    nativeSize === canonicalSize
+      ? new Set(
+          approvedImages
+            .filter((image) => image.assetObjectKey)
+            .map((image) => image.sceneVersionId),
+        )
+      : new Set(
+          nativeImages
+            .filter((image) => image.assetObjectKey)
+            .map((image) => image.sceneVersionId),
+        );
   const framingByVersion = new Map(
     storedFramings.map((framing) => [framing.sceneVersionId, framing]),
   );
@@ -294,6 +327,7 @@ export async function loadRenderWorkspace(input: {
         customized: Boolean(stored),
         outpaintStatus: toOutpaintStatus(latestOutpaint?.status),
         outpaintError: latestOutpaint?.safeErrorMessage ?? null,
+        hasNativeMatch: nativeVersionIds.has(version.id),
       },
     ];
   });

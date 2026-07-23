@@ -46,7 +46,7 @@ export async function createSceneImageBatch(input: {
   requestNonce: string;
   stylePresetVersionId: string;
   quality: ImageQuality;
-  size: string;
+  sizes: string[];
   requestedSceneCount: number;
   estimatedCostCents: number;
   requestedByUserId: string;
@@ -75,7 +75,7 @@ export async function createSceneImageBatch(input: {
         requestNonce: input.requestNonce,
         stylePresetVersionId: input.stylePresetVersionId,
         quality: input.quality,
-        size: input.size,
+        sizes: input.sizes,
         requestedSceneCount: input.requestedSceneCount,
         estimatedCostCents: input.estimatedCostCents,
         requestedByUserId: input.requestedByUserId,

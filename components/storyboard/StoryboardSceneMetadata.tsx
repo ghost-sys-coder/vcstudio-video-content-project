@@ -10,12 +10,20 @@ export function StoryboardSceneMetadata({
 }: {
   scene: StoryboardSceneView;
 }) {
+  // Summed across every size the scene has generated — actual cost where
+  // it's settled, the reservation estimate otherwise.
+  const totalCostCents = scene.images.reduce(
+    (total, image) =>
+      total + (image.actualCostCents ?? image.estimatedCostCents ?? 0),
+    0,
+  );
+  const hasActualCost = scene.images.some(
+    (image) => image.actualCostCents !== null,
+  );
   const cost =
-    scene.actualCostCents !== null
-      ? `${formatUsdCents(scene.actualCostCents)} actual`
-      : scene.estimatedCostCents !== null
-        ? `${formatUsdCents(scene.estimatedCostCents)} reserved`
-        : null;
+    totalCostCents > 0
+      ? `${formatUsdCents(totalCostCents)} ${hasActualCost ? "actual" : "reserved"}`
+      : null;
 
   return (
     <div className="space-y-2">
@@ -42,8 +50,10 @@ export function StoryboardSceneMetadata({
       <div className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-[11px] text-muted-foreground">
         <span>{formatDuration(scene.durationMilliseconds)}</span>
         {cost ? <span>{cost}</span> : null}
-        {scene.latestGenerationVersion !== null ? (
-          <span>v{scene.latestGenerationVersion}</span>
+        {scene.images.length > 0 ? (
+          <span>
+            {scene.images.length} {scene.images.length === 1 ? "size" : "sizes"}
+          </span>
         ) : null}
       </div>
     </div>

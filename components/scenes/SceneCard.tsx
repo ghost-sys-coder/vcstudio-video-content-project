@@ -16,7 +16,6 @@ export function SceneCard({
   onDirtyChange,
   assignedCharacters,
   availableCharacters,
-  projectAspectRatio,
   canGenerateImages,
   canReviewImages,
   imageIndicator,
@@ -27,7 +26,6 @@ export function SceneCard({
   onDirtyChange?: (dirty: boolean) => void;
   assignedCharacters: Character[];
   availableCharacters: Character[];
-  projectAspectRatio: "16:9" | "9:16" | "1:1";
   canGenerateImages: boolean;
   canReviewImages: boolean;
   imageIndicator?: SceneImageIndicator;
@@ -85,7 +83,6 @@ export function SceneCard({
               assignedCharacters={assignedCharacters}
               canGenerate={canGenerateImages}
               canReview={canReviewImages}
-              projectAspectRatio={projectAspectRatio}
               scene={scene}
               sceneVersion={version}
             />

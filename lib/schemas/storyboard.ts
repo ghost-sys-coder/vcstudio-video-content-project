@@ -28,6 +28,20 @@ const imageGenerationStatusSchema = z.enum([
   "cancelled",
 ]);
 
+const storyboardSceneImageSchema = z.object({
+  size: sceneImageApiSizeSchema,
+  approvedImageUrl: z.string().nullable(),
+  latestImageUrl: z.string().nullable(),
+  latestGenerationId: z.uuid().nullable(),
+  latestStatus: imageGenerationStatusSchema.nullable(),
+  latestReviewStatus: z.enum(["pending", "approved", "rejected"]).nullable(),
+  latestGenerationVersion: z.number().int().positive().nullable(),
+  progressPercent: z.number().int().min(0).max(100),
+  estimatedCostCents: z.number().int().nonnegative().nullable(),
+  actualCostCents: z.number().int().nonnegative().nullable(),
+  safeErrorMessage: z.string().nullable(),
+});
+
 const storyboardSceneSchema = z.object({
   sceneId: z.uuid(),
   sceneNumber: z.number().int().positive(),
@@ -50,16 +64,7 @@ const storyboardSceneSchema = z.object({
     "inProgress",
     "notApproved",
   ]),
-  approvedImageUrl: z.string().nullable(),
-  latestImageUrl: z.string().nullable(),
-  latestGenerationId: z.uuid().nullable(),
-  latestStatus: imageGenerationStatusSchema.nullable(),
-  latestReviewStatus: z.enum(["pending", "approved", "rejected"]).nullable(),
-  latestGenerationVersion: z.number().int().positive().nullable(),
-  progressPercent: z.number().int().min(0).max(100),
-  estimatedCostCents: z.number().int().nonnegative().nullable(),
-  actualCostCents: z.number().int().nonnegative().nullable(),
-  safeErrorMessage: z.string().nullable(),
+  images: z.array(storyboardSceneImageSchema),
 });
 
 const batchCountsSchema = z.object({

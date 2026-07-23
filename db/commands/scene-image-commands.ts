@@ -1485,6 +1485,10 @@ export async function approveSceneImageGeneration(input: {
           eq(sceneImageGenerations.workspaceId, input.workspaceId),
           eq(sceneImageGenerations.projectId, input.projectId),
           eq(sceneImageGenerations.sceneVersionId, generation.sceneVersionId),
+          // Scoped to the same size: a scene can have one approved image PER
+          // SIZE now, so approving one size must not demote another size's
+          // already-approved image.
+          eq(sceneImageGenerations.size, generation.size),
           eq(sceneImageGenerations.reviewStatus, "approved"),
           ne(sceneImageGenerations.id, input.generationId),
         ),

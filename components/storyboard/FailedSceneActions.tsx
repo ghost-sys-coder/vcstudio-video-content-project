@@ -22,15 +22,23 @@ export function FailedSceneActions({
   canGenerate: boolean;
   onGenerate: BulkGenerateHandler;
 }) {
+  const failedImages = scene.images.filter(
+    (image) => image.latestStatus === "failed",
+  );
   return (
     <div className="space-y-2 rounded-lg bg-destructive/5 p-3 ring-1 ring-inset ring-destructive/20">
-      <p className="flex items-start gap-2 text-xs text-destructive">
-        <AlertTriangleIcon aria-hidden className="mt-0.5 size-3.5 shrink-0" />
-        <span>
-          {scene.safeErrorMessage ??
-            "This scene's image generation failed. Try again."}
-        </span>
-      </p>
+      {failedImages.map((image) => (
+        <p
+          className="flex items-start gap-2 text-xs text-destructive"
+          key={image.size}
+        >
+          <AlertTriangleIcon aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+          <span>
+            {image.safeErrorMessage ??
+              `This scene's ${image.size} image generation failed. Try again.`}
+          </span>
+        </p>
+      ))}
       {canGenerate ? (
         <RegenerateSceneDialog
           availableBudgetCents={availableBudgetCents}

@@ -635,6 +635,7 @@ export async function listSceneImageGenerationsForSceneVersions(input: {
       generationVersion: sceneImageGenerations.generationVersion,
       status: sceneImageGenerations.status,
       reviewStatus: sceneImageGenerations.reviewStatus,
+      size: sceneImageGenerations.size,
       assetObjectKey: sceneImageGenerations.assetObjectKey,
       estimatedCostCents: sceneImageGenerations.estimatedCostCents,
       actualCostCents: sceneImageGenerations.actualCostCents,
@@ -648,6 +649,7 @@ export async function listSceneImageGenerationsForSceneVersions(input: {
         eq(sceneImageGenerations.workspaceId, input.workspaceId),
         eq(sceneImageGenerations.projectId, input.projectId),
         inArray(sceneImageGenerations.sceneVersionId, sceneVersionIds),
+        eq(sceneImageGenerations.purpose, "scene"),
       ),
     )
     .orderBy(

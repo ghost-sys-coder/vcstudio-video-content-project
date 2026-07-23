@@ -33,13 +33,8 @@ import {
   createSceneImageOutputCostMatrix,
   getSceneImageCompression,
 } from "@/lib/scenes/scene-image-configuration";
+import { getSceneImageSizeForAspectRatio } from "@/lib/schemas/scene-image";
 import type { sceneImageGenerationTask } from "@/trigger/scene-image-generation";
-
-function providerSize(aspectRatio: ProjectOutputVariant["aspectRatio"]) {
-  if (aspectRatio === "9:16") return "1024x1536" as const;
-  if (aspectRatio === "1:1") return "1024x1024" as const;
-  return "1536x1024" as const;
-}
 
 export function estimateSceneOutpaintCost(input: {
   prompt: string;
@@ -49,7 +44,7 @@ export function estimateSceneOutpaintCost(input: {
   return estimateSceneImageCost({
     prompt: input.prompt,
     quality: "low",
-    size: providerSize(input.aspectRatio),
+    size: getSceneImageSizeForAspectRatio(input.aspectRatio),
     referenceAssetCount: 1,
     outputCostMatrix: createSceneImageOutputCostMatrix(environment),
     textInputCostPerMillionCents:
@@ -100,7 +95,7 @@ export async function startSceneOutpaint(input: {
     height: input.outputVariant.height,
   });
   const quality = "low" as const;
-  const size = providerSize(input.outputVariant.aspectRatio);
+  const size = getSceneImageSizeForAspectRatio(input.outputVariant.aspectRatio);
   const compression = getSceneImageCompression(environment, quality);
   const estimatedCostCents = estimateSceneOutpaintCost({
     prompt,

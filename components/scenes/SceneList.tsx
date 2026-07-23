@@ -18,7 +18,6 @@ export function SceneList({
   canEdit,
   initialSceneNumber,
   availableCharacters,
-  projectAspectRatio,
   canGenerateImages,
   canReviewImages,
 }: {
@@ -31,7 +30,6 @@ export function SceneList({
   canEdit: boolean;
   initialSceneNumber: number | null;
   availableCharacters: Character[];
-  projectAspectRatio: "16:9" | "9:16" | "1:1";
   canGenerateImages: boolean;
   canReviewImages: boolean;
 }) {
@@ -187,7 +185,6 @@ export function SceneList({
           version={selectedRow.version}
           assignedCharacters={selectedRow.assignedCharacters}
           availableCharacters={availableCharacters}
-          projectAspectRatio={projectAspectRatio}
           canGenerateImages={canGenerateImages}
           canReviewImages={canReviewImages}
           imageIndicator={selectedRow.imageIndicator}

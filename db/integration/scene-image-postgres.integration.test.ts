@@ -65,6 +65,7 @@ function fixtureGenerationValues(input: {
   generationId: string;
   generationVersion: number;
   status: "running" | "succeeded";
+  size?: "1536x1024" | "1024x1536" | "1024x1024";
 }): typeof sceneImageGenerations.$inferInsert {
   const succeeded = input.status === "succeeded";
   const now = new Date();
@@ -85,7 +86,7 @@ function fixtureGenerationValues(input: {
     requestFingerprint: randomUUID().replaceAll("-", ""),
     model: "integration-test-model",
     quality: "medium",
-    size: "1536x1024",
+    size: input.size ?? "1536x1024",
     outputFormat: "webp",
     outputCompression: 90,
     promptTemplateVersion: "scene-image-v1",
@@ -528,6 +529,120 @@ describeDatabase("Phase 5 PostgreSQL invariants", () => {
     expect(results.some(({ status }) => status === "fulfilled")).toBe(true);
     expect(approved).toHaveLength(1);
     expect([firstGenerationId, secondGenerationId]).toContain(approved[0]?.id);
+  }, 30_000);
+
+  it("approving one size does not demote an already-approved different size", async () => {
+    const database = getDatabase();
+    const fixture = await createFixture();
+    const landscapeId = randomUUID();
+    const portraitId = randomUUID();
+
+    await database.batch([
+      database.insert(sceneImageGenerations).values(
+        fixtureGenerationValues({
+          fixture,
+          generationId: landscapeId,
+          generationVersion: 1,
+          status: "succeeded",
+          size: "1536x1024",
+        }),
+      ),
+      database.insert(sceneImageGenerations).values(
+        fixtureGenerationValues({
+          fixture,
+          generationId: portraitId,
+          generationVersion: 2,
+          status: "succeeded",
+          size: "1024x1536",
+        }),
+      ),
+    ]);
+
+    await approveSceneImageGeneration({
+      workspaceId: fixture.workspaceId,
+      projectId: fixture.projectId,
+      generationId: landscapeId,
+      userId: fixture.userId,
+    });
+    await approveSceneImageGeneration({
+      workspaceId: fixture.workspaceId,
+      projectId: fixture.projectId,
+      generationId: portraitId,
+      userId: fixture.userId,
+    });
+
+    const approved = await database
+      .select({
+        id: sceneImageGenerations.id,
+        size: sceneImageGenerations.size,
+      })
+      .from(sceneImageGenerations)
+      .where(
+        and(
+          eq(sceneImageGenerations.sceneVersionId, fixture.sceneVersionId),
+          eq(sceneImageGenerations.reviewStatus, "approved"),
+        ),
+      );
+
+    expect(approved).toHaveLength(2);
+    expect(approved.map((row) => row.id).sort()).toEqual(
+      [landscapeId, portraitId].sort(),
+    );
+  }, 30_000);
+
+  it("concurrent approvals of two different sizes both succeed independently", async () => {
+    const database = getDatabase();
+    const fixture = await createFixture();
+    const landscapeId = randomUUID();
+    const portraitId = randomUUID();
+
+    await database.batch([
+      database.insert(sceneImageGenerations).values(
+        fixtureGenerationValues({
+          fixture,
+          generationId: landscapeId,
+          generationVersion: 1,
+          status: "succeeded",
+          size: "1536x1024",
+        }),
+      ),
+      database.insert(sceneImageGenerations).values(
+        fixtureGenerationValues({
+          fixture,
+          generationId: portraitId,
+          generationVersion: 2,
+          status: "succeeded",
+          size: "1024x1536",
+        }),
+      ),
+    ]);
+
+    const results = await Promise.allSettled([
+      approveSceneImageGeneration({
+        workspaceId: fixture.workspaceId,
+        projectId: fixture.projectId,
+        generationId: landscapeId,
+        userId: fixture.userId,
+      }),
+      approveSceneImageGeneration({
+        workspaceId: fixture.workspaceId,
+        projectId: fixture.projectId,
+        generationId: portraitId,
+        userId: fixture.userId,
+      }),
+    ]);
+    const approved = await database
+      .select({ id: sceneImageGenerations.id })
+      .from(sceneImageGenerations)
+      .where(
+        and(
+          eq(sceneImageGenerations.sceneVersionId, fixture.sceneVersionId),
+          eq(sceneImageGenerations.reviewStatus, "approved"),
+        ),
+      );
+
+    expect(results.every(({ status }) => status === "fulfilled")).toBe(true);
+    expect(approved).toHaveLength(2);
   }, 30_000);
 
   it("rejects cross-workspace Phase 5 relationships", async () => {

@@ -37,6 +37,7 @@ export async function startBulkSceneImageGenerationAction(
     quality: formData.get("quality"),
     requestNonce: formData.get("requestNonce"),
     sceneIds: formData.getAll("sceneIds"),
+    sizes: formData.getAll("sizes"),
   });
   if (!parsed.success)
     return { success: false, error: "The bulk generation request is invalid." };

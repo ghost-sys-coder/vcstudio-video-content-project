@@ -10,14 +10,16 @@ import type {
   SceneImageStylePresetView,
 } from "@/lib/scenes/scene-image-view";
 import { isActiveSceneImageGenerationStatus } from "@/lib/scenes/scene-image-view";
+import { groupSceneImageGenerationsBySize } from "@/lib/scenes/scene-image-grouping";
+import { getSceneImageSizeLabel } from "@/lib/scenes/scene-image-size-options";
 import { GenerateSceneImageButton } from "@/components/scenes/GenerateSceneImageButton";
-import { GeneratedImageCard } from "@/components/scenes/GeneratedImageCard";
 import { GenerationCostEstimate } from "@/components/scenes/GenerationCostEstimate";
 import { ImageGenerationProgress } from "@/components/scenes/ImageGenerationProgress";
 import { ImagePromptPreview } from "@/components/scenes/ImagePromptPreview";
 import { ImageQualitySelector } from "@/components/scenes/ImageQualitySelector";
-import { ImageSizeSelector } from "@/components/scenes/ImageSizeSelector";
+import { ImageSizeMultiSelect } from "@/components/scenes/ImageSizeMultiSelect";
 import { ReferenceAssetSelector } from "@/components/scenes/ReferenceAssetSelector";
+import { SceneImageSizeGroup } from "@/components/scenes/SceneImageSizeGroup";
 import { StylePresetSelector } from "@/components/scenes/StylePresetSelector";
 
 export function SceneImagePanel({
@@ -30,7 +32,7 @@ export function SceneImagePanel({
   stylePresets,
   references,
   maximumReferenceAssets,
-  promptPreview,
+  promptPreviews,
   promptTemplateVersion,
   estimatedCostCents,
   budgetAvailable,
@@ -56,7 +58,7 @@ export function SceneImagePanel({
   stylePresets: SceneImageStylePresetView[];
   references: SceneImageReferenceView[];
   maximumReferenceAssets: number;
-  promptPreview: string;
+  promptPreviews: { size: string; prompt: string }[];
   promptTemplateVersion: string;
   estimatedCostCents: number;
   budgetAvailable: boolean;
@@ -146,11 +148,11 @@ export function SceneImagePanel({
           presets={stylePresets}
           value={selection.stylePresetVersionId}
         />
-        <ImageSizeSelector
+        <ImageSizeMultiSelect
           disabled={configurationDisabled || !canGenerate}
           id={`${idPrefix}-image-size`}
-          onChange={(size) => onSelectionChange({ ...selection, size })}
-          value={selection.size}
+          onChange={(sizes) => onSelectionChange({ ...selection, sizes })}
+          value={selection.sizes}
         />
       </div>
       <ImageQualitySelector
@@ -171,11 +173,23 @@ export function SceneImagePanel({
         references={references}
         selectedIds={selection.referenceAssetIds}
       />
-      <ImagePromptPreview
-        id={`${idPrefix}-prompt-preview`}
-        prompt={promptPreview}
-        promptTemplateVersion={promptTemplateVersion}
-      />
+      <div className="space-y-4">
+        {promptPreviews.map((preview) => (
+          <ImagePromptPreview
+            id={`${idPrefix}-prompt-preview-${preview.size}`}
+            key={preview.size}
+            prompt={preview.prompt}
+            promptTemplateVersion={promptTemplateVersion}
+            sizeLabel={
+              promptPreviews.length > 1
+                ? getSceneImageSizeLabel(
+                    preview.size as (typeof selection.sizes)[number],
+                  )
+                : undefined
+            }
+          />
+        ))}
+      </div>
       <GenerationCostEstimate
         budgetAvailable={budgetAvailable}
         compression={compression}
@@ -192,7 +206,7 @@ export function SceneImagePanel({
         onConfirm={(requestNonce) => onGenerate({ ...selection, requestNonce })}
         qualityLabel={qualityLabel}
         referenceCount={selection.referenceAssetIds.length}
-        size={selection.size}
+        sizes={selection.sizes}
         stylePresetLabel={
           selectedStyle
             ? `${selectedStyle.name} v${selectedStyle.version}`
@@ -222,17 +236,17 @@ export function SceneImagePanel({
             Generation history
           </h3>
           <p className="mt-1 text-xs text-muted-foreground">
-            Approvals change the current scene image without deleting older
-            generations.
+            Grouped by size — each size can have its own approved image.
+            Approving one size never changes another size&apos;s approval.
           </p>
         </div>
         {generations.length ? (
-          <div className="grid gap-4 xl:grid-cols-2">
-            {generations.map((generation) => (
-              <GeneratedImageCard
+          <div className="space-y-6">
+            {groupSceneImageGenerationsBySize(generations).map((group) => (
+              <SceneImageSizeGroup
                 canReview={canReview}
-                generation={generation}
-                key={generation.id}
+                group={group}
+                key={group.size}
                 onApprove={onApprove}
                 onReject={onReject}
               />

@@ -27,7 +27,7 @@ export function RegenerateSceneDialog({
   onGenerate: BulkGenerateHandler;
 }) {
   const [open, setOpen] = useState(false);
-  const isRetry = scene.latestStatus === "failed";
+  const isRetry = scene.images.some((image) => image.latestStatus === "failed");
 
   return (
     <>

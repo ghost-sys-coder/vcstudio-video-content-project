@@ -81,6 +81,10 @@ export interface RenderSceneFramingView {
   customized: boolean;
   outpaintStatus: "idle" | "queued" | "running" | "succeeded" | "failed";
   outpaintError: string | null;
+  // True when a natively-generated approved image already exists at this
+  // output variant's exact size — the render uses it directly and this
+  // scene's framing/outpaint settings are not applied.
+  hasNativeMatch: boolean;
 }
 
 export interface ShortSourceSceneView {

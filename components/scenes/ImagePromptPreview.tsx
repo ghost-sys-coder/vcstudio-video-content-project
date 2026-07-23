@@ -4,16 +4,18 @@ export function ImagePromptPreview({
   id,
   prompt,
   promptTemplateVersion,
+  sizeLabel,
 }: {
   id: string;
   prompt: string;
   promptTemplateVersion: string;
+  sizeLabel?: string;
 }) {
   return (
     <section aria-labelledby={`${id}-heading`} className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-medium" id={`${id}-heading`}>
-          Prompt preview
+          Prompt preview{sizeLabel ? ` — ${sizeLabel}` : ""}
         </h3>
         <Badge variant="secondary">Template {promptTemplateVersion}</Badge>
       </div>

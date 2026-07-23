@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { sceneImageQualitySchema } from "@/lib/schemas/scene-image";
+import {
+  sceneImageQualitySchema,
+  uniqueSceneImageSizesSchema,
+} from "@/lib/schemas/scene-image";
 
 const uniqueSceneIdsSchema = z
   .array(z.uuid())
@@ -19,6 +22,7 @@ export const startBulkSceneImageGenerationSchema = z.object({
   quality: sceneImageQualitySchema,
   requestNonce: z.uuid(),
   sceneIds: uniqueSceneIdsSchema,
+  sizes: uniqueSceneImageSizesSchema,
 });
 
 export const cancelSceneImageBatchSchema = z.object({

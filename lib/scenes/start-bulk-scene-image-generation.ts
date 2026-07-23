@@ -49,7 +49,10 @@ import {
 } from "@/lib/scenes/scene-image-configuration";
 import { createSceneImagePromptPreview } from "@/lib/scenes/scene-image-prompt";
 import { classifySceneBulkEligibility } from "@/lib/scenes/scene-image-eligibility";
-import { getSceneImageSizeForAspectRatio } from "@/lib/schemas/scene-image";
+import {
+  getAspectRatioForSceneImageSize,
+  type SceneImageApiSize,
+} from "@/lib/schemas/scene-image";
 import type { StartBulkSceneImageGenerationInput } from "@/lib/schemas/bulk-scene-image";
 import type { sceneImageGenerationTask } from "@/trigger/scene-image-generation";
 
@@ -77,9 +80,13 @@ type DispatchItem = {
   options: { idempotencyKey: string };
 };
 
-function deterministicSceneNonce(batchId: string, sceneId: string): string {
+function deterministicSceneNonce(
+  batchId: string,
+  sceneId: string,
+  size: string,
+): string {
   const value = createHash("sha256")
-    .update(`scene-image-batch:${batchId}:${sceneId}`)
+    .update(`scene-image-batch:${batchId}:${sceneId}:${size}`)
     .digest("hex")
     .slice(0, 32);
   return [
@@ -130,19 +137,21 @@ export async function startBulkSceneImageGeneration(input: {
     throw new BulkSceneImageGenerationRequestError(
       "Select at least one scene.",
     );
+  const sizes: SceneImageApiSize[] = [...new Set(input.request.sizes)];
   const limits = await loadEffectiveWorkspaceLimits({
     workspaceId: input.workspaceId,
   });
-  if (requestedSceneIds.length > limits.maxImagesPerBatch)
+  // The limit counts total images requested (scenes x sizes), not scenes
+  // alone, once a batch can span multiple sizes.
+  if (requestedSceneIds.length * sizes.length > limits.maxImagesPerBatch)
     throw new BulkSceneImageGenerationRequestError(
-      `Generate no more than ${limits.maxImagesPerBatch} scenes in a single batch.`,
+      `Generate no more than ${limits.maxImagesPerBatch} images (scenes x sizes) in a single batch.`,
     );
 
   const scope = {
     workspaceId: input.workspaceId,
     projectId: input.project.id,
   };
-  const size = getSceneImageSizeForAspectRatio(input.project.aspectRatio);
   const outputCompression = getSceneImageCompression(
     environment,
     input.request.quality,
@@ -227,28 +236,28 @@ export async function startBulkSceneImageGeneration(input: {
     defaultAspectRatio: stylePreset.version.defaultAspectRatio,
   };
 
-  const plans = await Promise.all(
-    plannedScenes.map(async (row) => {
-      const [assignedCharacterRows, referenceRows] = await Promise.all([
-        listAssignedSceneCharacters({
-          ...scope,
-          sceneVersionId: row.version.id,
-          limit: 100,
-        }),
-        listEligibleSceneReferenceAssets({
-          ...scope,
-          sceneVersionId: row.version.id,
-          limit: environment.MAX_REFERENCE_ASSETS_PER_GENERATION,
-        }),
-      ]);
-      const referenceAssetIds = referenceRows
-        .slice(0, environment.MAX_REFERENCE_ASSETS_PER_GENERATION)
-        .map(({ reference }) => reference.id)
-        .sort();
-      const finalPrompt = createSceneImagePromptPreview({
-        stylePreset: stylePresetView,
-        characters: assignedCharacterRows.map(({ character }) => character),
-        references: referenceRows
+  const plans = (
+    await Promise.all(
+      plannedScenes.map(async (row) => {
+        // Reference/character lookups are scene-scoped, not size-scoped —
+        // fetched once per scene and reused across every requested size.
+        const [assignedCharacterRows, referenceRows] = await Promise.all([
+          listAssignedSceneCharacters({
+            ...scope,
+            sceneVersionId: row.version.id,
+            limit: 100,
+          }),
+          listEligibleSceneReferenceAssets({
+            ...scope,
+            sceneVersionId: row.version.id,
+            limit: environment.MAX_REFERENCE_ASSETS_PER_GENERATION,
+          }),
+        ]);
+        const referenceAssetIds = referenceRows
+          .slice(0, environment.MAX_REFERENCE_ASSETS_PER_GENERATION)
+          .map(({ reference }) => reference.id)
+          .sort();
+        const referenceViews = referenceRows
           .slice(0, environment.MAX_REFERENCE_ASSETS_PER_GENERATION)
           .map(({ character, reference }) => ({
             id: reference.id,
@@ -259,36 +268,45 @@ export async function startBulkSceneImageGeneration(input: {
             thumbnailUrl: "",
             width: reference.width,
             height: reference.height,
-          })),
-        sceneVersion: row.version,
-        size,
-        aspectRatio: input.project.aspectRatio,
-      });
-      const estimate = estimateSceneImageCost({
-        prompt: finalPrompt,
-        quality: input.request.quality,
-        size,
-        referenceAssetCount: referenceAssetIds.length,
-        outputCostMatrix,
-        textInputCostPerMillionCents:
-          environment.OPENAI_IMAGE_TEXT_INPUT_COST_PER_MILLION_CENTS,
-        referenceInputReserveCents:
-          environment.OPENAI_IMAGE_REFERENCE_RESERVE_CENTS_PER_ASSET,
-        safetyMarginBasisPoints: 0,
-      });
-      const inputFidelity = getOpenAiReferenceInputFidelitySnapshot({
-        model: environment.OPENAI_IMAGE_MODEL,
-        hasReferences: referenceAssetIds.length > 0,
-      });
-      return {
-        row,
-        referenceAssetIds,
-        finalPrompt,
-        estimatedCostCents: estimate.estimatedCostCents,
-        inputFidelity,
-      };
-    }),
-  );
+          }));
+        const inputFidelity = getOpenAiReferenceInputFidelitySnapshot({
+          model: environment.OPENAI_IMAGE_MODEL,
+          hasReferences: referenceAssetIds.length > 0,
+        });
+
+        return sizes.map((size) => {
+          const finalPrompt = createSceneImagePromptPreview({
+            stylePreset: stylePresetView,
+            characters: assignedCharacterRows.map(({ character }) => character),
+            references: referenceViews,
+            sceneVersion: row.version,
+            size,
+            aspectRatio: getAspectRatioForSceneImageSize(size),
+          });
+          const estimate = estimateSceneImageCost({
+            prompt: finalPrompt,
+            quality: input.request.quality,
+            size,
+            referenceAssetCount: referenceAssetIds.length,
+            outputCostMatrix,
+            textInputCostPerMillionCents:
+              environment.OPENAI_IMAGE_TEXT_INPUT_COST_PER_MILLION_CENTS,
+            referenceInputReserveCents:
+              environment.OPENAI_IMAGE_REFERENCE_RESERVE_CENTS_PER_ASSET,
+            safetyMarginBasisPoints: 0,
+          });
+          return {
+            row,
+            size,
+            referenceAssetIds,
+            finalPrompt,
+            estimatedCostCents: estimate.estimatedCostCents,
+            inputFidelity,
+          };
+        });
+      }),
+    )
+  ).flat();
 
   const estimatedTotalCents = plans.reduce(
     (total, plan) => total + plan.estimatedCostCents,
@@ -328,6 +346,7 @@ export async function startBulkSceneImageGeneration(input: {
       "This batch would exceed the available budget. Reduce the number of scenes or lower the quality.",
     );
 
+  const requestedImageCount = requestedSceneIds.length * sizes.length;
   const batchId = randomUUID();
   const { batch, created } = await createSceneImageBatch({
     batchId,
@@ -336,7 +355,7 @@ export async function startBulkSceneImageGeneration(input: {
     requestNonce: input.request.requestNonce,
     stylePresetVersionId: stylePreset.version.id,
     quality: input.request.quality,
-    size,
+    sizes,
     requestedSceneCount: plans.length,
     estimatedCostCents: estimatedTotalCents,
     requestedByUserId: input.requestedByUserId,
@@ -348,7 +367,7 @@ export async function startBulkSceneImageGeneration(input: {
       created,
       reservedCount: batch.reservedSceneCount,
       requestedCount: plans.length,
-      skippedCount: requestedSceneIds.length - plans.length,
+      skippedCount: requestedImageCount - plans.length,
       dispatched: false,
       budgetStopped: false,
     };
@@ -378,7 +397,7 @@ export async function startBulkSceneImageGeneration(input: {
       created,
       reservedCount: batch.reservedSceneCount,
       requestedCount: plans.length,
-      skippedCount: requestedSceneIds.length - plans.length,
+      skippedCount: requestedImageCount - plans.length,
       dispatched,
       budgetStopped: false,
     };
@@ -396,7 +415,11 @@ export async function startBulkSceneImageGeneration(input: {
     });
     if (!approvedScene) continue;
 
-    const requestNonce = deterministicSceneNonce(batchId, plan.row.scene.id);
+    const requestNonce = deterministicSceneNonce(
+      batchId,
+      plan.row.scene.id,
+      plan.size,
+    );
     const requestFingerprint = createRequestFingerprint(
       environment.REQUEST_FINGERPRINT_SECRET,
       plan.finalPrompt,
@@ -423,7 +446,7 @@ export async function startBulkSceneImageGeneration(input: {
         generationVersion,
         model: environment.OPENAI_IMAGE_MODEL,
         quality: input.request.quality,
-        size,
+        size: plan.size,
         outputFormat: environment.OPENAI_IMAGE_OUTPUT_FORMAT,
         outputCompression,
         background: environment.OPENAI_IMAGE_BACKGROUND,
@@ -445,7 +468,7 @@ export async function startBulkSceneImageGeneration(input: {
           requestFingerprint,
           model: environment.OPENAI_IMAGE_MODEL,
           quality: input.request.quality,
-          size,
+          size: plan.size,
           outputFormat: environment.OPENAI_IMAGE_OUTPUT_FORMAT,
           outputCompression,
           background: environment.OPENAI_IMAGE_BACKGROUND,
@@ -508,7 +531,7 @@ export async function startBulkSceneImageGeneration(input: {
     created,
     reservedCount: items.length,
     requestedCount: plans.length,
-    skippedCount: requestedSceneIds.length - plans.length,
+    skippedCount: requestedImageCount - plans.length,
     dispatched,
     budgetStopped,
   };

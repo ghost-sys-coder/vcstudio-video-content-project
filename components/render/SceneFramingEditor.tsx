@@ -87,6 +87,14 @@ export function SceneFramingEditor({
         </p>
       </div>
 
+      {selected.hasNativeMatch ? (
+        <p className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
+          Scene {selected.sceneNumber} already has a natively-generated image at
+          this exact size — the render will use it directly, and the
+          framing/outpaint settings below won&apos;t be applied to it.
+        </p>
+      ) : null}
+
       <div
         className="flex min-w-0 max-w-full gap-2 overflow-x-auto pb-1"
         aria-label="Scenes"

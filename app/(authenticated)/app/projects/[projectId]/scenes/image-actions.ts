@@ -45,6 +45,7 @@ export async function startSceneImageGenerationAction(
 ): Promise<SceneImageActionResult> {
   const parsed = startSceneImageGenerationSchema.safeParse({
     ...Object.fromEntries(formData),
+    sizes: formData.getAll("sizes"),
     referenceAssetIds: formData.getAll("referenceAssetIds"),
   });
   if (!parsed.success)
@@ -58,14 +59,21 @@ export async function startSceneImageGenerationAction(
       parsed.data.projectId,
       "generateSceneImages",
     );
-    await startSceneImageGeneration({
+    const result = await startSceneImageGeneration({
       workspaceId: context.activeMembership.workspaceId,
       requestedByUserId: context.user.id,
       project,
       request: parsed.data,
     });
     revalidatePath(`/app/projects/${project.id}/scenes`);
-    return { success: true, error: null };
+    return {
+      success: true,
+      error: null,
+      warning:
+        result.skippedSizes.length > 0
+          ? `${result.started.length} of ${result.started.length + result.skippedSizes.length} sizes started. The rest were skipped (budget or the per-scene image limit) — try again once that clears.`
+          : null,
+    };
   } catch (error) {
     if (error instanceof RateLimitExceededError)
       return { success: false, error: error.message };

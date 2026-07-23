@@ -25,10 +25,14 @@ import { createSceneImageOutputCostMatrix } from "@/lib/scenes/scene-image-confi
 import { classifySceneBulkEligibility } from "@/lib/scenes/scene-image-eligibility";
 import type {
   StoryboardBatchView,
+  StoryboardSceneImageView,
   StoryboardSceneView,
   StoryboardView,
 } from "@/lib/scenes/storyboard-view";
-import { getSceneImageSizeForAspectRatio } from "@/lib/schemas/scene-image";
+import {
+  getSceneImageSizeForAspectRatio,
+  type SceneImageApiSize,
+} from "@/lib/schemas/scene-image";
 import { SCENE_IMAGE_PROMPT_VERSION } from "@studio/prompts";
 
 function formatCreatedAt(value: Date): string {
@@ -90,22 +94,43 @@ export async function loadStoryboard(input: {
     });
   }
 
-  const latestByScene = new Map<string, (typeof generations)[number]>();
-  const approvedByScene = new Map<string, (typeof generations)[number]>();
+  // Latest and approved generation, per scene, PER SIZE — a scene can have an
+  // approved image for each size independently. Rows arrive ordered scene
+  // asc / generationVersion desc, so the first row seen for a given
+  // (sceneId, size) pair is that size's latest.
+  const latestByScene = new Map<
+    string,
+    Map<SceneImageApiSize, (typeof generations)[number]>
+  >();
+  const approvedByScene = new Map<
+    string,
+    Map<SceneImageApiSize, (typeof generations)[number]>
+  >();
   const sceneVersionById = new Map(
     currentScenes.map((row) => [row.scene.id, row.version.id] as const),
   );
   for (const generation of generations) {
     if (sceneVersionById.get(generation.sceneId) !== generation.sceneVersionId)
       continue;
-    if (!latestByScene.has(generation.sceneId))
-      latestByScene.set(generation.sceneId, generation);
+    const size = generation.size as SceneImageApiSize;
+    let latestSizes = latestByScene.get(generation.sceneId);
+    if (!latestSizes) {
+      latestSizes = new Map();
+      latestByScene.set(generation.sceneId, latestSizes);
+    }
+    if (!latestSizes.has(size)) latestSizes.set(size, generation);
+
     if (
       generation.status === "succeeded" &&
-      generation.reviewStatus === "approved" &&
-      !approvedByScene.has(generation.sceneId)
-    )
-      approvedByScene.set(generation.sceneId, generation);
+      generation.reviewStatus === "approved"
+    ) {
+      let approvedSizes = approvedByScene.get(generation.sceneId);
+      if (!approvedSizes) {
+        approvedSizes = new Map();
+        approvedByScene.set(generation.sceneId, approvedSizes);
+      }
+      if (!approvedSizes.has(size)) approvedSizes.set(size, generation);
+    }
   }
 
   const assetUrl = (generationId: string) =>
@@ -113,8 +138,38 @@ export async function loadStoryboard(input: {
 
   const scenes: StoryboardSceneView[] = currentScenes.map(
     ({ scene, version }) => {
-      const latest = latestByScene.get(scene.id) ?? null;
-      const approved = approvedByScene.get(scene.id) ?? null;
+      const latestSizes = latestByScene.get(scene.id);
+      const approvedSizes = approvedByScene.get(scene.id);
+      const sizes = new Set<SceneImageApiSize>([
+        ...(latestSizes?.keys() ?? []),
+        ...(approvedSizes?.keys() ?? []),
+      ]);
+      const images: StoryboardSceneImageView[] = [...sizes].map((size) => {
+        const latest = latestSizes?.get(size) ?? null;
+        const approved = approvedSizes?.get(size) ?? null;
+        return {
+          size,
+          approvedImageUrl: approved ? assetUrl(approved.id) : null,
+          latestImageUrl:
+            latest && latest.status === "succeeded" && latest.assetObjectKey
+              ? assetUrl(latest.id)
+              : null,
+          latestGenerationId: latest?.id ?? null,
+          latestStatus: latest?.status ?? null,
+          latestReviewStatus: latest?.reviewStatus ?? null,
+          latestGenerationVersion: latest?.generationVersion ?? null,
+          progressPercent: latest?.progressPercent ?? 0,
+          estimatedCostCents: latest?.estimatedCostCents ?? null,
+          actualCostCents: latest?.actualCostCents ?? null,
+          safeErrorMessage: latest?.safeErrorMessage ?? null,
+        };
+      });
+      // Eligibility stays scene-level and size-agnostic: any approved size
+      // counts as "has an approved image", and the most recently created
+      // generation across all sizes represents "latest" activity for gating.
+      const mostRecentLatest = [...(latestSizes?.values() ?? [])].sort(
+        (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+      )[0];
       return {
         sceneId: scene.id,
         sceneNumber: scene.sceneNumber,
@@ -125,22 +180,10 @@ export async function loadStoryboard(input: {
         durationMilliseconds: version.estimatedDurationMilliseconds,
         eligibility: classifySceneBulkEligibility({
           sceneStatus: scene.status,
-          hasApprovedImage: approved !== null,
-          latestGenerationStatus: latest?.status ?? null,
+          hasApprovedImage: Boolean(approvedSizes && approvedSizes.size > 0),
+          latestGenerationStatus: mostRecentLatest?.status ?? null,
         }),
-        approvedImageUrl: approved ? assetUrl(approved.id) : null,
-        latestImageUrl:
-          latest && latest.status === "succeeded" && latest.assetObjectKey
-            ? assetUrl(latest.id)
-            : null,
-        latestGenerationId: latest?.id ?? null,
-        latestStatus: latest?.status ?? null,
-        latestReviewStatus: latest?.reviewStatus ?? null,
-        latestGenerationVersion: latest?.generationVersion ?? null,
-        progressPercent: latest?.progressPercent ?? 0,
-        estimatedCostCents: latest?.estimatedCostCents ?? null,
-        actualCostCents: latest?.actualCostCents ?? null,
-        safeErrorMessage: latest?.safeErrorMessage ?? null,
+        images,
       };
     },
   );

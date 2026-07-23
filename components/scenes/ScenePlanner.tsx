@@ -26,7 +26,6 @@ export function ScenePlanner({
   availableCharacters,
   cast,
   castAvailableCharacters,
-  projectAspectRatio,
   canGenerateImages,
   canReviewImages,
 }: {
@@ -45,7 +44,6 @@ export function ScenePlanner({
   availableCharacters: Character[];
   cast: ProjectCastEntry[];
   castAvailableCharacters: Character[];
-  projectAspectRatio: "16:9" | "9:16" | "1:1";
   canGenerateImages: boolean;
   canReviewImages: boolean;
 }) {
@@ -81,7 +79,6 @@ export function ScenePlanner({
         initialSceneNumber={initialSceneNumber}
         rows={rows}
         availableCharacters={availableCharacters}
-        projectAspectRatio={projectAspectRatio}
         canGenerateImages={canGenerateImages}
         canReviewImages={canReviewImages}
       />

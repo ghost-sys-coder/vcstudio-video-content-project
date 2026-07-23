@@ -26,6 +26,18 @@ const uniqueReferenceAssetIdsSchema = z
   })
   .transform((referenceAssetIds) => [...referenceAssetIds].sort());
 
+export const uniqueSceneImageSizesSchema = z
+  .array(sceneImageApiSizeSchema)
+  .min(1, "Select at least one size.")
+  .max(SCENE_IMAGE_API_SIZES.length)
+  .superRefine((sizes, context) => {
+    if (new Set(sizes).size !== sizes.length)
+      context.addIssue({
+        code: "custom",
+        message: "Sizes must be unique.",
+      });
+  });
+
 export const startSceneImageGenerationSchema = z.object({
   projectId: z.uuid(),
   sceneId: z.uuid(),
@@ -33,7 +45,7 @@ export const startSceneImageGenerationSchema = z.object({
   stylePresetVersionId: z.uuid(),
   requestNonce: z.uuid(),
   quality: sceneImageQualitySchema,
-  size: sceneImageApiSizeSchema,
+  sizes: uniqueSceneImageSizesSchema,
   referenceAssetIds: uniqueReferenceAssetIdsSchema,
 });
 
@@ -77,4 +89,18 @@ export function getSceneImageSizeForAspectRatio(
   if (aspectRatio === "16:9") return "1536x1024";
   if (aspectRatio === "9:16") return "1024x1536";
   return "1024x1024";
+}
+
+/**
+ * Inverse of {@link getSceneImageSizeForAspectRatio}. A generation's prompt
+ * must describe the composition of the size actually being produced, not the
+ * project's overall aspect ratio — otherwise a native portrait/square
+ * generation would carry landscape framing guidance.
+ */
+export function getAspectRatioForSceneImageSize(
+  size: SceneImageApiSize,
+): "16:9" | "9:16" | "1:1" {
+  if (size === "1536x1024") return "16:9";
+  if (size === "1024x1536") return "9:16";
+  return "1:1";
 }

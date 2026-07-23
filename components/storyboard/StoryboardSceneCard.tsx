@@ -1,11 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { CheckIcon, XIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { FailedSceneActions } from "@/components/storyboard/FailedSceneActions";
 import { RegenerateSceneDialog } from "@/components/storyboard/RegenerateSceneDialog";
-import { StoryboardSceneImage } from "@/components/storyboard/StoryboardSceneImage";
+import { StoryboardSceneImageGroup } from "@/components/storyboard/StoryboardSceneImageGroup";
+import { StoryboardSceneImageReviewRow } from "@/components/storyboard/StoryboardSceneImageReviewRow";
 import { StoryboardSceneMetadata } from "@/components/storyboard/StoryboardSceneMetadata";
 import { StoryboardSelectionCheckbox } from "@/components/storyboard/StoryboardSelectionCheckbox";
 import { isSceneSelectableForBulk } from "@/lib/scenes/scene-image-eligibility";
@@ -43,28 +41,21 @@ export function StoryboardSceneCard({
   onRejectScene: StoryboardReviewHandler;
   onGenerate: BulkGenerateHandler;
 }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-
   const selectable = isSceneSelectableForBulk(scene.eligibility);
-  const needsReview =
-    scene.latestStatus === "succeeded" &&
-    scene.latestReviewStatus === "pending";
-  const isFailed = scene.latestStatus === "failed";
-  const inProgress =
-    scene.latestStatus === "pending" ||
-    scene.latestStatus === "queued" ||
-    scene.latestStatus === "running";
-
-  const runReview = (handler: StoryboardReviewHandler) => {
-    if (!scene.latestGenerationId) return;
-    const generationId = scene.latestGenerationId;
-    startTransition(async () => {
-      setError(null);
-      const result = await handler(generationId);
-      if (!result.success) setError(result.error);
-    });
-  };
+  const imagesNeedingReview = scene.images.filter(
+    (image) =>
+      image.latestStatus === "succeeded" &&
+      image.latestReviewStatus === "pending",
+  );
+  const isFailed = scene.images.some(
+    (image) => image.latestStatus === "failed",
+  );
+  const inProgress = scene.images.some(
+    (image) =>
+      image.latestStatus === "pending" ||
+      image.latestStatus === "queued" ||
+      image.latestStatus === "running",
+  );
 
   return (
     <article
@@ -108,7 +99,7 @@ export function StoryboardSceneCard({
         </span>
       </div>
 
-      <StoryboardSceneImage scene={scene} />
+      <StoryboardSceneImageGroup scene={scene} />
       <StoryboardSceneMetadata scene={scene} />
 
       {isFailed ? (
@@ -122,27 +113,16 @@ export function StoryboardSceneCard({
         />
       ) : null}
 
-      {needsReview && canReview ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            disabled={pending}
-            onClick={() => runReview(onApproveScene)}
-            size="sm"
-            type="button"
-          >
-            <CheckIcon aria-hidden />
-            Approve
-          </Button>
-          <Button
-            disabled={pending}
-            onClick={() => runReview(onRejectScene)}
-            size="sm"
-            type="button"
-            variant="outline"
-          >
-            <XIcon aria-hidden />
-            Reject
-          </Button>
+      {imagesNeedingReview.length > 0 && canReview ? (
+        <div className="space-y-2">
+          {imagesNeedingReview.map((image) => (
+            <StoryboardSceneImageReviewRow
+              image={image}
+              key={image.size}
+              onApprove={onApproveScene}
+              onReject={onRejectScene}
+            />
+          ))}
         </div>
       ) : null}
 
@@ -155,12 +135,6 @@ export function StoryboardSceneCard({
           scene={scene}
           stylePresets={stylePresets}
         />
-      ) : null}
-
-      {error ? (
-        <p className="text-xs text-destructive" role="alert">
-          {error}
-        </p>
       ) : null}
     </article>
   );

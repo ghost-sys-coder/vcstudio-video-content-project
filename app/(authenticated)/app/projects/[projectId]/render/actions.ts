@@ -15,6 +15,7 @@ import {
 } from "@/lib/domain/errors";
 import { requireCapability } from "@/lib/policies/workspace-policy";
 import { cancelVideoRenderRun } from "@/lib/render/cancel-video-render";
+import { getSceneImageSizeForAspectRatio } from "@/lib/schemas/scene-image";
 import {
   startVideoRender,
   VideoRenderRequestError,
@@ -169,6 +170,7 @@ export async function saveSceneFramingAction(
     const [approvedImage] = await listApprovedSceneImageAssets({
       ...scope,
       sceneVersionIds: [parsed.data.sceneVersionId],
+      size: getSceneImageSizeForAspectRatio(project.aspectRatio),
     });
     if (
       !approvedImage ||

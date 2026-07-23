@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   calculateActualSceneImageCostCents,
+  estimateBulkSceneImageCostCents,
   estimateSceneImageCost,
   reconcileSceneImageCost,
   type SceneImageOutputCostMatrix,
@@ -93,6 +94,53 @@ describe("scene image costs", () => {
       chargedCostCents: 18,
       releasedCostCents: 0,
       overageCostCents: 0,
+    });
+  });
+
+  describe("estimateBulkSceneImageCostCents", () => {
+    it("sums the per-size output cost, multiplied by scene count", () => {
+      // One landscape (2) + one square (1) = 3 cents/scene x 4 scenes = 12.
+      expect(
+        estimateBulkSceneImageCostCents({
+          sceneCount: 4,
+          quality: "low",
+          sizes: ["1536x1024", "1024x1024"],
+          outputCostMatrix,
+        }),
+      ).toBe(12);
+    });
+
+    it("matches the single-size result when only one size is selected", () => {
+      expect(
+        estimateBulkSceneImageCostCents({
+          sceneCount: 5,
+          quality: "medium",
+          sizes: ["1536x1024"],
+          outputCostMatrix,
+        }),
+      ).toBe(35);
+    });
+
+    it("rejects an empty size selection", () => {
+      expect(() =>
+        estimateBulkSceneImageCostCents({
+          sceneCount: 3,
+          quality: "low",
+          sizes: [],
+          outputCostMatrix,
+        }),
+      ).toThrow(RangeError);
+    });
+
+    it("rejects a negative scene count", () => {
+      expect(() =>
+        estimateBulkSceneImageCostCents({
+          sceneCount: -1,
+          quality: "low",
+          sizes: ["1024x1024"],
+          outputCostMatrix,
+        }),
+      ).toThrow(RangeError);
     });
   });
 });
