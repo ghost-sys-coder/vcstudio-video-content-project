@@ -1,9 +1,11 @@
 "use client";
 
-import type { FormEvent } from "react";
+import { type FormEvent, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SUGGESTED_NICHES } from "@/lib/ideas/suggested-niches";
+import { cn } from "@/lib/utils";
 
 function formatCents(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
@@ -29,6 +31,7 @@ export function IdeaGeneratorForm({
   const highest = Math.max(3, maxPerBatch);
   const counts = Array.from({ length: highest - 2 }, (_, index) => index + 3);
   const safeDefault = Math.min(Math.max(defaultCount, 3), highest);
+  const [niche, setNiche] = useState("");
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -56,9 +59,30 @@ export function IdeaGeneratorForm({
             maxLength={120}
             minLength={2}
             name="niche"
+            onChange={(event) => setNiche(event.target.value)}
             placeholder="e.g. personal finance for students"
             required
+            value={niche}
           />
+          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+            <span className="text-xs text-muted-foreground">Popular:</span>
+            {SUGGESTED_NICHES.map((suggestion) => (
+              <button
+                aria-pressed={niche === suggestion}
+                className={cn(
+                  "rounded-full border px-2.5 py-1 text-xs transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50",
+                  niche === suggestion &&
+                    "border-primary bg-primary/10 text-primary hover:bg-primary/10",
+                )}
+                disabled={!canEdit}
+                key={suggestion}
+                onClick={() => setNiche(suggestion)}
+                type="button"
+              >
+                {suggestion}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="space-y-2">
           <Label htmlFor="idea-platform">Platform</Label>

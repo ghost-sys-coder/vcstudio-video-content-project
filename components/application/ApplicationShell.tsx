@@ -35,6 +35,8 @@ export function ApplicationShell({
         canManageUsage={canManageUsage}
         logoUrl={logoUrl}
         memberships={memberships}
+        userDisplayName={user.displayName}
+        userEmail={user.email}
       />
       <SidebarInset className="min-w-0 overflow-x-clip">
         <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur sm:px-6">
