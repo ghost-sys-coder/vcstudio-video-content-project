@@ -32,6 +32,7 @@ export function IdeaGeneratorForm({
   const counts = Array.from({ length: highest - 2 }, (_, index) => index + 3);
   const safeDefault = Math.min(Math.max(defaultCount, 3), highest);
   const [niche, setNiche] = useState("");
+  const [tone, setTone] = useState("");
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -68,18 +69,22 @@ export function IdeaGeneratorForm({
             <span className="text-xs text-muted-foreground">Popular:</span>
             {SUGGESTED_NICHES.map((suggestion) => (
               <button
-                aria-pressed={niche === suggestion}
+                aria-pressed={niche === suggestion.niche}
                 className={cn(
                   "rounded-full border px-2.5 py-1 text-xs transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50",
-                  niche === suggestion &&
+                  niche === suggestion.niche &&
                     "border-primary bg-primary/10 text-primary hover:bg-primary/10",
                 )}
                 disabled={!canEdit}
-                key={suggestion}
-                onClick={() => setNiche(suggestion)}
+                key={suggestion.niche}
+                onClick={() => {
+                  setNiche(suggestion.niche);
+                  setTone(suggestion.tone);
+                }}
+                title={`Suggested tone: ${suggestion.tone}`}
                 type="button"
               >
-                {suggestion}
+                {suggestion.niche}
               </button>
             ))}
           </div>
@@ -123,8 +128,14 @@ export function IdeaGeneratorForm({
             id="idea-tone"
             maxLength={200}
             name="tonePreference"
+            onChange={(event) => setTone(event.target.value)}
             placeholder="e.g. warm and encouraging, or dry and witty"
+            value={tone}
           />
+          <p className="text-xs text-muted-foreground">
+            Picking a popular niche suggests a fitting tone here — edit it
+            freely.
+          </p>
         </div>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
