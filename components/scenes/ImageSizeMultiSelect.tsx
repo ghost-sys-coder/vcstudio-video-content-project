@@ -25,19 +25,19 @@ export function ImageSizeMultiSelect({
   return (
     <fieldset
       aria-describedby={descriptionId}
-      className="space-y-2"
+      className="@container space-y-2"
       disabled={disabled}
       id={id}
     >
       <legend className="text-sm font-medium">Image sizes</legend>
-      <div className="grid gap-2 sm:grid-cols-3">
+      <div className="grid gap-2 @[420px]:grid-cols-3">
         {SCENE_IMAGE_SIZE_OPTIONS.map((option) => {
           const checked = selected.has(option.value);
           const checkboxId = `${id}-${option.value}`;
           const isOnlySelected = checked && selected.size === 1;
           return (
             <label
-              className="has-checked:border-foreground has-checked:bg-muted/50 flex cursor-pointer items-start gap-2 rounded-xl border p-2.5 transition-colors has-disabled:cursor-not-allowed has-disabled:opacity-50"
+              className="has-checked:border-foreground has-checked:bg-muted/50 flex min-w-0 cursor-pointer items-start gap-2 rounded-xl border p-2.5 transition-colors has-disabled:cursor-not-allowed has-disabled:opacity-50"
               htmlFor={checkboxId}
               key={option.value}
             >
