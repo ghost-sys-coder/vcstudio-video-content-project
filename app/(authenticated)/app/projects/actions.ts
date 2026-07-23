@@ -17,6 +17,10 @@ import { findProject } from "@/db/repositories/projects.repository";
 import { findProjectBrief } from "@/db/repositories/project-briefs.repository";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import { getProjectEnvironment } from "@/lib/env/server";
+import {
+  applyIdeaToBrief,
+  ApplyIdeaError,
+} from "@/lib/ideas/apply-idea-to-brief";
 import { requireCapability } from "@/lib/policies/workspace-policy";
 import {
   startScriptGeneration,
@@ -30,6 +34,7 @@ import {
   BudgetExceededError,
   RateLimitExceededError,
 } from "@/lib/domain/errors";
+import { applyIdeaToBriefSchema } from "@/lib/schemas/idea-generation";
 import {
   briefSchema,
   createProjectSchema,
@@ -164,6 +169,32 @@ export async function saveProjectBriefAction(
     return { error: null, success: true };
   } catch {
     return { error: "The brief could not be saved.", success: false };
+  }
+}
+
+export async function applyIdeaToBriefAction(
+  formData: FormData,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const parsed = applyIdeaToBriefSchema.safeParse({
+    projectId: formData.get("projectId"),
+    ideaId: formData.get("ideaId"),
+  });
+  if (!parsed.success)
+    return { ok: false, error: "That idea could not be applied." };
+  try {
+    const { context } = await requireProjectMutation(parsed.data.projectId);
+    await applyIdeaToBrief({
+      workspaceId: context.activeMembership.workspaceId,
+      userId: context.user.id,
+      projectId: parsed.data.projectId,
+      ideaId: parsed.data.ideaId,
+    });
+    revalidatePath(`/app/projects/${parsed.data.projectId}/script`);
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ApplyIdeaError)
+      return { ok: false, error: error.message };
+    return { ok: false, error: "That idea could not be applied." };
   }
 }
 

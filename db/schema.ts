@@ -870,6 +870,119 @@ export const projectBriefs = pgTable(
   ],
 );
 
+// How a saved content idea originated: produced by the AI idea generator, or
+// typed in by hand.
+export const contentIdeaSourceEnum = pgEnum("content_idea_source", [
+  "ai",
+  "manual",
+]);
+
+// Idea Lab niche-ideation run. Deliberately OFF the usage-reservation ledger
+// (like platform publishing): a one-shot text call costs a fraction of a cent,
+// so this table just records actual spend for visibility rather than reserving
+// budget up front. Synchronous — the row is written after the provider returns.
+export const contentIdeaGenerationRuns = pgTable(
+  "content_idea_generation_runs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    requestedByUserId: uuid("requested_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    niche: text("niche").notNull(),
+    platform: contentPlatformEnum("platform"),
+    tonePreference: text("tone_preference"),
+    language: text("language").notNull().default("English"),
+    requestedCount: integer("requested_count").notNull(),
+    resultCount: integer("result_count"),
+    model: text("model").notNull(),
+    promptVersion: text("prompt_version").notNull(),
+    finalPrompt: text("final_prompt").notNull(),
+    status: sceneAnalysisStatusEnum("status").notNull().default("completed"),
+    inputTokens: integer("input_tokens"),
+    outputTokens: integer("output_tokens"),
+    actualCostCents: integer("actual_cost_cents"),
+    providerRequestId: text("provider_request_id"),
+    errorCategory: text("error_category"),
+    safeErrorMessage: text("safe_error_message"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("content_idea_generation_runs_workspace_created_index").on(
+      table.workspaceId,
+      table.createdAt,
+    ),
+    check(
+      "content_idea_generation_runs_count_positive",
+      sql`${table.requestedCount} > 0`,
+    ),
+    check(
+      "content_idea_generation_runs_cost_nonnegative",
+      sql`${table.actualCostCents} is null or ${table.actualCostCents} >= 0`,
+    ),
+  ],
+);
+
+// A saved content idea: a pre-project brief, grouped by niche and workspace
+// scoped. Carries exactly the fields `project_briefs` needs so "use this idea"
+// is a direct copy into a project's brief.
+export const contentIdeas = pgTable(
+  "content_ideas",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    generationRunId: uuid("generation_run_id").references(
+      () => contentIdeaGenerationRuns.id,
+      { onDelete: "set null" },
+    ),
+    niche: text("niche").notNull(),
+    topic: text("topic").notNull().default(""),
+    targetAudience: text("target_audience").notNull().default(""),
+    tone: text("tone").notNull().default(""),
+    targetDurationSeconds: integer("target_duration_seconds"),
+    primaryPlatform: contentPlatformEnum("primary_platform")
+      .notNull()
+      .default("youtube"),
+    hookAngle: text("hook_angle").notNull().default(""),
+    rationale: text("rationale").notNull().default(""),
+    hookType: text("hook_type").notNull().default(""),
+    source: contentIdeaSourceEnum("source").notNull().default("ai"),
+    isArchived: boolean("is_archived").notNull().default(false),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("content_ideas_workspace_niche_index").on(
+      table.workspaceId,
+      table.niche,
+    ),
+    index("content_ideas_workspace_created_index").on(
+      table.workspaceId,
+      table.createdAt,
+    ),
+    check(
+      "content_ideas_duration_positive",
+      sql`${table.targetDurationSeconds} is null or ${table.targetDurationSeconds} > 0`,
+    ),
+  ],
+);
+
 // Money-safe AI script-generation run (project-scoped, on the usage ledger).
 export const scriptGenerationRuns = pgTable(
   "script_generation_runs",
@@ -3021,6 +3134,11 @@ export type ProjectScriptDraft = typeof projectScriptDrafts.$inferSelect;
 export type ProjectScriptVersion = typeof projectScriptVersions.$inferSelect;
 export type ProjectBrief = typeof projectBriefs.$inferSelect;
 export type ContentPlatform = (typeof contentPlatformEnum.enumValues)[number];
+export type ContentIdea = typeof contentIdeas.$inferSelect;
+export type ContentIdeaGenerationRun =
+  typeof contentIdeaGenerationRuns.$inferSelect;
+export type ContentIdeaSource =
+  (typeof contentIdeaSourceEnum.enumValues)[number];
 export type ScriptGenerationRun = typeof scriptGenerationRuns.$inferSelect;
 export type TitleGenerationRun = typeof titleGenerationRuns.$inferSelect;
 export type ProjectTitleSuggestion =

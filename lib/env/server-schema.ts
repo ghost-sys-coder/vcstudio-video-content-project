@@ -82,6 +82,7 @@ export const sceneAnalysisEnvironmentSchema = z.object({
   IDEMPOTENCY_HASH_SECRET: z.string().min(32),
   REQUEST_FINGERPRINT_SECRET: z.string().min(32),
   MAX_SCENES_PER_PROJECT: z.coerce.number().int().min(1).max(500).default(200),
+  MAX_IDEAS_PER_BATCH: z.coerce.number().int().min(1).max(20).default(5),
   MIN_SCENE_DURATION_MILLISECONDS: z.coerce
     .number()
     .int()

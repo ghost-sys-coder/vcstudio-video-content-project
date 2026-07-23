@@ -17,6 +17,7 @@ This repository is the foundation for an internal production tool that converts 
 - Owner-only workspace profile management for workspace names and private logos.
 - Workspace-scoped project creation, pagination, settings, status transitions, and archiving.
 - Optimistically locked script drafts with immutable version numbering, restore-as-new-version behavior, and audited owner/editor soft deletion of eligible versions.
+- Idea Lab (`/app/ideas`), a top-level workspace page outside the projects tree for brainstorming video ideas before a project exists. Owners/editors describe a niche (optionally a target platform, tone, and count) and generate a batch of distinct idea cards in one shot; each card is a pre-project brief carrying exactly the fields a project brief needs (topic, audience, tone, target duration, primary platform, hook angle) plus a short rationale and hook type. Saved ideas are grouped by niche in a library, and the script screen's **Start from a saved idea** picker copies a chosen idea straight into the project's brief (cross-workspace-guarded), so a saved idea seeds script generation without retyping. Idea generation reuses the OpenAI text model, runs as a plain server action (no Trigger.dev task), is rate-limited, and — because it is a sub-cent one-shot call — is deliberately kept **off** the usage-reservation ledger like publishing, recording its actual cost in `content_idea_generation_runs` for visibility. The prompt encodes proven, high-retention formats and is deliberately honest: it never claims an idea is guaranteed to go viral or is currently trending.
 - Per-project content brief (topic, audience, tone, target duration, primary platform, hook angle) and cost-confirmed AI script generation: a brief-driven, money-safe `script_generation` operation (OpenAI Responses API structured output on the `ai-text` queue, on the usage ledger) drafts a narration-ready script that is inserted non-destructively into the existing script editor for review, editing, and versioning. Encodes proven hook-first/retention heuristics — presented as suggestions, not guaranteed performance.
 - Per-platform publishing-metadata generation on the **Publish** tab: the existing money-safe `title_generation` operation now turns the brief and approved script into ranked titles, a publication-ready description or caption, and a restrained set of relevant tags for YouTube, TikTok, Facebook, or Instagram. Each explicit generation remains cost-confirmed and durable. Selecting a connected channel automatically loads the latest set into editable platform-specific drafts, prefers a favorited title, refreshes after generation or favorite changes, and preserves user edits while switching channels; completing a newly requested generation deliberately replaces that platform's older draft with the newly paid result. YouTube receives native title/description/tags, Facebook appends the editable topic tags as hashtags to its description, Instagram composes its editable caption and hashtags, and TikTok exposes editable suggestions for copying because inbox upload cannot transmit metadata.
 - Per-platform thumbnail generation on the same **Publish** tab: a money-safe `thumbnail_generation` image operation (OpenAI image model on the `image-generation` queue, on the usage ledger) renders cover images at each platform's native size — 16:9 for YouTube/Facebook, 9:16 for TikTok/Instagram — in either a **text-free** mode (deliberate negative space for overlaying a headline later) or a **baked-headline** mode (one short headline rendered into the image). Results accumulate into a per-platform gallery with favorites and authenticated signed-URL download; owners/editors see the cost before confirming and can cancel a not-yet-started generation. Images are stored in private R2 under `workspaces/{ws}/projects/{proj}/thumbnails/{platform}/{id}.{ext}` and served only through a workspace-scoped redirect route. The prompt encodes proven composition heuristics (single expressive face, strong readable emotion, high contrast, rule-of-thirds, minimal clutter, directional gaze) — presented as A/B-test candidates, not guaranteed performers — and the UI warns that baked text can be rendered imperfectly. In baked-headline mode the UI also offers suggested headlines in a `Select`, condensed from that platform's already-generated titles (favorites first) and the brief's hook angle and topic; picking one fills a headline field that stays freely editable, so a suggestion is a starting point rather than a fixed choice. Suggestions are derived from existing content, so they add no provider call and no cost.
@@ -82,123 +83,124 @@ docs/                Bootstrap and phase specifications
 
 ## Environment variables
 
-| Variable                                            | Visibility  | Required    | Purpose                                                                       |
-| --------------------------------------------------- | ----------- | ----------- | ----------------------------------------------------------------------------- |
-| `APP_NAME`                                          | Server only | Yes         | Human-readable application name (`VCStudio`).                                 |
-| `NEXT_PUBLIC_APP_URL`                               | Browser     | Yes         | Canonical web application URL.                                                |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`                 | Browser     | Yes         | Identifies the Clerk application.                                             |
-| `CLERK_SECRET_KEY`                                  | Server only | Yes         | Authenticates server-side Clerk operations.                                   |
-| `CLERK_WEBHOOK_SIGNING_SECRET`                      | Server only | Yes         | Verifies Clerk webhook signatures.                                            |
-| `NEXT_PUBLIC_CLERK_SIGN_IN_URL`                     | Browser     | Yes         | Clerk sign-in route.                                                          |
-| `NEXT_PUBLIC_CLERK_SIGN_UP_URL`                     | Browser     | Yes         | Clerk sign-up route.                                                          |
-| `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL`   | Browser     | Yes         | Post-sign-in destination.                                                     |
-| `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL`   | Browser     | Yes         | Post-sign-up destination.                                                     |
-| `DATABASE_URL`                                      | Server only | Yes         | Pooled Neon URL used by application requests.                                 |
-| `DATABASE_URL_UNPOOLED`                             | Server only | Recommended | Direct Neon URL preferred by migration commands.                              |
-| `RUN_DATABASE_INTEGRATION_TESTS`                    | Test only   | No          | Enables mutating integration tests against development Neon only.             |
-| `NODE_ENV`                                          | Server only | Automatic   | Runtime mode; defaults to `development`.                                      |
-| `R2_ACCOUNT_ID`                                     | Server only | Yes         | Cloudflare account owning the R2 bucket.                                      |
-| `R2_ACCESS_KEY_ID`                                  | Server only | Yes         | R2 S3 API access key.                                                         |
-| `R2_SECRET_ACCESS_KEY`                              | Server only | Yes         | R2 S3 API secret key.                                                         |
-| `R2_BUCKET_NAME`                                    | Server only | Yes         | Private media bucket name.                                                    |
-| `R2_ENDPOINT`                                       | Server only | Yes         | Account-specific R2 S3 endpoint.                                              |
-| `R2_REGION`                                         | Server only | Yes         | R2 region (`auto`).                                                           |
-| `R2_SIGNED_UPLOAD_EXPIRY_SECONDS`                   | Server only | Yes         | Upload URL lifetime, 60–900 seconds.                                          |
-| `R2_SIGNED_DOWNLOAD_EXPIRY_SECONDS`                 | Server only | Yes         | Download URL lifetime, 60–3600 seconds.                                       |
-| `MAX_CHARACTER_REFERENCE_SIZE_BYTES`                | Server only | Yes         | Maximum character reference size (`5242880`).                                 |
-| `ALLOWED_IMAGE_MIME_TYPES`                          | Server only | Yes         | Allowed character image MIME types.                                           |
-| `MIN_REFERENCE_IMAGE_WIDTH`                         | Server only | Yes         | Minimum character reference width (`512`).                                    |
-| `MIN_REFERENCE_IMAGE_HEIGHT`                        | Server only | Yes         | Minimum character reference height (`512`).                                   |
-| `MAX_REFERENCE_IMAGE_WIDTH`                         | Server only | Yes         | Maximum character reference width (`4096`).                                   |
-| `MAX_REFERENCE_IMAGE_HEIGHT`                        | Server only | Yes         | Maximum character reference height (`4096`).                                  |
-| `ENABLE_CHARACTER_LIBRARY`                          | Server only | Yes         | Enables the Phase 4 character library.                                        |
-| `MAX_SCRIPT_CHARACTERS`                             | Server only | Yes         | Maximum narration script length (`50000`).                                    |
-| `DEFAULT_PROJECT_BUDGET_CENTS`                      | Server only | Yes         | New-project budget ceiling default (`200`).                                   |
-| `OPENAI_API_KEY`                                    | Server only | Yes         | Authenticates OpenAI Responses API calls.                                     |
-| `OPENAI_TEXT_MODEL`                                 | Server only | Yes         | Configurable structured scene-analysis model.                                 |
-| `OPENAI_TEXT_INPUT_COST_PER_MILLION_CENTS`          | Server only | Yes         | Model input price used for cost controls.                                     |
-| `OPENAI_TEXT_OUTPUT_COST_PER_MILLION_CENTS`         | Server only | Yes         | Model output price used for cost controls.                                    |
-| `OPENAI_REQUEST_TIMEOUT_SECONDS`                    | Server only | Yes         | Shared OpenAI request timeout (`180`).                                        |
-| `OPENAI_IMAGE_MODEL`                                | Server only | Yes         | Image model alias or dated snapshot (`gpt-image-2`).                          |
-| `OPENAI_IMAGE_DRAFT_QUALITY`                        | Server only | Yes         | Draft quality; Phase 5 requires `low`.                                        |
-| `OPENAI_IMAGE_FINAL_QUALITY`                        | Server only | Yes         | Final quality; Phase 5 requires `medium`.                                     |
-| `OPENAI_IMAGE_OUTPUT_FORMAT`                        | Server only | Yes         | Generated image format (`webp` by default).                                   |
-| `OPENAI_IMAGE_DRAFT_COMPRESSION`                    | Server only | Yes         | Draft WebP/JPEG compression (`80`).                                           |
-| `OPENAI_IMAGE_FINAL_COMPRESSION`                    | Server only | Yes         | Final WebP/JPEG compression (`90`).                                           |
-| `OPENAI_IMAGE_BACKGROUND`                           | Server only | Yes         | Opaque or automatic image background.                                         |
-| `OPENAI_IMAGE_TEXT_INPUT_COST_PER_MILLION_CENTS`    | Server only | Yes         | Image-model text-input price (`500`).                                         |
-| `OPENAI_IMAGE_INPUT_COST_PER_MILLION_CENTS`         | Server only | Yes         | Image-reference input price (`800`).                                          |
-| `OPENAI_IMAGE_OUTPUT_COST_PER_MILLION_CENTS`        | Server only | Yes         | Generated-image output price (`3000`).                                        |
-| `OPENAI_IMAGE_LOW_SQUARE_ESTIMATE_CENTS`            | Server only | Yes         | Conservative low-quality square reservation.                                  |
-| `OPENAI_IMAGE_LOW_RECTANGULAR_ESTIMATE_CENTS`       | Server only | Yes         | Conservative low-quality rectangular reservation.                             |
-| `OPENAI_IMAGE_MEDIUM_SQUARE_ESTIMATE_CENTS`         | Server only | Yes         | Conservative medium square reservation.                                       |
-| `OPENAI_IMAGE_MEDIUM_RECTANGULAR_ESTIMATE_CENTS`    | Server only | Yes         | Conservative medium rectangular reservation.                                  |
-| `OPENAI_IMAGE_HIGH_SQUARE_ESTIMATE_CENTS`           | Server only | Yes         | Conservative high-quality square reservation.                                 |
-| `OPENAI_IMAGE_HIGH_RECTANGULAR_ESTIMATE_CENTS`      | Server only | Yes         | Conservative high-quality rectangular reservation.                            |
-| `OPENAI_IMAGE_REFERENCE_RESERVE_CENTS_PER_ASSET`    | Server only | Yes         | Extra reservation per selected reference.                                     |
-| `MAX_IMAGE_GENERATION_RETRIES`                      | Server only | Yes         | Maximum bounded billable retries (`1`).                                       |
-| `MAX_REFERENCE_ASSETS_PER_GENERATION`               | Server only | Yes         | Application reference limit, maximum `16`.                                    |
-| `MAX_REFERENCE_BYTES_PER_GENERATION`                | Server only | Yes         | Aggregate downloaded reference-byte ceiling.                                  |
-| `MAX_IMAGE_GENERATIONS_PER_SCENE_VERSION`           | Server only | Yes         | Per-version generation and returned-history cap.                              |
-| `MAX_IMAGES_PER_BATCH`                              | Server only | Yes         | Maximum scenes per Phase 6 bulk storyboard batch.                             |
-| `ENABLE_SCENE_IMAGE_GENERATION`                     | Server only | Yes         | Phase 5/6 generation feature switch.                                          |
-| `OPENAI_TTS_MODEL`                                  | Server only | Yes         | Phase 7 text-to-speech model (default `gpt-4o-mini-tts`).                     |
-| `OPENAI_TTS_VOICE`                                  | Server only | Yes         | Default narration voice for new voice presets.                                |
-| `OPENAI_TTS_FORMAT`                                 | Server only | Yes         | Default audio container (`mp3`/`opus`/`aac`/`flac`/`wav`/`pcm`).              |
-| `OPENAI_TTS_COST_PER_MILLION_CHARACTERS_CENTS`      | Server only | Yes         | Character-based TTS pricing used for estimates and reconciliation.            |
-| `MAX_SCENES_PER_AUDIO_BATCH`                        | Server only | Yes         | Maximum scenes per Phase 7 audio generation request.                          |
-| `AUDIO_SCENE_PADDING_MILLISECONDS`                  | Server only | Yes         | Padding inserted between scenes in the computed timeline.                     |
-| `FFPROBE_PATH`                                      | Server only | Yes         | ffprobe binary used to measure narration audio duration.                      |
-| `ENABLE_SCENE_AUDIO_GENERATION`                     | Server only | Yes         | Phase 7 audio generation feature switch.                                      |
-| `SUBTITLE_MAX_LINE_CHARACTERS`                      | Server only | Yes         | Default caption wrap length for new caption styles (`42`).                    |
-| `SUBTITLE_MIN_SEGMENT_DURATION_MILLISECONDS`        | Server only | Yes         | Minimum caption duration; shorter segments merge (`700`).                     |
-| `SUBTITLE_MAX_SEGMENT_DURATION_MILLISECONDS`        | Server only | Yes         | Advisory ceiling flagging long captions in review (`7000`).                   |
-| `SUBTITLE_DURATION_MISMATCH_TOLERANCE_MILLISECONDS` | Server only | Yes         | Audio-vs-estimate gap that raises a timeline warning (`1500`).                |
-| `ENABLE_SUBTITLES`                                  | Server only | Yes         | Phase 8 subtitle feature switch.                                              |
-| `TRIGGER_SECRET_KEY`                                | Server only | Yes         | Authenticates Trigger.dev task submissions.                                   |
-| `TRIGGER_PROJECT_REF`                               | Server only | Yes         | Identifies the Trigger.dev project.                                           |
-| `IDEMPOTENCY_HASH_SECRET`                           | Server only | Yes         | HMAC secret for billable-operation identity.                                  |
-| `REQUEST_FINGERPRINT_SECRET`                        | Server only | Yes         | HMAC secret for prompt request fingerprints.                                  |
-| `MAX_SCENES_PER_PROJECT`                            | Server only | Yes         | Maximum structured scenes returned per analysis.                              |
-| `MIN_SCENE_DURATION_MILLISECONDS`                   | Server only | Yes         | Minimum generated scene duration.                                             |
-| `MAX_SCENE_DURATION_MILLISECONDS`                   | Server only | Yes         | Maximum generated scene duration.                                             |
-| `MAX_SCENE_ANALYSIS_RETRIES`                        | Server only | Yes         | Maximum bounded text-analysis retries.                                        |
-| `GENERATION_RESERVATION_EXPIRY_MINUTES`             | Server only | Yes         | Pending AI reservation lifetime (`30`).                                       |
-| `DEFAULT_DAILY_BUDGET_CENTS`                        | Server only | Yes         | Default workspace daily AI budget.                                            |
-| `DEFAULT_MONTHLY_BUDGET_CENTS`                      | Server only | Yes         | Default workspace monthly AI budget.                                          |
-| `ENABLE_VIDEO_RENDERING`                            | Both        | No          | Master switch for Phase 9 preview/render (default `true`).                    |
-| `VIDEO_RENDER_COST_PER_MINUTE_CENTS`                | Both        | No          | Compute cost per output minute; must match across targets.                    |
-| `VIDEO_RENDER_MINIMUM_ESTIMATE_CENTS`               | Both        | No          | Minimum render cost floor.                                                    |
-| `MAX_RENDER_DURATION_SECONDS`                       | Both        | No          | Maximum renderable output length (cost-control limit).                        |
-| `MAX_RENDER_ATTEMPTS`                               | Both        | No          | Billable render retry ceiling.                                                |
-| `VIDEO_RENDER_RESERVATION_EXPIRY_MINUTES`           | Both        | No          | Render reservation expiry window.                                             |
-| `VIDEO_WATERMARK_ENABLED` / `VIDEO_WATERMARK_TEXT`  | Both        | No          | Optional burned-in watermark toggle and text.                                 |
-| `VIDEO_PREVIEW_URL_EXPIRY_SECONDS`                  | Vercel      | No          | Signed asset URL lifetime for the preview player (900–3600s).                 |
-| `VIDEO_RENDER_CONCURRENCY`                          | Trigger.dev | No          | Worker render concurrency (default 1).                                        |
-| `VIDEO_RENDER_TIMEOUT_SECONDS`                      | Trigger.dev | No          | Per-render worker timeout.                                                    |
-| `VIDEO_RENDER_CRF` / `VIDEO_RENDER_JPEG_QUALITY`    | Trigger.dev | No          | H.264 quality and frame JPEG quality.                                         |
-| `REMOTION_CHROMIUM_EXECUTABLE`                      | Trigger.dev | No          | Optional explicit headless Chromium path.                                     |
-| `MANUAL_CONFIRMATION_THRESHOLD_CENTS`               | Vercel      | No          | Default estimate (cents) that requires heightened confirmation.               |
-| `RATE_LIMIT_WINDOW_SECONDS`                         | Vercel      | No          | Fixed-window size for per-workspace rate limiting (default 60).               |
-| `RATE_LIMIT_GENERATIONS_PER_WINDOW`                 | Vercel      | No          | Max billable generations per workspace per window (default 30).               |
-| `RATE_LIMIT_RENDERS_PER_WINDOW`                     | Vercel      | No          | Max renders per workspace per window (default 10).                            |
-| `APP_BASE_URL`                                      | Vercel      | Yes         | Public origin used to build OAuth redirect URIs; must match the OAuth client. |
-| `PLATFORM_TOKEN_ENCRYPTION_KEY`                     | Server only | Yes         | 32 bytes (base64/hex). Seals platform OAuth tokens at rest (AES-256-GCM).     |
-| `OAUTH_STATE_SECRET`                                | Vercel      | Yes         | Signs the OAuth `state` so a callback cannot be forged or replayed.           |
-| `OAUTH_STATE_TTL_SECONDS`                           | Vercel      | No          | Lifetime of a signed OAuth state (default 600).                               |
-| `GOOGLE_OAUTH_CLIENT_ID`                            | Server only | Yes         | Google OAuth 2.0 **web** client id (not a service account).                   |
-| `GOOGLE_OAUTH_CLIENT_SECRET`                        | Server only | Yes         | Google OAuth 2.0 web client secret.                                           |
-| `FACEBOOK_APP_ID`                                   | Vercel      | Yes         | Meta app id used only for the Facebook OAuth flow.                            |
-| `FACEBOOK_APP_SECRET`                               | Vercel      | Yes         | Meta app secret used only for OAuth token exchange.                           |
-| `INSTAGRAM_APP_ID`                                  | Vercel      | Yes         | Instagram app id used for direct Instagram Login.                             |
-| `INSTAGRAM_APP_SECRET`                              | Vercel      | Yes         | Instagram app secret used only for OAuth token exchange.                      |
-| `INSTAGRAM_GRAPH_API_VERSION`                       | Both        | Yes         | Versioned Instagram Graph API path; defaults to `v25.0`.                      |
-| `TIKTOK_API_CLIENT_KEY`                             | Both        | Yes         | TikTok Login Kit client key for OAuth, refresh, and inbox upload.             |
-| `TIKTOK_API_CLIENT_SECRET`                          | Both        | Yes         | TikTok client secret; never expose it to browser code.                        |
-| `FACEBOOK_GRAPH_API_VERSION`                        | Both        | No          | Pinned Graph API version (default `v25.0`).                                   |
-| `ENABLE_VIDEO_PUBLISHING`                           | Server only | No          | Feature flag for publishing to external platforms (default true).             |
-| `MAX_PUBLISH_VIDEO_BYTES`                           | Server only | No          | Upload size ceiling (default 1 GiB).                                          |
-| `PUBLISH_ASSET_URL_TTL_SECONDS`                     | Trigger.dev | No          | R2 source URL lifetime; must exceed the publish task wall clock.              |
+| Variable                                            | Visibility  | Required    | Purpose                                                                         |
+| --------------------------------------------------- | ----------- | ----------- | ------------------------------------------------------------------------------- |
+| `APP_NAME`                                          | Server only | Yes         | Human-readable application name (`VCStudio`).                                   |
+| `NEXT_PUBLIC_APP_URL`                               | Browser     | Yes         | Canonical web application URL.                                                  |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`                 | Browser     | Yes         | Identifies the Clerk application.                                               |
+| `CLERK_SECRET_KEY`                                  | Server only | Yes         | Authenticates server-side Clerk operations.                                     |
+| `CLERK_WEBHOOK_SIGNING_SECRET`                      | Server only | Yes         | Verifies Clerk webhook signatures.                                              |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_URL`                     | Browser     | Yes         | Clerk sign-in route.                                                            |
+| `NEXT_PUBLIC_CLERK_SIGN_UP_URL`                     | Browser     | Yes         | Clerk sign-up route.                                                            |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL`   | Browser     | Yes         | Post-sign-in destination.                                                       |
+| `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL`   | Browser     | Yes         | Post-sign-up destination.                                                       |
+| `DATABASE_URL`                                      | Server only | Yes         | Pooled Neon URL used by application requests.                                   |
+| `DATABASE_URL_UNPOOLED`                             | Server only | Recommended | Direct Neon URL preferred by migration commands.                                |
+| `RUN_DATABASE_INTEGRATION_TESTS`                    | Test only   | No          | Enables mutating integration tests against development Neon only.               |
+| `NODE_ENV`                                          | Server only | Automatic   | Runtime mode; defaults to `development`.                                        |
+| `R2_ACCOUNT_ID`                                     | Server only | Yes         | Cloudflare account owning the R2 bucket.                                        |
+| `R2_ACCESS_KEY_ID`                                  | Server only | Yes         | R2 S3 API access key.                                                           |
+| `R2_SECRET_ACCESS_KEY`                              | Server only | Yes         | R2 S3 API secret key.                                                           |
+| `R2_BUCKET_NAME`                                    | Server only | Yes         | Private media bucket name.                                                      |
+| `R2_ENDPOINT`                                       | Server only | Yes         | Account-specific R2 S3 endpoint.                                                |
+| `R2_REGION`                                         | Server only | Yes         | R2 region (`auto`).                                                             |
+| `R2_SIGNED_UPLOAD_EXPIRY_SECONDS`                   | Server only | Yes         | Upload URL lifetime, 60–900 seconds.                                            |
+| `R2_SIGNED_DOWNLOAD_EXPIRY_SECONDS`                 | Server only | Yes         | Download URL lifetime, 60–3600 seconds.                                         |
+| `MAX_CHARACTER_REFERENCE_SIZE_BYTES`                | Server only | Yes         | Maximum character reference size (`5242880`).                                   |
+| `ALLOWED_IMAGE_MIME_TYPES`                          | Server only | Yes         | Allowed character image MIME types.                                             |
+| `MIN_REFERENCE_IMAGE_WIDTH`                         | Server only | Yes         | Minimum character reference width (`512`).                                      |
+| `MIN_REFERENCE_IMAGE_HEIGHT`                        | Server only | Yes         | Minimum character reference height (`512`).                                     |
+| `MAX_REFERENCE_IMAGE_WIDTH`                         | Server only | Yes         | Maximum character reference width (`4096`).                                     |
+| `MAX_REFERENCE_IMAGE_HEIGHT`                        | Server only | Yes         | Maximum character reference height (`4096`).                                    |
+| `ENABLE_CHARACTER_LIBRARY`                          | Server only | Yes         | Enables the Phase 4 character library.                                          |
+| `MAX_SCRIPT_CHARACTERS`                             | Server only | Yes         | Maximum narration script length (`50000`).                                      |
+| `DEFAULT_PROJECT_BUDGET_CENTS`                      | Server only | Yes         | New-project budget ceiling default (`200`).                                     |
+| `OPENAI_API_KEY`                                    | Server only | Yes         | Authenticates OpenAI Responses API calls.                                       |
+| `OPENAI_TEXT_MODEL`                                 | Server only | Yes         | Configurable structured scene-analysis model.                                   |
+| `OPENAI_TEXT_INPUT_COST_PER_MILLION_CENTS`          | Server only | Yes         | Model input price used for cost controls.                                       |
+| `OPENAI_TEXT_OUTPUT_COST_PER_MILLION_CENTS`         | Server only | Yes         | Model output price used for cost controls.                                      |
+| `OPENAI_REQUEST_TIMEOUT_SECONDS`                    | Server only | Yes         | Shared OpenAI request timeout (`180`).                                          |
+| `OPENAI_IMAGE_MODEL`                                | Server only | Yes         | Image model alias or dated snapshot (`gpt-image-2`).                            |
+| `OPENAI_IMAGE_DRAFT_QUALITY`                        | Server only | Yes         | Draft quality; Phase 5 requires `low`.                                          |
+| `OPENAI_IMAGE_FINAL_QUALITY`                        | Server only | Yes         | Final quality; Phase 5 requires `medium`.                                       |
+| `OPENAI_IMAGE_OUTPUT_FORMAT`                        | Server only | Yes         | Generated image format (`webp` by default).                                     |
+| `OPENAI_IMAGE_DRAFT_COMPRESSION`                    | Server only | Yes         | Draft WebP/JPEG compression (`80`).                                             |
+| `OPENAI_IMAGE_FINAL_COMPRESSION`                    | Server only | Yes         | Final WebP/JPEG compression (`90`).                                             |
+| `OPENAI_IMAGE_BACKGROUND`                           | Server only | Yes         | Opaque or automatic image background.                                           |
+| `OPENAI_IMAGE_TEXT_INPUT_COST_PER_MILLION_CENTS`    | Server only | Yes         | Image-model text-input price (`500`).                                           |
+| `OPENAI_IMAGE_INPUT_COST_PER_MILLION_CENTS`         | Server only | Yes         | Image-reference input price (`800`).                                            |
+| `OPENAI_IMAGE_OUTPUT_COST_PER_MILLION_CENTS`        | Server only | Yes         | Generated-image output price (`3000`).                                          |
+| `OPENAI_IMAGE_LOW_SQUARE_ESTIMATE_CENTS`            | Server only | Yes         | Conservative low-quality square reservation.                                    |
+| `OPENAI_IMAGE_LOW_RECTANGULAR_ESTIMATE_CENTS`       | Server only | Yes         | Conservative low-quality rectangular reservation.                               |
+| `OPENAI_IMAGE_MEDIUM_SQUARE_ESTIMATE_CENTS`         | Server only | Yes         | Conservative medium square reservation.                                         |
+| `OPENAI_IMAGE_MEDIUM_RECTANGULAR_ESTIMATE_CENTS`    | Server only | Yes         | Conservative medium rectangular reservation.                                    |
+| `OPENAI_IMAGE_HIGH_SQUARE_ESTIMATE_CENTS`           | Server only | Yes         | Conservative high-quality square reservation.                                   |
+| `OPENAI_IMAGE_HIGH_RECTANGULAR_ESTIMATE_CENTS`      | Server only | Yes         | Conservative high-quality rectangular reservation.                              |
+| `OPENAI_IMAGE_REFERENCE_RESERVE_CENTS_PER_ASSET`    | Server only | Yes         | Extra reservation per selected reference.                                       |
+| `MAX_IMAGE_GENERATION_RETRIES`                      | Server only | Yes         | Maximum bounded billable retries (`1`).                                         |
+| `MAX_REFERENCE_ASSETS_PER_GENERATION`               | Server only | Yes         | Application reference limit, maximum `16`.                                      |
+| `MAX_REFERENCE_BYTES_PER_GENERATION`                | Server only | Yes         | Aggregate downloaded reference-byte ceiling.                                    |
+| `MAX_IMAGE_GENERATIONS_PER_SCENE_VERSION`           | Server only | Yes         | Per-version generation and returned-history cap.                                |
+| `MAX_IMAGES_PER_BATCH`                              | Server only | Yes         | Maximum scenes per Phase 6 bulk storyboard batch.                               |
+| `ENABLE_SCENE_IMAGE_GENERATION`                     | Server only | Yes         | Phase 5/6 generation feature switch.                                            |
+| `OPENAI_TTS_MODEL`                                  | Server only | Yes         | Phase 7 text-to-speech model (default `gpt-4o-mini-tts`).                       |
+| `OPENAI_TTS_VOICE`                                  | Server only | Yes         | Default narration voice for new voice presets.                                  |
+| `OPENAI_TTS_FORMAT`                                 | Server only | Yes         | Default audio container (`mp3`/`opus`/`aac`/`flac`/`wav`/`pcm`).                |
+| `OPENAI_TTS_COST_PER_MILLION_CHARACTERS_CENTS`      | Server only | Yes         | Character-based TTS pricing used for estimates and reconciliation.              |
+| `MAX_SCENES_PER_AUDIO_BATCH`                        | Server only | Yes         | Maximum scenes per Phase 7 audio generation request.                            |
+| `AUDIO_SCENE_PADDING_MILLISECONDS`                  | Server only | Yes         | Padding inserted between scenes in the computed timeline.                       |
+| `FFPROBE_PATH`                                      | Server only | Yes         | ffprobe binary used to measure narration audio duration.                        |
+| `ENABLE_SCENE_AUDIO_GENERATION`                     | Server only | Yes         | Phase 7 audio generation feature switch.                                        |
+| `SUBTITLE_MAX_LINE_CHARACTERS`                      | Server only | Yes         | Default caption wrap length for new caption styles (`42`).                      |
+| `SUBTITLE_MIN_SEGMENT_DURATION_MILLISECONDS`        | Server only | Yes         | Minimum caption duration; shorter segments merge (`700`).                       |
+| `SUBTITLE_MAX_SEGMENT_DURATION_MILLISECONDS`        | Server only | Yes         | Advisory ceiling flagging long captions in review (`7000`).                     |
+| `SUBTITLE_DURATION_MISMATCH_TOLERANCE_MILLISECONDS` | Server only | Yes         | Audio-vs-estimate gap that raises a timeline warning (`1500`).                  |
+| `ENABLE_SUBTITLES`                                  | Server only | Yes         | Phase 8 subtitle feature switch.                                                |
+| `TRIGGER_SECRET_KEY`                                | Server only | Yes         | Authenticates Trigger.dev task submissions.                                     |
+| `TRIGGER_PROJECT_REF`                               | Server only | Yes         | Identifies the Trigger.dev project.                                             |
+| `IDEMPOTENCY_HASH_SECRET`                           | Server only | Yes         | HMAC secret for billable-operation identity.                                    |
+| `REQUEST_FINGERPRINT_SECRET`                        | Server only | Yes         | HMAC secret for prompt request fingerprints.                                    |
+| `MAX_SCENES_PER_PROJECT`                            | Server only | Yes         | Maximum structured scenes returned per analysis.                                |
+| `MAX_IDEAS_PER_BATCH`                               | Server only | No          | Max Idea Lab cards per one-shot generation (default 5; reuses `OPENAI_TEXT_*`). |
+| `MIN_SCENE_DURATION_MILLISECONDS`                   | Server only | Yes         | Minimum generated scene duration.                                               |
+| `MAX_SCENE_DURATION_MILLISECONDS`                   | Server only | Yes         | Maximum generated scene duration.                                               |
+| `MAX_SCENE_ANALYSIS_RETRIES`                        | Server only | Yes         | Maximum bounded text-analysis retries.                                          |
+| `GENERATION_RESERVATION_EXPIRY_MINUTES`             | Server only | Yes         | Pending AI reservation lifetime (`30`).                                         |
+| `DEFAULT_DAILY_BUDGET_CENTS`                        | Server only | Yes         | Default workspace daily AI budget.                                              |
+| `DEFAULT_MONTHLY_BUDGET_CENTS`                      | Server only | Yes         | Default workspace monthly AI budget.                                            |
+| `ENABLE_VIDEO_RENDERING`                            | Both        | No          | Master switch for Phase 9 preview/render (default `true`).                      |
+| `VIDEO_RENDER_COST_PER_MINUTE_CENTS`                | Both        | No          | Compute cost per output minute; must match across targets.                      |
+| `VIDEO_RENDER_MINIMUM_ESTIMATE_CENTS`               | Both        | No          | Minimum render cost floor.                                                      |
+| `MAX_RENDER_DURATION_SECONDS`                       | Both        | No          | Maximum renderable output length (cost-control limit).                          |
+| `MAX_RENDER_ATTEMPTS`                               | Both        | No          | Billable render retry ceiling.                                                  |
+| `VIDEO_RENDER_RESERVATION_EXPIRY_MINUTES`           | Both        | No          | Render reservation expiry window.                                               |
+| `VIDEO_WATERMARK_ENABLED` / `VIDEO_WATERMARK_TEXT`  | Both        | No          | Optional burned-in watermark toggle and text.                                   |
+| `VIDEO_PREVIEW_URL_EXPIRY_SECONDS`                  | Vercel      | No          | Signed asset URL lifetime for the preview player (900–3600s).                   |
+| `VIDEO_RENDER_CONCURRENCY`                          | Trigger.dev | No          | Worker render concurrency (default 1).                                          |
+| `VIDEO_RENDER_TIMEOUT_SECONDS`                      | Trigger.dev | No          | Per-render worker timeout.                                                      |
+| `VIDEO_RENDER_CRF` / `VIDEO_RENDER_JPEG_QUALITY`    | Trigger.dev | No          | H.264 quality and frame JPEG quality.                                           |
+| `REMOTION_CHROMIUM_EXECUTABLE`                      | Trigger.dev | No          | Optional explicit headless Chromium path.                                       |
+| `MANUAL_CONFIRMATION_THRESHOLD_CENTS`               | Vercel      | No          | Default estimate (cents) that requires heightened confirmation.                 |
+| `RATE_LIMIT_WINDOW_SECONDS`                         | Vercel      | No          | Fixed-window size for per-workspace rate limiting (default 60).                 |
+| `RATE_LIMIT_GENERATIONS_PER_WINDOW`                 | Vercel      | No          | Max billable generations per workspace per window (default 30).                 |
+| `RATE_LIMIT_RENDERS_PER_WINDOW`                     | Vercel      | No          | Max renders per workspace per window (default 10).                              |
+| `APP_BASE_URL`                                      | Vercel      | Yes         | Public origin used to build OAuth redirect URIs; must match the OAuth client.   |
+| `PLATFORM_TOKEN_ENCRYPTION_KEY`                     | Server only | Yes         | 32 bytes (base64/hex). Seals platform OAuth tokens at rest (AES-256-GCM).       |
+| `OAUTH_STATE_SECRET`                                | Vercel      | Yes         | Signs the OAuth `state` so a callback cannot be forged or replayed.             |
+| `OAUTH_STATE_TTL_SECONDS`                           | Vercel      | No          | Lifetime of a signed OAuth state (default 600).                                 |
+| `GOOGLE_OAUTH_CLIENT_ID`                            | Server only | Yes         | Google OAuth 2.0 **web** client id (not a service account).                     |
+| `GOOGLE_OAUTH_CLIENT_SECRET`                        | Server only | Yes         | Google OAuth 2.0 web client secret.                                             |
+| `FACEBOOK_APP_ID`                                   | Vercel      | Yes         | Meta app id used only for the Facebook OAuth flow.                              |
+| `FACEBOOK_APP_SECRET`                               | Vercel      | Yes         | Meta app secret used only for OAuth token exchange.                             |
+| `INSTAGRAM_APP_ID`                                  | Vercel      | Yes         | Instagram app id used for direct Instagram Login.                               |
+| `INSTAGRAM_APP_SECRET`                              | Vercel      | Yes         | Instagram app secret used only for OAuth token exchange.                        |
+| `INSTAGRAM_GRAPH_API_VERSION`                       | Both        | Yes         | Versioned Instagram Graph API path; defaults to `v25.0`.                        |
+| `TIKTOK_API_CLIENT_KEY`                             | Both        | Yes         | TikTok Login Kit client key for OAuth, refresh, and inbox upload.               |
+| `TIKTOK_API_CLIENT_SECRET`                          | Both        | Yes         | TikTok client secret; never expose it to browser code.                          |
+| `FACEBOOK_GRAPH_API_VERSION`                        | Both        | No          | Pinned Graph API version (default `v25.0`).                                     |
+| `ENABLE_VIDEO_PUBLISHING`                           | Server only | No          | Feature flag for publishing to external platforms (default true).               |
+| `MAX_PUBLISH_VIDEO_BYTES`                           | Server only | No          | Upload size ceiling (default 1 GiB).                                            |
+| `PUBLISH_ASSET_URL_TTL_SECONDS`                     | Trigger.dev | No          | R2 source URL lifetime; must exceed the publish task wall clock.                |
 
 ## Database setup
 
@@ -353,9 +355,11 @@ Workspace budgets are editable from the owner/editor `/app/usage` dashboard. Eac
 
 ## Implementation status
 
-Phases 1–9 are implemented through authenticated workspaces, project/script versioning, durable AI scene planning, workspace character consistency references, cost-controlled single-scene image generation and review, the storyboard with controlled bulk image generation, per-scene narration audio with FFprobe-measured durations and a deterministic project timeline, deterministic subtitles with a typed video timeline contract and SRT/WebVTT/Remotion caption outputs, and Remotion video preview plus durable, cost-controlled rendering to private R2 MP4 exports. The end-to-end Chromium render is exercised only in the deployed Trigger.dev worker. Phase 10 (usage administration, editable budgets, audit logs, operational hardening) is implemented. The creator-facing Script → Publishing Metadata → Thumbnails workflow is implemented, including channel-aware editable metadata autofill. The updated `title-generation` and `thumbnail-generation` Trigger.dev tasks require deployment before their latest behavior is available in production.
+Phases 1–9 are implemented through authenticated workspaces, project/script versioning, durable AI scene planning, workspace character consistency references, cost-controlled single-scene image generation and review, the storyboard with controlled bulk image generation, per-scene narration audio with FFprobe-measured durations and a deterministic project timeline, deterministic subtitles with a typed video timeline contract and SRT/WebVTT/Remotion caption outputs, and Remotion video preview plus durable, cost-controlled rendering to private R2 MP4 exports. The end-to-end Chromium render is exercised only in the deployed Trigger.dev worker. Phase 10 (usage administration, editable budgets, audit logs, operational hardening) is implemented. The creator-facing Script → Publishing Metadata → Thumbnails workflow is implemented, including channel-aware editable metadata autofill. The Idea Lab (`/app/ideas`) niche-ideation workflow is implemented and feeds saved ideas into the project brief; it runs as an off-ledger, rate-limited OpenAI server action with no Trigger.dev task, so it needs no worker deploy. The updated `title-generation` and `thumbnail-generation` Trigger.dev tasks require deployment before their latest behavior is available in production.
 
 ## Recent major changes
+
+- 2026-07-23: Added the **Idea Lab** (`/app/ideas`) — a top-level, workspace-scoped ideation page (new sidebar entry) separate from projects, for finding and shaping video ideas before a project exists. Owners/editors enter a niche (with optional platform, tone, and count) and generate a batch of distinct idea cards in one shot; each card is a **pre-project brief** carrying exactly the fields `project_briefs` needs (topic, audience, tone, target duration, primary platform, hook angle) plus a rationale and hook type. Saved ideas group by niche in a library, and the project **script screen** gains a **Start from a saved idea** picker that copies a chosen idea into that project's brief — both the idea and the project are resolved workspace-scoped first, so a browser cannot apply another tenant's idea or write to another tenant's project. **Cost/architecture decisions (confirmed with the owner):** the Claude Agent SDK was evaluated and dropped because the feature must run live on Vercel, where its subscription-auth cost advantage is unavailable; the feature therefore reuses the existing OpenAI `TextGenerationProvider` (`generateIdeas` added to the interface and OpenAI impl via `responses.parse` + `zodTextFormat`), with bring-your-own-key deferred to the monetization phase. Generation runs as a **plain server action — no Trigger.dev task and no run compute** — is guarded by the shared `enforce-rate-limit` generation ceiling (`idea_generation`), and because it is a sub-cent one-shot text call it is deliberately kept **off** the `usage_reservations` ledger (mirroring publishing); actual spend is recorded in a new `content_idea_generation_runs` table for visibility. New schema: `content_ideas` and `content_idea_generation_runs` tables plus a `content_idea_source` enum (migration `20260723155000_simple_red_ghost`, additive — reuses the existing `content_platform` enum). New optional env `MAX_IDEAS_PER_BATCH` (default 5, web-runtime only; everything else reuses `OPENAI_TEXT_*`). The prompt (`idea-generation-v1`) encodes proven, high-retention educational/short-form formats and stays honest — it never claims an idea is guaranteed to go viral or is "currently trending" (live trends cannot be verified). New unit tests cover the prompt render/version pin and honesty rules, the output/action schemas, the duration-scaled cost estimator, the orchestration (records a completed run with actual cost, records a failed run on provider error, and never calls the provider when rate-limited), the niche-grouping view mapper, and the cross-workspace apply-to-brief guard; a Postgres integration test covers create/list-by-niche, archive exclusion, workspace isolation, and run recording. Verified with format, lint (clean), typecheck, the full unit suite (573 passed / 51 skipped), and the production build (`/app/ideas` registered). One design decision left open by cost realism: BYO-key is a monetization-phase lever, not a current cost reduction, since the owner is the sole user during the in-house phase.
 
 - 2026-07-23: Fixed a production publishing outage and hardened the subsystem against its whole class of failure. **Root cause:** `TIKTOK_API_CLIENT_KEY`/`TIKTOK_API_CLIENT_SECRET` were present in the repo's `.env.trigger.dev` but never set in the Trigger.dev prod environment (deployed workers read env from the Trigger dashboard, not that file). Because `getPublishingEnvironment()` validated every platform's credentials as one required block, the two missing TikTok values threw a `ZodError` at task startup that crashed **every** publish — YouTube and Instagram included — and, because the throw happened before the code that records a failure, publications were stranded at `queued` and the Publish button spun forever. Three fixes: **(1) env-var parity on deploy** — a `syncEnvVars` build extension (`trigger.config.ts`) now pushes `.env.trigger.dev` (minus deploy-control keys, skipped for `dev`) to the Trigger.dev environment on every deploy, so a variable can't exist in the repo but be missing from the running worker. **(2) Per-platform credential independence** — the four platform app-credential env vars (`GOOGLE_OAUTH_CLIENT_ID/SECRET`, `TIKTOK_API_CLIENT_KEY/SECRET`) are now `optional()` in the schema and validated lazily in `createVideoPublishProvider` only when that platform is actually used, throwing a typed `PlatformNotConfiguredError`; a missing TikTok credential can no longer break YouTube/Instagram. A new `isPlatformConfigured()` pre-check in `startVideoPublication` fails fast with a clear message instead of dispatching a doomed job, and the TikTok OAuth routes now go through the same factory. **(3) Fail loudly, never hang** — the `video-publish` task wraps its whole body so any unexpected error (env/config/DB) marks the publication `failed` with an actionable message; config errors (`PlatformNotConfiguredError`, `ZodError`) are treated as non-retriable and fail immediately, while genuinely transient errors still retry. Facebook/Instagram need no app-level secret (they use the connected page token) so they are always "configured"; the token encryption key stays required (every platform needs it). New unit tests cover per-platform configuration gating, lazy `PlatformNotConfiguredError`, simulation-mode bypass, and the schema parsing with no platform credentials set. Verified with format, lint, typecheck, the full unit suite (549 passed / 47 skipped), and the production build; deployed to the Trigger.dev prod environment, which synced the missing TikTok variables and cleared the outage.
 

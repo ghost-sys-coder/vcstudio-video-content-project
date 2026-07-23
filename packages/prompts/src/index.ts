@@ -16,6 +16,14 @@ export {
 } from "./title-generation";
 export type { TitleGenerationPromptInput } from "./title-generation";
 export {
+  renderIdeaGenerationPrompt,
+  IDEA_GENERATION_PROMPT_VERSION,
+} from "./idea-generation";
+export type {
+  IdeaGenerationPlatform,
+  IdeaGenerationPromptInput,
+} from "./idea-generation";
+export {
   renderThumbnailPrompt,
   THUMBNAIL_PROMPT_TEMPLATE_KEY,
   THUMBNAIL_PROMPT_TEMPLATE_SOURCE,

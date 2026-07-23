@@ -3,6 +3,7 @@ import "server-only";
 import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { getSceneAnalysisEnvironment } from "@/lib/env/server";
+import { ideaGenerationOutputSchema } from "@/lib/schemas/idea-generation";
 import { sceneAnalysisOutputSchema } from "@/lib/schemas/scene";
 import { scriptGenerationOutputSchema } from "@/lib/schemas/script-generation";
 import { titleGenerationOutputSchema } from "@/lib/schemas/title-generation";
@@ -84,6 +85,30 @@ export class OpenAiTextGenerationProvider implements TextGenerationProvider {
     if (!response.output_parsed) throw new Error("OPENAI_INVALID_RESPONSE");
     return {
       output: titleGenerationOutputSchema.parse(response.output_parsed),
+      requestId: response.id,
+      inputTokens: response.usage?.input_tokens ?? 0,
+      outputTokens: response.usage?.output_tokens ?? 0,
+    };
+  }
+
+  async generateIdeas(input: { model: string; prompt: string }) {
+    const response = await this.createClient().responses.parse({
+      model: input.model,
+      input: [
+        {
+          role: "system",
+          content:
+            "You are an expert content strategist. Return specific, honest, high-retention video ideas as structured production briefs.",
+        },
+        { role: "user", content: input.prompt },
+      ],
+      text: {
+        format: zodTextFormat(ideaGenerationOutputSchema, "generated_ideas"),
+      },
+    });
+    if (!response.output_parsed) throw new Error("OPENAI_INVALID_RESPONSE");
+    return {
+      output: ideaGenerationOutputSchema.parse(response.output_parsed),
       requestId: response.id,
       inputTokens: response.usage?.input_tokens ?? 0,
       outputTokens: response.usage?.output_tokens ?? 0,

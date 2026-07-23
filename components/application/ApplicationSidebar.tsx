@@ -3,6 +3,7 @@
 import {
   FolderKanban,
   LayoutDashboard,
+  Lightbulb,
   ReceiptText,
   Settings,
   UsersIcon,
@@ -86,6 +87,16 @@ export function ApplicationSidebar({
                 >
                   <LayoutDashboard />
                   <span>Dashboard</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={pathname.startsWith("/app/ideas")}
+                  render={<Link href="/app/ideas" />}
+                  tooltip="Idea Lab"
+                >
+                  <Lightbulb />
+                  <span>Idea Lab</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>

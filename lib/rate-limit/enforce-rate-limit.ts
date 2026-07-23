@@ -17,6 +17,7 @@ export type RateLimitedOperation =
   | "script_generation"
   | "title_generation"
   | "thumbnail_generation"
+  | "idea_generation"
   | "video_publication";
 
 /**
