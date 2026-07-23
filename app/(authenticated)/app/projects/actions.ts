@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { z } from "zod";
 import { createProject } from "@/db/commands/create-project.command";
+import { findContentIdea } from "@/db/repositories/content-ideas.repository";
 import {
   createScriptVersion,
   deleteScriptVersion,
@@ -83,10 +85,34 @@ export async function createProjectAction(
     if (!context)
       return { error: "Workspace context is unavailable.", success: false };
     requireCapability(context.activeMembership.role, "mutateWorkspaceData");
+
+    // Optional: starting the project from a saved Idea Lab idea. A missing,
+    // foreign, or malformed id just falls back to a blank brief rather than
+    // failing project creation — this only affects the pre-fill.
+    const rawIdeaId = formData.get("ideaId");
+    const ideaIdCheck =
+      typeof rawIdeaId === "string" ? z.uuid().safeParse(rawIdeaId) : null;
+    const idea = ideaIdCheck?.success
+      ? await findContentIdea({
+          workspaceId: context.activeMembership.workspaceId,
+          ideaId: ideaIdCheck.data,
+        })
+      : null;
+
     const project = await createProject({
       ...parsed.data,
       workspaceId: context.activeMembership.workspaceId,
       userId: context.user.id,
+      brief: idea
+        ? {
+            topic: idea.topic,
+            targetAudience: idea.targetAudience,
+            tone: idea.tone,
+            targetDurationSeconds: idea.targetDurationSeconds,
+            primaryPlatform: idea.primaryPlatform,
+            hookAngle: idea.hookAngle,
+          }
+        : null,
     });
     projectId = project.id;
   } catch {

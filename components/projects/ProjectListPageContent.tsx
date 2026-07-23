@@ -5,6 +5,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { CreateProjectDialog } from "@/components/projects/CreateProjectDialog";
 import { EmptyProjectsState } from "@/components/projects/EmptyProjectsState";
 import { ProjectCard } from "@/components/projects/ProjectCard";
+import type { IdeaNicheGroup } from "@/lib/ideas/ideas-view";
 import { cn } from "@/lib/utils";
 
 export function ProjectListPageContent({
@@ -14,6 +15,8 @@ export function ProjectListPageContent({
   pageCount,
   canCreate,
   defaultBudgetCents,
+  ideaGroups,
+  initialIdeaId,
 }: {
   projects: Project[];
   total: number;
@@ -21,6 +24,8 @@ export function ProjectListPageContent({
   pageCount: number;
   canCreate: boolean;
   defaultBudgetCents: number;
+  ideaGroups: IdeaNicheGroup[];
+  initialIdeaId?: string | null;
 }) {
   return (
     <section className="space-y-8">
@@ -43,7 +48,11 @@ export function ProjectListPageContent({
           </p>
         </div>
         {canCreate ? (
-          <CreateProjectDialog defaultBudgetCents={defaultBudgetCents} />
+          <CreateProjectDialog
+            defaultBudgetCents={defaultBudgetCents}
+            ideaGroups={ideaGroups}
+            initialIdeaId={initialIdeaId}
+          />
         ) : null}
       </div>
 

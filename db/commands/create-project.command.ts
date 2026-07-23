@@ -6,6 +6,7 @@ import {
   projectOutputVariants,
   projectScriptDrafts,
   projects,
+  type ContentPlatform,
   type ProjectAspectRatio,
 } from "@/db/schema";
 import { getProjectDimensions } from "@/lib/schemas/project";
@@ -20,6 +21,20 @@ export async function createProject(input: {
   language: string;
   maximumBudgetCents: number;
   userId: string;
+  /**
+   * When starting a project from a saved Idea Lab idea, seeds the new
+   * project's brief with the idea's fields instead of the default blank
+   * brief. Omitted (or null) for every other creation path — existing
+   * projects and the plain create-project flow are unaffected.
+   */
+  brief?: {
+    topic: string;
+    targetAudience: string;
+    tone: string;
+    targetDurationSeconds: number | null;
+    primaryPlatform: ContentPlatform;
+    hookAngle: string;
+  } | null;
 }) {
   const projectId = crypto.randomUUID();
   const dimensions = getProjectDimensions(input.aspectRatio);
@@ -45,11 +60,14 @@ export async function createProject(input: {
       projectId,
       updatedByUserId: input.userId,
     }),
-    getDatabase().insert(projectBriefs).values({
-      workspaceId: input.workspaceId,
-      projectId,
-      updatedByUserId: input.userId,
-    }),
+    getDatabase()
+      .insert(projectBriefs)
+      .values({
+        workspaceId: input.workspaceId,
+        projectId,
+        updatedByUserId: input.userId,
+        ...(input.brief ?? {}),
+      }),
     getDatabase()
       .insert(projectOutputVariants)
       .values(

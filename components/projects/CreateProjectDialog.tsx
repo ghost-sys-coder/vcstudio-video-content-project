@@ -11,14 +11,19 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import type { IdeaNicheGroup } from "@/lib/ideas/ideas-view";
 
 export function CreateProjectDialog({
   defaultBudgetCents,
+  ideaGroups,
+  initialIdeaId,
 }: {
   defaultBudgetCents: number;
+  ideaGroups: IdeaNicheGroup[];
+  initialIdeaId?: string | null;
 }) {
   return (
-    <Dialog>
+    <Dialog defaultOpen={Boolean(initialIdeaId)}>
       <DialogTrigger render={<Button />}>
         <Plus />
         New project
@@ -31,7 +36,11 @@ export function CreateProjectDialog({
             later.
           </DialogDescription>
         </DialogHeader>
-        <CreateProjectForm defaultBudgetCents={defaultBudgetCents} />
+        <CreateProjectForm
+          defaultBudgetCents={defaultBudgetCents}
+          ideaGroups={ideaGroups}
+          initialIdeaId={initialIdeaId}
+        />
       </DialogContent>
     </Dialog>
   );

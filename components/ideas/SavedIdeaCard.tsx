@@ -1,11 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { archiveIdeaAction } from "@/app/(authenticated)/app/ideas/actions";
 import { IdeaCardBody } from "@/components/ideas/IdeaCardBody";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import type { SavedIdeaView } from "@/lib/ideas/ideas-view";
+import { cn } from "@/lib/utils";
 
 export function SavedIdeaCard({
   idea,
@@ -47,14 +49,22 @@ export function SavedIdeaCard({
           </span>
         )}
         {canEdit ? (
-          <Button
-            disabled={pending}
-            onClick={archive}
-            size="sm"
-            variant="ghost"
-          >
-            {pending ? "Removing…" : "Remove"}
-          </Button>
+          <div className="flex items-center gap-1">
+            <Link
+              className={cn(buttonVariants({ size: "sm", variant: "outline" }))}
+              href={`/app/projects?ideaId=${idea.id}`}
+            >
+              Start project
+            </Link>
+            <Button
+              disabled={pending}
+              onClick={archive}
+              size="sm"
+              variant="ghost"
+            >
+              {pending ? "Removing…" : "Remove"}
+            </Button>
+          </div>
         ) : null}
       </CardFooter>
     </Card>
