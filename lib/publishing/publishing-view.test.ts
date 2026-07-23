@@ -15,7 +15,7 @@ vi.mock("@/db/repositories/publishing.repository", () => ({
   listProjectVideoPublications: mocks.listPublications,
 }));
 vi.mock("@/db/repositories/video-render.repository", () => ({
-  listVideoRenders: mocks.listRenders,
+  listRendersWithSource: mocks.listRenders,
 }));
 vi.mock("@/db/repositories/title-generation.repository", () => ({
   findLatestCompletedTitleGenerationRunForPlatform: mocks.findMetadataRun,
@@ -161,5 +161,83 @@ describe("publishing view generated metadata", () => {
         status: "uploading",
       }),
     );
+  });
+
+  it("labels shorts, variants, and full-length renders distinctly and orders them", async () => {
+    const baseRender = {
+      status: "succeeded" as const,
+      framesPerSecond: 30,
+      assetObjectKey: "key",
+      assetContentType: "video/mp4",
+    };
+    mocks.listRenders.mockResolvedValue([
+      {
+        ...baseRender,
+        id: "longform-render",
+        width: 1920,
+        height: 1080,
+        durationMilliseconds: 660_000,
+        aspectRatio: "16:9",
+        assetSizeBytes: 5_000_000,
+        createdAt: new Date("2026-07-22T00:00:00Z"),
+        outputVariantId: null,
+        shortCompositionId: null,
+        variantName: null,
+        shortName: null,
+      },
+      {
+        ...baseRender,
+        id: "short-render",
+        width: 1080,
+        height: 1920,
+        durationMilliseconds: 2000,
+        aspectRatio: "9:16",
+        assetSizeBytes: 400_000,
+        createdAt: new Date("2026-07-22T02:00:00Z"),
+        outputVariantId: "variant-9-16",
+        shortCompositionId: "short-1",
+        variantName: "Vertical 9:16",
+        shortName: "short-testing",
+      },
+    ]);
+
+    const view = await loadPublishingView({
+      workspaceId: "workspace-id",
+      project: {
+        id: "project-id",
+        workspaceId: "workspace-id",
+        name: "Project",
+        description: "",
+        status: "draft",
+        aspectRatio: "16:9",
+        width: 1920,
+        height: 1080,
+        framesPerSecond: 30,
+        language: "English",
+        maximumBudgetCents: 1000,
+        createdByUserId: "user-id",
+        archivedAt: null,
+        createdAt: new Date("2026-07-22T00:00:00Z"),
+        updatedAt: new Date("2026-07-22T00:00:00Z"),
+      },
+    });
+
+    // The short is surfaced (previously it was indistinguishable) and sorts
+    // ahead of the full-length render.
+    expect(view.renders.map((render) => render.id)).toEqual([
+      "short-render",
+      "longform-render",
+    ]);
+    const short = view.renders[0];
+    expect(short.kind).toBe("short");
+    expect(short.groupLabel).toBe("Shorts");
+    expect(short.sourceName).toBe("short-testing");
+    expect(short.label).toContain("short-testing");
+    expect(short.label).toContain("0:02");
+
+    const longform = view.renders[1];
+    expect(longform.kind).toBe("longform");
+    expect(longform.sourceName).toBeNull();
+    expect(longform.label).toContain("Full video");
   });
 });

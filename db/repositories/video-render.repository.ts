@@ -2,7 +2,12 @@ import "server-only";
 
 import { and, asc, desc, eq, inArray, lte, sql } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
-import { usageReservations, videoRenders } from "@/db/schema";
+import {
+  projectOutputVariants,
+  shortCompositions,
+  usageReservations,
+  videoRenders,
+} from "@/db/schema";
 
 const MAX_LIST_LIMIT = 100;
 
@@ -128,6 +133,61 @@ export async function listVideoRenders(input: {
   return getDatabase()
     .select()
     .from(videoRenders)
+    .where(
+      and(
+        eq(videoRenders.workspaceId, input.workspaceId),
+        eq(videoRenders.projectId, input.projectId),
+      ),
+    )
+    .orderBy(desc(videoRenders.createdAt))
+    .limit(Math.min(input.limit ?? 50, MAX_LIST_LIMIT));
+}
+
+/**
+ * Renders enriched with the name of what they were rendered from — the source
+ * output variant or short composition. The publish picker needs this to tell a
+ * long-form export, a repurposed aspect variant, and a named short apart;
+ * `listVideoRenders` alone returns only dimensions, which are indistinguishable
+ * across several long-form renders.
+ */
+export async function listRendersWithSource(input: {
+  workspaceId: string;
+  projectId: string;
+  limit?: number;
+}) {
+  return getDatabase()
+    .select({
+      id: videoRenders.id,
+      status: videoRenders.status,
+      width: videoRenders.width,
+      height: videoRenders.height,
+      framesPerSecond: videoRenders.framesPerSecond,
+      durationMilliseconds: videoRenders.durationMilliseconds,
+      aspectRatio: videoRenders.aspectRatio,
+      assetObjectKey: videoRenders.assetObjectKey,
+      assetContentType: videoRenders.assetContentType,
+      assetSizeBytes: videoRenders.assetSizeBytes,
+      createdAt: videoRenders.createdAt,
+      outputVariantId: videoRenders.outputVariantId,
+      shortCompositionId: videoRenders.shortCompositionId,
+      variantName: projectOutputVariants.name,
+      shortName: shortCompositions.name,
+    })
+    .from(videoRenders)
+    .leftJoin(
+      projectOutputVariants,
+      and(
+        eq(projectOutputVariants.id, videoRenders.outputVariantId),
+        eq(projectOutputVariants.workspaceId, videoRenders.workspaceId),
+      ),
+    )
+    .leftJoin(
+      shortCompositions,
+      and(
+        eq(shortCompositions.id, videoRenders.shortCompositionId),
+        eq(shortCompositions.workspaceId, videoRenders.workspaceId),
+      ),
+    )
     .where(
       and(
         eq(videoRenders.workspaceId, input.workspaceId),

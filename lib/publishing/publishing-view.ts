@@ -10,13 +10,20 @@ import {
   listPlatformConnections,
   listProjectVideoPublications,
 } from "@/db/repositories/publishing.repository";
-import { listVideoRenders } from "@/db/repositories/video-render.repository";
+import { listRendersWithSource } from "@/db/repositories/video-render.repository";
 import {
   findLatestCompletedTitleGenerationRunForPlatform,
   listTitleSuggestionsForRuns,
 } from "@/db/repositories/title-generation.repository";
 import { getPublishingEnvironment } from "@/lib/env/server";
 import { PUBLISHABLE_PLATFORMS } from "@/lib/publishing/provider-registry";
+import {
+  buildRenderOptionLabel,
+  classifyRenderSource,
+  formatRenderClock,
+  RENDER_KIND_ORDER,
+  type PublishableRenderKind,
+} from "@/lib/publishing/render-source-label";
 import { validateTikTokUploadAsset } from "@/lib/publishing/tiktok-upload-validation";
 import {
   normalizeGeneratedTags,
@@ -40,7 +47,16 @@ export type ConnectionView = {
 
 export type PublishableRenderView = {
   id: string;
+  /** Concise one-line label including kind + source name (used by the closed picker). */
   label: string;
+  /** short | variant | longform — drives grouping and the icon in the picker. */
+  kind: PublishableRenderKind;
+  /** Section heading for grouping, e.g. "Shorts". */
+  groupLabel: string;
+  /** The short/variant name, or null for a full-length export. */
+  sourceName: string | null;
+  dimensionsLabel: string;
+  clockLabel: string;
   sizeBytes: number;
   durationSeconds: number;
   createdAtLabel: string;
@@ -91,7 +107,7 @@ export async function loadPublishingView(input: {
   const environment = getPublishingEnvironment();
   const [connections, renders, publications, metadataRuns] = await Promise.all([
     listPlatformConnections({ workspaceId: input.workspaceId }),
-    listVideoRenders({
+    listRendersWithSource({
       workspaceId: input.workspaceId,
       projectId: input.project.id,
       limit: PUBLISHABLE_RENDER_LIMIT,
@@ -150,7 +166,10 @@ export async function loadPublishingView(input: {
       status: connection.status,
       lastError: connection.lastError,
     })),
-    // Only finished renders with a stored asset can be published.
+    // Only finished renders with a stored asset can be published. Shorts and
+    // repurposed variants surface here alongside the full-length export, each
+    // tagged with its kind and source name so a user can tell them apart —
+    // grouped shorts first, then variants, then full video, newest within each.
     renders: renders
       .filter(
         (render) =>
@@ -159,6 +178,10 @@ export async function loadPublishingView(input: {
           (render.assetSizeBytes ?? 0) > 0,
       )
       .map((render) => {
+        const source = classifyRenderSource({
+          shortName: render.shortName,
+          variantName: render.variantName,
+        });
         const tiktokValidation = validateTikTokUploadAsset({
           width: render.width,
           height: render.height,
@@ -169,9 +192,18 @@ export async function loadPublishingView(input: {
         });
         return {
           id: render.id,
-          label: `${render.width}×${render.height} · ${Math.round(
-            render.durationMilliseconds / 1000,
-          )}s · ${formatUtc(render.createdAt)}`,
+          kind: source.kind,
+          groupLabel: source.groupLabel,
+          sourceName: source.sourceName,
+          dimensionsLabel: `${render.width}×${render.height}`,
+          clockLabel: formatRenderClock(render.durationMilliseconds),
+          label: buildRenderOptionLabel({
+            kind: source.kind,
+            sourceName: source.sourceName,
+            width: render.width,
+            height: render.height,
+            durationMilliseconds: render.durationMilliseconds,
+          }),
           sizeBytes: render.assetSizeBytes ?? 0,
           durationSeconds: Math.round(render.durationMilliseconds / 1000),
           createdAtLabel: formatUtc(render.createdAt),
@@ -204,7 +236,12 @@ export async function loadPublishingView(input: {
           tiktokEligible: tiktokValidation.eligible,
           tiktokIneligibilityReason: tiktokValidation.reason,
         };
-      }),
+      })
+      // Stable sort keeps the query's newest-first order within each kind.
+      .sort(
+        (left, right) =>
+          RENDER_KIND_ORDER[left.kind] - RENDER_KIND_ORDER[right.kind],
+      ),
     publications: publications.map((publication) => ({
       id: publication.id,
       connectionId: publication.connectionId,
