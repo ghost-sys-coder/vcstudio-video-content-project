@@ -1,13 +1,17 @@
 import "server-only";
 
-import { and, count, desc, eq, isNull, max } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, max } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
 import {
   projectScriptDrafts,
   projectScriptVersions,
   projects,
+  videoPublications,
+  type Project,
 } from "@/db/schema";
 import { calculatePagination } from "@/lib/domain/pagination";
+
+export type ProjectListItem = Project & { hasPublished: boolean };
 
 export async function listProjects(input: {
   workspaceId: string;
@@ -29,8 +33,32 @@ export async function listProjects(input: {
       .where(eq(projects.workspaceId, input.workspaceId)),
   ]);
   const total = totals[0]?.value ?? 0;
+
+  const projectIds = items.map((project) => project.id);
+  const publishedProjectIds = new Set(
+    projectIds.length === 0
+      ? []
+      : (
+          await getDatabase()
+            .selectDistinct({ projectId: videoPublications.projectId })
+            .from(videoPublications)
+            .where(
+              and(
+                eq(videoPublications.workspaceId, input.workspaceId),
+                eq(videoPublications.status, "succeeded"),
+                inArray(videoPublications.projectId, projectIds),
+              ),
+            )
+        ).map((row) => row.projectId),
+  );
+
+  const itemsWithPublishState: ProjectListItem[] = items.map((project) => ({
+    ...project,
+    hasPublished: publishedProjectIds.has(project.id),
+  }));
+
   return {
-    items,
+    items: itemsWithPublishState,
     total,
     page: input.page,
     pageSize: input.pageSize,

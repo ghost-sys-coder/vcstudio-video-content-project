@@ -2,6 +2,8 @@
 
 import { ExternalLinkIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { VideoPublicationChannelBadge } from "@/components/publish/VideoPublicationChannelBadge";
+import { VideoPublicationStatusBadge } from "@/components/publish/VideoPublicationStatusBadge";
 import type { PublicationView } from "@/lib/publishing/publishing-view";
 
 const statusLabels: Record<PublicationView["status"], string> = {
@@ -52,10 +54,16 @@ export function VideoPublicationRow({
             · {publication.createdAtLabel}
           </p>
         </div>
-        <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs">
-          {statusLabel}
-          {isUploading ? ` · ${progressPercent}%` : null}
-        </span>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <VideoPublicationStatusBadge
+            label={`${statusLabel}${isUploading ? ` · ${progressPercent}%` : ""}`}
+            status={publication.status}
+          />
+          <VideoPublicationChannelBadge
+            label={publication.platformLabel}
+            platform={publication.platform}
+          />
+        </div>
       </div>
 
       {isUploading ? (

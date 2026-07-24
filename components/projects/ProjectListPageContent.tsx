@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
-import type { Project } from "@/db/schema";
+import type { ProjectListItem } from "@/db/repositories/projects.repository";
 import { buttonVariants } from "@/components/ui/button";
 import { CreateProjectDialog } from "@/components/projects/CreateProjectDialog";
 import { EmptyProjectsState } from "@/components/projects/EmptyProjectsState";
@@ -18,7 +18,7 @@ export function ProjectListPageContent({
   ideaGroups,
   initialIdeaId,
 }: {
-  projects: Project[];
+  projects: ProjectListItem[];
   total: number;
   page: number;
   pageCount: number;
