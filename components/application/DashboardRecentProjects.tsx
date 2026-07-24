@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRightIcon, FolderIcon } from "lucide-react";
-import type { Project } from "@/db/schema";
+import type { ProjectListItem } from "@/db/repositories/projects.repository";
 import { ProjectStatusBadge } from "@/components/projects/ProjectStatusBadge";
 
 const dateFormatter = new Intl.DateTimeFormat("en-US", {
@@ -8,7 +8,11 @@ const dateFormatter = new Intl.DateTimeFormat("en-US", {
   day: "numeric",
 });
 
-export function DashboardRecentProjects({ projects }: { projects: Project[] }) {
+export function DashboardRecentProjects({
+  projects,
+}: {
+  projects: ProjectListItem[];
+}) {
   return (
     <section
       aria-labelledby="dashboard-recent-projects-heading"
@@ -63,7 +67,10 @@ export function DashboardRecentProjects({ projects }: { projects: Project[] }) {
                     {dateFormatter.format(project.updatedAt)}
                   </p>
                 </div>
-                <ProjectStatusBadge status={project.status} />
+                <ProjectStatusBadge
+                  hasPublished={project.hasPublished}
+                  status={project.status}
+                />
               </Link>
             </li>
           ))}

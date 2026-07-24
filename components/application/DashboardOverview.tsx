@@ -4,9 +4,9 @@ import {
   UsersIcon,
   WalletIcon,
 } from "lucide-react";
-import type { Project } from "@/db/schema";
 import type { WorkspaceMembershipView } from "@/db/repositories/workspaces.repository";
 import type { WorkspaceDashboardStatistics } from "@/db/repositories/dashboard.repository";
+import type { ProjectListItem } from "@/db/repositories/projects.repository";
 import { DashboardRecentProjects } from "@/components/application/DashboardRecentProjects";
 import { DashboardStatCard } from "@/components/application/DashboardStatCard";
 import { formatUsdCents } from "@/lib/format/currency";
@@ -18,7 +18,7 @@ export function DashboardOverview({
 }: {
   membership: WorkspaceMembershipView;
   statistics: WorkspaceDashboardStatistics;
-  recentProjects: Project[];
+  recentProjects: ProjectListItem[];
 }) {
   return (
     <section aria-labelledby="dashboard-heading" className="space-y-8">
