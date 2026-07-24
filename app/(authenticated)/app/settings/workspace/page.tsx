@@ -1,6 +1,10 @@
 import { redirect } from "next/navigation";
 import { WorkspaceProfilePage } from "@/components/workspace/WorkspaceProfilePage";
 import { findWorkspaceLogo } from "@/db/repositories/storage-objects.repository";
+import {
+  listPendingWorkspaceInvitations,
+  listWorkspaceMembers,
+} from "@/db/repositories/workspaces.repository";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import { canManageWorkspace } from "@/lib/policies/workspace-policy";
 import { loadWorkspaceChannelsView } from "@/lib/publishing/workspace-connections-view";
@@ -22,14 +26,21 @@ export default async function WorkspaceSettingsPage({
     redirect("/app/access-denied");
   }
 
-  const [{ facebook, instagram, tiktok, youtube }, logo, channelsView] =
-    await Promise.all([
-      searchParams,
-      findWorkspaceLogo(context.activeMembership.workspaceId),
-      loadWorkspaceChannelsView({
-        workspaceId: context.activeMembership.workspaceId,
-      }),
-    ]);
+  const [
+    { facebook, instagram, tiktok, youtube },
+    logo,
+    channelsView,
+    members,
+    pendingInvitations,
+  ] = await Promise.all([
+    searchParams,
+    findWorkspaceLogo(context.activeMembership.workspaceId),
+    loadWorkspaceChannelsView({
+      workspaceId: context.activeMembership.workspaceId,
+    }),
+    listWorkspaceMembers(context.activeMembership.workspaceId),
+    listPendingWorkspaceInvitations(context.activeMembership.workspaceId),
+  ]);
   const logoUrl = logo
     ? await createWorkspaceLogoDownloadUrl(logo.objectKey)
     : null;
@@ -37,13 +48,16 @@ export default async function WorkspaceSettingsPage({
   return (
     <WorkspaceProfilePage
       channelsView={channelsView}
+      currentUserId={context.user.id}
       logoUrl={logoUrl}
+      members={members}
       oauthStatus={{
         facebook: facebook ?? null,
         instagram: instagram ?? null,
         tiktok: tiktok ?? null,
         youtube: youtube ?? null,
       }}
+      pendingInvitations={pendingInvitations}
       workspaceId={context.activeMembership.workspaceId}
       workspaceName={context.activeMembership.workspaceName}
     />

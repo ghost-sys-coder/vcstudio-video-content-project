@@ -54,3 +54,34 @@ export class ClerkSynchronizationError extends Error {
     this.name = "ClerkSynchronizationError";
   }
 }
+
+export class LastWorkspaceOwnerError extends Error {
+  readonly code = "LAST_WORKSPACE_OWNER";
+
+  constructor() {
+    super(
+      "A workspace must always have at least one owner. Assign another owner before changing this role.",
+    );
+    this.name = "LastWorkspaceOwnerError";
+  }
+}
+
+export class WorkspaceInvitationNotFoundError extends Error {
+  readonly code = "WORKSPACE_INVITATION_NOT_FOUND";
+
+  constructor() {
+    super("This invitation is no longer valid.");
+    this.name = "WorkspaceInvitationNotFoundError";
+  }
+}
+
+export class WorkspaceInvitationEmailMismatchError extends Error {
+  readonly code = "WORKSPACE_INVITATION_EMAIL_MISMATCH";
+
+  constructor() {
+    super(
+      "This invitation was sent to a different email address than the one you're signed in with.",
+    );
+    this.name = "WorkspaceInvitationEmailMismatchError";
+  }
+}

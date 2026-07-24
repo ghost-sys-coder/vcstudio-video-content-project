@@ -89,3 +89,5 @@ export const canGenerateAssets = canCreateProject;
 export const canRenderProject = canCreateProject;
 export const canManageWorkspace = (role: WorkspaceRole) =>
   can(role, "manageSettings");
+export const canManageMembers = (role: WorkspaceRole) =>
+  can(role, "manageMembers");

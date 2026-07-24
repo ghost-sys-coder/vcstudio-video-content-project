@@ -289,6 +289,10 @@ export const auditActionEnum = pgEnum("audit_action", [
   "platform_connected",
   "platform_disconnected",
   "video_published",
+  "member_invited",
+  "invitation_revoked",
+  "member_joined",
+  "member_removed",
 ]);
 
 export const userThemePreferenceEnum = pgEnum("user_theme_preference", [
@@ -371,6 +375,52 @@ export const workspaceMembers = pgTable(
       table.workspaceId,
       table.role,
     ),
+  ],
+);
+
+export const workspaceInvitationStatusEnum = pgEnum(
+  "workspace_invitation_status",
+  ["pending", "accepted", "revoked", "expired"],
+);
+
+export const workspaceInvitations = pgTable(
+  "workspace_invitations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    role: workspaceRoleEnum("role").notNull(),
+    status: workspaceInvitationStatusEnum("status")
+      .notNull()
+      .default("pending"),
+    invitedByUserId: uuid("invited_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    /** Clerk's invitation id, needed to call `revokeInvitation`. */
+    clerkInvitationId: text("clerk_invitation_id"),
+    acceptedByUserId: uuid("accepted_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("workspace_invitations_workspace_status_index").on(
+      table.workspaceId,
+      table.status,
+    ),
+    uniqueIndex("workspace_invitations_workspace_email_pending_unique")
+      .on(table.workspaceId, table.email)
+      .where(sql`${table.status} = 'pending'`),
   ],
 );
 

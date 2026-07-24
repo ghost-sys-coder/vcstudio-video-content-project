@@ -3,6 +3,7 @@ import {
   can,
   canCreateProject,
   canEditProject,
+  canManageMembers,
   canManageWorkspace,
   requireCapability,
 } from "@/lib/policies/workspace-policy";
@@ -24,6 +25,7 @@ describe("workspace policy", () => {
   it("allows editors to mutate workspace data but not manage membership", () => {
     expect(can("editor", "mutateWorkspaceData")).toBe(true);
     expect(can("editor", "manageMembers")).toBe(false);
+    expect(canManageMembers("editor")).toBe(false);
     expect(canManageWorkspace("editor")).toBe(false);
     expect(canEditProject("editor")).toBe(true);
     expect(can("editor", "deleteScriptVersions")).toBe(true);
@@ -34,7 +36,9 @@ describe("workspace policy", () => {
 
   it("allows owners to manage membership and workspace settings", () => {
     expect(can("owner", "manageMembers")).toBe(true);
+    expect(canManageMembers("owner")).toBe(true);
     expect(canManageWorkspace("owner")).toBe(true);
+    expect(canManageMembers("viewer")).toBe(false);
     expect(can("owner", "deleteScriptVersions")).toBe(true);
     expect(can("owner", "manageCharacters")).toBe(true);
     expect(can("owner", "generateSceneImages")).toBe(true);

@@ -22,6 +22,10 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   platform_connected: "Platform account connected",
   platform_disconnected: "Platform account disconnected",
   video_published: "Video published to platform",
+  member_invited: "Member invited",
+  invitation_revoked: "Invitation revoked",
+  member_joined: "Member joined",
+  member_removed: "Member removed",
 };
 
 // Keys whose values are genuinely sensitive and must never be persisted to the
