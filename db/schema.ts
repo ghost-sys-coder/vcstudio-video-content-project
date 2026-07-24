@@ -291,6 +291,11 @@ export const auditActionEnum = pgEnum("audit_action", [
   "video_published",
 ]);
 
+export const userThemePreferenceEnum = pgEnum("user_theme_preference", [
+  "light",
+  "dark",
+]);
+
 export const users = pgTable(
   "users",
   {
@@ -299,6 +304,9 @@ export const users = pgTable(
     email: text("email").notNull(),
     displayName: text("display_name").notNull(),
     avatarUrl: text("avatar_url"),
+    themePreference: userThemePreferenceEnum("theme_preference")
+      .notNull()
+      .default("light"),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -3118,6 +3126,8 @@ export const clerkWebhookEvents = pgTable(
 );
 
 export type ApplicationUser = typeof users.$inferSelect;
+export type UserThemePreference =
+  (typeof userThemePreferenceEnum.enumValues)[number];
 export type Workspace = typeof workspaces.$inferSelect;
 export type WorkspaceMember = typeof workspaceMembers.$inferSelect;
 export type WorkspaceRole = (typeof workspaceRoleEnum.enumValues)[number];

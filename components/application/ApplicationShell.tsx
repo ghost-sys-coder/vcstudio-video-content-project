@@ -1,6 +1,7 @@
 import type { WorkspaceMembershipView } from "@/db/repositories/workspaces.repository";
-import type { ApplicationUser } from "@/db/schema";
+import type { ApplicationUser, UserThemePreference } from "@/db/schema";
 import { ApplicationSidebar } from "@/components/application/ApplicationSidebar";
+import { ThemeResyncEffect } from "@/components/application/ThemeResyncEffect";
 import { UserAccountMenu } from "@/components/application/UserAccountMenu";
 import {
   SidebarInset,
@@ -14,8 +15,10 @@ export function ApplicationShell({
   canManageUsage,
   children,
   defaultSidebarOpen,
+  initialTheme,
   logoUrl,
   memberships,
+  themeResyncTarget,
   user,
 }: {
   activeMembership: WorkspaceMembershipView;
@@ -23,16 +26,20 @@ export function ApplicationShell({
   canManageUsage: boolean;
   children: React.ReactNode;
   defaultSidebarOpen: boolean;
+  initialTheme: UserThemePreference;
   logoUrl: string | null;
   memberships: WorkspaceMembershipView[];
+  themeResyncTarget: UserThemePreference | null;
   user: ApplicationUser;
 }) {
   return (
     <SidebarProvider defaultOpen={defaultSidebarOpen}>
+      <ThemeResyncEffect targetTheme={themeResyncTarget} />
       <ApplicationSidebar
         activeMembership={activeMembership}
         canManageSettings={canManageSettings}
         canManageUsage={canManageUsage}
+        initialTheme={initialTheme}
         logoUrl={logoUrl}
         memberships={memberships}
         userDisplayName={user.displayName}

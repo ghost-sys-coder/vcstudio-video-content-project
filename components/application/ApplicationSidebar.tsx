@@ -13,7 +13,9 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { WorkspaceMembershipView } from "@/db/repositories/workspaces.repository";
+import type { UserThemePreference } from "@/db/schema";
 import { getUserInitials } from "@/lib/users/user-initials";
+import { ThemeToggle } from "@/components/application/ThemeToggle";
 import { WorkspaceLogoImage } from "@/components/application/WorkspaceLogoImage";
 import { WorkspaceSelector } from "@/components/application/WorkspaceSelector";
 import {
@@ -34,6 +36,7 @@ export function ApplicationSidebar({
   activeMembership,
   canManageSettings,
   canManageUsage,
+  initialTheme,
   logoUrl,
   memberships,
   userDisplayName,
@@ -42,6 +45,7 @@ export function ApplicationSidebar({
   activeMembership: WorkspaceMembershipView;
   canManageSettings: boolean;
   canManageUsage: boolean;
+  initialTheme: UserThemePreference;
   logoUrl: string | null;
   memberships: WorkspaceMembershipView[];
   userDisplayName: string;
@@ -158,6 +162,9 @@ export function ApplicationSidebar({
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
+          <SidebarMenuItem>
+            <ThemeToggle initialTheme={initialTheme} />
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton
               onClick={() => void signOut({ redirectUrl: "/" })}

@@ -1,0 +1,2 @@
+CREATE TYPE "user_theme_preference" AS ENUM('light', 'dark');--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN "theme_preference" "user_theme_preference" DEFAULT 'light'::"user_theme_preference" NOT NULL;
