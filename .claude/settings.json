@@ -94,8 +94,6 @@
       "Bash(xargs -I{} dirname {})",
       "Bash(npx drizzle-kit *)"
     ],
-    "additionalDirectories": [
-      "\\tmp"
-    ]
+    "additionalDirectories": ["\\tmp"]
   }
 }

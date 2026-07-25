@@ -469,7 +469,12 @@ export function PublishToPlatformPanel({
                                     ? " · Not Reel-compatible"
                                     : tiktokSelected && !render.tiktokEligible
                                       ? " · Not TikTok-compatible"
-                                      : ""}
+                                      : !instagramSelected &&
+                                          !tiktokSelected &&
+                                          activePlatform === "youtube" &&
+                                          render.youtubeShortsEligible
+                                        ? " · Shorts-eligible"
+                                        : ""}
                                 </span>
                               </span>
                             </SelectItem>
@@ -796,7 +801,15 @@ export function PublishToPlatformPanel({
                 ? "Instagram will process this vertical Reel before publishing it."
                 : tiktokSelected
                   ? "Delivery is not publication. Complete the post from TikTok's inbox notification."
-                  : `Uploads use ${effectiveVisibility} visibility.`}{" "}
+                  : `Uploads use ${effectiveVisibility} visibility.`}
+              {activePlatform === "youtube" && selectedRender ? (
+                <>
+                  {" "}
+                  {selectedRender.youtubeShortsEligible
+                    ? "This will publish as a YouTube Short."
+                    : "This will publish as a regular YouTube video."}
+                </>
+              ) : null}{" "}
               Publishing does not cost credits; each platform may enforce its
               own upload limits.
             </p>

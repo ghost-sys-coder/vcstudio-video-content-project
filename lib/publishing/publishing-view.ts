@@ -25,6 +25,7 @@ import {
   type PublishableRenderKind,
 } from "@/lib/publishing/render-source-label";
 import { validateTikTokUploadAsset } from "@/lib/publishing/tiktok-upload-validation";
+import { evaluateYouTubeShortsEligibility } from "@/lib/publishing/youtube-shorts-eligibility";
 import {
   normalizeGeneratedTags,
   selectPreferredGeneratedTitle,
@@ -65,6 +66,8 @@ export type PublishableRenderView = {
   instagramIneligibilityReason: string | null;
   tiktokEligible: boolean;
   tiktokIneligibilityReason: string | null;
+  /** Advisory only — a render that fails this is still a valid regular YouTube upload. */
+  youtubeShortsEligible: boolean;
 };
 
 export type PublicationView = {
@@ -190,6 +193,11 @@ export async function loadPublishingView(input: {
           sizeBytes: render.assetSizeBytes ?? 0,
           contentType: render.assetContentType,
         });
+        const youtubeShortsValidation = evaluateYouTubeShortsEligibility({
+          width: render.width,
+          height: render.height,
+          durationMilliseconds: render.durationMilliseconds,
+        });
         return {
           id: render.id,
           kind: source.kind,
@@ -235,6 +243,7 @@ export async function loadPublishingView(input: {
                         : null,
           tiktokEligible: tiktokValidation.eligible,
           tiktokIneligibilityReason: tiktokValidation.reason,
+          youtubeShortsEligible: youtubeShortsValidation.eligible,
         };
       })
       // Stable sort keeps the query's newest-first order within each kind.
