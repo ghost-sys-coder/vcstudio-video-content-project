@@ -1,8 +1,13 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { createShortCompositionAction } from "@/app/(authenticated)/app/projects/[projectId]/render/actions";
+import {
+  createShortCompositionAction,
+  updateShortCompositionAction,
+} from "@/app/(authenticated)/app/projects/[projectId]/render/actions";
 import { ShortClipRow } from "@/components/render/ShortClipRow";
+import { ShortClipTrimEditor } from "@/components/render/ShortClipTrimEditor";
+import { ShortSceneMultiSelect } from "@/components/render/ShortSceneMultiSelect";
 import { StartRenderButton } from "@/components/render/StartRenderButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,9 +16,11 @@ import type {
   ShortSourceSceneView,
 } from "@/lib/render/render-view";
 import {
-  snapToNearestBoundary,
+  sumDurationMilliseconds,
   type ShortDraftClip,
 } from "@/lib/shorts/short-editor";
+
+const EMPTY_NAME = "Untitled short";
 
 export function ShortsEditor({
   projectId,
@@ -36,164 +43,156 @@ export function ShortsEditor({
   onPreview: (shortCompositionId: string) => void;
   renderPending: boolean;
 }) {
-  const [name, setName] = useState("Untitled short");
-  const [selectedSceneId, setSelectedSceneId] = useState(
-    sourceScenes[0]?.sceneId ?? "",
-  );
-  const selectedScene = useMemo(
-    () =>
-      sourceScenes.find((scene) => scene.sceneId === selectedSceneId) ??
-      sourceScenes[0] ??
-      null,
-    [selectedSceneId, sourceScenes],
-  );
-  const [startSeconds, setStartSeconds] = useState(
-    (sourceScenes[0]?.startMilliseconds ?? 0) / 1000,
-  );
-  const [endSeconds, setEndSeconds] = useState(
-    (sourceScenes[0]?.endMilliseconds ?? 0) / 1000,
-  );
-  const [snapEnabled, setSnapEnabled] = useState(true);
+  const [name, setName] = useState(EMPTY_NAME);
   const [clips, setClips] = useState<ShortDraftClip[]>([]);
+  const [editingShortId, setEditingShortId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const selectScene = (sceneId: string) => {
-    const scene = sourceScenes.find((item) => item.sceneId === sceneId);
-    setSelectedSceneId(sceneId);
-    if (scene) {
-      setStartSeconds(scene.startMilliseconds / 1000);
-      setEndSeconds(scene.endMilliseconds / 1000);
-    }
-  };
-
-  const durationMilliseconds = clips.reduce(
-    (total, clip) =>
-      total + (clip.sourceEndMilliseconds - clip.sourceStartMilliseconds),
-    0,
+  const availableScenes = useMemo(
+    () =>
+      sourceScenes.filter(
+        (scene) => !clips.some((clip) => clip.sourceSceneId === scene.sceneId),
+      ),
+    [clips, sourceScenes],
   );
+  const durationMilliseconds = sumDurationMilliseconds(
+    clips.map((clip) => ({
+      startMilliseconds: clip.sourceStartMilliseconds,
+      endMilliseconds: clip.sourceEndMilliseconds,
+    })),
+  );
+
+  function resetDraft() {
+    setName(EMPTY_NAME);
+    setClips([]);
+    setEditingShortId(null);
+  }
+
+  function addSelectedScenes(sceneIds: string[]) {
+    const idsInOrder = sourceScenes.filter((scene) =>
+      sceneIds.includes(scene.sceneId),
+    );
+    setClips((current) => [
+      ...current,
+      ...idsInOrder.map((scene): ShortDraftClip => ({
+        clientId: crypto.randomUUID(),
+        sourceSceneId: scene.sceneId,
+        sourceSceneVersionId: scene.sceneVersionId,
+        sceneNumber: scene.sceneNumber,
+        sourceStartMilliseconds: scene.startMilliseconds,
+        sourceEndMilliseconds: scene.endMilliseconds,
+        transition: "cut",
+      })),
+    ]);
+    setMessage(null);
+  }
+
+  function updateClip(
+    clientId: string,
+    patch: {
+      sourceStartMilliseconds: number;
+      sourceEndMilliseconds: number;
+      transition: "cut" | "fade";
+    },
+  ) {
+    setClips((current) =>
+      current.map((clip) =>
+        clip.clientId === clientId ? { ...clip, ...patch } : clip,
+      ),
+    );
+  }
+
+  function editSavedShort(short: ShortCompositionView) {
+    setName(short.name);
+    setClips(
+      short.clips.map((clip): ShortDraftClip => ({
+        clientId: crypto.randomUUID(),
+        sourceSceneId: clip.sourceSceneId,
+        sourceSceneVersionId: clip.sourceSceneVersionId,
+        sceneNumber:
+          sourceScenes.find((scene) => scene.sceneId === clip.sourceSceneId)
+            ?.sceneNumber ?? 0,
+        sourceStartMilliseconds: clip.sourceStartMilliseconds,
+        sourceEndMilliseconds: clip.sourceEndMilliseconds,
+        transition: clip.transition,
+      })),
+    );
+    setEditingShortId(short.id);
+    setMessage(null);
+  }
+
+  function save() {
+    if (!verticalOutputVariantId) return;
+    startTransition(async () => {
+      const formData = new FormData();
+      formData.set("projectId", projectId);
+      formData.set("outputVariantId", verticalOutputVariantId);
+      formData.set("name", name);
+      formData.set(
+        "clips",
+        JSON.stringify(
+          clips.map((clip, index) => ({
+            sourceSceneId: clip.sourceSceneId,
+            sourceSceneVersionId: clip.sourceSceneVersionId,
+            position: index + 1,
+            sourceStartMilliseconds: clip.sourceStartMilliseconds,
+            sourceEndMilliseconds: clip.sourceEndMilliseconds,
+            transition: clip.transition,
+          })),
+        ),
+      );
+      if (editingShortId) formData.set("shortCompositionId", editingShortId);
+      const result = editingShortId
+        ? await updateShortCompositionAction(formData)
+        : await createShortCompositionAction(formData);
+      if (!result.success) {
+        setMessage(result.error);
+        return;
+      }
+      setMessage(
+        result.warnings.length
+          ? `Short saved. ${result.warnings[0]}`
+          : "Short saved and ready to render.",
+      );
+      resetDraft();
+      await onSaved();
+    });
+  }
 
   return (
     <section className="min-w-0 max-w-full space-y-4 overflow-hidden rounded-xl border p-4">
       <div>
         <h2 className="text-sm font-semibold">Shorts editor</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Select precise ranges from the assembled source timeline. Audio is
-          trimmed from the approved narration and captions are rebased—nothing
-          is regenerated.
+          Multiselect scenes to build a short, then fine-tune each clip&apos;s
+          range and transition. Audio is trimmed from the approved narration and
+          captions are rebased—nothing is regenerated.
         </p>
       </div>
 
-      {selectedScene && verticalOutputVariantId ? (
+      {sourceScenes.length && verticalOutputVariantId ? (
         <div className="grid min-w-0 gap-4 lg:grid-cols-2">
-          <div className="min-w-0 space-y-3 rounded-lg border bg-muted/20 p-3">
-            <label className="block space-y-1 text-xs font-medium">
-              Source scene
-              <select
-                className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-                disabled={!canEdit || pending}
-                onChange={(event) => selectScene(event.target.value)}
-                value={selectedScene.sceneId}
-              >
-                {sourceScenes.map((scene) => (
-                  <option key={scene.sceneId} value={scene.sceneId}>
-                    Scene {scene.sceneNumber} ·{" "}
-                    {(scene.startMilliseconds / 1000).toFixed(1)}s–
-                    {(scene.endMilliseconds / 1000).toFixed(1)}s
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              <label className="block space-y-1 text-xs font-medium">
-                Start (seconds)
-                <Input
-                  disabled={!canEdit || pending}
-                  max={selectedScene.endMilliseconds / 1000}
-                  min={selectedScene.startMilliseconds / 1000}
-                  onChange={(event) =>
-                    setStartSeconds(Number(event.target.value))
-                  }
-                  step="0.1"
-                  type="number"
-                  value={startSeconds}
-                />
-              </label>
-              <label className="block space-y-1 text-xs font-medium">
-                End (seconds)
-                <Input
-                  disabled={!canEdit || pending}
-                  max={selectedScene.endMilliseconds / 1000}
-                  min={selectedScene.startMilliseconds / 1000}
-                  onChange={(event) =>
-                    setEndSeconds(Number(event.target.value))
-                  }
-                  step="0.1"
-                  type="number"
-                  value={endSeconds}
-                />
-              </label>
-            </div>
-            <label className="flex items-center gap-2 text-xs">
-              <input
-                checked={snapEnabled}
-                className="size-4 accent-primary"
-                disabled={!canEdit || pending}
-                onChange={(event) => setSnapEnabled(event.target.checked)}
-                type="checkbox"
-              />
-              Snap cuts to the nearest scene or subtitle boundary
-            </label>
-            <Button
+          <div className="min-w-0 space-y-4">
+            <ShortSceneMultiSelect
+              availableScenes={availableScenes}
               disabled={!canEdit || pending}
-              nativeButton
-              onClick={() => {
-                const boundaries = [
-                  selectedScene.startMilliseconds,
-                  ...selectedScene.captionBoundariesMilliseconds,
-                  selectedScene.endMilliseconds,
-                ];
-                const rawStart = Math.round(startSeconds * 1000);
-                const rawEnd = Math.round(endSeconds * 1000);
-                const start = snapEnabled
-                  ? snapToNearestBoundary(rawStart, boundaries)
-                  : rawStart;
-                const end = snapEnabled
-                  ? snapToNearestBoundary(rawEnd, boundaries)
-                  : rawEnd;
-                if (
-                  start < selectedScene.startMilliseconds ||
-                  end > selectedScene.endMilliseconds ||
-                  end <= start
-                ) {
-                  setMessage("Choose a valid range inside this scene.");
-                  return;
-                }
-                setClips((current) => [
-                  ...current,
-                  {
-                    clientId: crypto.randomUUID(),
-                    sourceSceneId: selectedScene.sceneId,
-                    sourceSceneVersionId: selectedScene.sceneVersionId,
-                    sceneNumber: selectedScene.sceneNumber,
-                    sourceStartMilliseconds: start,
-                    sourceEndMilliseconds: end,
-                    transition: "cut",
-                  },
-                ]);
-                setMessage(null);
-              }}
-              type="button"
-              variant="outline"
-            >
-              Add clip
-            </Button>
+              onAddSelected={addSelectedScenes}
+            />
+            {clips.length ? (
+              <ShortClipTrimEditor
+                clips={clips}
+                disabled={!canEdit || pending}
+                onUpdateClip={updateClip}
+                sourceScenes={sourceScenes}
+              />
+            ) : null}
           </div>
 
           <div className="min-w-0 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Selected clips
+                Short clips
               </h3>
               <span className="text-xs text-muted-foreground">
                 {(durationMilliseconds / 1000).toFixed(1)}s
@@ -231,7 +230,8 @@ export function ShortsEditor({
               </ol>
             ) : (
               <p className="rounded-lg border border-dashed p-4 text-xs text-muted-foreground">
-                Add one or more ranges in the order they should play.
+                Select one or more scenes to add them in the order they should
+                play.
               </p>
             )}
             <label className="block space-y-1 text-xs font-medium">
@@ -243,46 +243,34 @@ export function ShortsEditor({
                 value={name}
               />
             </label>
-            <Button
-              disabled={!canEdit || pending || clips.length === 0}
-              nativeButton
-              onClick={() => {
-                startTransition(async () => {
-                  const formData = new FormData();
-                  formData.set("projectId", projectId);
-                  formData.set("outputVariantId", verticalOutputVariantId);
-                  formData.set("name", name);
-                  formData.set(
-                    "clips",
-                    JSON.stringify(
-                      clips.map((clip, index) => ({
-                        sourceSceneId: clip.sourceSceneId,
-                        sourceSceneVersionId: clip.sourceSceneVersionId,
-                        position: index + 1,
-                        sourceStartMilliseconds: clip.sourceStartMilliseconds,
-                        sourceEndMilliseconds: clip.sourceEndMilliseconds,
-                        transition: clip.transition,
-                      })),
-                    ),
-                  );
-                  const result = await createShortCompositionAction(formData);
-                  if (!result.success) {
-                    setMessage(result.error);
-                    return;
-                  }
-                  setMessage(
-                    result.warnings.length
-                      ? `Short saved. ${result.warnings[0]}`
-                      : "Short saved and ready to render.",
-                  );
-                  setClips([]);
-                  await onSaved();
-                });
-              }}
-              type="button"
-            >
-              {pending ? "Saving short…" : "Save short"}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                disabled={!canEdit || pending || clips.length === 0}
+                nativeButton
+                onClick={save}
+                type="button"
+              >
+                {pending
+                  ? "Saving…"
+                  : editingShortId
+                    ? "Save changes"
+                    : "Save short"}
+              </Button>
+              {editingShortId ? (
+                <Button
+                  disabled={pending}
+                  nativeButton
+                  onClick={() => {
+                    resetDraft();
+                    setMessage(null);
+                  }}
+                  type="button"
+                  variant="ghost"
+                >
+                  Cancel edit
+                </Button>
+              ) : null}
+            </div>
             {message ? (
               <p className="text-xs text-muted-foreground" role="status">
                 {message}
@@ -319,6 +307,15 @@ export function ShortsEditor({
                     variant="outline"
                   >
                     Preview
+                  </Button>
+                  <Button
+                    disabled={!canEdit || pending}
+                    nativeButton
+                    onClick={() => editSavedShort(short)}
+                    type="button"
+                    variant="outline"
+                  >
+                    Edit
                   </Button>
                   <StartRenderButton
                     disabled={!canEdit || renderPending}

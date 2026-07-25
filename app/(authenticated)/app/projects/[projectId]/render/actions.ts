@@ -7,7 +7,10 @@ import { findSceneImageGeneration } from "@/db/repositories/scene-images.reposit
 import { listCurrentScenes } from "@/db/repositories/scenes.repository";
 import { listApprovedSceneImageAssets } from "@/db/repositories/subtitle.repository";
 import { saveSceneVariantFraming } from "@/db/commands/output-variant-commands";
-import { createShortComposition } from "@/db/commands/short-commands";
+import {
+  createShortComposition,
+  updateShortComposition,
+} from "@/db/commands/short-commands";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import {
   BudgetExceededError,
@@ -28,7 +31,10 @@ import {
   startSceneOutpaintSchema,
 } from "@/lib/schemas/output-variant";
 import { startSceneOutpaint } from "@/lib/output-variants/start-scene-outpaint";
-import { createShortCompositionSchema } from "@/lib/schemas/short";
+import {
+  createShortCompositionSchema,
+  updateShortCompositionSchema,
+} from "@/lib/schemas/short";
 import { buildOutputVariantTimelineContext } from "@/lib/output-variants/output-variant-context";
 import { buildShortTimeline } from "@/lib/shorts/short-timeline";
 
@@ -341,6 +347,90 @@ export async function createShortCompositionAction(formData: FormData) {
         error instanceof RangeError
           ? error.message
           : "The short draft could not be created.",
+    };
+  }
+}
+
+export async function updateShortCompositionAction(formData: FormData) {
+  let clips: unknown = null;
+  try {
+    clips = JSON.parse(String(formData.get("clips") ?? "null")) as unknown;
+  } catch {
+    return {
+      success: false as const,
+      error: "The selected clips are invalid.",
+    };
+  }
+  const parsed = updateShortCompositionSchema.safeParse({
+    shortCompositionId: formData.get("shortCompositionId"),
+    projectId: formData.get("projectId"),
+    outputVariantId: formData.get("outputVariantId"),
+    name: formData.get("name"),
+    clips,
+  });
+  if (!parsed.success)
+    return { success: false as const, error: "The short draft is invalid." };
+
+  try {
+    const { context, project } = await requireRenderAccess(
+      parsed.data.projectId,
+    );
+    const scope = {
+      workspaceId: context.activeMembership.workspaceId,
+      projectId: project.id,
+    };
+    const variant = await findProjectOutputVariant({
+      ...scope,
+      outputVariantId: parsed.data.outputVariantId,
+    });
+    if (!variant || variant.aspectRatio !== "9:16")
+      return {
+        success: false as const,
+        error: "Shorts require the vertical 9:16 output.",
+      };
+    const timelineContext = await buildOutputVariantTimelineContext({
+      workspaceId: scope.workspaceId,
+      project,
+      outputVariant: variant,
+    });
+    if (timelineContext.timeline.status !== "ready")
+      return {
+        success: false as const,
+        error: "The source timeline is not ready.",
+      };
+    const clipDefinitions = parsed.data.clips.map((clip) => ({
+      ...clip,
+      id: clip.id ?? crypto.randomUUID(),
+    }));
+    const built = buildShortTimeline({
+      source: timelineContext.timeline.timeline,
+      clips: clipDefinitions,
+      width: variant.width,
+      height: variant.height,
+    });
+    const updated = await updateShortComposition({
+      ...scope,
+      shortCompositionId: parsed.data.shortCompositionId,
+      name: parsed.data.name,
+      clips: clipDefinitions,
+    });
+    revalidatePath(`/app/projects/${project.id}/render`);
+    return {
+      success: true as const,
+      error: null,
+      shortCompositionId: updated.id,
+      warnings: built.warnings.map((warning) => warning.message),
+    };
+  } catch (error) {
+    return {
+      success: false as const,
+      error:
+        error instanceof RangeError
+          ? error.message
+          : error instanceof Error &&
+              error.message === "SHORT_COMPOSITION_NOT_FOUND"
+            ? "That short no longer exists."
+            : "The short could not be updated.",
     };
   }
 }

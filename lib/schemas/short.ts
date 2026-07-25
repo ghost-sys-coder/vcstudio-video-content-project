@@ -10,6 +10,29 @@ export const shortClipInputSchema = z.object({
   transition: z.enum(["cut", "fade"]),
 });
 
+function checkShortCompositionClips(
+  input: { clips: z.infer<typeof shortClipInputSchema>[] },
+  context: z.RefinementCtx,
+) {
+  if (
+    new Set(input.clips.map((clip) => clip.position)).size !==
+    input.clips.length
+  )
+    context.addIssue({
+      code: "custom",
+      path: ["clips"],
+      message: "Clip positions must be unique.",
+    });
+  input.clips.forEach((clip, index) => {
+    if (clip.sourceEndMilliseconds <= clip.sourceStartMilliseconds)
+      context.addIssue({
+        code: "custom",
+        path: ["clips", index, "sourceEndMilliseconds"],
+        message: "A clip must end after it starts.",
+      });
+  });
+}
+
 export const createShortCompositionSchema = z
   .object({
     projectId: z.uuid(),
@@ -17,22 +40,14 @@ export const createShortCompositionSchema = z
     name: z.string().trim().min(1).max(120),
     clips: z.array(shortClipInputSchema).min(1).max(50),
   })
-  .superRefine((input, context) => {
-    if (
-      new Set(input.clips.map((clip) => clip.position)).size !==
-      input.clips.length
-    )
-      context.addIssue({
-        code: "custom",
-        path: ["clips"],
-        message: "Clip positions must be unique.",
-      });
-    input.clips.forEach((clip, index) => {
-      if (clip.sourceEndMilliseconds <= clip.sourceStartMilliseconds)
-        context.addIssue({
-          code: "custom",
-          path: ["clips", index, "sourceEndMilliseconds"],
-          message: "A clip must end after it starts.",
-        });
-    });
-  });
+  .superRefine(checkShortCompositionClips);
+
+export const updateShortCompositionSchema = z
+  .object({
+    shortCompositionId: z.uuid(),
+    projectId: z.uuid(),
+    outputVariantId: z.uuid(),
+    name: z.string().trim().min(1).max(120),
+    clips: z.array(shortClipInputSchema).min(1).max(50),
+  })
+  .superRefine(checkShortCompositionClips);

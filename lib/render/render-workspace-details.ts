@@ -35,6 +35,7 @@ import { loadEffectiveWorkspaceBudget } from "@/lib/budgets/workspace-budget";
 import { loadEffectiveWorkspaceLimits } from "@/lib/budgets/current-settings";
 import { estimateSceneOutpaintCost } from "@/lib/output-variants/start-scene-outpaint";
 import { getSceneImageSizeForAspectRatio } from "@/lib/schemas/scene-image";
+import { sumDurationMilliseconds } from "@/lib/shorts/short-editor";
 import { renderSceneOutpaintPrompt } from "@studio/prompts";
 import {
   buildOutputVariantTimelineContext,
@@ -62,6 +63,10 @@ function toOutpaintStatus(
   if (status === "pending") return "queued";
   if (status === "cancelled") return "failed";
   return status;
+}
+
+function toClipTransition(transition: string): "cut" | "fade" {
+  return transition === "fade" ? "fade" : "cut";
 }
 
 function toExportView(render: VideoRender): RenderExportView {
@@ -355,30 +360,39 @@ export async function loadRenderWorkspace(input: {
     clipsByShort.set(clip.shortCompositionId, clips);
   }
   const shorts = shortRows.map((short) => {
-    const clips = clipsByShort.get(short.id) ?? [];
+    const clips = (clipsByShort.get(short.id) ?? []).sort(
+      (left, right) => left.position - right.position,
+    );
+    const durationMilliseconds = sumDurationMilliseconds(
+      clips.map((clip) => ({
+        startMilliseconds: clip.sourceStartMilliseconds,
+        endMilliseconds: clip.sourceEndMilliseconds,
+      })),
+    );
     return {
       id: short.id,
       name: short.name,
       status: short.status,
       outputVariantId: short.outputVariantId,
       clipCount: clips.length,
-      durationMilliseconds: clips.reduce(
-        (total, clip) =>
-          total + (clip.sourceEndMilliseconds - clip.sourceStartMilliseconds),
-        0,
-      ),
+      durationMilliseconds,
       estimatedRenderCostCents: estimateRenderCostCents({
-        durationMilliseconds: clips.reduce(
-          (total, clip) =>
-            total + (clip.sourceEndMilliseconds - clip.sourceStartMilliseconds),
-          0,
-        ),
+        durationMilliseconds,
         rates: {
           costPerMinuteCents: environment.VIDEO_RENDER_COST_PER_MINUTE_CENTS,
           minimumEstimateCents: environment.VIDEO_RENDER_MINIMUM_ESTIMATE_CENTS,
         },
       }),
       createdAt: short.createdAt.toISOString(),
+      clips: clips.map((clip) => ({
+        id: clip.id,
+        sourceSceneId: clip.sourceSceneId,
+        sourceSceneVersionId: clip.sourceSceneVersionId,
+        position: clip.position,
+        sourceStartMilliseconds: clip.sourceStartMilliseconds,
+        sourceEndMilliseconds: clip.sourceEndMilliseconds,
+        transition: toClipTransition(clip.transition),
+      })),
     };
   });
 

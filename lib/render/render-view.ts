@@ -96,6 +96,16 @@ export interface ShortSourceSceneView {
   captionBoundariesMilliseconds: number[];
 }
 
+export interface ShortCompositionClipView {
+  id: string;
+  sourceSceneId: string;
+  sourceSceneVersionId: string;
+  position: number;
+  sourceStartMilliseconds: number;
+  sourceEndMilliseconds: number;
+  transition: "cut" | "fade";
+}
+
 export interface ShortCompositionView {
   id: string;
   name: string;
@@ -105,6 +115,8 @@ export interface ShortCompositionView {
   durationMilliseconds: number;
   estimatedRenderCostCents: number;
   createdAt: string;
+  /** Ordered clip list, so a saved short can be reopened into the editor without an extra fetch. */
+  clips: ShortCompositionClipView[];
 }
 
 export interface RenderWorkspaceView {

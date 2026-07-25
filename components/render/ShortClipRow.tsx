@@ -29,7 +29,8 @@ export function ShortClipRow({
         <p className="truncate text-xs text-muted-foreground">
           {(clip.sourceStartMilliseconds / 1000).toFixed(1)}s–
           {(clip.sourceEndMilliseconds / 1000).toFixed(1)}s ·{" "}
-          {(duration / 1000).toFixed(1)}s
+          {(duration / 1000).toFixed(1)}s ·{" "}
+          {clip.transition === "fade" ? "Fade" : "Cut"}
         </p>
       </div>
       <div className="flex shrink-0 gap-1">

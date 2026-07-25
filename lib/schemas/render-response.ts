@@ -125,6 +125,17 @@ const workspaceViewSchema = z.object({
       durationMilliseconds: z.number(),
       estimatedRenderCostCents: z.number(),
       createdAt: z.string(),
+      clips: z.array(
+        z.object({
+          id: z.string(),
+          sourceSceneId: z.string(),
+          sourceSceneVersionId: z.string(),
+          position: z.number(),
+          sourceStartMilliseconds: z.number(),
+          sourceEndMilliseconds: z.number(),
+          transition: z.enum(["cut", "fade"]),
+        }),
+      ),
     }),
   ),
   exports: z.array(renderExportSchema),

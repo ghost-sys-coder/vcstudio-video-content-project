@@ -8,6 +8,16 @@ export interface ShortDraftClip {
   transition: "cut" | "fade";
 }
 
+/** Sums `end - start` across a set of trimmed ranges (source scenes or clips). */
+export function sumDurationMilliseconds(
+  ranges: { startMilliseconds: number; endMilliseconds: number }[],
+): number {
+  return ranges.reduce(
+    (total, range) => total + (range.endMilliseconds - range.startMilliseconds),
+    0,
+  );
+}
+
 export function snapToNearestBoundary(
   milliseconds: number,
   boundaries: number[],
