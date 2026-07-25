@@ -1,15 +1,19 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import {
   saveSceneFramingAction,
   startSceneOutpaintAction,
 } from "@/app/(authenticated)/app/projects/[projectId]/render/actions";
+import { SceneFramingBulkApply } from "@/components/render/SceneFramingBulkApply";
+import { SceneFramingChip } from "@/components/render/SceneFramingChip";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { RenderSceneFramingView } from "@/lib/render/render-view";
 import {
+  DEFAULT_SCENE_FRAMING,
+  focalPointFromPointerOffset,
   framingObjectPosition,
   framingScale,
 } from "@/lib/output-variants/scene-framing";
@@ -54,9 +58,12 @@ export function SceneFramingEditor({
   );
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [dragging, setDragging] = useState(false);
+  const imageContainerRef = useRef<HTMLDivElement>(null);
   const outpaintPending =
     selected?.outpaintStatus === "queued" ||
     selected?.outpaintStatus === "running";
+  const editingDisabled = !canEdit || pending;
 
   if (!selected)
     return (
@@ -76,6 +83,17 @@ export function SceneFramingEditor({
     backgroundColor,
   } as const;
   const imageUrl = `/api/projects/${projectId}/scene-images/${selected.sourceImageGenerationId}/asset`;
+
+  function updateFocalFromPointer(event: React.PointerEvent<HTMLDivElement>) {
+    const rect = imageContainerRef.current?.getBoundingClientRect();
+    if (!rect || rect.width === 0 || rect.height === 0) return;
+    const { focalPointXBps, focalPointYBps } = focalPointFromPointerOffset({
+      offsetXRatio: (event.clientX - rect.left) / rect.width,
+      offsetYRatio: (event.clientY - rect.top) / rect.height,
+    });
+    setFocalX(focalPointXBps);
+    setFocalY(focalPointYBps);
+  }
 
   return (
     <section className="min-w-0 max-w-full space-y-4 overflow-hidden rounded-xl border p-4">
@@ -100,16 +118,10 @@ export function SceneFramingEditor({
         aria-label="Scenes"
       >
         {scenes.map((scene) => (
-          <button
-            aria-pressed={scene.sceneId === selected.sceneId}
-            className={cn(
-              "shrink-0 rounded-md border px-3 py-2 text-xs font-medium",
-              scene.sceneId === selected.sceneId
-                ? "border-primary bg-primary text-primary-foreground"
-                : "hover:bg-muted",
-            )}
+          <SceneFramingChip
+            active={scene.sceneId === selected.sceneId}
             key={scene.sceneId}
-            onClick={() => {
+            onSelect={() => {
               setSelectedSceneId(scene.sceneId);
               setMode(scene.mode === "contain" ? "contain" : "cover");
               setFocalX(scene.focalPointXBps);
@@ -118,16 +130,29 @@ export function SceneFramingEditor({
               setBackgroundColor(scene.backgroundColor);
               setMessage(null);
             }}
-            type="button"
-          >
-            Scene {scene.sceneNumber}
-          </button>
+            scene={scene}
+          />
         ))}
       </div>
 
       <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,18rem)]">
         <div
-          className="relative mx-auto w-full max-w-xl overflow-hidden rounded-lg border"
+          className={cn(
+            "relative mx-auto w-full max-w-xl touch-none overflow-hidden rounded-lg border",
+            editingDisabled ? "cursor-not-allowed" : "cursor-crosshair",
+          )}
+          onPointerDown={(event) => {
+            if (editingDisabled) return;
+            event.currentTarget.setPointerCapture(event.pointerId);
+            setDragging(true);
+            updateFocalFromPointer(event);
+          }}
+          onPointerMove={(event) => {
+            if (!dragging || editingDisabled) return;
+            updateFocalFromPointer(event);
+          }}
+          onPointerUp={() => setDragging(false)}
+          ref={imageContainerRef}
           style={{ aspectRatio: `${width} / ${height}`, backgroundColor }}
         >
           <Image
@@ -142,16 +167,25 @@ export function SceneFramingEditor({
             }}
             unoptimized
           />
+          <span
+            aria-hidden
+            className="pointer-events-none absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-primary shadow"
+            style={{ left: `${focalX / 100}%`, top: `${focalY / 100}%` }}
+          />
         </div>
 
         <div className="min-w-0 space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Click or drag on the image to set the focal point, or use the
+            sliders below.
+          </p>
           <fieldset className="space-y-2">
             <legend className="text-xs font-medium">Fit mode</legend>
             <div className="grid grid-cols-2 gap-2">
               {(["cover", "contain"] as const).map((value) => (
                 <Button
                   aria-pressed={mode === value}
-                  disabled={!canEdit || pending}
+                  disabled={editingDisabled}
                   key={value}
                   nativeButton
                   onClick={() => setMode(value)}
@@ -168,7 +202,7 @@ export function SceneFramingEditor({
             Horizontal focus · {Math.round(focalX / 100)}%
             <input
               className="w-full accent-primary"
-              disabled={!canEdit || pending}
+              disabled={editingDisabled}
               max={10000}
               min={0}
               onChange={(event) => setFocalX(Number(event.target.value))}
@@ -181,7 +215,7 @@ export function SceneFramingEditor({
             Vertical focus · {Math.round(focalY / 100)}%
             <input
               className="w-full accent-primary"
-              disabled={!canEdit || pending}
+              disabled={editingDisabled}
               max={10000}
               min={0}
               onChange={(event) => setFocalY(Number(event.target.value))}
@@ -194,7 +228,7 @@ export function SceneFramingEditor({
             Scale · {Math.round(scale / 100)}%
             <input
               className="w-full accent-primary"
-              disabled={!canEdit || pending}
+              disabled={editingDisabled}
               max={20000}
               min={10000}
               onChange={(event) => setScale(Number(event.target.value))}
@@ -208,7 +242,7 @@ export function SceneFramingEditor({
               Background
               <input
                 aria-label="Frame background color"
-                disabled={!canEdit || pending}
+                disabled={editingDisabled}
                 onChange={(event) => setBackgroundColor(event.target.value)}
                 type="color"
                 value={backgroundColor}
@@ -216,34 +250,67 @@ export function SceneFramingEditor({
             </label>
           ) : null}
 
-          <Button
-            disabled={!canEdit || pending}
-            nativeButton
-            onClick={() => {
-              startTransition(async () => {
-                const formData = new FormData();
-                formData.set("projectId", projectId);
-                formData.set("outputVariantId", outputVariantId);
-                formData.set("sceneId", selected.sceneId);
-                formData.set("sceneVersionId", selected.sceneVersionId);
-                formData.set(
-                  "sourceImageGenerationId",
-                  selected.approvedSourceImageGenerationId,
+          <div className="flex flex-wrap gap-2">
+            <Button
+              disabled={editingDisabled}
+              nativeButton
+              onClick={() => {
+                startTransition(async () => {
+                  const formData = new FormData();
+                  formData.set("projectId", projectId);
+                  formData.set("outputVariantId", outputVariantId);
+                  formData.set("sceneId", selected.sceneId);
+                  formData.set("sceneVersionId", selected.sceneVersionId);
+                  formData.set(
+                    "sourceImageGenerationId",
+                    selected.approvedSourceImageGenerationId,
+                  );
+                  formData.set("mode", mode);
+                  formData.set("focalPointXBps", String(focalX));
+                  formData.set("focalPointYBps", String(focalY));
+                  formData.set("scaleBps", String(scale));
+                  formData.set("backgroundColor", backgroundColor);
+                  const result = await saveSceneFramingAction(formData);
+                  setMessage(result.success ? "Framing saved." : result.error);
+                  if (result.success) await onSaved();
+                });
+              }}
+              type="button"
+            >
+              {pending ? "Saving…" : "Save framing"}
+            </Button>
+            <Button
+              disabled={editingDisabled}
+              nativeButton
+              onClick={() => {
+                setMode(
+                  DEFAULT_SCENE_FRAMING.mode === "contain"
+                    ? "contain"
+                    : "cover",
                 );
-                formData.set("mode", mode);
-                formData.set("focalPointXBps", String(focalX));
-                formData.set("focalPointYBps", String(focalY));
-                formData.set("scaleBps", String(scale));
-                formData.set("backgroundColor", backgroundColor);
-                const result = await saveSceneFramingAction(formData);
-                setMessage(result.success ? "Framing saved." : result.error);
-                if (result.success) await onSaved();
-              });
-            }}
-            type="button"
-          >
-            {pending ? "Saving…" : "Save framing"}
-          </Button>
+                setFocalX(DEFAULT_SCENE_FRAMING.focalPointXBps);
+                setFocalY(DEFAULT_SCENE_FRAMING.focalPointYBps);
+                setScale(DEFAULT_SCENE_FRAMING.scaleBps);
+                setBackgroundColor(DEFAULT_SCENE_FRAMING.backgroundColor);
+                setMessage(null);
+              }}
+              type="button"
+              variant="ghost"
+            >
+              Reset to default
+            </Button>
+          </div>
+
+          <SceneFramingBulkApply
+            activeSceneId={selected.sceneId}
+            disabled={editingDisabled}
+            framing={framing}
+            onApplied={onSaved}
+            outputVariantId={outputVariantId}
+            projectId={projectId}
+            scenes={scenes}
+          />
+
           <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950">
             <p className="font-semibold">AI canvas extension</p>
             <p className="mt-1">

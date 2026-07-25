@@ -6,7 +6,10 @@ import { findProjectOutputVariant } from "@/db/repositories/output-variants.repo
 import { findSceneImageGeneration } from "@/db/repositories/scene-images.repository";
 import { listCurrentScenes } from "@/db/repositories/scenes.repository";
 import { listApprovedSceneImageAssets } from "@/db/repositories/subtitle.repository";
-import { saveSceneVariantFraming } from "@/db/commands/output-variant-commands";
+import {
+  saveSceneVariantFraming,
+  saveSceneVariantFramingBulk,
+} from "@/db/commands/output-variant-commands";
 import {
   createShortComposition,
   updateShortComposition,
@@ -27,6 +30,7 @@ import {
 import type { RenderActionResult } from "@/lib/render/render-view";
 import { cancelRenderSchema, startRenderSchema } from "@/lib/schemas/render";
 import {
+  applySceneVariantFramingSchema,
   saveSceneVariantFramingSchema,
   startSceneOutpaintSchema,
 } from "@/lib/schemas/output-variant";
@@ -196,6 +200,92 @@ export async function saveSceneFramingAction(
     return { success: true, error: null };
   } catch {
     return { success: false, error: "The scene framing could not be saved." };
+  }
+}
+
+export async function applySceneFramingToScenesAction(
+  formData: FormData,
+): Promise<RenderActionResult> {
+  let targets: unknown = null;
+  try {
+    targets = JSON.parse(String(formData.get("targets") ?? "null")) as unknown;
+  } catch {
+    return { success: false, error: "The target scenes are invalid." };
+  }
+  const parsed = applySceneVariantFramingSchema.safeParse({
+    projectId: formData.get("projectId"),
+    outputVariantId: formData.get("outputVariantId"),
+    mode: formData.get("mode"),
+    focalPointXBps: formData.get("focalPointXBps"),
+    focalPointYBps: formData.get("focalPointYBps"),
+    scaleBps: formData.get("scaleBps"),
+    backgroundColor: formData.get("backgroundColor"),
+    targets,
+  });
+  if (!parsed.success)
+    return { success: false, error: "The framing settings are invalid." };
+
+  try {
+    const { context, project } = await requireRenderAccess(
+      parsed.data.projectId,
+    );
+    const scope = {
+      workspaceId: context.activeMembership.workspaceId,
+      projectId: project.id,
+    };
+    const [variant, currentScenes] = await Promise.all([
+      findProjectOutputVariant({
+        ...scope,
+        outputVariantId: parsed.data.outputVariantId,
+      }),
+      listCurrentScenes(scope),
+    ]);
+    if (!variant)
+      return { success: false, error: "The scene output was not found." };
+
+    const approvedImages = await listApprovedSceneImageAssets({
+      ...scope,
+      sceneVersionIds: parsed.data.targets.map(
+        (target) => target.sceneVersionId,
+      ),
+      size: getSceneImageSizeForAspectRatio(project.aspectRatio),
+    });
+    const approvedByVersion = new Map(
+      approvedImages.map((image) => [image.sceneVersionId, image]),
+    );
+    for (const target of parsed.data.targets) {
+      const current = currentScenes.find(
+        ({ scene, version }) =>
+          scene.id === target.sceneId && version.id === target.sceneVersionId,
+      );
+      const approvedImage = approvedByVersion.get(target.sceneVersionId);
+      if (
+        !current ||
+        !approvedImage ||
+        approvedImage.generationId !== target.sourceImageGenerationId
+      )
+        return {
+          success: false,
+          error:
+            "One of the selected scenes has changed. Refresh and try again.",
+        };
+    }
+
+    await saveSceneVariantFramingBulk({
+      ...scope,
+      outputVariantId: variant.id,
+      mode: parsed.data.mode,
+      focalPointXBps: parsed.data.focalPointXBps,
+      focalPointYBps: parsed.data.focalPointYBps,
+      scaleBps: parsed.data.scaleBps,
+      backgroundColor: parsed.data.backgroundColor,
+      updatedByUserId: context.user.id,
+      targets: parsed.data.targets,
+    });
+    revalidatePath(`/app/projects/${project.id}/render`);
+    return { success: true, error: null };
+  } catch {
+    return { success: false, error: "The framing could not be applied." };
   }
 }
 
