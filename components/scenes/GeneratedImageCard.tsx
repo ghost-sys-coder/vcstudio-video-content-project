@@ -58,7 +58,11 @@ export function GeneratedImageCard({
           </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          {generation.createdAtLabel} / {generation.quality} / {generation.size}
+          {generation.createdAtLabel} /{" "}
+          {generation.source === "user_uploaded"
+            ? "Uploaded"
+            : generation.quality}{" "}
+          / {generation.size}
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -88,7 +92,9 @@ export function GeneratedImageCard({
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="text-xs text-muted-foreground">
             <p>
-              {generation.stylePresetName} v{generation.stylePresetVersion}
+              {generation.stylePresetName
+                ? `${generation.stylePresetName} v${generation.stylePresetVersion}`
+                : "Uploaded image"}
             </p>
             <p className="mt-1 tabular-nums">
               {generation.actualCostCents === null

@@ -137,6 +137,7 @@ export async function loadAudioWorkspace(input: {
       sceneVersionId: version.id,
       narrationPreview:
         narration.length > 240 ? `${narration.slice(0, 240)}…` : narration,
+      narrationText: narration,
       characterCount: narration.length,
       eligibility,
       latestGenerationId: latest?.id ?? null,

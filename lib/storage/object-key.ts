@@ -1,6 +1,9 @@
 import type { z } from "zod";
 import { requestWorkspaceLogoUploadSchema } from "@/lib/schemas/workspace-logo";
-import type { CharacterReferenceType } from "@/db/schema";
+import type {
+  CharacterReferenceType,
+  SceneAudioAssetFormat,
+} from "@/db/schema";
 import type { SceneImageOutputFormat } from "@/lib/schemas/scene-image";
 
 const extensionByContentType = {
@@ -131,6 +134,30 @@ export function isSceneImageObjectKey(input: {
 }): boolean {
   return (
     input.objectKey === createSceneImageObjectKey(input) &&
+    !input.objectKey.includes("..")
+  );
+}
+
+export function createSceneAudioObjectKey(input: {
+  workspaceId: string;
+  projectId: string;
+  sceneId: string;
+  generationId: string;
+  format: SceneAudioAssetFormat;
+}): string {
+  return `workspaces/${input.workspaceId}/projects/${input.projectId}/scenes/${input.sceneId}/audio/${input.generationId}.${input.format}`;
+}
+
+export function isSceneAudioObjectKey(input: {
+  workspaceId: string;
+  projectId: string;
+  sceneId: string;
+  generationId: string;
+  format: SceneAudioAssetFormat;
+  objectKey: string;
+}): boolean {
+  return (
+    input.objectKey === createSceneAudioObjectKey(input) &&
     !input.objectKey.includes("..")
   );
 }

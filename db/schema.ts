@@ -156,6 +156,11 @@ export const imageGenerationPurposeEnum = pgEnum("image_generation_purpose", [
   "variant_outpaint",
 ]);
 
+export const imageGenerationSourceEnum = pgEnum("image_generation_source", [
+  "ai_generated",
+  "user_uploaded",
+]);
+
 export const imageReviewStatusEnum = pgEnum("image_review_status", [
   "pending",
   "approved",
@@ -202,6 +207,27 @@ export const audioOutputFormatEnum = pgEnum("audio_output_format", [
   "flac",
   "wav",
   "pcm",
+]);
+
+// Superset of audioOutputFormatEnum: also covers the raw browser-recording
+// containers (webm/m4a) that a user_recorded generation stores as-is. Kept
+// distinct from audioOutputFormatEnum because that enum is also used by
+// voicePresets.format and various AI-provider-facing code paths, all of
+// which must never see a non-TTS format value.
+export const sceneAudioAssetFormatEnum = pgEnum("scene_audio_asset_format", [
+  "mp3",
+  "opus",
+  "aac",
+  "flac",
+  "wav",
+  "pcm",
+  "webm",
+  "m4a",
+]);
+
+export const audioGenerationSourceEnum = pgEnum("audio_generation_source", [
+  "ai_generated",
+  "user_recorded",
 ]);
 
 export const subtitleGranularityEnum = pgEnum("subtitle_granularity", [
@@ -1838,12 +1864,16 @@ export const sceneImageGenerations = pgTable(
     sceneId: uuid("scene_id").notNull(),
     sceneVersionId: uuid("scene_version_id").notNull(),
     purpose: imageGenerationPurposeEnum("purpose").notNull().default("scene"),
+    source: imageGenerationSourceEnum("source")
+      .notNull()
+      .default("ai_generated"),
     outputVariantId: uuid("output_variant_id"),
     sourceImageGenerationId: uuid("source_image_generation_id"),
-    stylePresetVersionId: uuid("style_preset_version_id").notNull(),
-    promptTemplateVersionId: uuid("prompt_template_version_id")
-      .notNull()
-      .references(() => promptTemplateVersions.id, { onDelete: "restrict" }),
+    stylePresetVersionId: uuid("style_preset_version_id"),
+    promptTemplateVersionId: uuid("prompt_template_version_id").references(
+      () => promptTemplateVersions.id,
+      { onDelete: "restrict" },
+    ),
     generationVersion: integer("generation_version").notNull(),
     requestNonce: uuid("request_nonce").notNull(),
     status: imageGenerationStatusEnum("status").notNull().default("pending"),
@@ -1852,18 +1882,18 @@ export const sceneImageGenerations = pgTable(
       .default("pending"),
     batchId: uuid("batch_id"),
     triggerRunId: text("trigger_run_id"),
-    idempotencyKey: text("idempotency_key").notNull(),
-    requestFingerprint: text("request_fingerprint").notNull(),
-    model: text("model").notNull(),
-    quality: imageQualityEnum("quality").notNull(),
+    idempotencyKey: text("idempotency_key"),
+    requestFingerprint: text("request_fingerprint"),
+    model: text("model"),
+    quality: imageQualityEnum("quality"),
     size: text("size").notNull(),
     outputFormat: imageOutputFormatEnum("output_format").notNull(),
-    outputCompression: integer("output_compression").notNull(),
+    outputCompression: integer("output_compression"),
     background: text("background").notNull().default("opaque"),
     inputFidelity: text("input_fidelity"),
-    promptTemplateVersion: text("prompt_template_version").notNull(),
-    stylePresetVersion: integer("style_preset_version").notNull(),
-    finalPrompt: text("final_prompt").notNull(),
+    promptTemplateVersion: text("prompt_template_version"),
+    stylePresetVersion: integer("style_preset_version"),
+    finalPrompt: text("final_prompt"),
     estimatedCostCents: integer("estimated_cost_cents").notNull(),
     actualCostCents: integer("actual_cost_cents"),
     progressPercent: integer("progress_percent").notNull().default(0),
@@ -1946,7 +1976,7 @@ export const sceneImageGenerations = pgTable(
     ),
     check(
       "scene_image_generations_compression_range",
-      sql`${table.outputCompression} between 1 and 100`,
+      sql`${table.outputCompression} is null or ${table.outputCompression} between 1 and 100`,
     ),
     check(
       "scene_image_generations_background_supported",
@@ -2443,7 +2473,10 @@ export const sceneAudioGenerations = pgTable(
     projectId: uuid("project_id").notNull(),
     sceneId: uuid("scene_id").notNull(),
     sceneVersionId: uuid("scene_version_id").notNull(),
-    voicePresetId: uuid("voice_preset_id").notNull(),
+    voicePresetId: uuid("voice_preset_id"),
+    source: audioGenerationSourceEnum("source")
+      .notNull()
+      .default("ai_generated"),
     generationVersion: integer("generation_version").notNull(),
     requestNonce: uuid("request_nonce").notNull(),
     status: audioGenerationStatusEnum("status").notNull().default("pending"),
@@ -2451,13 +2484,13 @@ export const sceneAudioGenerations = pgTable(
       .notNull()
       .default("pending"),
     triggerRunId: text("trigger_run_id"),
-    idempotencyKey: text("idempotency_key").notNull(),
-    requestFingerprint: text("request_fingerprint").notNull(),
-    provider: text("provider").notNull(),
-    model: text("model").notNull(),
-    voice: text("voice").notNull(),
-    format: audioOutputFormatEnum("format").notNull(),
-    speedScaledPercent: integer("speed_scaled_percent").notNull(),
+    idempotencyKey: text("idempotency_key"),
+    requestFingerprint: text("request_fingerprint"),
+    provider: text("provider"),
+    model: text("model"),
+    voice: text("voice"),
+    format: sceneAudioAssetFormatEnum("format").notNull(),
+    speedScaledPercent: integer("speed_scaled_percent"),
     instructions: text("instructions").notNull().default(""),
     sampleRate: integer("sample_rate"),
     inputText: text("input_text").notNull(),
@@ -2539,7 +2572,7 @@ export const sceneAudioGenerations = pgTable(
     ),
     check(
       "scene_audio_generations_speed_range",
-      sql`${table.speedScaledPercent} between 25 and 400`,
+      sql`${table.speedScaledPercent} is null or ${table.speedScaledPercent} between 25 and 400`,
     ),
     check(
       "scene_audio_generations_duration_nonnegative",
@@ -3234,6 +3267,8 @@ export type StylePreset = typeof stylePresets.$inferSelect;
 export type StylePresetVersion = typeof stylePresetVersions.$inferSelect;
 export type PromptTemplateVersion = typeof promptTemplateVersions.$inferSelect;
 export type SceneImageGeneration = typeof sceneImageGenerations.$inferSelect;
+export type ImageGenerationSource =
+  (typeof imageGenerationSourceEnum.enumValues)[number];
 export type SceneVariantFraming = typeof sceneVariantFramings.$inferSelect;
 export type SceneFramingMode = (typeof sceneFramingModeEnum.enumValues)[number];
 export type ShortComposition = typeof shortCompositions.$inferSelect;
@@ -3245,12 +3280,16 @@ export type SceneImageBatchStatus =
   (typeof sceneImageBatchStatusEnum.enumValues)[number];
 export type VoicePreset = typeof voicePresets.$inferSelect;
 export type SceneAudioGeneration = typeof sceneAudioGenerations.$inferSelect;
+export type AudioGenerationSource =
+  (typeof audioGenerationSourceEnum.enumValues)[number];
 export type AudioGenerationStatus =
   (typeof audioGenerationStatusEnum.enumValues)[number];
 export type AudioReviewStatus =
   (typeof audioReviewStatusEnum.enumValues)[number];
 export type AudioOutputFormat =
   (typeof audioOutputFormatEnum.enumValues)[number];
+export type SceneAudioAssetFormat =
+  (typeof sceneAudioAssetFormatEnum.enumValues)[number];
 export type ImageGenerationStatus =
   (typeof imageGenerationStatusEnum.enumValues)[number];
 export type ImageReviewStatus =

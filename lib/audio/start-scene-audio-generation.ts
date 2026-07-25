@@ -297,7 +297,7 @@ export async function startSceneAudioGeneration(input: {
             workspaceId: input.workspaceId,
             projectId: input.project.id,
           },
-          idempotencyKey: reservation.generation.idempotencyKey,
+          idempotencyKey,
         });
         reserved = true;
       } catch (error) {

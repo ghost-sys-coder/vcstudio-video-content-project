@@ -152,7 +152,7 @@ export function VideoPreviewWorkspace({
         </div>
       </section>
 
-      <div className="grid min-w-0 gap-5 lg:grid-cols-2">
+      <div className="grid min-w-0 items-start gap-5 lg:grid-cols-2">
         <div className="min-w-0 space-y-4">
           <VideoPreviewPlayer
             outputVariantId={

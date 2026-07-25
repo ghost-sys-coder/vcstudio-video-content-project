@@ -104,3 +104,46 @@ export function getAspectRatioForSceneImageSize(
   if (size === "1024x1536") return "9:16";
   return "1:1";
 }
+
+export const SCENE_IMAGE_UPLOAD_CONTENT_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+] as const;
+
+export function createSceneImageUploadSchema(input: {
+  allowedTypes: string[];
+  maximumBytes: number;
+}) {
+  return z.object({
+    sceneId: z.uuid(),
+    sceneVersionId: z.uuid(),
+    size: sceneImageApiSizeSchema,
+    contentType: z
+      .enum(SCENE_IMAGE_UPLOAD_CONTENT_TYPES)
+      .refine((value) => input.allowedTypes.includes(value), {
+        message: "Unsupported image type.",
+      }),
+    fileName: z.string().trim().min(1).max(255),
+    sizeBytes: z.number().int().positive().max(input.maximumBytes),
+  });
+}
+
+export function completeSceneImageUploadSchema(input: {
+  allowedTypes: string[];
+  maximumBytes: number;
+}) {
+  return createSceneImageUploadSchema(input)
+    .omit({ fileName: true })
+    .extend({
+      generationId: z.uuid(),
+      objectKey: z.string().min(1).max(512),
+    });
+}
+
+export type SceneImageUploadInput = z.infer<
+  ReturnType<typeof createSceneImageUploadSchema>
+>;
+export type CompleteSceneImageUploadInput = z.infer<
+  ReturnType<typeof completeSceneImageUploadSchema>
+>;

@@ -7,6 +7,7 @@ import {
   syncSceneImageGenerationRunning,
 } from "@/db/commands/scene-image-commands";
 import { findSceneImageGenerationWorkflowContext } from "@/db/repositories/scene-images.repository";
+import { assertAiGeneratedSceneImage } from "@/lib/domain/scene-image";
 import { getSceneImageReconciliationDecision } from "@/lib/domain/scene-image-reconciliation";
 import {
   failSceneImageWithConservativeProviderOutcome,
@@ -79,6 +80,7 @@ export async function reconcileSceneImageGeneration(
   const context = await findSceneImageGenerationWorkflowContext(scope);
   if (!context) throw new Error("SCENE_IMAGE_GENERATION_NOT_FOUND");
   const { generation, reservation, latestProviderRequest } = context;
+  assertAiGeneratedSceneImage(generation);
   if (
     generation.status === "succeeded" ||
     generation.status === "failed" ||

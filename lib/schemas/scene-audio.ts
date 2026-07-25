@@ -61,6 +61,52 @@ export const audioRouteParamsSchema = z.object({
   projectId: z.uuid(),
 });
 
+export const SCENE_AUDIO_UPLOAD_CONTENT_TYPES = [
+  "audio/webm",
+  "audio/mp4",
+] as const;
+
+export function createSceneAudioRecordingUploadSchema(input: {
+  allowedTypes: string[];
+  maximumBytes: number;
+}) {
+  return z.object({
+    sceneId: z.uuid(),
+    sceneVersionId: z.uuid(),
+    contentType: z
+      .enum(SCENE_AUDIO_UPLOAD_CONTENT_TYPES)
+      .refine((value) => input.allowedTypes.includes(value), {
+        message: "Unsupported recording type.",
+      }),
+    fileName: z.string().trim().min(1).max(255),
+    sizeBytes: z.number().int().positive().max(input.maximumBytes),
+  });
+}
+
+export function completeSceneAudioRecordingUploadSchema(input: {
+  allowedTypes: string[];
+  maximumBytes: number;
+}) {
+  return createSceneAudioRecordingUploadSchema(input)
+    .omit({ fileName: true })
+    .extend({
+      generationId: z.uuid(),
+      objectKey: z.string().min(1).max(512),
+      durationMilliseconds: z
+        .number()
+        .int()
+        .nonnegative()
+        .max(30 * 60 * 1000),
+    });
+}
+
+export type SceneAudioRecordingUploadInput = z.infer<
+  ReturnType<typeof createSceneAudioRecordingUploadSchema>
+>;
+export type CompleteSceneAudioRecordingUploadInput = z.infer<
+  ReturnType<typeof completeSceneAudioRecordingUploadSchema>
+>;
+
 export type VoicePresetInput = z.infer<typeof voicePresetInputSchema>;
 export type StartSceneAudioGenerationInput = z.infer<
   typeof startSceneAudioGenerationSchema

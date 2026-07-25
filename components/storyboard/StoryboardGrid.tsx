@@ -10,6 +10,7 @@ import type {
 } from "@/lib/scenes/storyboard-view";
 
 export function StoryboardGrid({
+  projectId,
   scenes,
   selectedSceneIds,
   onToggleSelect,
@@ -21,7 +22,9 @@ export function StoryboardGrid({
   onApproveScene,
   onRejectScene,
   onGenerate,
+  onUploaded,
 }: {
+  projectId: string;
   scenes: StoryboardSceneView[];
   selectedSceneIds: ReadonlySet<string>;
   onToggleSelect: (sceneId: string, checked: boolean) => void;
@@ -33,6 +36,7 @@ export function StoryboardGrid({
   onApproveScene: StoryboardReviewHandler;
   onRejectScene: StoryboardReviewHandler;
   onGenerate: BulkGenerateHandler;
+  onUploaded: () => Promise<void>;
 }) {
   if (scenes.length === 0)
     return (
@@ -54,6 +58,8 @@ export function StoryboardGrid({
           onGenerate={onGenerate}
           onRejectScene={onRejectScene}
           onToggleSelect={onToggleSelect}
+          onUploaded={onUploaded}
+          projectId={projectId}
           scene={scene}
           selected={selectedSceneIds.has(scene.sceneId)}
           stylePresets={stylePresets}

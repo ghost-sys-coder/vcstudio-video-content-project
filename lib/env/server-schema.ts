@@ -51,6 +51,31 @@ export const characterEnvironmentSchema = z.object({
     .transform((value) => value === "true"),
 });
 
+export const sceneMediaUploadEnvironmentSchema = z.object({
+  MAX_SCENE_IMAGE_UPLOAD_SIZE_BYTES: z.coerce
+    .number()
+    .int()
+    .min(1024)
+    .max(20 * 1024 * 1024)
+    .default(10 * 1024 * 1024),
+  ALLOWED_SCENE_IMAGE_UPLOAD_MIME_TYPES: z
+    .string()
+    .default("image/png,image/jpeg,image/webp")
+    .transform((value) => value.split(",").map((item) => item.trim()))
+    .pipe(z.array(z.enum(["image/png", "image/jpeg", "image/webp"])).min(1)),
+  MAX_SCENE_AUDIO_UPLOAD_SIZE_BYTES: z.coerce
+    .number()
+    .int()
+    .min(1024)
+    .max(20 * 1024 * 1024)
+    .default(15 * 1024 * 1024),
+  ALLOWED_SCENE_AUDIO_UPLOAD_MIME_TYPES: z
+    .string()
+    .default("audio/webm,audio/mp4")
+    .transform((value) => value.split(",").map((item) => item.trim()))
+    .pipe(z.array(z.enum(["audio/webm", "audio/mp4"])).min(1)),
+});
+
 export const projectEnvironmentSchema = z.object({
   MAX_SCRIPT_CHARACTERS: z.coerce
     .number()
@@ -571,6 +596,9 @@ export type ClerkWebhookEnvironment = z.infer<
 >;
 export type StorageEnvironment = z.infer<typeof storageEnvironmentSchema>;
 export type CharacterEnvironment = z.infer<typeof characterEnvironmentSchema>;
+export type SceneMediaUploadEnvironment = z.infer<
+  typeof sceneMediaUploadEnvironmentSchema
+>;
 export type ProjectEnvironment = z.infer<typeof projectEnvironmentSchema>;
 export type SceneAnalysisEnvironment = z.infer<
   typeof sceneAnalysisEnvironmentSchema

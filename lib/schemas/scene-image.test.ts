@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  completeSceneImageUploadSchema,
+  createSceneImageUploadSchema,
   getAspectRatioForSceneImageSize,
   getSceneImageDimensions,
   getSceneImageSizeForAspectRatio,
@@ -14,6 +16,12 @@ const ids = {
   sceneVersionId: "00000000-0000-4000-8000-000000000003",
   stylePresetVersionId: "00000000-0000-4000-8000-000000000004",
   requestNonce: "00000000-0000-4000-8000-000000000005",
+};
+
+const uploadIds = {
+  sceneId: "00000000-0000-4000-8000-000000000002",
+  sceneVersionId: "00000000-0000-4000-8000-000000000003",
+  generationId: "00000000-0000-4000-8000-000000000006",
 };
 
 describe("scene image schemas", () => {
@@ -119,6 +127,74 @@ describe("scene image schemas", () => {
 
     it("rejects an empty array", () => {
       expect(uniqueSceneImageSizesSchema.safeParse([]).success).toBe(false);
+    });
+  });
+
+  describe("scene image upload schemas", () => {
+    const config = {
+      allowedTypes: ["image/png", "image/jpeg", "image/webp"],
+      maximumBytes: 10 * 1024 * 1024,
+    };
+
+    it("accepts a well-formed upload authorization request", () => {
+      expect(
+        createSceneImageUploadSchema(config).safeParse({
+          ...uploadIds,
+          size: "1536x1024",
+          contentType: "image/png",
+          fileName: "photo.png",
+          sizeBytes: 1024,
+        }).success,
+      ).toBe(true);
+    });
+
+    it("rejects a content type outside the allowlist", () => {
+      const restricted = createSceneImageUploadSchema({
+        ...config,
+        allowedTypes: ["image/png"],
+      });
+      expect(
+        restricted.safeParse({
+          ...uploadIds,
+          size: "1536x1024",
+          contentType: "image/webp",
+          fileName: "photo.webp",
+          sizeBytes: 1024,
+        }).success,
+      ).toBe(false);
+    });
+
+    it("rejects a file over the maximum size", () => {
+      expect(
+        createSceneImageUploadSchema(config).safeParse({
+          ...uploadIds,
+          size: "1536x1024",
+          contentType: "image/png",
+          fileName: "photo.png",
+          sizeBytes: config.maximumBytes + 1,
+        }).success,
+      ).toBe(false);
+    });
+
+    it("requires an objectKey and generationId to complete, not a fileName", () => {
+      const schema = completeSceneImageUploadSchema(config);
+      expect(
+        schema.safeParse({
+          ...uploadIds,
+          size: "1536x1024",
+          contentType: "image/png",
+          sizeBytes: 1024,
+          objectKey: "workspaces/w/projects/p/scenes/s/versions/v/images/g.png",
+        }).success,
+      ).toBe(true);
+      expect(
+        schema.safeParse({
+          ...uploadIds,
+          size: "1536x1024",
+          contentType: "image/png",
+          sizeBytes: 1024,
+        }).success,
+      ).toBe(false);
     });
   });
 });

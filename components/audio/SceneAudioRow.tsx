@@ -2,6 +2,7 @@
 
 import { GenerateSceneAudioButton } from "@/components/audio/GenerateSceneAudioButton";
 import { RegenerateSceneAudioDialog } from "@/components/audio/RegenerateSceneAudioDialog";
+import { SceneAudioRecordDialog } from "@/components/audio/SceneAudioRecordDialog";
 import { ApproveSceneAudioButton } from "@/components/audio/ApproveSceneAudioButton";
 import { CancelSceneAudioButton } from "@/components/audio/CancelSceneAudioButton";
 import { AudioDurationDisplay } from "@/components/audio/AudioDurationDisplay";
@@ -24,6 +25,7 @@ const ELIGIBILITY_LABEL: Record<AudioSceneView["eligibility"], string> = {
 };
 
 export function SceneAudioRow({
+  projectId,
   scene,
   selected,
   onToggleSelect,
@@ -37,7 +39,9 @@ export function SceneAudioRow({
   onApprove,
   onReject,
   onCancel,
+  onRecorded,
 }: {
+  projectId: string;
   scene: AudioSceneView;
   selected: boolean;
   onToggleSelect: (sceneId: string, checked: boolean) => void;
@@ -51,6 +55,7 @@ export function SceneAudioRow({
   onApprove: AudioReviewHandler;
   onReject: AudioReviewHandler;
   onCancel: AudioReviewHandler;
+  onRecorded: () => Promise<void>;
 }) {
   const selectable =
     scene.eligibility === "eligible" ||
@@ -167,6 +172,17 @@ export function SceneAudioRow({
               voicePresetName={voicePresetName}
             />
           ) : null
+        ) : null}
+        {canGenerate &&
+        !inProgress &&
+        (scene.eligibility === "eligible" ||
+          scene.eligibility === "hasApprovedAudio") ? (
+          <SceneAudioRecordDialog
+            disabled={false}
+            onRecorded={onRecorded}
+            projectId={projectId}
+            scene={scene}
+          />
         ) : null}
       </div>
     </article>

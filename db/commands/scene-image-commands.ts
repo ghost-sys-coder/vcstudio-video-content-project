@@ -33,6 +33,9 @@ import {
   findStylePresetVersion,
   getNextSceneImageGenerationVersion,
 } from "@/db/repositories/scene-images.repository";
+import type { SceneImageApiSize } from "@/lib/schemas/scene-image";
+import type { ImageReferenceMimeType } from "@/lib/openai/image-generation-provider";
+import { sceneImageOutputFormatForUploadContentType } from "@/lib/domain/scene-image";
 import { BudgetExceededError } from "@/lib/domain/errors";
 import { assertSceneImageReferenceSelection } from "@/lib/domain/scene-image-references";
 
@@ -1625,6 +1628,79 @@ export async function createStylePresetVersion(input: {
       )
     )
       throw new Error("STYLE_PRESET_VERSION_CONFLICT");
+    throw error;
+  }
+}
+
+/**
+ * Inserts a user-uploaded scene image as a new, already-`succeeded`
+ * generation row (`source: "user_uploaded"`) so it flows through the exact
+ * same review/approve pipeline as an AI-generated one. Free operation — no
+ * usage_reservations/usage_events, unlike createSceneImageGenerationReservation.
+ */
+export async function saveUploadedSceneImage(input: {
+  workspaceId: string;
+  projectId: string;
+  sceneId: string;
+  sceneVersionId: string;
+  size: SceneImageApiSize;
+  objectKey: string;
+  generationId: string;
+  contentType: ImageReferenceMimeType;
+  sizeBytes: number;
+  width: number;
+  height: number;
+  etag: string;
+  requestedByUserId: string;
+}) {
+  const generationVersion = await getNextSceneImageGenerationVersion({
+    workspaceId: input.workspaceId,
+    projectId: input.projectId,
+    sceneVersionId: input.sceneVersionId,
+  });
+  const now = new Date();
+
+  try {
+    const [created] = await getDatabase()
+      .insert(sceneImageGenerations)
+      .values({
+        id: input.generationId,
+        workspaceId: input.workspaceId,
+        projectId: input.projectId,
+        sceneId: input.sceneId,
+        sceneVersionId: input.sceneVersionId,
+        purpose: "scene",
+        source: "user_uploaded",
+        generationVersion,
+        requestNonce: crypto.randomUUID(),
+        status: "succeeded",
+        reviewStatus: "pending",
+        size: input.size,
+        outputFormat: sceneImageOutputFormatForUploadContentType(
+          input.contentType,
+        ),
+        estimatedCostCents: 0,
+        actualCostCents: 0,
+        progressPercent: 100,
+        attemptCount: 0,
+        assetObjectKey: input.objectKey,
+        assetContentType: input.contentType,
+        assetSizeBytes: input.sizeBytes,
+        assetWidth: input.width,
+        assetHeight: input.height,
+        assetEtag: input.etag,
+        requestedByUserId: input.requestedByUserId,
+        startedAt: now,
+        completedAt: now,
+      })
+      .returning();
+    if (!created) throw new Error("SCENE_IMAGE_UPLOAD_INSERT_FAILED");
+    return created;
+  } catch (error) {
+    if (
+      isUniqueConstraintError(error, "scene_image_generations_version_unique")
+    )
+      throw new Error("SCENE_IMAGE_UPLOAD_VERSION_CONFLICT");
     throw error;
   }
 }

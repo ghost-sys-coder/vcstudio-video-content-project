@@ -381,7 +381,8 @@ export async function startBulkSceneImageGeneration(input: {
     const pendingItems: DispatchItem[] = existing
       .filter(
         (generation) =>
-          generation.status === "pending" || generation.status === "queued",
+          (generation.status === "pending" || generation.status === "queued") &&
+          generation.idempotencyKey !== null,
       )
       .map((generation) => ({
         payload: {
@@ -389,7 +390,10 @@ export async function startBulkSceneImageGeneration(input: {
           workspaceId: input.workspaceId,
           projectId: input.project.id,
         },
-        options: { idempotencyKey: generation.idempotencyKey },
+        // A batch-dispatched generation is always AI-generated, so its
+        // idempotencyKey is always set — the null check above just proves
+        // that to the type checker.
+        options: { idempotencyKey: generation.idempotencyKey as string },
       }));
     const dispatched = await dispatchBatchItems(pendingItems);
     return {
@@ -498,7 +502,7 @@ export async function startBulkSceneImageGeneration(input: {
             workspaceId: input.workspaceId,
             projectId: input.project.id,
           },
-          options: { idempotencyKey: reservation.generation.idempotencyKey },
+          options: { idempotencyKey },
         });
         reserved = true;
       } catch (error) {

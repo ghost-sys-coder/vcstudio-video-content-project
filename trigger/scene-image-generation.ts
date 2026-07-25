@@ -26,6 +26,7 @@ import {
   createRequestFingerprint,
   createSceneImageIdempotencyKey,
 } from "@/lib/domain/idempotency";
+import { assertAiGeneratedSceneImage } from "@/lib/domain/scene-image";
 import { validateSceneImagePreflight } from "@/lib/domain/scene-image-preflight";
 import { getSceneImageEnvironment } from "@/lib/env/server";
 import {
@@ -131,6 +132,7 @@ export const sceneImageGenerationTask = task({
     if (!context) throw new Error("SCENE_IMAGE_GENERATION_NOT_FOUND");
     const { generation, reservation, references, latestProviderRequest } =
       context;
+    assertAiGeneratedSceneImage(generation);
 
     if (generation.status === "succeeded")
       return { generationId: generation.id, status: "succeeded" as const };

@@ -9,6 +9,7 @@ import type {
 } from "@/lib/audio/audio-view";
 
 export function SceneAudioList({
+  projectId,
   scenes,
   selectedSceneIds,
   onToggleSelect,
@@ -22,7 +23,9 @@ export function SceneAudioList({
   onApprove,
   onReject,
   onCancel,
+  onRecorded,
 }: {
+  projectId: string;
   scenes: AudioSceneView[];
   selectedSceneIds: ReadonlySet<string>;
   onToggleSelect: (sceneId: string, checked: boolean) => void;
@@ -36,6 +39,7 @@ export function SceneAudioList({
   onApprove: AudioReviewHandler;
   onReject: AudioReviewHandler;
   onCancel: AudioReviewHandler;
+  onRecorded: () => Promise<void>;
 }) {
   return (
     <div className="space-y-3">
@@ -50,7 +54,9 @@ export function SceneAudioList({
           onCancel={onCancel}
           onGenerate={onGenerate}
           onReject={onReject}
+          onRecorded={onRecorded}
           onToggleSelect={onToggleSelect}
+          projectId={projectId}
           scene={scene}
           selected={selectedSceneIds.has(scene.sceneId)}
           voicePresetId={voicePresetId}

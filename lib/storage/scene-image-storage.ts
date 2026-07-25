@@ -1,12 +1,14 @@
 import "server-only";
 
 import {
+  DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
   PutObjectCommand,
   type HeadObjectCommandOutput,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import sharp from "sharp";
 import type {
   ImageGenerationProviderResult,
   ImageGenerationReference,
@@ -266,4 +268,79 @@ export async function createSceneImageDownloadUrl(
     }),
     { expiresIn: environment.R2_SIGNED_DOWNLOAD_EXPIRY_SECONDS },
   );
+}
+
+export async function deleteUploadedSceneImageObject(
+  objectKey: string,
+): Promise<void> {
+  const environment = getStorageEnvironment();
+  await getR2Client().send(
+    new DeleteObjectCommand({
+      Bucket: environment.R2_BUCKET_NAME,
+      Key: objectKey,
+    }),
+  );
+}
+
+export async function createSceneImageUploadUrl(input: {
+  objectKey: string;
+  contentType: string;
+  sizeBytes: number;
+}): Promise<string> {
+  const environment = getStorageEnvironment();
+  return getSignedUrl(
+    getR2Client(),
+    new PutObjectCommand({
+      Bucket: environment.R2_BUCKET_NAME,
+      Key: input.objectKey,
+      ContentLength: input.sizeBytes,
+      ContentType: input.contentType,
+    }),
+    { expiresIn: environment.R2_SIGNED_UPLOAD_EXPIRY_SECONDS },
+  );
+}
+
+export async function inspectUploadedSceneImage(objectKey: string): Promise<{
+  width: number;
+  height: number;
+  contentType: ImageReferenceMimeType;
+  sizeBytes: number;
+  etag: string;
+}> {
+  const environment = getStorageEnvironment();
+  const client = getR2Client();
+  const head = await client.send(
+    new HeadObjectCommand({
+      Bucket: environment.R2_BUCKET_NAME,
+      Key: objectKey,
+    }),
+  );
+  const response = await client.send(
+    new GetObjectCommand({
+      Bucket: environment.R2_BUCKET_NAME,
+      Key: objectKey,
+    }),
+  );
+  if (!response.Body) throw new Error("UPLOADED_SCENE_IMAGE_BODY_MISSING");
+  const bytes = Buffer.from(await response.Body.transformToByteArray());
+  const metadata = await sharp(bytes).metadata();
+  const width = metadata.width;
+  const height = metadata.height;
+  if (!width || !height)
+    throw new Error("UPLOADED_SCENE_IMAGE_DIMENSIONS_MISSING");
+  const contentType = requireSupportedContentType(head.ContentType);
+  const expectedFormat =
+    contentType === "image/jpeg" ? "jpeg" : contentType.replace("image/", "");
+  if (metadata.format !== expectedFormat)
+    throw new Error("UPLOADED_SCENE_IMAGE_FORMAT_MISMATCH");
+  if (!head.ContentLength || head.ContentLength <= 0)
+    throw new Error("INVALID_UPLOADED_SCENE_IMAGE_SIZE");
+  if (!head.ETag) throw new Error("UPLOADED_SCENE_IMAGE_ETAG_MISSING");
+  return {
+    width,
+    height,
+    contentType,
+    sizeBytes: head.ContentLength,
+    etag: head.ETag,
+  };
 }

@@ -66,13 +66,19 @@ export async function startSceneOutpaint(input: {
   const environment = getSceneImageEnvironment();
   if (!environment.ENABLE_SCENE_IMAGE_GENERATION)
     throw new Error("Scene image generation is disabled.");
+  const sourceStylePresetVersionId =
+    input.sourceGeneration.stylePresetVersionId;
+  if (!sourceStylePresetVersionId)
+    throw new Error(
+      "OUTPAINT_SOURCE_HAS_NO_STYLE_PRESET: the source image was not AI-generated.",
+    );
   await ensureSceneOutpaintPromptTemplate();
 
   const [stylePreset, promptTemplate, generationVersion, budget] =
     await Promise.all([
       findStylePresetVersion({
         workspaceId: input.workspaceId,
-        stylePresetVersionId: input.sourceGeneration.stylePresetVersionId,
+        stylePresetVersionId: sourceStylePresetVersionId,
         includeArchived: true,
       }),
       findPromptTemplateVersion({

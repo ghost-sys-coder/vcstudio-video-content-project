@@ -265,6 +265,8 @@ export function Storyboard({
           runReview(rejectGeneratedImageAction, generationId)
         }
         onToggleSelect={toggleSelect}
+        onUploaded={refresh}
+        projectId={projectId}
         scenes={filteredScenes}
         selectedSceneIds={selected}
         stylePresets={data.stylePresets}

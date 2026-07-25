@@ -173,6 +173,7 @@ export async function loadSceneImageDetails(input: {
         generationVersion: generation.generationVersion,
         status: generation.status,
         reviewStatus: generation.reviewStatus,
+        source: generation.source,
         model: generation.model,
         quality: generation.quality,
         size: parsedSize,
@@ -180,7 +181,7 @@ export async function loadSceneImageDetails(input: {
         outputCompression: generation.outputCompression,
         finalPrompt: generation.finalPrompt,
         promptTemplateVersion: generation.promptTemplateVersion,
-        stylePresetName: stylePresetVersion.name,
+        stylePresetName: stylePresetVersion?.name ?? null,
         stylePresetVersion: generation.stylePresetVersion,
         imageUrl:
           generation.status === "succeeded" && generation.assetObjectKey

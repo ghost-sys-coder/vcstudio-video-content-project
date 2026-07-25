@@ -35,6 +35,7 @@ const audioSceneSchema = z.object({
   ]),
   sceneVersionId: z.uuid(),
   narrationPreview: z.string(),
+  narrationText: z.string(),
   characterCount: z.number().int().nonnegative(),
   eligibility: z.enum([
     "eligible",

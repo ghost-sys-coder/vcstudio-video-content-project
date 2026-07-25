@@ -29,6 +29,7 @@ export interface AudioSceneView {
   sceneStatus: SceneStatus;
   sceneVersionId: string;
   narrationPreview: string;
+  narrationText: string;
   characterCount: number;
   eligibility: SceneAudioEligibility;
   latestGenerationId: string | null;

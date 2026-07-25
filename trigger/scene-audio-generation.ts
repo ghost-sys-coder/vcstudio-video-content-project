@@ -8,6 +8,7 @@ import {
 } from "@/db/commands/scene-audio-commands";
 import { findSceneAudioGenerationWorkflowContext } from "@/db/repositories/scene-audio.repository";
 import { calculateActualSceneAudioCostCents } from "@/lib/costs/scene-audio-cost";
+import { assertAiGeneratedSceneAudio } from "@/lib/domain/scene-audio";
 import { getSceneAudioEnvironment } from "@/lib/env/server";
 import {
   probeAudioDurationMilliseconds,
@@ -22,6 +23,7 @@ import {
   findStoredSceneAudio,
   putSceneAudio,
 } from "@/lib/storage/scene-audio-storage";
+import { createSceneAudioObjectKey } from "@/lib/storage/object-key";
 
 export const sceneAudioGenerationTaskPayloadSchema = z.object({
   generationId: z.uuid(),
@@ -32,16 +34,6 @@ export const sceneAudioGenerationTaskPayloadSchema = z.object({
 type SceneAudioTaskPayload = z.infer<
   typeof sceneAudioGenerationTaskPayloadSchema
 >;
-
-function getSceneAudioObjectKey(generation: {
-  workspaceId: string;
-  projectId: string;
-  sceneId: string;
-  id: string;
-  format: string;
-}): string {
-  return `workspaces/${generation.workspaceId}/projects/${generation.projectId}/scenes/${generation.sceneId}/audio/${generation.id}.${generation.format}`;
-}
 
 export const sceneAudioGenerationTask = task({
   id: "scene-audio-generation",
@@ -65,6 +57,7 @@ export const sceneAudioGenerationTask = task({
     const context = await findSceneAudioGenerationWorkflowContext(scope);
     if (!context) throw new Error("SCENE_AUDIO_GENERATION_NOT_FOUND");
     const { generation, reservation } = context;
+    assertAiGeneratedSceneAudio(generation);
 
     if (generation.status === "succeeded")
       return { generationId: generation.id, status: "succeeded" as const };
@@ -89,7 +82,13 @@ export const sceneAudioGenerationTask = task({
       return { generationId: generation.id, status: "failed" as const };
     }
 
-    const objectKey = getSceneAudioObjectKey(generation);
+    const objectKey = createSceneAudioObjectKey({
+      workspaceId: generation.workspaceId,
+      projectId: generation.projectId,
+      sceneId: generation.sceneId,
+      generationId: generation.id,
+      format: generation.format,
+    });
     const rates = {
       costPerMillionCharactersCents:
         environment.OPENAI_TTS_COST_PER_MILLION_CHARACTERS_CENTS,

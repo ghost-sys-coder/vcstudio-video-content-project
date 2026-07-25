@@ -286,12 +286,16 @@ export function SceneImageWorkspace({
           handleReview(generationId, rejectGeneratedImageAction)
         }
         onSelectionChange={setSelection}
+        onUploaded={loadDetails}
         outputFormat={details.configuration.outputFormat}
+        projectId={scene.projectId}
         promptPreviews={derived.promptPreviews}
         promptTemplateVersion={details.promptTemplateVersion}
         references={details.references}
         sceneApproved={scene.status === "approved"}
+        sceneId={scene.id}
         sceneNumber={scene.sceneNumber}
+        sceneVersionId={sceneVersion.id}
         selection={selection}
         stylePresets={details.stylePresets}
       />

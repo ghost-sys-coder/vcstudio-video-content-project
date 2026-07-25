@@ -30,6 +30,7 @@ import {
   createSceneImageIdempotencyKey,
 } from "@/lib/domain/idempotency";
 import { BudgetExceededError } from "@/lib/domain/errors";
+import { assertAiGeneratedSceneImage } from "@/lib/domain/scene-image";
 import { getSceneImageEnvironment } from "@/lib/env/server";
 import { getOpenAiReferenceInputFidelitySnapshot } from "@/lib/openai/image-generation-request";
 import {
@@ -357,6 +358,7 @@ export async function startSceneImageGeneration(input: {
         throw new SceneImageGenerationRequestError(
           "This request identifier was already used for different image settings. Start a new generation.",
         );
+      assertAiGeneratedSceneImage(existingGeneration);
       if (
         !existingGeneration.triggerRunId &&
         (existingGeneration.status === "pending" ||

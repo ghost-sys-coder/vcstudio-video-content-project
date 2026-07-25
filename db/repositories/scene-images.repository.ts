@@ -413,41 +413,55 @@ export async function listSceneImageGenerationSummaries(input: {
     eq(sceneImageGenerations.workspaceId, input.workspaceId),
     eq(sceneImageGenerations.projectId, input.projectId),
     eq(sceneImageGenerations.sceneId, input.sceneId),
-    eq(stylePresetVersions.workspaceId, input.workspaceId),
-    eq(stylePresets.workspaceId, input.workspaceId),
   ];
   if (input.sceneVersionId)
     conditions.push(
       eq(sceneImageGenerations.sceneVersionId, input.sceneVersionId),
     );
 
-  return getDatabase()
-    .select({
-      generation: sceneImageGenerations,
-      stylePreset: stylePresets,
-      stylePresetVersion: stylePresetVersions,
-      reservationStatus: usageReservations.status,
-    })
-    .from(sceneImageGenerations)
-    .innerJoin(
-      stylePresetVersions,
-      eq(stylePresetVersions.id, sceneImageGenerations.stylePresetVersionId),
-    )
-    .innerJoin(
-      stylePresets,
-      eq(stylePresets.id, stylePresetVersions.stylePresetId),
-    )
-    .leftJoin(
-      usageReservations,
-      and(
-        eq(usageReservations.workspaceId, input.workspaceId),
-        eq(usageReservations.projectId, input.projectId),
-        eq(usageReservations.imageGenerationId, sceneImageGenerations.id),
-      ),
-    )
-    .where(and(...conditions))
-    .orderBy(desc(sceneImageGenerations.generationVersion))
-    .limit(boundedLimit(input.limit));
+  return (
+    getDatabase()
+      .select({
+        generation: sceneImageGenerations,
+        stylePreset: stylePresets,
+        stylePresetVersion: stylePresetVersions,
+        reservationStatus: usageReservations.status,
+      })
+      .from(sceneImageGenerations)
+      // A user-uploaded image has no stylePresetVersionId, so these must be
+      // left joins (not inner) or uploaded rows would silently disappear from
+      // this list entirely. The workspace scoping moves onto the join
+      // condition itself so it still constrains the match without turning the
+      // join back into an inner join via the WHERE clause.
+      .leftJoin(
+        stylePresetVersions,
+        and(
+          eq(
+            stylePresetVersions.id,
+            sceneImageGenerations.stylePresetVersionId,
+          ),
+          eq(stylePresetVersions.workspaceId, input.workspaceId),
+        ),
+      )
+      .leftJoin(
+        stylePresets,
+        and(
+          eq(stylePresets.id, stylePresetVersions.stylePresetId),
+          eq(stylePresets.workspaceId, input.workspaceId),
+        ),
+      )
+      .leftJoin(
+        usageReservations,
+        and(
+          eq(usageReservations.workspaceId, input.workspaceId),
+          eq(usageReservations.projectId, input.projectId),
+          eq(usageReservations.imageGenerationId, sceneImageGenerations.id),
+        ),
+      )
+      .where(and(...conditions))
+      .orderBy(desc(sceneImageGenerations.generationVersion))
+      .limit(boundedLimit(input.limit))
+  );
 }
 
 export async function listGenerationReferenceAssets(input: {

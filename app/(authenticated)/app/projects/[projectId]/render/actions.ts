@@ -334,6 +334,12 @@ export async function startSceneOutpaintAction(formData: FormData) {
         success: false as const,
         error: "The approved source image is unavailable.",
       };
+    if (source.source !== "ai_generated")
+      return {
+        success: false as const,
+        error:
+          "Outpainting requires an AI-generated source image — uploaded images can't be outpainted.",
+      };
     if (variant.aspectRatio === project.aspectRatio)
       return {
         success: false as const,

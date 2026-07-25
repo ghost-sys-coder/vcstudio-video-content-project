@@ -1,5 +1,6 @@
 "use client";
 
+import { SceneImageUploadDialog } from "@/components/scenes/SceneImageUploadDialog";
 import { FailedSceneActions } from "@/components/storyboard/FailedSceneActions";
 import { RegenerateSceneDialog } from "@/components/storyboard/RegenerateSceneDialog";
 import { StoryboardSceneImageGroup } from "@/components/storyboard/StoryboardSceneImageGroup";
@@ -17,6 +18,7 @@ import type {
 import { cn } from "@/lib/utils";
 
 export function StoryboardSceneCard({
+  projectId,
   scene,
   selected,
   onToggleSelect,
@@ -28,7 +30,9 @@ export function StoryboardSceneCard({
   onApproveScene,
   onRejectScene,
   onGenerate,
+  onUploaded,
 }: {
+  projectId: string;
   scene: StoryboardSceneView;
   selected: boolean;
   onToggleSelect: (sceneId: string, checked: boolean) => void;
@@ -40,6 +44,7 @@ export function StoryboardSceneCard({
   onApproveScene: StoryboardReviewHandler;
   onRejectScene: StoryboardReviewHandler;
   onGenerate: BulkGenerateHandler;
+  onUploaded: () => Promise<void>;
 }) {
   const selectable = isSceneSelectableForBulk(scene.eligibility);
   const imagesNeedingReview = scene.images.filter(
@@ -126,15 +131,27 @@ export function StoryboardSceneCard({
         </div>
       ) : null}
 
-      {canGenerate && !isFailed && !inProgress && selectable ? (
-        <RegenerateSceneDialog
-          availableBudgetCents={availableBudgetCents}
-          configuration={configuration}
-          disabled={false}
-          onGenerate={onGenerate}
-          scene={scene}
-          stylePresets={stylePresets}
-        />
+      {canGenerate && selectable ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {!isFailed && !inProgress ? (
+            <RegenerateSceneDialog
+              availableBudgetCents={availableBudgetCents}
+              configuration={configuration}
+              disabled={false}
+              onGenerate={onGenerate}
+              scene={scene}
+              stylePresets={stylePresets}
+            />
+          ) : null}
+          <SceneImageUploadDialog
+            disabled={false}
+            onUploaded={onUploaded}
+            projectId={projectId}
+            sceneId={scene.sceneId}
+            sceneNumber={scene.sceneNumber}
+            sceneVersionId={scene.sceneVersionId}
+          />
+        </div>
       ) : null}
     </article>
   );

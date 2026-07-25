@@ -286,10 +286,12 @@ export function AudioWorkspace({
           runReview(cancelSceneAudioAction, generationId)
         }
         onGenerate={handleGenerate}
+        onRecorded={refresh}
         onReject={(generationId) =>
           runReview(rejectSceneAudioAction, generationId)
         }
         onToggleSelect={toggleSelect}
+        projectId={projectId}
         scenes={data.scenes}
         selectedSceneIds={selected}
         voicePresetId={voicePresetId}

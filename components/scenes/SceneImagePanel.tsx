@@ -20,10 +20,14 @@ import { ImageQualitySelector } from "@/components/scenes/ImageQualitySelector";
 import { ImageSizeMultiSelect } from "@/components/scenes/ImageSizeMultiSelect";
 import { ReferenceAssetSelector } from "@/components/scenes/ReferenceAssetSelector";
 import { SceneImageSizeGroup } from "@/components/scenes/SceneImageSizeGroup";
+import { SceneImageUploadDialog } from "@/components/scenes/SceneImageUploadDialog";
 import { StylePresetSelector } from "@/components/scenes/StylePresetSelector";
 
 export function SceneImagePanel({
   idPrefix,
+  projectId,
+  sceneId,
+  sceneVersionId,
   sceneNumber,
   sceneApproved,
   canGenerate,
@@ -48,8 +52,12 @@ export function SceneImagePanel({
   onPoll,
   onApprove,
   onReject,
+  onUploaded,
 }: {
   idPrefix: string;
+  projectId: string;
+  sceneId: string;
+  sceneVersionId: string;
   sceneNumber: number;
   sceneApproved: boolean;
   canGenerate: boolean;
@@ -76,6 +84,7 @@ export function SceneImagePanel({
   onPoll?: (generationId: string) => Promise<void>;
   onApprove: (generationId: string) => Promise<SceneImageActionResult>;
   onReject: (generationId: string) => Promise<SceneImageActionResult>;
+  onUploaded: () => Promise<void>;
 }) {
   const activeGeneration = generations.find((generation) =>
     isActiveSceneImageGenerationStatus(generation.status),
@@ -198,21 +207,35 @@ export function SceneImagePanel({
         model={model}
         outputFormat={outputFormat}
       />
-      <GenerateSceneImageButton
-        disabled={generationDisabled}
-        disabledReason={generatedDisabledReason}
-        estimatedCostCents={estimatedCostCents}
-        model={model}
-        onConfirm={(requestNonce) => onGenerate({ ...selection, requestNonce })}
-        qualityLabel={qualityLabel}
-        referenceCount={selection.referenceAssetIds.length}
-        sizes={selection.sizes}
-        stylePresetLabel={
-          selectedStyle
-            ? `${selectedStyle.name} v${selectedStyle.version}`
-            : "Not selected"
-        }
-      />
+      <div className="flex flex-wrap items-center gap-2">
+        <GenerateSceneImageButton
+          disabled={generationDisabled}
+          disabledReason={generatedDisabledReason}
+          estimatedCostCents={estimatedCostCents}
+          model={model}
+          onConfirm={(requestNonce) =>
+            onGenerate({ ...selection, requestNonce })
+          }
+          qualityLabel={qualityLabel}
+          referenceCount={selection.referenceAssetIds.length}
+          sizes={selection.sizes}
+          stylePresetLabel={
+            selectedStyle
+              ? `${selectedStyle.name} v${selectedStyle.version}`
+              : "Not selected"
+          }
+        />
+        {sceneApproved && canGenerate ? (
+          <SceneImageUploadDialog
+            disabled={false}
+            onUploaded={onUploaded}
+            projectId={projectId}
+            sceneId={sceneId}
+            sceneNumber={sceneNumber}
+            sceneVersionId={sceneVersionId}
+          />
+        ) : null}
+      </div>
 
       {activeGeneration ? (
         <ImageGenerationProgress

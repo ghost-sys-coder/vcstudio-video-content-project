@@ -1,6 +1,7 @@
 import "server-only";
 
 import {
+  DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
   PutObjectCommand,
@@ -141,4 +142,58 @@ export async function createSceneAudioDownloadUrl(
     }),
     { expiresIn: environment.R2_SIGNED_DOWNLOAD_EXPIRY_SECONDS },
   );
+}
+
+export async function deleteUploadedSceneAudioObject(
+  objectKey: string,
+): Promise<void> {
+  const environment = getStorageEnvironment();
+  await getR2Client().send(
+    new DeleteObjectCommand({
+      Bucket: environment.R2_BUCKET_NAME,
+      Key: objectKey,
+    }),
+  );
+}
+
+export async function createSceneAudioUploadUrl(input: {
+  objectKey: string;
+  contentType: string;
+  sizeBytes: number;
+}): Promise<string> {
+  const environment = getStorageEnvironment();
+  return getSignedUrl(
+    getR2Client(),
+    new PutObjectCommand({
+      Bucket: environment.R2_BUCKET_NAME,
+      Key: input.objectKey,
+      ContentLength: input.sizeBytes,
+      ContentType: input.contentType,
+    }),
+    { expiresIn: environment.R2_SIGNED_UPLOAD_EXPIRY_SECONDS },
+  );
+}
+
+export async function inspectUploadedSceneAudio(objectKey: string): Promise<{
+  contentType: string;
+  sizeBytes: number;
+  etag: string;
+}> {
+  const environment = getStorageEnvironment();
+  const head = await getR2Client().send(
+    new HeadObjectCommand({
+      Bucket: environment.R2_BUCKET_NAME,
+      Key: objectKey,
+    }),
+  );
+  if (!head.ContentLength || head.ContentLength <= 0)
+    throw new Error("INVALID_UPLOADED_SCENE_AUDIO_SIZE");
+  if (!head.ETag) throw new Error("UPLOADED_SCENE_AUDIO_ETAG_MISSING");
+  if (!head.ContentType)
+    throw new Error("UPLOADED_SCENE_AUDIO_CONTENT_TYPE_MISSING");
+  return {
+    contentType: head.ContentType,
+    sizeBytes: head.ContentLength,
+    etag: head.ETag,
+  };
 }

@@ -5,11 +5,13 @@ import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
 import { sceneAudioGenerations } from "@/db/schema";
 import { BudgetExceededError } from "@/lib/domain/errors";
+import { sceneAudioFormatForUploadContentType } from "@/lib/domain/scene-audio";
 import {
   findSceneAudioGeneration,
   findSceneAudioGenerationByIdempotencyKey,
   findSceneAudioGenerationByRequestNonce,
   findSceneAudioReservation,
+  getNextSceneAudioGenerationVersion,
 } from "@/db/repositories/scene-audio.repository";
 
 type AudioFormat = typeof sceneAudioGenerations.$inferInsert.format;
@@ -224,7 +226,7 @@ export async function createSceneAudioGenerationReservation(input: {
           ${input.provider},
           ${input.model},
           ${input.voice},
-          ${input.format}::audio_output_format,
+          ${input.format}::scene_audio_asset_format,
           ${input.speedScaledPercent},
           ${input.instructions},
           ${input.sampleRate}::int,
@@ -794,4 +796,79 @@ export async function rejectSceneAudioGeneration(input: {
     .returning();
   if (!rejected) throw new Error("SCENE_AUDIO_REJECTION_CONFLICT");
   return rejected;
+}
+
+/**
+ * Inserts a user-recorded scene narration as a new, already-`succeeded`
+ * generation row (`source: "user_recorded"`) so it flows through the exact
+ * same review/approve pipeline as an AI-generated one. Free operation — no
+ * usage_reservations/usage_events, unlike createSceneAudioGenerationReservation.
+ */
+export async function saveRecordedSceneAudio(input: {
+  workspaceId: string;
+  projectId: string;
+  sceneId: string;
+  sceneVersionId: string;
+  generationId: string;
+  objectKey: string;
+  contentType: "audio/webm" | "audio/mp4";
+  sizeBytes: number;
+  etag: string;
+  durationMilliseconds: number | null;
+  narrationText: string;
+  requestedByUserId: string;
+}) {
+  assertNonnegativeInteger(input.sizeBytes, "asset_size_bytes");
+  if (input.sizeBytes === 0) throw new Error("INVALID_SCENE_AUDIO_UPLOAD");
+  assertNonnegativeInteger(input.durationMilliseconds, "duration_milliseconds");
+  if (input.narrationText.trim().length === 0)
+    throw new Error("SCENE_AUDIO_RECORDING_NARRATION_TEXT_MISSING");
+
+  const generationVersion = await getNextSceneAudioGenerationVersion({
+    workspaceId: input.workspaceId,
+    projectId: input.projectId,
+    sceneVersionId: input.sceneVersionId,
+  });
+  const now = new Date();
+
+  try {
+    const [created] = await getDatabase()
+      .insert(sceneAudioGenerations)
+      .values({
+        id: input.generationId,
+        workspaceId: input.workspaceId,
+        projectId: input.projectId,
+        sceneId: input.sceneId,
+        sceneVersionId: input.sceneVersionId,
+        source: "user_recorded",
+        generationVersion,
+        requestNonce: crypto.randomUUID(),
+        status: "succeeded",
+        reviewStatus: "pending",
+        format: sceneAudioFormatForUploadContentType(input.contentType),
+        inputText: input.narrationText,
+        inputCharacterCount: input.narrationText.length,
+        estimatedCostCents: 0,
+        actualCostCents: 0,
+        progressPercent: 100,
+        attemptCount: 0,
+        assetObjectKey: input.objectKey,
+        assetContentType: input.contentType,
+        assetSizeBytes: input.sizeBytes,
+        assetEtag: input.etag,
+        durationMilliseconds: input.durationMilliseconds,
+        requestedByUserId: input.requestedByUserId,
+        startedAt: now,
+        completedAt: now,
+      })
+      .returning();
+    if (!created) throw new Error("SCENE_AUDIO_RECORDING_INSERT_FAILED");
+    return created;
+  } catch (error) {
+    if (
+      isUniqueConstraintError(error, "scene_audio_generations_version_unique")
+    )
+      throw new Error("SCENE_AUDIO_RECORDING_VERSION_CONFLICT");
+    throw error;
+  }
 }
