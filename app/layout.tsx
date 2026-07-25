@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { cookies } from "next/headers";
 import "./globals.css";
+import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { THEME_COOKIE } from "@/lib/theme/theme-cookie";
 import { cn } from "@/lib/utils";
@@ -45,6 +46,7 @@ export default async function RootLayout({
         <ClerkProvider appearance={{ theme: shadcn }} telemetry={false}>
           <TooltipProvider>{children}</TooltipProvider>
         </ClerkProvider>
+        <Toaster />
       </body>
     </html>
   );

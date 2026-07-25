@@ -2,10 +2,12 @@
 
 import Image from "next/image";
 import { useMemo, useRef, useState, useTransition } from "react";
+import { toast } from "sonner";
 import {
   saveSceneFramingAction,
   startSceneOutpaintAction,
 } from "@/app/(authenticated)/app/projects/[projectId]/render/actions";
+import { OutpaintConfirmDialog } from "@/components/render/OutpaintConfirmDialog";
 import { SceneFramingBulkApply } from "@/components/render/SceneFramingBulkApply";
 import { SceneFramingChip } from "@/components/render/SceneFramingChip";
 import { Button } from "@/components/ui/button";
@@ -59,6 +61,7 @@ export function SceneFramingEditor({
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [dragging, setDragging] = useState(false);
+  const [outpaintDialogOpen, setOutpaintDialogOpen] = useState(false);
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const outpaintPending =
     selected?.outpaintStatus === "queued" ||
@@ -93,6 +96,26 @@ export function SceneFramingEditor({
     });
     setFocalX(focalPointXBps);
     setFocalY(focalPointYBps);
+  }
+
+  function startOutpaint() {
+    startTransition(async () => {
+      const formData = new FormData();
+      formData.set("projectId", projectId);
+      formData.set("outputVariantId", outputVariantId);
+      formData.set("sceneId", selected.sceneId);
+      formData.set("sceneVersionId", selected.sceneVersionId);
+      formData.set(
+        "sourceImageGenerationId",
+        selected.approvedSourceImageGenerationId,
+      );
+      formData.set("requestNonce", crypto.randomUUID());
+      const result = await startSceneOutpaintAction(formData);
+      setOutpaintDialogOpen(false);
+      if (result.success) toast.success("Outpaint queued.");
+      else toast.error(result.error);
+      await onSaved();
+    });
   }
 
   return (
@@ -135,7 +158,7 @@ export function SceneFramingEditor({
         ))}
       </div>
 
-      <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,18rem)]">
+      <div className="grid min-w-0 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,18rem)]">
         <div
           className={cn(
             "relative mx-auto w-full max-w-xl touch-none overflow-hidden rounded-lg border",
@@ -326,31 +349,7 @@ export function SceneFramingEditor({
               className="mt-3 w-full"
               disabled={!canEdit || pending || outpaintPending}
               nativeButton
-              onClick={() => {
-                if (
-                  !window.confirm(
-                    `Generate a paid outpaint for up to ${(outpaintEstimatedCostCents / 100).toFixed(2)} USD? The original approved image will remain unchanged.`,
-                  )
-                )
-                  return;
-                startTransition(async () => {
-                  const formData = new FormData();
-                  formData.set("projectId", projectId);
-                  formData.set("outputVariantId", outputVariantId);
-                  formData.set("sceneId", selected.sceneId);
-                  formData.set("sceneVersionId", selected.sceneVersionId);
-                  formData.set(
-                    "sourceImageGenerationId",
-                    selected.approvedSourceImageGenerationId,
-                  );
-                  formData.set("requestNonce", crypto.randomUUID());
-                  const result = await startSceneOutpaintAction(formData);
-                  setMessage(
-                    result.success ? "Outpaint queued." : result.error,
-                  );
-                  await onSaved();
-                });
-              }}
+              onClick={() => setOutpaintDialogOpen(true)}
               type="button"
               variant="outline"
             >
@@ -369,7 +368,7 @@ export function SceneFramingEditor({
             <p
               className={cn(
                 "text-xs",
-                message === "Framing saved." || message === "Outpaint queued."
+                message === "Framing saved."
                   ? "text-emerald-700"
                   : "text-destructive",
               )}
@@ -380,6 +379,14 @@ export function SceneFramingEditor({
           ) : null}
         </div>
       </div>
+
+      <OutpaintConfirmDialog
+        estimatedCostCents={outpaintEstimatedCostCents}
+        onConfirm={startOutpaint}
+        onOpenChange={setOutpaintDialogOpen}
+        open={outpaintDialogOpen}
+        pending={pending}
+      />
     </section>
   );
 }
