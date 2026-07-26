@@ -58,6 +58,7 @@ export type PublishableRenderView = {
   sourceName: string | null;
   dimensionsLabel: string;
   clockLabel: string;
+  includeCaptions: boolean;
   sizeBytes: number;
   durationSeconds: number;
   createdAtLabel: string;
@@ -205,6 +206,7 @@ export async function loadPublishingView(input: {
           sourceName: source.sourceName,
           dimensionsLabel: `${render.width}×${render.height}`,
           clockLabel: formatRenderClock(render.durationMilliseconds),
+          includeCaptions: render.includeCaptions,
           label: buildRenderOptionLabel({
             kind: source.kind,
             sourceName: source.sourceName,

@@ -172,6 +172,7 @@ export async function listRendersWithSource(input: {
       shortCompositionId: videoRenders.shortCompositionId,
       variantName: projectOutputVariants.name,
       shortName: shortCompositions.name,
+      includeCaptions: videoRenders.includeCaptions,
     })
     .from(videoRenders)
     .leftJoin(

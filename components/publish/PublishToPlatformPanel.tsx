@@ -464,6 +464,9 @@ export function PublishToPlatformPanel({
                                 </span>
                                 <span className="text-xs text-muted-foreground">
                                   {render.dimensionsLabel} · {render.clockLabel}
+                                  {render.includeCaptions
+                                    ? ""
+                                    : " · No captions"}
                                   {instagramSelected &&
                                   !render.instagramEligible
                                     ? " · Not Reel-compatible"
