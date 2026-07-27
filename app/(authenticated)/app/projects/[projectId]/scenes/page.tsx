@@ -13,8 +13,13 @@ import { renderSceneAnalysisPrompt } from "@studio/prompts";
 import { estimateSceneAnalysisCost } from "@/lib/costs/scene-analysis-cost";
 import {
   listCharacters,
+  listCharactersByIds,
   listSceneVersionCharacters,
 } from "@/db/repositories/characters.repository";
+import {
+  listAnimationReadyCharacters,
+  listSceneAnimationDirectionsForVersions,
+} from "@/db/repositories/scene-animation.repository";
 import { listProjectCast } from "@/db/repositories/project-characters.repository";
 import { listSceneImageGenerationsForSceneVersions } from "@/db/repositories/scene-images.repository";
 import { buildSceneImageIndicatorMap } from "@/lib/scenes/scene-image-indicator";
@@ -48,19 +53,38 @@ export default async function ProjectScenesPage({
     listCurrentScenes(scope),
   ]);
   if (!project) notFound();
-  const [availableCharacters, assignments, imageGenerations, cast] =
-    await Promise.all([
-      listCharacters({ workspaceId: scope.workspaceId, status: "active" }),
-      listSceneVersionCharacters({
-        ...scope,
-        sceneVersionIds: rows.map((row) => row.version.id),
-      }),
-      listSceneImageGenerationsForSceneVersions({
-        ...scope,
-        sceneVersionIds: rows.map((row) => row.version.id),
-      }),
-      listProjectCast(scope),
-    ]);
+  const sceneVersionIds = rows.map((row) => row.version.id);
+  const [
+    availableCharacters,
+    assignments,
+    imageGenerations,
+    cast,
+    animationReadyCharacters,
+    animationDirections,
+  ] = await Promise.all([
+    listCharacters({ workspaceId: scope.workspaceId, status: "active" }),
+    listSceneVersionCharacters({ ...scope, sceneVersionIds }),
+    listSceneImageGenerationsForSceneVersions({ ...scope, sceneVersionIds }),
+    listProjectCast(scope),
+    listAnimationReadyCharacters({ workspaceId: scope.workspaceId }),
+    listSceneAnimationDirectionsForVersions({ ...scope, sceneVersionIds }),
+  ]);
+  const animatedCharacterIds = [
+    ...new Set(animationDirections.map((direction) => direction.characterId)),
+  ];
+  const animatedCharacters = await listCharactersByIds({
+    workspaceId: scope.workspaceId,
+    characterIds: animatedCharacterIds,
+  });
+  const animatedCharacterById = new Map(
+    animatedCharacters.map((character) => [character.id, character]),
+  );
+  const animatedCharacterBySceneVersionId = new Map(
+    animationDirections.map((direction) => [
+      direction.sceneVersionId,
+      animatedCharacterById.get(direction.characterId) ?? null,
+    ]),
+  );
   const castCandidates = cast.map((member) => ({
     id: member.characterId,
     name: member.character.name,
@@ -97,6 +121,8 @@ export default async function ProjectScenesPage({
     imageIndicator: imageIndicatorBySceneId.get(row.scene.id) ?? {
       state: "none" as const,
     },
+    animatedCharacter:
+      animatedCharacterBySceneVersionId.get(row.version.id) ?? null,
   }));
   const environment = getSceneAnalysisEnvironment();
   const prompt = approvedVersion
@@ -129,6 +155,7 @@ export default async function ProjectScenesPage({
       projectId={project.id}
       rows={rowsWithCharacters}
       availableCharacters={availableCharacters}
+      animationReadyCharacters={animationReadyCharacters}
       cast={castEntries}
       castAvailableCharacters={castAvailableCharacters}
       canGenerateImages={

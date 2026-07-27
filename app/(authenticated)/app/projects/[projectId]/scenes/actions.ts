@@ -13,6 +13,10 @@ import {
   assignSceneCharactersSchema,
   projectCastMemberSchema,
 } from "@/lib/schemas/character";
+import {
+  clearSceneAnimationDirection,
+  setSceneAnimationDirection,
+} from "@/db/commands/scene-animation-commands";
 import type { sceneAnalysisTask } from "@/trigger/scene-analysis";
 import { findProject } from "@/db/repositories/projects.repository";
 import {
@@ -35,7 +39,9 @@ import {
   approveAllScenesSchema,
   approveSceneSchema,
   approveScriptVersionSchema,
+  clearSceneAnimationDirectionSchema,
   reconcileSceneAnalysisSchema,
+  setSceneAnimationDirectionSchema,
   startSceneAnalysisSchema,
   updateSceneSchema,
 } from "@/lib/schemas/scene";
@@ -97,6 +103,63 @@ export async function assignSceneCharactersAction(
     return {
       success: false,
       error: "The scene characters could not be assigned.",
+    };
+  }
+}
+
+export async function setSceneAnimationDirectionAction(
+  formData: FormData,
+): Promise<SceneActionState> {
+  const parsed = setSceneAnimationDirectionSchema.safeParse(
+    Object.fromEntries(formData),
+  );
+  if (!parsed.success)
+    return { success: false, error: "Invalid animation direction." };
+  try {
+    const { context } = await requireProjectMutation(
+      parsed.data.projectId,
+      "editScenes",
+    );
+    await setSceneAnimationDirection({
+      workspaceId: context.activeMembership.workspaceId,
+      projectId: parsed.data.projectId,
+      sceneVersionId: parsed.data.sceneVersionId,
+      characterId: parsed.data.characterId,
+      createdByUserId: context.user.id,
+    });
+    revalidatePath(`/app/projects/${parsed.data.projectId}/scenes`);
+    return { success: true, error: null };
+  } catch {
+    return {
+      success: false,
+      error: "The animation direction could not be saved.",
+    };
+  }
+}
+
+export async function clearSceneAnimationDirectionAction(
+  formData: FormData,
+): Promise<SceneActionState> {
+  const parsed = clearSceneAnimationDirectionSchema.safeParse(
+    Object.fromEntries(formData),
+  );
+  if (!parsed.success)
+    return { success: false, error: "Invalid animation direction." };
+  try {
+    const { context } = await requireProjectMutation(
+      parsed.data.projectId,
+      "editScenes",
+    );
+    await clearSceneAnimationDirection({
+      workspaceId: context.activeMembership.workspaceId,
+      sceneVersionId: parsed.data.sceneVersionId,
+    });
+    revalidatePath(`/app/projects/${parsed.data.projectId}/scenes`);
+    return { success: true, error: null };
+  } catch {
+    return {
+      success: false,
+      error: "The animation direction could not be cleared.",
     };
   }
 }

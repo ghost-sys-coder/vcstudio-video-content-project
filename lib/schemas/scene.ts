@@ -45,5 +45,18 @@ export const approveSceneSchema = z.object({
 
 export const approveAllScenesSchema = z.object({ projectId: z.uuid() });
 
+export const setSceneAnimationDirectionSchema = z.object({
+  projectId: z.uuid(),
+  sceneId: z.uuid(),
+  sceneVersionId: z.uuid(),
+  characterId: z.uuid(),
+});
+
+export const clearSceneAnimationDirectionSchema = z.object({
+  projectId: z.uuid(),
+  sceneId: z.uuid(),
+  sceneVersionId: z.uuid(),
+});
+
 export type SceneContent = z.infer<typeof sceneContentSchema>;
 export type SceneAnalysisOutput = z.infer<typeof sceneAnalysisOutputSchema>;
