@@ -35,6 +35,8 @@ export function GenerateCharacterPortraitDialog({
   const [pending, startTransition] = useTransition();
 
   const selectedView = views.find((view) => view.type === selected) ?? views[0];
+  const identityViews = views.filter((view) => !view.type.startsWith("pose"));
+  const poseViews = views.filter((view) => view.type.startsWith("pose"));
 
   function generate() {
     startTransition(async () => {
@@ -71,26 +73,59 @@ export function GenerateCharacterPortraitDialog({
             used automatically in scenes.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-2">
-          {views.map((view) => (
-            <label
-              className="flex items-center justify-between gap-3 rounded-lg border p-3"
-              key={view.type}
-            >
-              <span className="flex items-center gap-3">
-                <input
-                  checked={selected === view.type}
-                  name="portrait-view"
-                  onChange={() => setSelected(view.type)}
-                  type="radio"
-                />
-                <span className="text-sm font-medium">{view.label}</span>
-              </span>
-              <span className="text-xs text-muted-foreground">
-                ~{formatCents(view.estimatedCostCents)}
-              </span>
-            </label>
-          ))}
+        <div className="max-h-80 space-y-3 overflow-y-auto pr-1">
+          {identityViews.length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">
+                Identity portraits
+              </p>
+              {identityViews.map((view) => (
+                <label
+                  className="flex items-center justify-between gap-3 rounded-lg border p-3"
+                  key={view.type}
+                >
+                  <span className="flex items-center gap-3">
+                    <input
+                      checked={selected === view.type}
+                      name="portrait-view"
+                      onChange={() => setSelected(view.type)}
+                      type="radio"
+                    />
+                    <span className="text-sm font-medium">{view.label}</span>
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    ~{formatCents(view.estimatedCostCents)}
+                  </span>
+                </label>
+              ))}
+            </div>
+          ) : null}
+          {poseViews.length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">
+                Animation poses
+              </p>
+              {poseViews.map((view) => (
+                <label
+                  className="flex items-center justify-between gap-3 rounded-lg border p-3"
+                  key={view.type}
+                >
+                  <span className="flex items-center gap-3">
+                    <input
+                      checked={selected === view.type}
+                      name="portrait-view"
+                      onChange={() => setSelected(view.type)}
+                      type="radio"
+                    />
+                    <span className="text-sm font-medium">{view.label}</span>
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    ~{formatCents(view.estimatedCostCents)}
+                  </span>
+                </label>
+              ))}
+            </div>
+          ) : null}
         </div>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         <DialogFooter showCloseButton>

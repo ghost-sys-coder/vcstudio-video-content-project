@@ -48,6 +48,18 @@ export interface RenderSceneAudioData {
   trimBeforeFrames?: number;
 }
 
+// Object keys for a scene's four pose stills (idle/talk-open/talk-closed/
+// blink), used to swap poses during animated-character rendering instead of
+// showing `image` as a single static still. `image` is still populated
+// (with the idle pose) when this is present, so thumbnails/fallbacks that
+// only know about `image` keep working unchanged.
+export interface RenderAnimatedCharacterData {
+  idleObjectKey: string;
+  talkOpenObjectKey: string;
+  talkClosedObjectKey: string;
+  blinkObjectKey: string;
+}
+
 export interface RenderSceneData {
   sceneId: string;
   sceneNumber: number;
@@ -60,6 +72,7 @@ export interface RenderSceneData {
   transition: RenderSceneTransition;
   image: RenderSceneImageData;
   audio: RenderSceneAudioData;
+  animatedCharacter?: RenderAnimatedCharacterData;
   captions: RenderCaptionData[];
 }
 

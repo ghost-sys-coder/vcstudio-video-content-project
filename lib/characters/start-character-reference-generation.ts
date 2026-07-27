@@ -9,7 +9,10 @@ import {
   type CharacterReferenceView,
 } from "@studio/prompts";
 import type { CharacterReferenceType } from "@/db/schema";
-import { findCharacter } from "@/db/repositories/characters.repository";
+import {
+  findCharacter,
+  listCharacterReferences,
+} from "@/db/repositories/characters.repository";
 import {
   findPromptTemplateVersion,
   getWorkspaceCommittedCostCents,
@@ -38,19 +41,34 @@ import type { characterReferenceGenerationTask } from "@/trigger/character-refer
 // many a single character can accumulate to keep spend and storage bounded.
 export const MAX_CHARACTER_REFERENCE_GENERATIONS_PER_CHARACTER = 12;
 
-// Only canonical identity views can be generated (expression/outfit/pose stay
-// upload-only); each maps to a supported OpenAI portrait size.
+// Canonical identity views, plus the four animation pose stills, can be
+// generated (the generic expression/outfit/pose categories stay upload-only);
+// each maps to a supported OpenAI portrait size.
 const generatableReferenceViews: CharacterReferenceView[] = [
   "master",
   "front",
   "threeQuarter",
   "side",
   "fullBody",
+  "poseIdle",
+  "poseTalkOpen",
+  "poseTalkClosed",
+  "poseBlink",
 ];
+
+// The four pose kinds must share one fixed canvas so they line up as a
+// swappable set (see the pose-consistency clause in the prompt template).
+const animationPoseViews = new Set<CharacterReferenceView>([
+  "poseIdle",
+  "poseTalkOpen",
+  "poseTalkClosed",
+  "poseBlink",
+]);
 
 const PORTRAIT_QUALITY = "medium" as const;
 
 function portraitSize(view: CharacterReferenceView): "1024x1536" | "1024x1024" {
+  if (animationPoseViews.has(view)) return "1024x1024";
   return view === "fullBody" ? "1024x1536" : "1024x1024";
 }
 
@@ -116,7 +134,7 @@ export async function startCharacterReferenceGeneration(input: {
     );
   if (!isGeneratableView(input.referenceType))
     throw new CharacterReferenceGenerationRequestError(
-      "Only master, front, three-quarter, side, and full-body portraits can be generated.",
+      "Only master, front, three-quarter, side, full-body, and animation pose portraits can be generated.",
     );
 
   const existing = await findCharacterReferenceGenerationByRequestNonce({
@@ -158,6 +176,19 @@ export async function startCharacterReferenceGeneration(input: {
       "The character reference prompt template is unavailable.",
     );
 
+  // Every portrait is generated as an edit anchored to the character's own
+  // existing reference images (see `resolveCharacterReferenceInputs` in the
+  // Trigger task), so the estimate must reserve for however many will
+  // actually be attached, capped the same way the task caps them.
+  const existingReferences = await listCharacterReferences({
+    workspaceId: input.workspaceId,
+    characterId: input.characterId,
+  });
+  const referenceAssetCount = Math.min(
+    existingReferences.length,
+    environment.MAX_REFERENCE_ASSETS_PER_GENERATION,
+  );
+
   const size = portraitSize(input.referenceType);
   const dimensions = portraitDimensions(size);
   const finalPrompt = renderCharacterReferencePrompt({
@@ -180,7 +211,7 @@ export async function startCharacterReferenceGeneration(input: {
     prompt: finalPrompt,
     quality: PORTRAIT_QUALITY,
     size,
-    referenceAssetCount: 0,
+    referenceAssetCount,
     outputCostMatrix: createSceneImageOutputCostMatrix(environment),
     textInputCostPerMillionCents:
       environment.OPENAI_IMAGE_TEXT_INPUT_COST_PER_MILLION_CENTS,

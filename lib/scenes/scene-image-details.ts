@@ -37,6 +37,10 @@ const referenceTypeLabels = {
   expression: "Expression reference",
   outfit: "Outfit reference",
   pose: "Pose reference",
+  poseIdle: "Animation pose: idle",
+  poseTalkOpen: "Animation pose: talking (mouth open)",
+  poseTalkClosed: "Animation pose: talking (mouth closed)",
+  poseBlink: "Animation pose: blinking",
 } as const satisfies Record<CharacterReferenceType, string>;
 
 function formatCreatedAt(value: Date): string {

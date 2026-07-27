@@ -20,6 +20,7 @@ import {
 import { BudgetExceededError } from "@/lib/domain/errors";
 import { getRenderEnvironment } from "@/lib/env/server";
 import { buildRenderTimelineSnapshot } from "@/lib/render/build-render-snapshot";
+import { resolveAnimatedCharactersBySceneVersion } from "@/lib/render/resolve-animated-characters";
 import { defaultPresetForAspectRatio } from "@/lib/render/render-formats";
 import { estimateRenderCostCents } from "@/lib/render/render-cost";
 import { validateRenderDuration } from "@/lib/render/render-duration";
@@ -147,11 +148,17 @@ export async function startVideoRender(input: {
     }).timeline;
   }
 
+  const animatedCharactersBySceneVersionId =
+    await resolveAnimatedCharactersBySceneVersion({
+      workspaceId: input.workspaceId,
+      timeline: renderTimeline,
+    });
   const snapshot = buildRenderTimelineSnapshot({
     timeline: renderTimeline,
     captionStyle: context.captionStyle,
     includeCaptions: input.includeCaptions,
     includeWatermark: input.includeWatermark,
+    animatedCharactersBySceneVersionId,
   });
 
   const effectiveLimits = await loadEffectiveWorkspaceLimits({

@@ -14,6 +14,13 @@ import type {
  * components can share them in both the browser preview (via @remotion/player)
  * and the render worker bundle without pulling in server-only code.
  */
+export type VideoCompositionAnimatedCharacter = {
+  idleUrl: string;
+  talkOpenUrl: string;
+  talkClosedUrl: string;
+  blinkUrl: string;
+};
+
 export type VideoCompositionScene = {
   sceneId: string;
   sceneNumber: number;
@@ -31,6 +38,7 @@ export type VideoCompositionScene = {
   };
   audioUrl: string;
   audioTrimBeforeFrames?: number;
+  animatedCharacter?: VideoCompositionAnimatedCharacter;
   captions: RenderCaptionData[];
 };
 

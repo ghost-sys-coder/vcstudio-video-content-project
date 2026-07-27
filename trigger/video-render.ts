@@ -144,6 +144,14 @@ export const videoRenderTask = task({
     const objectKeys = render.timelineSnapshot.scenes.flatMap((scene) => [
       scene.image.objectKey,
       scene.audio.objectKey,
+      ...(scene.animatedCharacter
+        ? [
+            scene.animatedCharacter.idleObjectKey,
+            scene.animatedCharacter.talkOpenObjectKey,
+            scene.animatedCharacter.talkClosedObjectKey,
+            scene.animatedCharacter.blinkObjectKey,
+          ]
+        : []),
     ]);
     // Sign for the full render window, not the short default download TTL. The
     // worker downloads Chromium, bundles the composition, and renders every

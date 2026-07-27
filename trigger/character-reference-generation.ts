@@ -11,6 +11,7 @@ import {
   failCharacterReferenceGeneration,
 } from "@/db/commands/character-reference-generation.command";
 import { findCharacterReferenceGeneration } from "@/db/repositories/character-reference-generation.repository";
+import { listCharacterReferences } from "@/db/repositories/characters.repository";
 import { findPromptTemplateVersion } from "@/db/repositories/scene-images.repository";
 import {
   calculateActualSceneImageCostCents,
@@ -18,12 +19,70 @@ import {
 } from "@/lib/costs/scene-image-cost";
 import { getSceneImageEnvironment } from "@/lib/env/server";
 import { classifyImageGenerationError } from "@/lib/openai/image-generation-error";
+import type { ImageGenerationReference } from "@/lib/openai/image-generation-provider";
 import { OpenAiImageGenerationProvider } from "@/lib/openai/openai-image-generation-provider";
 import { createCharacterReferenceObjectKey } from "@/lib/storage/object-key";
 import {
   deleteCharacterReferenceObject,
   putCharacterReferenceImage,
 } from "@/lib/storage/character-reference-storage";
+import { downloadSceneImageReferences } from "@/lib/storage/scene-image-storage";
+
+// Every portrait — identity views and animation poses alike — is generated as
+// an edit anchored to the character's own already-uploaded/generated
+// reference images, not from text alone. Master and front are prioritized
+// (they carry the clearest identity signal); everything else the character
+// has (expression, outfit, other views, other poses) fills the remaining
+// slots up to the configured per-generation cap, most recent first.
+const referencePriorityTypes = ["master", "front"];
+
+async function resolveCharacterReferenceInputs(input: {
+  workspaceId: string;
+  characterId: string;
+  maximumCount: number;
+  maximumTotalBytes: number;
+}): Promise<ImageGenerationReference[]> {
+  const existing = await listCharacterReferences({
+    workspaceId: input.workspaceId,
+    characterId: input.characterId,
+  });
+  if (existing.length === 0) return [];
+
+  // `listCharacterReferences` already orders most-recent-first; a stable sort
+  // that only promotes master/front preserves that recency order otherwise.
+  const prioritized = [...existing].sort((left, right) => {
+    const leftRank = referencePriorityTypes.indexOf(left.type);
+    const rightRank = referencePriorityTypes.indexOf(right.type);
+    if (leftRank === rightRank) return 0;
+    if (leftRank === -1) return 1;
+    if (rightRank === -1) return -1;
+    return leftRank - rightRank;
+  });
+  const selected = prioritized.slice(0, input.maximumCount);
+
+  return downloadSceneImageReferences({
+    references: selected.map((asset) => ({
+      referenceAssetIdSnapshot: asset.id,
+      objectKeySnapshot: asset.objectKey,
+      contentTypeSnapshot: asset.contentType,
+      etagSnapshot: asset.etag ?? "",
+    })),
+    maximumTotalBytes: input.maximumTotalBytes,
+  }).catch((error: unknown) => {
+    // A reference-fetch failure (e.g. a legacy asset missing its etag) must
+    // not block the whole portrait; it degrades to a text-only generation
+    // rather than failing the request outright.
+    console.error(
+      "Character reference inputs could not be resolved; generating without them.",
+      {
+        workspaceId: input.workspaceId,
+        characterId: input.characterId,
+        error: error instanceof Error ? error.message : error,
+      },
+    );
+    return [];
+  });
+}
 
 export const characterReferenceGenerationTaskPayloadSchema = z.object({
   generationId: z.uuid(),
@@ -104,6 +163,13 @@ export const characterReferenceGenerationTask = task({
       return { generationId: generation.id, status: "failed" as const };
     }
 
+    const referenceInputs = await resolveCharacterReferenceInputs({
+      workspaceId: generation.workspaceId,
+      characterId: generation.characterId,
+      maximumCount: environment.MAX_REFERENCE_ASSETS_PER_GENERATION,
+      maximumTotalBytes: environment.MAX_REFERENCE_BYTES_PER_GENERATION,
+    });
+
     const provider = new OpenAiImageGenerationProvider({
       apiKey: environment.OPENAI_API_KEY,
       timeoutMilliseconds: environment.OPENAI_REQUEST_TIMEOUT_SECONDS * 1_000,
@@ -123,7 +189,7 @@ export const characterReferenceGenerationTask = task({
         outputCompression: generation.outputCompression,
         background: z.enum(["opaque", "auto"]).parse(generation.background),
         endUserId: generation.requestedByUserId,
-        references: [],
+        references: referenceInputs,
       });
     } catch (error) {
       const failure = classifyImageGenerationError(error);

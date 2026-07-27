@@ -12,6 +12,7 @@ import { estimateSceneImageCost } from "@/lib/costs/scene-image-cost";
 import { getSceneImageEnvironment } from "@/lib/env/server";
 import { createSceneImageOutputCostMatrix } from "@/lib/scenes/scene-image-configuration";
 import { listCharacterReferenceGenerations } from "@/db/repositories/character-reference-generation.repository";
+import { listCharacterReferences } from "@/db/repositories/characters.repository";
 
 export type PortraitViewOption = {
   type: CharacterReferenceView;
@@ -42,6 +43,10 @@ const viewLabels: Record<CharacterReferenceView, string> = {
   threeQuarter: "Three-quarter view",
   side: "Side view",
   fullBody: "Full-body view",
+  poseIdle: "Animation pose: idle",
+  poseTalkOpen: "Animation pose: talking (mouth open)",
+  poseTalkClosed: "Animation pose: talking (mouth closed)",
+  poseBlink: "Animation pose: blinking",
 };
 
 const generatableViews: CharacterReferenceView[] = [
@@ -50,9 +55,21 @@ const generatableViews: CharacterReferenceView[] = [
   "threeQuarter",
   "side",
   "fullBody",
+  "poseIdle",
+  "poseTalkOpen",
+  "poseTalkClosed",
+  "poseBlink",
 ];
 
+const animationPoseViews = new Set<CharacterReferenceView>([
+  "poseIdle",
+  "poseTalkOpen",
+  "poseTalkClosed",
+  "poseBlink",
+]);
+
 function sizeForView(view: CharacterReferenceView): "1024x1536" | "1024x1024" {
+  if (animationPoseViews.has(view)) return "1024x1024";
   return view === "fullBody" ? "1024x1536" : "1024x1024";
 }
 
@@ -68,6 +85,18 @@ export async function loadCharacterPortraitView(input: {
 }): Promise<CharacterPortraitView> {
   const environment = getSceneImageEnvironment();
   const outputCostMatrix = createSceneImageOutputCostMatrix(environment);
+  // Every portrait is generated as an edit anchored to the character's own
+  // existing reference images, so the displayed estimate must reserve for
+  // however many will actually be attached (see `resolveCharacterReferenceInputs`
+  // in the Trigger task), capped the same way the task caps them.
+  const existingReferences = await listCharacterReferences({
+    workspaceId: input.workspaceId,
+    characterId: input.character.id,
+  });
+  const referenceAssetCount = Math.min(
+    existingReferences.length,
+    environment.MAX_REFERENCE_ASSETS_PER_GENERATION,
+  );
   const views = generatableViews.map((view) => {
     const size = sizeForView(view);
     const prompt = renderCharacterReferencePrompt({
@@ -89,7 +118,7 @@ export async function loadCharacterPortraitView(input: {
       prompt,
       quality: "medium",
       size,
-      referenceAssetCount: 0,
+      referenceAssetCount,
       outputCostMatrix,
       textInputCostPerMillionCents:
         environment.OPENAI_IMAGE_TEXT_INPUT_COST_PER_MILLION_CENTS,

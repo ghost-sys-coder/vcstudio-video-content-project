@@ -40,6 +40,10 @@ export const generatableCharacterReferenceTypes = [
   "threeQuarter",
   "side",
   "fullBody",
+  "poseIdle",
+  "poseTalkOpen",
+  "poseTalkClosed",
+  "poseBlink",
 ] as const;
 
 export const generateCharacterReferenceSchema = z.object({

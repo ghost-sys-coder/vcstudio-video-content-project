@@ -7,6 +7,10 @@ export const singleCharacterReferenceTypes = new Set<CharacterReferenceType>([
   "threeQuarter",
   "side",
   "fullBody",
+  "poseIdle",
+  "poseTalkOpen",
+  "poseTalkClosed",
+  "poseBlink",
 ]);
 
 export function createCharacterSlug(name: string): string {
