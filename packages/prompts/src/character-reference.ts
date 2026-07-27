@@ -1,19 +1,42 @@
-export const CHARACTER_REFERENCE_PROMPT_VERSION = "character-reference-v1";
+export const CHARACTER_REFERENCE_PROMPT_VERSION = "character-reference-v2";
 
 // SHA-256 of CHARACTER_REFERENCE_PROMPT_TEMPLATE_SOURCE. Any change to the
-// template's meaning must bump the version and this hash and ship a matching
-// `prompt_template_versions` seed migration, or generation fails
+// template's meaning must bump the version and this hash, or generation fails
 // `prompt_template_mismatch` (reproducibility guard, mirroring scene images).
+// No migration is needed for the version bump itself — `ensureCharacterReferencePromptTemplate`
+// inserts each new (templateKey, version) row at request time.
 export const CHARACTER_REFERENCE_PROMPT_TEMPLATE_SOURCE_HASH =
-  "ce418585988fd5824d4d947daf9f839807d165611b844e16f8a8054b760bcc1e";
+  "893859100fddfe6cdaa9e01b35d23fe34e3e63e36a96ac468e8858b710d9ce1a";
 
 export const CHARACTER_REFERENCE_PROMPT_TEMPLATE_SOURCE = `VCStudio character reference portrait prompt
 Layers: global portrait framing, character identity, face, hair, skin tone,
 body proportions, default outfit, requested reference view, negative
-constraints, output dimensions, and text exclusion.`;
+constraints, output dimensions, and text exclusion. Animation pose views
+(poseIdle, poseTalkOpen, poseTalkClosed, poseBlink) additionally require
+pixel-for-pixel matched camera distance, framing, scale, and crop across the
+set, since they are swapped during playback rather than shown individually.`;
 
 export type CharacterReferenceView =
-  "master" | "front" | "threeQuarter" | "side" | "fullBody";
+  | "master"
+  | "front"
+  | "threeQuarter"
+  | "side"
+  | "fullBody"
+  | "poseIdle"
+  | "poseTalkOpen"
+  | "poseTalkClosed"
+  | "poseBlink";
+
+// The four pose kinds must line up as a matched set (same camera distance,
+// framing, scale, crop) since they're swapped frame-to-frame during
+// animation playback — unlike the five identity views above, which are shown
+// individually and only need consistent *identity*, not consistent *scale*.
+const animationPoseViews = new Set<CharacterReferenceView>([
+  "poseIdle",
+  "poseTalkOpen",
+  "poseTalkClosed",
+  "poseBlink",
+]);
 
 export type CharacterReferencePromptCharacter = {
   name: string;
@@ -46,6 +69,14 @@ const viewFraming: Record<CharacterReferenceView, string> = {
   side: "A side profile (approximately 90 degree) view character portrait.",
   fullBody:
     "A full-body, head-to-toe, front-facing character portrait showing the complete outfit and proportions.",
+  poseIdle:
+    "A relaxed neutral idle pose for this character: standing or sitting comfortably, arms at ease, mouth gently closed, eyes open, facing the camera.",
+  poseTalkOpen:
+    "The exact same pose, camera distance, and framing as this character's idle pose, but with the mouth open mid-speech as if actively talking.",
+  poseTalkClosed:
+    "The exact same pose, camera distance, and framing as this character's idle pose, with the mouth gently closed as if between words while talking.",
+  poseBlink:
+    "The exact same pose, camera distance, and framing as this character's idle pose, with the eyes closed as if mid-blink.",
 };
 
 function escapePromptValue(value: string): string {
@@ -90,6 +121,9 @@ export function renderCharacterReferencePrompt(
     "<global_portrait_framing>",
     viewFraming[input.referenceType],
     "Render exactly one character, centered, on a plain neutral studio background with soft, even lighting. This is a reusable identity reference, not a scene.",
+    animationPoseViews.has(input.referenceType)
+      ? "This portrait is one of a matched set of pose stills for this character (idle, talking mouth-open, talking mouth-closed, blinking) that will be swapped during animation — keep camera distance, framing, scale, crop, and background pixel-for-pixel identical across the set, as if the camera never moved between shots."
+      : null,
     "</global_portrait_framing>",
     "<character_identity>",
     identity.length > 0
@@ -110,5 +144,7 @@ export function renderCharacterReferencePrompt(
     `- Output dimensions: ${input.output.width}x${input.output.height} pixels.`,
     "- No text, letters, numbers, logos, or watermarks anywhere in the image.",
     "</output_requirements>",
-  ].join("\n");
+  ]
+    .filter((line): line is string => line !== null)
+    .join("\n");
 }

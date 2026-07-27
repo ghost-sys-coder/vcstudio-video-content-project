@@ -13,6 +13,10 @@ export const characterReferenceTypeLabels: Record<
   expression: "Expression reference",
   outfit: "Outfit reference",
   pose: "Pose reference",
+  poseIdle: "Animation pose: idle",
+  poseTalkOpen: "Animation pose: talking (mouth open)",
+  poseTalkClosed: "Animation pose: talking (mouth closed)",
+  poseBlink: "Animation pose: blinking",
 };
 
 const characterReferenceTypes = [
@@ -24,6 +28,10 @@ const characterReferenceTypes = [
   "expression",
   "outfit",
   "pose",
+  "poseIdle",
+  "poseTalkOpen",
+  "poseTalkClosed",
+  "poseBlink",
 ] as const satisfies readonly CharacterReferenceType[];
 
 export function CharacterReferenceTypeSelector({

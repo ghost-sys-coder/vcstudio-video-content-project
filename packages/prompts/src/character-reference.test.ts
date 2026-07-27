@@ -31,7 +31,7 @@ describe("character reference prompt", () => {
         .update(CHARACTER_REFERENCE_PROMPT_TEMPLATE_SOURCE)
         .digest("hex"),
     ).toBe(CHARACTER_REFERENCE_PROMPT_TEMPLATE_SOURCE_HASH);
-    expect(CHARACTER_REFERENCE_PROMPT_VERSION).toBe("character-reference-v1");
+    expect(CHARACTER_REFERENCE_PROMPT_VERSION).toBe("character-reference-v2");
   });
 
   it("renders deterministically with every identity and framing layer", () => {
@@ -56,5 +56,21 @@ describe("character reference prompt", () => {
     expect(front).not.toBe(fullBody);
     expect(fullBody).toContain("full-body");
     expect(fullBody).toContain("- Requested view: fullBody");
+  });
+
+  it("adds the matched-set consistency clause only for animation pose views", () => {
+    const front = renderCharacterReferencePrompt(input);
+    const poseIdle = renderCharacterReferencePrompt({
+      ...input,
+      referenceType: "poseIdle",
+    });
+    const poseTalkOpen = renderCharacterReferencePrompt({
+      ...input,
+      referenceType: "poseTalkOpen",
+    });
+    expect(front).not.toContain("matched set of pose stills");
+    expect(poseIdle).toContain("matched set of pose stills");
+    expect(poseTalkOpen).toContain("matched set of pose stills");
+    expect(poseTalkOpen).toContain("mouth open mid-speech");
   });
 });
