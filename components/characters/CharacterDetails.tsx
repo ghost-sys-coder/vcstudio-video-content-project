@@ -3,6 +3,7 @@ import type { CharacterPortraitView } from "@/lib/characters/character-reference
 import { ArchiveCharacterDialog } from "@/components/characters/ArchiveCharacterDialog";
 import { CharacterForm } from "@/components/characters/CharacterForm";
 import { CharacterPortraitGenerationList } from "@/components/characters/CharacterPortraitGenerationList";
+import { CharacterPortraitStatusPoller } from "@/components/characters/CharacterPortraitStatusPoller";
 import { CharacterReferenceGallery } from "@/components/characters/CharacterReferenceGallery";
 import { CharacterReferenceUploader } from "@/components/characters/CharacterReferenceUploader";
 import { CharacterStatusBadge } from "@/components/characters/CharacterStatusBadge";
@@ -83,7 +84,14 @@ export function CharacterDetails({
             ) : null}
           </div>
           {portrait.enabled ? (
-            <CharacterPortraitGenerationList rows={portrait.recent} />
+            <>
+              <CharacterPortraitStatusPoller
+                hasPending={portrait.recent.some(
+                  (row) => row.status === "queued" || row.status === "running",
+                )}
+              />
+              <CharacterPortraitGenerationList rows={portrait.recent} />
+            </>
           ) : (
             <p className="rounded-xl border bg-muted/30 p-4 text-sm text-muted-foreground">
               Portrait generation is disabled by server configuration.
