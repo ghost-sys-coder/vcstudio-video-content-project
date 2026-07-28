@@ -67,6 +67,23 @@ export function createVoicePreviewObjectKey(input: {
   return `system/voice-previews/${safe(input.model)}/${safe(input.voice)}/${safe(input.sampleHash)}.mp3`;
 }
 
+/**
+ * The single R2 prefix every project-scoped asset lives under — renders,
+ * thumbnails, scene images, and scene audio all nest beneath it (see the key
+ * builders below, which must all keep starting with this).
+ *
+ * Deliberately does NOT cover character references
+ * (`workspaces/{ws}/characters/...`), workspace logos, or voice previews: those
+ * are workspace-level or shared assets that outlive any one project, so purging
+ * this prefix when a project is deleted can never take them with it.
+ */
+export function createProjectAssetPrefix(input: {
+  workspaceId: string;
+  projectId: string;
+}): string {
+  return `workspaces/${input.workspaceId}/projects/${input.projectId}/`;
+}
+
 export function createVideoExportObjectKey(input: {
   workspaceId: string;
   projectId: string;

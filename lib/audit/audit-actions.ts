@@ -10,6 +10,7 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   role_changed: "Member role changed",
   project_archived: "Project archived",
   project_restored: "Project restored",
+  project_deleted: "Project deleted",
   script_restored: "Script version restored",
   scene_approved: "Scene approved",
   asset_approved: "Asset approved",

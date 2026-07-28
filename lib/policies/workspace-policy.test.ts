@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   can,
   canCreateProject,
+  canDeleteProject,
   canEditProject,
   canManageMembers,
   canManageWorkspace,
@@ -61,5 +62,25 @@ describe("workspace policy", () => {
     expect(() => requireCapability("viewer", "manageUsage")).toThrow(
       WorkspacePermissionDeniedError,
     );
+  });
+
+  it("gates permanent project deletion to owners only", () => {
+    // Stricter than every other destructive capability, including
+    // deleteScriptVersions: deletion erases stored assets and publish history
+    // with no archive or restore path back.
+    expect(can("owner", "deleteProjects")).toBe(true);
+    expect(can("editor", "deleteProjects")).toBe(false);
+    expect(can("viewer", "deleteProjects")).toBe(false);
+    expect(canDeleteProject("owner")).toBe(true);
+    expect(canDeleteProject("editor")).toBe(false);
+    for (const role of ["editor", "viewer"] as const)
+      expect(() => requireCapability(role, "deleteProjects")).toThrow(
+        WorkspacePermissionDeniedError,
+      );
+  });
+
+  it("still lets editors edit the projects they cannot delete", () => {
+    expect(canEditProject("editor")).toBe(true);
+    expect(canDeleteProject("editor")).toBe(false);
   });
 });

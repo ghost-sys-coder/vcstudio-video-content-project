@@ -39,7 +39,7 @@ export function WorkspaceChannelCard({
               channel.platform === "facebook"
                 ? "bg-[#1877f2]"
                 : channel.platform === "instagram"
-                  ? "bg-gradient-to-br from-[#833ab4] via-[#e1306c] to-[#f77737]"
+                  ? "bg-linear-to-br from-[#833ab4] via-[#e1306c] to-[#f77737]"
                   : channel.platform === "tiktok"
                     ? "bg-black"
                     : "bg-[#e60000]"

@@ -12,6 +12,7 @@ const workspaceCapabilities = {
     editScenes: true,
     approveScenes: true,
     deleteScriptVersions: true,
+    deleteProjects: true,
     manageCharacters: true,
     generateSceneImages: true,
     reviewSceneImages: true,
@@ -32,6 +33,10 @@ const workspaceCapabilities = {
     editScenes: true,
     approveScenes: true,
     deleteScriptVersions: true,
+    // Owner-only, unlike the other destructive capabilities: deleting a project
+    // permanently erases its stored assets and its publish history, and is the
+    // one action in the app with no archive/restore path back.
+    deleteProjects: false,
     manageCharacters: true,
     generateSceneImages: true,
     reviewSceneImages: true,
@@ -52,6 +57,7 @@ const workspaceCapabilities = {
     editScenes: false,
     approveScenes: false,
     deleteScriptVersions: false,
+    deleteProjects: false,
     manageCharacters: false,
     generateSceneImages: false,
     reviewSceneImages: false,
@@ -91,3 +97,5 @@ export const canManageWorkspace = (role: WorkspaceRole) =>
   can(role, "manageSettings");
 export const canManageMembers = (role: WorkspaceRole) =>
   can(role, "manageMembers");
+export const canDeleteProject = (role: WorkspaceRole) =>
+  can(role, "deleteProjects");

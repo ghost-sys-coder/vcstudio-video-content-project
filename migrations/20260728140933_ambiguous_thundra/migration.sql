@@ -1,0 +1,1 @@
+ALTER TYPE "audit_action" ADD VALUE 'project_deleted' BEFORE 'script_restored';

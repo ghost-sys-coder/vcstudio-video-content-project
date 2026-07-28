@@ -31,12 +31,19 @@ import {
 import {
   BudgetExceededError,
   RateLimitExceededError,
+  WorkspacePermissionDeniedError,
 } from "@/lib/domain/errors";
+import {
+  deleteProjectPermanently,
+  ProjectDeletionError,
+} from "@/lib/projects/delete-project-permanently";
+import { ProjectAssetPurgeError } from "@/lib/storage/project-asset-storage";
 import {
   briefSchema,
   createProjectSchema,
   createScriptContentSchema,
   createScriptVersionSchema,
+  deleteProjectSchema,
   deleteScriptVersionSchema,
   restoreScriptVersionSchema,
   scriptMutationSchema,
@@ -59,6 +66,47 @@ async function requireProjectMutation(projectId: string) {
   });
   if (!project) throw new Error("Project not found.");
   return { context, project };
+}
+
+/**
+ * Permanently deletes a project and everything stored for it.
+ *
+ * Gated by the owner-only `deleteProjects` capability on top of the usual
+ * project-mutation check — this is the one action in the app with no archive or
+ * restore path back.
+ */
+export async function deleteProjectAction(
+  formData: FormData,
+): Promise<ProjectActionState> {
+  const parsed = deleteProjectSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: "Invalid project.", success: false };
+  try {
+    const { context, project } = await requireProjectMutation(
+      parsed.data.projectId,
+    );
+    requireCapability(context.activeMembership.role, "deleteProjects");
+    await deleteProjectPermanently({
+      workspaceId: context.activeMembership.workspaceId,
+      project,
+      actorUserId: context.user.id,
+    });
+  } catch (error) {
+    if (error instanceof WorkspacePermissionDeniedError)
+      return {
+        error: "Only workspace owners can delete a project.",
+        success: false,
+      };
+    if (
+      error instanceof ProjectAssetPurgeError ||
+      error instanceof ProjectDeletionError
+    )
+      return { error: error.message, success: false };
+    return { error: "The project could not be deleted.", success: false };
+  }
+  // Outside the try: a redirect works by throwing, so catching it here would
+  // report a successful deletion as a failure.
+  revalidatePath("/app/projects");
+  redirect("/app/projects");
 }
 
 export async function createProjectAction(
