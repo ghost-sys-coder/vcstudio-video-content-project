@@ -91,117 +91,127 @@ export function BulkGenerateDialog({
     !pending;
 
   return (
+    // Laid out as a column whose middle scrolls, so the cost summary and the
+    // confirm button stay on screen while the options above them scroll — on a
+    // short viewport this dialog is otherwise tall enough to push its own
+    // actions out of reach.
     <Dialog onOpenChange={onOpenChange} open={open}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[calc(100dvh-2rem)] flex-col overflow-y-hidden sm:max-w-md">
+        <DialogHeader className="shrink-0">
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium" htmlFor="bulk-style-preset">
-            Style preset
-          </label>
-          <select
-            className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm"
-            id="bulk-style-preset"
-            onChange={(event) => setStylePresetVersionId(event.target.value)}
-            value={stylePresetVersionId}
-          >
-            {stylePresets.map((preset) => (
-              <option key={preset.versionId} value={preset.versionId}>
-                {preset.name} v{preset.version}
-                {preset.isDefault ? " (default)" : ""}
-              </option>
-            ))}
-          </select>
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
+          <div className="space-y-2">
+            <label className="text-sm font-medium" htmlFor="bulk-style-preset">
+              Style preset
+            </label>
+            <select
+              className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm"
+              id="bulk-style-preset"
+              onChange={(event) => setStylePresetVersionId(event.target.value)}
+              value={stylePresetVersionId}
+            >
+              {stylePresets.map((preset) => (
+                <option key={preset.versionId} value={preset.versionId}>
+                  {preset.name} v{preset.version}
+                  {preset.isDefault ? " (default)" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-medium">Quality</legend>
+            <div className="grid grid-cols-2 gap-2">
+              {(
+                [
+                  [configuration.draftQuality, "Draft", "Lower cost"],
+                  [configuration.finalQuality, "Final", "Higher quality"],
+                ] as const
+              ).map(([value, label, hint]) => (
+                <button
+                  className={cn(
+                    "rounded-lg border p-3 text-left text-sm transition",
+                    quality === value
+                      ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                      : "border-input hover:bg-muted",
+                  )}
+                  key={value}
+                  onClick={() => setQuality(value)}
+                  type="button"
+                >
+                  <span className="block font-medium capitalize">{label}</span>
+                  <span className="block text-xs text-muted-foreground">
+                    {hint}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </fieldset>
+
+          <ImageSizeMultiSelect
+            disabled={pending}
+            id="bulk-image-sizes"
+            onChange={setSizes}
+            value={sizes}
+          />
         </div>
 
-        <fieldset className="space-y-2">
-          <legend className="text-sm font-medium">Quality</legend>
-          <div className="grid grid-cols-2 gap-2">
-            {(
-              [
-                [configuration.draftQuality, "Draft", "Lower cost"],
-                [configuration.finalQuality, "Final", "Higher quality"],
-              ] as const
-            ).map(([value, label, hint]) => (
-              <button
-                className={cn(
-                  "rounded-lg border p-3 text-left text-sm transition",
-                  quality === value
-                    ? "border-primary bg-primary/5 ring-1 ring-primary/30"
-                    : "border-input hover:bg-muted",
-                )}
-                key={value}
-                onClick={() => setQuality(value)}
-                type="button"
-              >
-                <span className="block font-medium capitalize">{label}</span>
-                <span className="block text-xs text-muted-foreground">
-                  {hint}
-                </span>
-              </button>
-            ))}
-          </div>
-        </fieldset>
+        {/* Pinned: what it costs and whether it can proceed must stay visible
+            alongside the button that spends the money. */}
+        <div className="shrink-0 space-y-4 border-t border-border pt-4">
+          <BulkGenerationSummary
+            availableBudgetCents={availableBudgetCents}
+            estimatedCostCents={estimatedCostCents}
+            maximumImagesPerBatch={configuration.maximumImagesPerBatch}
+            requestedImageCount={requestedImageCount}
+            sceneCount={sceneIds.length}
+            sizeCount={sizes.length}
+          />
 
-        <ImageSizeMultiSelect
-          disabled={pending}
-          id="bulk-image-sizes"
-          onChange={setSizes}
-          value={sizes}
-        />
+          <ManualConfirmationField
+            checked={confirmedHighCost}
+            disabled={pending}
+            estimatedCostCents={estimatedCostCents}
+            onChange={setConfirmedHighCost}
+            thresholdCents={configuration.manualConfirmationThresholdCents}
+          />
 
-        <BulkGenerationSummary
-          availableBudgetCents={availableBudgetCents}
-          estimatedCostCents={estimatedCostCents}
-          maximumImagesPerBatch={configuration.maximumImagesPerBatch}
-          requestedImageCount={requestedImageCount}
-          sceneCount={sceneIds.length}
-          sizeCount={sizes.length}
-        />
+          {error ? (
+            <p className="text-sm text-destructive" role="alert">
+              {error}
+            </p>
+          ) : null}
 
-        <ManualConfirmationField
-          checked={confirmedHighCost}
-          disabled={pending}
-          estimatedCostCents={estimatedCostCents}
-          onChange={setConfirmedHighCost}
-          thresholdCents={configuration.manualConfirmationThresholdCents}
-        />
-
-        {error ? (
-          <p className="text-sm text-destructive" role="alert">
-            {error}
-          </p>
-        ) : null}
-
-        <DialogFooter>
-          <DialogClose render={<Button variant="outline" />}>
-            Cancel
-          </DialogClose>
-          <Button
-            disabled={!canConfirm}
-            onClick={() =>
-              startTransition(async () => {
-                setError(null);
-                const result = await onGenerate({
-                  sceneIds,
-                  stylePresetVersionId,
-                  quality,
-                  sizes,
-                });
-                if (result.success) onOpenChange(false);
-                else setError(result.error);
-              })
-            }
-            type="button"
-          >
-            {pending
-              ? "Starting…"
-              : `Generate ${requestedImageCount} ${requestedImageCount === 1 ? "image" : "images"}`}
-          </Button>
-        </DialogFooter>
+          <DialogFooter>
+            <DialogClose render={<Button variant="outline" />}>
+              Cancel
+            </DialogClose>
+            <Button
+              disabled={!canConfirm}
+              onClick={() =>
+                startTransition(async () => {
+                  setError(null);
+                  const result = await onGenerate({
+                    sceneIds,
+                    stylePresetVersionId,
+                    quality,
+                    sizes,
+                  });
+                  if (result.success) onOpenChange(false);
+                  else setError(result.error);
+                })
+              }
+              type="button"
+            >
+              {pending
+                ? "Starting…"
+                : `Generate ${requestedImageCount} ${requestedImageCount === 1 ? "image" : "images"}`}
+            </Button>
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
