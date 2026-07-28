@@ -86,7 +86,7 @@ describe("scene image prompt", () => {
   it("renders every required layer deterministically with a source version", () => {
     const first = renderSceneImagePrompt(input);
     expect(renderSceneImagePrompt(input)).toBe(first);
-    expect(SCENE_IMAGE_PROMPT_VERSION).toBe("scene-image-v2");
+    expect(SCENE_IMAGE_PROMPT_VERSION).toBe("scene-image-v3");
     expect(first).toContain("<global_style_preset>");
     expect(first).toContain("<character_identity>");
     expect(first).toContain("<character_reference_requirements>");
@@ -106,6 +106,50 @@ describe("scene image prompt", () => {
     expect(prompt).toContain("clean, simple, and uncluttered");
     expect(prompt).toContain("single clear focal subject");
     expect(prompt).toContain("No cluttered, busy, or crowded compositions");
+  });
+
+  describe("background plate mode", () => {
+    const plate = () =>
+      renderSceneImagePrompt({ ...input, mode: "backgroundPlate" });
+
+    it("strips every character layer so the cast is not baked into the plate", () => {
+      const prompt = plate();
+      // The cast is composited over this still at render time; generating them
+      // into it too would show every character twice.
+      expect(prompt).toContain("Render no characters at all");
+      expect(prompt).toContain("No character references apply");
+      expect(prompt).not.toContain("Canonical visual identity");
+      expect(prompt).not.toContain("Reference image 1: Ada");
+    });
+
+    it("keeps the action as context only and forbids any human presence", () => {
+      const prompt = plate();
+      expect(prompt).toContain("for context only");
+      expect(prompt).toContain("Do not depict the action itself");
+      expect(prompt).toContain("Absolutely no people");
+      expect(prompt).toContain("silhouettes");
+    });
+
+    it("keeps the character area clear rather than demanding a dominant subject", () => {
+      const prompt = plate();
+      expect(prompt).toContain("Render an empty environment");
+      expect(prompt).toContain("characters are composited there");
+      expect(prompt).not.toContain("single clear focal subject");
+    });
+
+    it("still renders the setting, style, and output layers", () => {
+      const prompt = plate();
+      expect(prompt).toContain("<global_style_preset>");
+      expect(prompt).toContain("<scene_setting>");
+      expect(prompt).toContain("1536x1024");
+      expect(prompt).toContain("Do not render captions");
+    });
+
+    it("defaults to full scene mode when no mode is given", () => {
+      expect(renderSceneImagePrompt(input)).toBe(
+        renderSceneImagePrompt({ ...input, mode: "scene" }),
+      );
+    });
   });
 
   it("limits props to those the scene explicitly requires", () => {

@@ -1,5 +1,11 @@
-import type { Character, Scene, SceneVersion } from "@/db/schema";
+import type {
+  Character,
+  ProjectVideoKind,
+  Scene,
+  SceneVersion,
+} from "@/db/schema";
 import type { SceneImageIndicator } from "@/lib/scenes/scene-image-indicator";
+import type { SceneCharacterStaging } from "@/lib/scenes/scene-character-staging";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SceneImageIndicatorBadge } from "@/components/scenes/SceneImageIndicatorBadge";
 import { SceneStatusBadge } from "@/components/scenes/SceneStatusBadge";
@@ -15,20 +21,24 @@ export function SceneCard({
   canEdit,
   onDirtyChange,
   assignedCharacters,
+  characterStaging,
   availableCharacters,
   canGenerateImages,
   canReviewImages,
   imageIndicator,
+  videoKind,
 }: {
   scene: Scene;
   version: SceneVersion;
   canEdit: boolean;
   onDirtyChange?: (dirty: boolean) => void;
   assignedCharacters: Character[];
+  characterStaging: SceneCharacterStaging[];
   availableCharacters: Character[];
   canGenerateImages: boolean;
   canReviewImages: boolean;
   imageIndicator?: SceneImageIndicator;
+  videoKind: ProjectVideoKind;
 }) {
   return (
     <Card>
@@ -57,11 +67,13 @@ export function SceneCard({
           <TabsContent className="space-y-5 pt-4" keepMounted value="details">
             <SceneCharacterList
               assignedCharacters={assignedCharacters}
+              characterStaging={characterStaging}
               availableCharacters={availableCharacters}
               canEdit={canEdit}
               projectId={scene.projectId}
               sceneId={scene.id}
               sceneVersionId={version.id}
+              videoKind={videoKind}
             />
             <SceneEditor
               canEdit={canEdit}
@@ -85,6 +97,7 @@ export function SceneCard({
               canReview={canReviewImages}
               scene={scene}
               sceneVersion={version}
+              videoKind={videoKind}
             />
           </TabsContent>
         </Tabs>

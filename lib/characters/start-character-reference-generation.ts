@@ -78,6 +78,33 @@ function portraitDimensions(size: "1024x1536" | "1024x1024") {
     : { width: 1024, height: 1024 };
 }
 
+/**
+ * Animation poses are composited over a scene background during rendering, so
+ * they need a real alpha channel; identity views stay on the deployment-wide
+ * default because they are only ever viewed on their own.
+ *
+ * `png` is pinned rather than taken from `OPENAI_IMAGE_OUTPUT_FORMAT` because
+ * that variable can legitimately be deployed as `jpeg`, which silently discards
+ * transparency — the resulting sprite would look correct in the gallery and only
+ * fail later as an opaque box over the scene. `prepareOpenAiImageRequest` drops
+ * `outputCompression` for png anyway, but the column is NOT NULL so it is still
+ * recorded.
+ */
+function resolvePortraitImageOptions(
+  view: CharacterReferenceView,
+  environment: {
+    OPENAI_IMAGE_OUTPUT_FORMAT: string;
+    OPENAI_IMAGE_BACKGROUND: string;
+  },
+): { background: string; outputFormat: string } {
+  return animationPoseViews.has(view)
+    ? { background: "transparent", outputFormat: "png" }
+    : {
+        background: environment.OPENAI_IMAGE_BACKGROUND,
+        outputFormat: environment.OPENAI_IMAGE_OUTPUT_FORMAT,
+      };
+}
+
 export class CharacterReferenceGenerationRequestError extends Error {
   constructor(message: string) {
     super(message);
@@ -257,6 +284,10 @@ export async function startCharacterReferenceGeneration(input: {
     throw new BudgetExceededError("workspace_monthly");
 
   const generationId = crypto.randomUUID();
+  const imageOptions = resolvePortraitImageOptions(input.referenceType, {
+    OPENAI_IMAGE_OUTPUT_FORMAT: environment.OPENAI_IMAGE_OUTPUT_FORMAT,
+    OPENAI_IMAGE_BACKGROUND: environment.OPENAI_IMAGE_BACKGROUND,
+  });
   const idempotencyKey = createHash("sha256")
     .update(
       [
@@ -269,6 +300,12 @@ export async function startCharacterReferenceGeneration(input: {
         environment.OPENAI_IMAGE_MODEL,
         size,
         PORTRAIT_QUALITY,
+        // Background and output format participate in the key (as they already
+        // do for scene images in `lib/domain/idempotency.ts`) so that changing a
+        // pose from opaque to transparent is a genuinely different operation
+        // rather than a dedupe hit that silently returns the old opaque image.
+        imageOptions.background,
+        imageOptions.outputFormat,
         input.requestNonce,
       ].join(":"),
     )
@@ -283,9 +320,9 @@ export async function startCharacterReferenceGeneration(input: {
       model: environment.OPENAI_IMAGE_MODEL,
       size,
       quality: PORTRAIT_QUALITY,
-      outputFormat: environment.OPENAI_IMAGE_OUTPUT_FORMAT,
+      outputFormat: imageOptions.outputFormat,
       outputCompression: environment.OPENAI_IMAGE_FINAL_COMPRESSION,
-      background: environment.OPENAI_IMAGE_BACKGROUND,
+      background: imageOptions.background,
       finalPrompt,
       promptTemplateVersion: CHARACTER_REFERENCE_PROMPT_VERSION,
       promptTemplateVersionId: promptTemplate.id,

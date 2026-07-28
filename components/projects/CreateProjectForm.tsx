@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { VideoKindSelect } from "@/components/projects/VideoKindSelect";
 import type { ProjectAspectRatio } from "@/db/schema";
 import type { IdeaNicheGroup, SavedIdeaView } from "@/lib/ideas/ideas-view";
 import {
@@ -108,6 +109,7 @@ export function CreateProjectForm({
           maxLength={2000}
         />
       </div>
+      <VideoKindSelect defaultValue="staticImages" id="project-video-kind" />
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="project-ratio">Aspect ratio</Label>

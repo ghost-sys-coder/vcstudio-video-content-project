@@ -31,7 +31,7 @@ describe("character reference prompt", () => {
         .update(CHARACTER_REFERENCE_PROMPT_TEMPLATE_SOURCE)
         .digest("hex"),
     ).toBe(CHARACTER_REFERENCE_PROMPT_TEMPLATE_SOURCE_HASH);
-    expect(CHARACTER_REFERENCE_PROMPT_VERSION).toBe("character-reference-v2");
+    expect(CHARACTER_REFERENCE_PROMPT_VERSION).toBe("character-reference-v3");
   });
 
   it("renders deterministically with every identity and framing layer", () => {
@@ -72,5 +72,38 @@ describe("character reference prompt", () => {
     expect(poseIdle).toContain("matched set of pose stills");
     expect(poseTalkOpen).toContain("matched set of pose stills");
     expect(poseTalkOpen).toContain("mouth open mid-speech");
+  });
+
+  it("renders pose views as transparent cutouts and identity views on a studio background", () => {
+    const front = renderCharacterReferencePrompt(input);
+    const poseIdle = renderCharacterReferencePrompt({
+      ...input,
+      referenceType: "poseIdle",
+    });
+
+    // Identity views are only ever viewed on their own, so they keep the
+    // opaque studio backdrop.
+    expect(front).toContain("plain neutral studio background");
+    expect(front).not.toContain("transparent background");
+
+    // Poses are composited over a scene plate, so any backdrop at all —
+    // including a contact shadow — would render as a visible box.
+    expect(poseIdle).toContain("completely transparent background");
+    expect(poseIdle).not.toContain("plain neutral studio background");
+    expect(poseIdle).toContain("no cast shadow");
+    expect(poseIdle).toContain(
+      "Anything that is not the character itself must be fully transparent.",
+    );
+  });
+
+  it("requires identical in-canvas placement across the pose set", () => {
+    // Without this the character shifts between pose swaps and the sprite
+    // visibly jitters at every mouth movement.
+    const poseBlink = renderCharacterReferencePrompt({
+      ...input,
+      referenceType: "poseBlink",
+    });
+    expect(poseBlink).toContain("exact position within the canvas");
+    expect(poseBlink).toContain("pixel-for-pixel identical");
   });
 });

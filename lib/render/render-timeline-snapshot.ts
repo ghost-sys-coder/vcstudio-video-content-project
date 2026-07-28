@@ -48,6 +48,30 @@ export interface RenderSceneAudioData {
   trimBeforeFrames?: number;
 }
 
+export type RenderSceneCharacterStageSlot = "left" | "center" | "right";
+
+/**
+ * One animated character standing in a scene, frozen at render request time.
+ *
+ * Pose object keys are stored rather than URLs (matching image/audio) so a
+ * render stays reproducible and the worker signs them itself. Only the speaking
+ * character carries an amplitude envelope; the rest idle and blink.
+ */
+export interface RenderSceneCharacterData {
+  characterId: string;
+  name: string;
+  stageSlot: RenderSceneCharacterStageSlot;
+  isSpeaker: boolean;
+  poses: {
+    idle: string;
+    talkOpen: string;
+    talkClosed: string;
+    blink: string;
+  };
+  amplitudeEnvelope?: number[];
+  amplitudeSampleRateHz?: number;
+}
+
 export interface RenderSceneData {
   sceneId: string;
   sceneNumber: number;
@@ -61,6 +85,11 @@ export interface RenderSceneData {
   image: RenderSceneImageData;
   audio: RenderSceneAudioData;
   captions: RenderCaptionData[];
+  /**
+   * Present only for animated projects. Absent (not empty) for static-image
+   * projects, so an existing render's frozen snapshot is unchanged.
+   */
+  characters?: RenderSceneCharacterData[];
 }
 
 export interface RenderTimelineSnapshot {

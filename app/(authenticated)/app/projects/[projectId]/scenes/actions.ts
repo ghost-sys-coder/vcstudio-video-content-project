@@ -2,7 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { tasks } from "@trigger.dev/sdk";
-import { assignSceneCharacters } from "@/db/commands/character-commands";
+import {
+  assignSceneCharacters,
+  setSceneCharacterStaging,
+} from "@/db/commands/character-commands";
 import {
   addCharacterToProjectCast,
   applyCastToScenes,
@@ -11,6 +14,7 @@ import {
 import {
   applyCastToScenesSchema,
   assignSceneCharactersSchema,
+  setSceneCharacterStagingSchema,
   projectCastMemberSchema,
 } from "@/lib/schemas/character";
 import type { sceneAnalysisTask } from "@/trigger/scene-analysis";
@@ -97,6 +101,38 @@ export async function assignSceneCharactersAction(
     return {
       success: false,
       error: "The scene characters could not be assigned.",
+    };
+  }
+}
+
+export async function setSceneCharacterStagingAction(
+  formData: FormData,
+): Promise<SceneActionState> {
+  const parsed = setSceneCharacterStagingSchema.safeParse(
+    Object.fromEntries(formData),
+  );
+  if (!parsed.success)
+    return { success: false, error: "Invalid character staging." };
+  try {
+    const { context } = await requireProjectMutation(
+      parsed.data.projectId,
+      "editScenes",
+    );
+    await setSceneCharacterStaging({
+      ...parsed.data,
+      workspaceId: context.activeMembership.workspaceId,
+    });
+    revalidatePath(`/app/projects/${parsed.data.projectId}/scenes`);
+    return { success: true, error: null };
+  } catch (error) {
+    if (error instanceof Error && error.message === "CHARACTER_NOT_ASSIGNED")
+      return {
+        success: false,
+        error: "That character is not assigned to this scene.",
+      };
+    return {
+      success: false,
+      error: "The character staging could not be saved.",
     };
   }
 }

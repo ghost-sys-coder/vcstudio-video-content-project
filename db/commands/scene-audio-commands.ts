@@ -406,6 +406,7 @@ export async function completeSceneAudioGeneration(input: {
   providerRequestId: string | null;
   actualCostCents: number;
   durationMilliseconds: number | null;
+  amplitudeEnvelope?: number[] | null;
   asset: {
     objectKey: string;
     contentType: string;
@@ -453,6 +454,11 @@ export async function completeSceneAudioGeneration(input: {
         asset_size_bytes = ${input.asset.sizeBytes},
         asset_etag = ${input.asset.etag},
         duration_milliseconds = ${input.durationMilliseconds}::int,
+        amplitude_envelope = ${
+          input.amplitudeEnvelope
+            ? JSON.stringify(input.amplitudeEnvelope)
+            : null
+        }::jsonb,
         error_category = null,
         safe_error_message = null,
         completed_at = now(),

@@ -6,6 +6,7 @@ import {
   projects,
   type ProjectAspectRatio,
   type ProjectStatus,
+  type ProjectVideoKind,
 } from "@/db/schema";
 import { canTransitionProjectStatus } from "@/lib/domain/project-status";
 import { getProjectDimensions } from "@/lib/schemas/project";
@@ -16,6 +17,7 @@ export async function updateProject(input: {
   name: string;
   description: string;
   aspectRatio: ProjectAspectRatio;
+  videoKind: ProjectVideoKind;
   framesPerSecond: number;
   language: string;
   maximumBudgetCents: number;
@@ -32,6 +34,7 @@ export async function updateProject(input: {
       name: input.name,
       description: input.description,
       aspectRatio: input.aspectRatio,
+      videoKind: input.videoKind,
       width: dimensions.width,
       height: dimensions.height,
       framesPerSecond: input.framesPerSecond,

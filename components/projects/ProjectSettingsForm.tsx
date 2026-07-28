@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { VideoKindSelect } from "@/components/projects/VideoKindSelect";
 
 export function ProjectSettingsForm({
   project,
@@ -67,6 +68,11 @@ export function ProjectSettingsForm({
             <option>1:1</option>
           </select>
         </div>
+        <VideoKindSelect
+          defaultValue={project.videoKind}
+          disabled={!canEdit || pending}
+          id="settings-video-kind"
+        />
         <div className="space-y-2">
           <Label htmlFor="settings-fps">Frame rate</Label>
           <Input

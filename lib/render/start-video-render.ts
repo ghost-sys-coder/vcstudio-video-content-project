@@ -20,6 +20,7 @@ import {
 import { BudgetExceededError } from "@/lib/domain/errors";
 import { getRenderEnvironment } from "@/lib/env/server";
 import { buildRenderTimelineSnapshot } from "@/lib/render/build-render-snapshot";
+import { resolveSceneCharactersBySceneVersion } from "@/lib/render/resolve-scene-characters";
 import { defaultPresetForAspectRatio } from "@/lib/render/render-formats";
 import { estimateRenderCostCents } from "@/lib/render/render-cost";
 import { validateRenderDuration } from "@/lib/render/render-duration";
@@ -147,11 +148,25 @@ export async function startVideoRender(input: {
     }).timeline;
   }
 
+  // Only animated projects have a cast to draw; a static-image project skips
+  // the lookup entirely and its snapshot is byte-identical to before.
+  const charactersBySceneVersionId =
+    input.project.videoKind === "animatedCharacter"
+      ? await resolveSceneCharactersBySceneVersion({
+          workspaceId: input.workspaceId,
+          projectId: input.project.id,
+          sceneVersionIds: renderTimeline.scenes.map(
+            (scene) => scene.sceneVersionId,
+          ),
+        })
+      : undefined;
+
   const snapshot = buildRenderTimelineSnapshot({
     timeline: renderTimeline,
     captionStyle: context.captionStyle,
     includeCaptions: input.includeCaptions,
     includeWatermark: input.includeWatermark,
+    charactersBySceneVersionId,
   });
 
   const effectiveLimits = await loadEffectiveWorkspaceLimits({

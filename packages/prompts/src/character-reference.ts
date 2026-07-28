@@ -1,4 +1,4 @@
-export const CHARACTER_REFERENCE_PROMPT_VERSION = "character-reference-v2";
+export const CHARACTER_REFERENCE_PROMPT_VERSION = "character-reference-v3";
 
 // SHA-256 of CHARACTER_REFERENCE_PROMPT_TEMPLATE_SOURCE. Any change to the
 // template's meaning must bump the version and this hash, or generation fails
@@ -6,15 +6,18 @@ export const CHARACTER_REFERENCE_PROMPT_VERSION = "character-reference-v2";
 // No migration is needed for the version bump itself — `ensureCharacterReferencePromptTemplate`
 // inserts each new (templateKey, version) row at request time.
 export const CHARACTER_REFERENCE_PROMPT_TEMPLATE_SOURCE_HASH =
-  "893859100fddfe6cdaa9e01b35d23fe34e3e63e36a96ac468e8858b710d9ce1a";
+  "aca0d246ff9d7bfa2226828a0ed2b5f842fd158a82f9ad5f57387340ec8e7a45";
 
 export const CHARACTER_REFERENCE_PROMPT_TEMPLATE_SOURCE = `VCStudio character reference portrait prompt
 Layers: global portrait framing, character identity, face, hair, skin tone,
 body proportions, default outfit, requested reference view, negative
-constraints, output dimensions, and text exclusion. Animation pose views
-(poseIdle, poseTalkOpen, poseTalkClosed, poseBlink) additionally require
-pixel-for-pixel matched camera distance, framing, scale, and crop across the
-set, since they are swapped during playback rather than shown individually.`;
+constraints, output dimensions, and text exclusion. Identity views render on a
+plain neutral studio background. Animation pose views (poseIdle, poseTalkOpen,
+poseTalkClosed, poseBlink) instead render as fully cut-out sprites on a
+transparent background, and additionally require pixel-for-pixel matched camera
+distance, framing, scale, crop, and character placement within the canvas across
+the set, since they are swapped during playback and composited over a separate
+scene background rather than shown individually.`;
 
 export type CharacterReferenceView =
   | "master"
@@ -116,13 +119,16 @@ export function renderCharacterReferencePrompt(
     renderField("Default outfit", input.character.defaultOutfitDescription),
   ]);
   const negative = escapePromptValue(input.character.negativeConstraints);
+  const isAnimationPose = animationPoseViews.has(input.referenceType);
 
   return [
     "<global_portrait_framing>",
     viewFraming[input.referenceType],
-    "Render exactly one character, centered, on a plain neutral studio background with soft, even lighting. This is a reusable identity reference, not a scene.",
-    animationPoseViews.has(input.referenceType)
-      ? "This portrait is one of a matched set of pose stills for this character (idle, talking mouth-open, talking mouth-closed, blinking) that will be swapped during animation — keep camera distance, framing, scale, crop, and background pixel-for-pixel identical across the set, as if the camera never moved between shots."
+    isAnimationPose
+      ? "Render exactly one character, centered, fully cut out on a completely transparent background with soft, even lighting. There must be no backdrop, no floor, no ground plane, no cast shadow on any surface, and no vignette — only the character's own pixels are opaque. This sprite is composited over a separate scene background during video rendering."
+      : "Render exactly one character, centered, on a plain neutral studio background with soft, even lighting. This is a reusable identity reference, not a scene.",
+    isAnimationPose
+      ? "This portrait is one of a matched set of pose stills for this character (idle, talking mouth-open, talking mouth-closed, blinking) that will be swapped frame to frame during animation — keep camera distance, framing, scale, crop, and the character's exact position within the canvas pixel-for-pixel identical across the set, as if the camera never moved between shots and the character never shifted. Only the detail named for this specific pose may differ; everything else must match."
       : null,
     "</global_portrait_framing>",
     "<character_identity>",
@@ -139,6 +145,9 @@ export function renderCharacterReferencePrompt(
       ? `- ${negative}`
       : "- (no character-specific negative constraints)",
     "- Do not include multiple characters, props, scenery, borders, watermarks, or any text.",
+    isAnimationPose
+      ? "- Do not draw any background, backdrop, wall, floor, ground plane, contact shadow, or environment behind or beneath the character. Anything that is not the character itself must be fully transparent."
+      : null,
     "</negative_constraints>",
     "<output_requirements>",
     `- Output dimensions: ${input.output.width}x${input.output.height} pixels.`,

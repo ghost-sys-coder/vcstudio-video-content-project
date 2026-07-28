@@ -7,7 +7,21 @@ export const SCENE_IMAGE_API_SIZES = [
 ] as const;
 export const SCENE_IMAGE_QUALITIES = ["low", "medium", "high"] as const;
 export const SCENE_IMAGE_OUTPUT_FORMATS = ["webp", "png", "jpeg"] as const;
-export const SCENE_IMAGE_BACKGROUNDS = ["opaque", "auto"] as const;
+/**
+ * `transparent` is only honored by the provider for `png`/`webp` output, so any
+ * caller requesting it must also pin an alpha-capable output format — see
+ * `resolvePortraitImageOptions` in
+ * `lib/characters/start-character-reference-generation.ts`, the only current
+ * caller, which pins `png` for the animation pose views that become sprites.
+ */
+export const SCENE_IMAGE_BACKGROUNDS = [
+  "opaque",
+  "auto",
+  "transparent",
+] as const;
+
+/** Output formats that can actually carry an alpha channel. */
+export const ALPHA_CAPABLE_OUTPUT_FORMATS = ["png", "webp"] as const;
 
 export const sceneImageApiSizeSchema = z.enum(SCENE_IMAGE_API_SIZES);
 export const sceneImageQualitySchema = z.enum(SCENE_IMAGE_QUALITIES);

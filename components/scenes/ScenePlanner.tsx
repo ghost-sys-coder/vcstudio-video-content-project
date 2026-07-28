@@ -4,8 +4,10 @@ import type {
   SceneAnalysisRun,
   SceneVersion,
   Character,
+  ProjectVideoKind,
 } from "@/db/schema";
 import type { SceneImageIndicator } from "@/lib/scenes/scene-image-indicator";
+import type { SceneCharacterStaging } from "@/lib/scenes/scene-character-staging";
 import { ScenePlannerHeader } from "@/components/scenes/ScenePlannerHeader";
 import { AnalysisProgressPanel } from "@/components/scenes/AnalysisProgressPanel";
 import { SceneAnalysisErrorState } from "@/components/scenes/SceneAnalysisErrorState";
@@ -28,6 +30,7 @@ export function ScenePlanner({
   castAvailableCharacters,
   canGenerateImages,
   canReviewImages,
+  videoKind,
 }: {
   projectId: string;
   approvedVersion: ProjectScriptVersion | null;
@@ -36,8 +39,10 @@ export function ScenePlanner({
     scene: Scene;
     version: SceneVersion;
     assignedCharacters: Character[];
+    characterStaging: SceneCharacterStaging[];
     imageIndicator: SceneImageIndicator;
   }>;
+  videoKind: ProjectVideoKind;
   estimatedCostCents: number;
   canEdit: boolean;
   initialSceneNumber: number | null;
@@ -81,6 +86,7 @@ export function ScenePlanner({
         availableCharacters={availableCharacters}
         canGenerateImages={canGenerateImages}
         canReviewImages={canReviewImages}
+        videoKind={videoKind}
       />
     </div>
   );

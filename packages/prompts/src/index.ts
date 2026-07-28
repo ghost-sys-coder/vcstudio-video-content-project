@@ -47,6 +47,7 @@ export {
 export type {
   SceneImagePromptCharacter,
   SceneImagePromptInput,
+  SceneImagePromptMode,
   SceneImagePromptReference,
 } from "./scene-image";
 export {

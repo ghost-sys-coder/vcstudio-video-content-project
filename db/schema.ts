@@ -90,6 +90,24 @@ export const projectAspectRatioEnum = pgEnum("project_aspect_ratio", [
   "1:1",
 ]);
 
+/**
+ * Whether a project renders AI-generated stills or animated character sprites.
+ *
+ * This is deliberately a property of the *project*, not the scene: mixing the
+ * two within one video produced an unpredictable authoring experience and a
+ * visually inconsistent result, so the two modes are structurally exclusive.
+ */
+export const projectVideoKindEnum = pgEnum("project_video_kind", [
+  "staticImages",
+  "animatedCharacter",
+]);
+
+/** Where a character stands within the frame in an animated scene. */
+export const sceneCharacterStageSlotEnum = pgEnum(
+  "scene_character_stage_slot",
+  ["left", "center", "right"],
+);
+
 export const outputVariantStatusEnum = pgEnum("output_variant_status", [
   "draft",
   "ready",
@@ -711,6 +729,9 @@ export const projects = pgTable(
     name: text("name").notNull(),
     description: text("description").notNull().default(""),
     status: projectStatusEnum("status").notNull().default("draft"),
+    videoKind: projectVideoKindEnum("video_kind")
+      .notNull()
+      .default("staticImages"),
     aspectRatio: projectAspectRatioEnum("aspect_ratio").notNull(),
     width: integer("width").notNull(),
     height: integer("height").notNull(),
@@ -1619,6 +1640,13 @@ export const sceneVersionCharacters = pgTable(
     characterId: uuid("character_id")
       .notNull()
       .references(() => characters.id, { onDelete: "restrict" }),
+    // Staging for animated projects. Both are ignored by static-image projects,
+    // which is why they carry defaults rather than being nullable — every
+    // existing assignment stays valid and simply centers with no speaker.
+    stageSlot: sceneCharacterStageSlotEnum("stage_slot")
+      .notNull()
+      .default("center"),
+    isSpeaker: boolean("is_speaker").notNull().default(false),
     assignedByUserId: uuid("assigned_by_user_id")
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
@@ -1631,6 +1659,13 @@ export const sceneVersionCharacters = pgTable(
       table.sceneVersionId,
       table.characterId,
     ),
+    // One scene is one narration clip, so at most one character can be speaking
+    // it. Enforced in the database because the lip-sync envelope is attached to
+    // exactly one character at render time and a second speaker would silently
+    // pick a winner by row order.
+    uniqueIndex("scene_version_characters_single_speaker_unique")
+      .on(table.sceneVersionId)
+      .where(sql`${table.isSpeaker}`),
     index("scene_version_characters_workspace_project_index").on(
       table.workspaceId,
       table.projectId,
@@ -2509,6 +2544,13 @@ export const sceneAudioGenerations = pgTable(
     assetSizeBytes: integer("asset_size_bytes"),
     assetEtag: text("asset_etag"),
     durationMilliseconds: integer("duration_milliseconds"),
+    // Fixed-rate loudness envelope (integer percentages at
+    // AMPLITUDE_ENVELOPE_SAMPLE_RATE_HZ) measured once when the audio is
+    // produced, so animated lip-sync works in the browser preview — which
+    // cannot run ffmpeg — and the render worker never recomputes it. Null when
+    // ffmpeg was unavailable or the audio could not be decoded; the character
+    // then idles instead of the render failing.
+    amplitudeEnvelope: jsonb("amplitude_envelope").$type<number[]>(),
     errorCategory: text("error_category"),
     safeErrorMessage: text("safe_error_message"),
     requestedByUserId: uuid("requested_by_user_id")
@@ -3235,6 +3277,10 @@ export type Project = typeof projects.$inferSelect;
 export type ProjectStatus = (typeof projectStatusEnum.enumValues)[number];
 export type ProjectAspectRatio =
   (typeof projectAspectRatioEnum.enumValues)[number];
+export type ProjectVideoKind = (typeof projectVideoKindEnum.enumValues)[number];
+export type SceneCharacterStageSlot =
+  (typeof sceneCharacterStageSlotEnum.enumValues)[number];
+export type SceneVersionCharacter = typeof sceneVersionCharacters.$inferSelect;
 export type ProjectOutputVariant = typeof projectOutputVariants.$inferSelect;
 export type OutputVariantStatus =
   (typeof outputVariantStatusEnum.enumValues)[number];

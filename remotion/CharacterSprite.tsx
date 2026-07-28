@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  AbsoluteFill,
   getRemotionEnvironment,
   Img,
   useBufferState,
@@ -8,20 +7,26 @@ import {
   useVideoConfig,
 } from "remotion";
 import { recordPreviewEvent } from "@/lib/render/preview-telemetry";
-import {
-  DEFAULT_SCENE_FRAMING,
-  framingObjectPosition,
-  framingScale,
-  type SceneFramingData,
-} from "@/lib/output-variants/scene-framing";
+import type { VideoCompositionSceneCharacter } from "@/lib/render/video-composition-data";
 
 // Amplitude (0..1, measured from the narration audio, never fabricated) at or
-// above this is read as "actively talking." Both this and the blink timing
-// below are Phase 0 defaults meant to be tuned once real pilot output can be
-// watched (see the animated-video plan's Phase 0 verification section).
+// above this is read as "actively talking".
 const TALK_AMPLITUDE_THRESHOLD = 0.12;
 const BLINK_INTERVAL_SECONDS = 4;
 const BLINK_DURATION_FRAMES = 3;
+
+/** Share of the frame height a standing character occupies. */
+const SPRITE_HEIGHT_RATIO = 0.82;
+
+/** Horizontal centre of each stage slot, as a share of frame width. */
+const STAGE_SLOT_CENTER: Record<
+  VideoCompositionSceneCharacter["stageSlot"],
+  number
+> = {
+  left: 0.27,
+  center: 0.5,
+  right: 0.73,
+};
 
 type PoseKind = "idle" | "talkOpen" | "talkClosed" | "blink";
 
@@ -29,15 +34,16 @@ function resolveActivePose(input: {
   frame: number;
   fps: number;
   amplitude: number | null;
+  blinkOffsetFrames: number;
 }): PoseKind {
   const framesPerBlinkCycle = Math.round(BLINK_INTERVAL_SECONDS * input.fps);
-  if (
-    framesPerBlinkCycle > 0 &&
-    ((input.frame % framesPerBlinkCycle) + framesPerBlinkCycle) %
-      framesPerBlinkCycle <
-      BLINK_DURATION_FRAMES
-  )
-    return "blink";
+  if (framesPerBlinkCycle > 0) {
+    const cyclePosition =
+      (((input.frame + input.blinkOffsetFrames) % framesPerBlinkCycle) +
+        framesPerBlinkCycle) %
+      framesPerBlinkCycle;
+    if (cyclePosition < BLINK_DURATION_FRAMES) return "blink";
+  }
   if (input.amplitude === null) return "idle";
   return input.amplitude >= TALK_AMPLITUDE_THRESHOLD
     ? "talkOpen"
@@ -45,46 +51,28 @@ function resolveActivePose(input: {
 }
 
 /**
- * Reserved for the standalone Animated Videos feature (not yet built) — no
- * current caller. Animated and static-image videos are no longer mixed
- * within one render, so this isn't wired into `VideoScene.tsx` today; kept
- * because it's generic (no dependency on scenes/projects beyond `sceneId`,
- * used only for telemetry labeling) and already debugged.
+ * One animated character standing in a scene, drawn over the background plate.
  *
- * Renders an animated character by swapping between four pre-generated pose
- * stills (idle / talk-open / talk-closed / blink) instead of showing one
- * static image. All four are mounted and decoded up front, stacked and
+ * All four pose stills are mounted and decoded up front, stacked and
  * opacity-toggled, rather than swapping one `<Img>`'s `src` — src-swapping
- * would re-trigger Remotion's decode/buffer-stall logic on every pose change.
+ * re-triggers Remotion's decode/buffer-stall logic on every pose change, which
+ * stutters at exactly the rate a mouth moves.
  *
- * The talk/idle choice is driven by the narration audio's measured amplitude
- * at the current frame, never fabricated timing — the same principle this app
- * already applies to subtitle timing. The amplitude envelope itself is
- * computed server-side, once, at render time (see
- * `lib/media/audio-amplitude.ts`) and passed in as a plain array indexed by
- * scene-relative frame — this component never fetches audio itself, since
- * doing so in-browser during rendering requires the asset bucket to serve
- * CORS headers it doesn't have. Blinking is a fixed-interval timer,
- * independent of amplitude.
+ * The talk/idle choice comes from the narration audio's measured amplitude at
+ * the current frame, never fabricated timing — the same principle this app
+ * applies to subtitle timing. Non-speakers get an empty envelope and so idle
+ * and blink. Blinking is a fixed-interval timer offset per character so a cast
+ * does not blink in unison.
  */
-export function AnimatedCharacterScene({
+export function CharacterSprite({
+  character,
   sceneId,
-  idleUrl,
-  talkOpenUrl,
-  talkClosedUrl,
-  blinkUrl,
-  amplitudeEnvelope,
-  framing,
+  blinkOffsetFrames,
 }: {
+  character: VideoCompositionSceneCharacter;
   sceneId: string;
-  idleUrl: string;
-  talkOpenUrl: string;
-  talkClosedUrl: string;
-  blinkUrl: string;
-  amplitudeEnvelope: number[];
-  framing?: SceneFramingData;
+  blinkOffsetFrames: number;
 }) {
-  const effectiveFraming = framing ?? DEFAULT_SCENE_FRAMING;
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const { delayPlayback } = useBufferState();
@@ -96,10 +84,10 @@ export function AnimatedCharacterScene({
   const isActive = frame >= 0;
 
   const poses: { kind: PoseKind; url: string }[] = [
-    { kind: "idle", url: idleUrl },
-    { kind: "talkOpen", url: talkOpenUrl },
-    { kind: "talkClosed", url: talkClosedUrl },
-    { kind: "blink", url: blinkUrl },
+    { kind: "idle", url: character.idleUrl },
+    { kind: "talkOpen", url: character.talkOpenUrl },
+    { kind: "talkClosed", url: character.talkClosedUrl },
+    { kind: "blink", url: character.blinkUrl },
   ];
   const allLoaded = poses.every((pose) => loadedUrls.has(pose.url));
 
@@ -118,14 +106,29 @@ export function AnimatedCharacterScene({
   }, [isPlayer, isActive, allLoaded, delayPlayback]);
 
   const amplitude =
-    frame >= 0 && frame < amplitudeEnvelope.length
-      ? amplitudeEnvelope[frame]!
+    frame >= 0 && frame < character.amplitudeEnvelope.length
+      ? (character.amplitudeEnvelope[frame] ?? null)
       : null;
-
-  const activePose = resolveActivePose({ frame, fps, amplitude });
+  const activePose = resolveActivePose({
+    frame,
+    fps,
+    amplitude,
+    blinkOffsetFrames,
+  });
 
   return (
-    <AbsoluteFill style={{ backgroundColor: effectiveFraming.backgroundColor }}>
+    <div
+      style={{
+        position: "absolute",
+        bottom: 0,
+        left: `${STAGE_SLOT_CENTER[character.stageSlot] * 100}%`,
+        height: `${SPRITE_HEIGHT_RATIO * 100}%`,
+        // Translate by half the sprite's own width so the slot value is its
+        // centre regardless of how wide the artwork turns out to be, and mirror
+        // in the same transform so facing never fights the centring.
+        transform: `translateX(-50%)${character.faceLeft ? " scaleX(-1)" : ""}`,
+      }}
+    >
       {poses.map((pose) => (
         <Img
           key={pose.kind}
@@ -154,17 +157,15 @@ export function AnimatedCharacterScene({
           src={pose.url}
           style={{
             position: "absolute",
-            inset: 0,
-            width: "100%",
+            bottom: 0,
+            left: 0,
             height: "100%",
-            objectFit:
-              effectiveFraming.mode === "contain" ? "contain" : "cover",
-            objectPosition: framingObjectPosition(effectiveFraming),
-            transform: `scale(${framingScale(effectiveFraming.scaleBps)})`,
+            width: "auto",
+            objectFit: "contain",
             opacity: activePose === pose.kind ? 1 : 0,
           }}
         />
       ))}
-    </AbsoluteFill>
+    </div>
   );
 }

@@ -88,6 +88,7 @@ export async function listApprovedSceneAudioAssets(input: {
       assetObjectKey: sceneAudioGenerations.assetObjectKey,
       durationMilliseconds: sceneAudioGenerations.durationMilliseconds,
       format: sceneAudioGenerations.format,
+      amplitudeEnvelope: sceneAudioGenerations.amplitudeEnvelope,
     })
     .from(sceneAudioGenerations)
     .where(

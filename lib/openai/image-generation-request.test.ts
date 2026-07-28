@@ -82,6 +82,25 @@ describe("prepareOpenAiImageRequest", () => {
     );
     expect(request).not.toHaveProperty("outputCompression");
   });
+
+  it("passes a transparent background through for alpha-capable formats", () => {
+    for (const outputFormat of ["png", "webp"] as const)
+      expect(
+        prepareOpenAiImageRequest(
+          createInput({ background: "transparent", outputFormat }),
+        ).background,
+      ).toBe("transparent");
+  });
+
+  it("rejects a transparent background for a format that cannot carry alpha", () => {
+    // JPEG would come back opaque with no error from the provider, and the
+    // sprite would only fail much later as a solid box over the scene plate.
+    expect(() =>
+      prepareOpenAiImageRequest(
+        createInput({ background: "transparent", outputFormat: "jpeg" }),
+      ),
+    ).toThrow(RangeError);
+  });
 });
 
 describe("getOpenAiReferenceInputFidelitySnapshot", () => {

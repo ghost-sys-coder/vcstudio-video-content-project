@@ -84,15 +84,23 @@ export default async function ProjectScenesPage({
     (character) => !castCharacterIds.has(character.id),
   );
   const imageIndicatorBySceneId = buildSceneImageIndicatorMap(imageGenerations);
-  const rowsWithCharacters = rows.map((row) => ({
-    ...row,
-    assignedCharacters: assignments
-      .filter((item) => item.assignment.sceneVersionId === row.version.id)
-      .map((item) => item.character),
-    imageIndicator: imageIndicatorBySceneId.get(row.scene.id) ?? {
-      state: "none" as const,
-    },
-  }));
+  const rowsWithCharacters = rows.map((row) => {
+    const sceneAssignments = assignments.filter(
+      (item) => item.assignment.sceneVersionId === row.version.id,
+    );
+    return {
+      ...row,
+      assignedCharacters: sceneAssignments.map((item) => item.character),
+      characterStaging: sceneAssignments.map((item) => ({
+        characterId: item.character.id,
+        stageSlot: item.assignment.stageSlot,
+        isSpeaker: item.assignment.isSpeaker,
+      })),
+      imageIndicator: imageIndicatorBySceneId.get(row.scene.id) ?? {
+        state: "none" as const,
+      },
+    };
+  });
   const environment = getSceneAnalysisEnvironment();
   const prompt = approvedVersion
     ? renderSceneAnalysisPrompt({
@@ -123,6 +131,7 @@ export default async function ProjectScenesPage({
       initialSceneNumber={initialSceneNumber}
       projectId={project.id}
       rows={rowsWithCharacters}
+      videoKind={project.videoKind}
       availableCharacters={availableCharacters}
       cast={castEntries}
       castAvailableCharacters={castAvailableCharacters}

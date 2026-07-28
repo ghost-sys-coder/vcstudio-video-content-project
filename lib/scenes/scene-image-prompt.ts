@@ -1,8 +1,9 @@
 import {
   renderSceneImagePrompt,
   type SceneImagePromptCharacter,
+  type SceneImagePromptMode,
 } from "@studio/prompts";
-import type { Character, SceneVersion } from "@/db/schema";
+import type { Character, ProjectVideoKind, SceneVersion } from "@/db/schema";
 import type {
   SceneImageApiSize,
   SceneImageReferenceView,
@@ -29,6 +30,17 @@ export function toSceneImagePromptCharacter(
   };
 }
 
+/**
+ * An animated project's scene still is a background plate that its character
+ * sprites are drawn over, so generating the cast into it would show every
+ * character twice.
+ */
+export function sceneImagePromptModeForVideoKind(
+  videoKind: ProjectVideoKind,
+): SceneImagePromptMode {
+  return videoKind === "animatedCharacter" ? "backgroundPlate" : "scene";
+}
+
 export function createSceneImagePromptPreview(input: {
   stylePreset: SceneImageStylePresetView;
   characters: Character[];
@@ -36,9 +48,11 @@ export function createSceneImagePromptPreview(input: {
   sceneVersion: SceneVersion;
   size: SceneImageApiSize;
   aspectRatio: "16:9" | "9:16" | "1:1";
+  mode?: SceneImagePromptMode;
 }): string {
   const dimensions = getSceneImageDimensions(input.size);
   return renderSceneImagePrompt({
+    mode: input.mode ?? "scene",
     stylePreset: {
       name: input.stylePreset.name,
       description: input.stylePreset.description,

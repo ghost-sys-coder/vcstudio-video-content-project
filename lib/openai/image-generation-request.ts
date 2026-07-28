@@ -3,7 +3,10 @@ import {
   type ImageGenerationProviderInput,
   type ImageGenerationReference,
 } from "@/lib/openai/image-generation-provider";
-import { sceneImageProviderConfigurationSchema } from "@/lib/schemas/scene-image";
+import {
+  ALPHA_CAPABLE_OUTPUT_FORMATS,
+  sceneImageProviderConfigurationSchema,
+} from "@/lib/schemas/scene-image";
 
 export const DEFAULT_OPENAI_IMAGE_MODEL = "gpt-image-2";
 export const DEFAULT_OPENAI_IMAGE_OUTPUT_FORMAT = "webp";
@@ -23,7 +26,7 @@ export type PreparedOpenAiImageRequest = {
   size: "1536x1024" | "1024x1536" | "1024x1024";
   outputFormat: "webp" | "png" | "jpeg";
   outputCompression?: number;
-  background: "opaque" | "auto";
+  background: "opaque" | "auto" | "transparent";
   endUserId?: string;
   inputFidelity?: "high";
   references: ImageGenerationReference[];
@@ -79,6 +82,19 @@ export function prepareOpenAiImageRequest(
 ): PreparedOpenAiImageRequest {
   const configuration = sceneImageProviderConfigurationSchema.parse(input);
   validateReferences(input.references);
+  // The provider silently returns an opaque image when transparency is asked
+  // for in a format that cannot carry alpha, which would look correct in the
+  // gallery and only fail much later as an opaque box composited over a scene.
+  // Fail here instead, at the single chokepoint every image request passes.
+  if (
+    configuration.background === "transparent" &&
+    !ALPHA_CAPABLE_OUTPUT_FORMATS.includes(
+      configuration.outputFormat as (typeof ALPHA_CAPABLE_OUTPUT_FORMATS)[number],
+    )
+  )
+    throw new RangeError(
+      `A transparent background requires an alpha-capable output format (${ALPHA_CAPABLE_OUTPUT_FORMATS.join(", ")}), not ${configuration.outputFormat}.`,
+    );
   const references = [...input.references].sort((left, right) =>
     left.assetId.localeCompare(right.assetId),
   );

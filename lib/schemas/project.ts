@@ -14,6 +14,11 @@ export const projectStatusSchema = z.enum([
 
 export const projectAspectRatioSchema = z.enum(["16:9", "9:16", "1:1"]);
 
+export const projectVideoKindSchema = z.enum([
+  "staticImages",
+  "animatedCharacter",
+]);
+
 export const projectIdSchema = z.object({ projectId: z.uuid() });
 
 export const projectListQuerySchema = z.object({
@@ -25,6 +30,9 @@ export const createProjectSchema = z.object({
   name: z.string().trim().min(2).max(100),
   description: z.string().trim().max(2000).default(""),
   aspectRatio: projectAspectRatioSchema,
+  // Defaulted so every existing caller and form that omits it keeps producing
+  // a static-image project exactly as before.
+  videoKind: projectVideoKindSchema.default("staticImages"),
   framesPerSecond: z.coerce.number().int().min(1).max(120),
   language: z.string().trim().min(2).max(40),
   maximumBudgetCents: z.coerce.number().int().min(0).max(100000),

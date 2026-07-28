@@ -14,6 +14,25 @@ import type {
  * components can share them in both the browser preview (via @remotion/player)
  * and the render worker bundle without pulling in server-only code.
  */
+/**
+ * One animated character to draw over the scene's background plate, with pose
+ * object keys already resolved to signed URLs and the amplitude envelope
+ * already resampled to one value per frame of this scene.
+ */
+export type VideoCompositionSceneCharacter = {
+  characterId: string;
+  stageSlot: "left" | "center" | "right";
+  isSpeaker: boolean;
+  /** Mirrors the sprite horizontally so characters face each other. */
+  faceLeft: boolean;
+  idleUrl: string;
+  talkOpenUrl: string;
+  talkClosedUrl: string;
+  blinkUrl: string;
+  /** Empty for non-speakers and when no envelope was measured. */
+  amplitudeEnvelope: number[];
+};
+
 export type VideoCompositionScene = {
   sceneId: string;
   sceneNumber: number;
@@ -32,6 +51,8 @@ export type VideoCompositionScene = {
   audioUrl: string;
   audioTrimBeforeFrames?: number;
   captions: RenderCaptionData[];
+  /** Absent for static-image projects. */
+  characters?: VideoCompositionSceneCharacter[];
 };
 
 // A type alias (not an interface) so it satisfies `Record<string, unknown>`,

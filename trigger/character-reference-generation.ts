@@ -27,6 +27,12 @@ import {
   putCharacterReferenceImage,
 } from "@/lib/storage/character-reference-storage";
 import { downloadSceneImageReferences } from "@/lib/storage/scene-image-storage";
+import {
+  sceneImageApiSizeSchema,
+  sceneImageBackgroundSchema,
+  sceneImageOutputFormatSchema,
+  sceneImageQualitySchema,
+} from "@/lib/schemas/scene-image";
 
 // Every portrait — identity views and animation poses alike — is generated as
 // an edit anchored to the character's own already-uploaded/generated
@@ -179,15 +185,17 @@ export const characterReferenceGenerationTask = task({
       result = await provider.generate({
         model: generation.model,
         prompt: generation.finalPrompt,
-        quality: z.enum(["low", "medium", "high"]).parse(generation.quality),
-        size: z
-          .enum(["1536x1024", "1024x1536", "1024x1024"])
-          .parse(generation.size),
-        outputFormat: z
-          .enum(["webp", "png", "jpeg"])
-          .parse(generation.outputFormat),
+        // Parsed through the shared scene-image schemas rather than inline
+        // enums: these columns are plain `text`, and a local copy of the
+        // allowed values silently goes stale (transparent pose backgrounds
+        // were rejected here for exactly that reason).
+        quality: sceneImageQualitySchema.parse(generation.quality),
+        size: sceneImageApiSizeSchema.parse(generation.size),
+        outputFormat: sceneImageOutputFormatSchema.parse(
+          generation.outputFormat,
+        ),
         outputCompression: generation.outputCompression,
-        background: z.enum(["opaque", "auto"]).parse(generation.background),
+        background: sceneImageBackgroundSchema.parse(generation.background),
         endUserId: generation.requestedByUserId,
         references: referenceInputs,
       });

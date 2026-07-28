@@ -54,6 +54,7 @@ interface ApprovedAudio {
   assetObjectKey: string | null;
   durationMilliseconds: number | null;
   format: string;
+  amplitudeEnvelope: number[] | null;
 }
 
 export interface SubtitleContext {
@@ -272,6 +273,7 @@ export async function buildSubtitleContext(input: {
                 objectKey: audio.assetObjectKey,
                 durationMilliseconds: audio.durationMilliseconds,
                 format: audio.format,
+                amplitudeEnvelope: audio.amplitudeEnvelope,
               }
             : null,
       };

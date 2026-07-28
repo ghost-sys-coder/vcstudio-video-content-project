@@ -331,6 +331,10 @@ export const sceneAudioEnvironmentSchema = z.object({
     .positive()
     .default(5000),
   FFPROBE_PATH: z.string().min(1).default("ffprobe"),
+  // Sits alongside FFPROBE_PATH because the same task uses both: ffprobe for
+  // the clip's duration, ffmpeg to decode it into the amplitude envelope that
+  // drives animated lip-sync. Worker-only.
+  FFMPEG_PATH: z.string().min(1).default("ffmpeg"),
   ENABLE_SCENE_AUDIO_GENERATION: z
     .enum(["true", "false"])
     .default("true")
@@ -434,10 +438,6 @@ export const renderEnvironmentSchema = z.object({
     .max(100)
     .default(80),
   REMOTION_CHROMIUM_EXECUTABLE: z.string().min(1).optional(),
-  // Reserved for the standalone Animated Videos feature (not yet built) — no
-  // current caller now that animated and static-image videos are no longer
-  // mixed within one render. Worker-only, like the Chromium path above.
-  FFMPEG_PATH: z.string().min(1).default("ffmpeg"),
   VIDEO_WATERMARK_ENABLED: z
     .enum(["true", "false"])
     .default("false")

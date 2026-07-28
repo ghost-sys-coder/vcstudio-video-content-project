@@ -1,7 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { Character, Scene, SceneVersion } from "@/db/schema";
+import type {
+  Character,
+  ProjectVideoKind,
+  Scene,
+  SceneVersion,
+} from "@/db/schema";
 import {
   approveGeneratedImageAction,
   reconcileSceneImageGenerationAction,
@@ -12,7 +17,10 @@ import { SceneImagePanel } from "@/components/scenes/SceneImagePanel";
 import { estimateSceneImageCost } from "@/lib/costs/scene-image-cost";
 import { getAspectRatioForSceneImageSize } from "@/lib/schemas/scene-image";
 import { sceneImageDetailsResponseSchema } from "@/lib/schemas/scene-image-details";
-import { createSceneImagePromptPreview } from "@/lib/scenes/scene-image-prompt";
+import {
+  createSceneImagePromptPreview,
+  sceneImagePromptModeForVideoKind,
+} from "@/lib/scenes/scene-image-prompt";
 import type {
   SceneImageActionResult,
   SceneImageDetailsView,
@@ -30,12 +38,14 @@ export function SceneImageWorkspace({
   assignedCharacters,
   canGenerate,
   canReview,
+  videoKind,
 }: {
   scene: Scene;
   sceneVersion: SceneVersion;
   assignedCharacters: Character[];
   canGenerate: boolean;
   canReview: boolean;
+  videoKind: ProjectVideoKind;
 }) {
   const [details, setDetails] = useState<SceneImageDetailsView | null>(null);
   const [selection, setSelection] = useState<SceneImageSelection | null>(null);
@@ -130,6 +140,7 @@ export function SceneImageWorkspace({
         sceneVersion,
         size,
         aspectRatio: getAspectRatioForSceneImageSize(size),
+        mode: sceneImagePromptModeForVideoKind(videoKind),
       });
       const estimate = estimateSceneImageCost({
         prompt,
@@ -157,7 +168,7 @@ export function SceneImageWorkspace({
       ),
       compression,
     };
-  }, [assignedCharacters, details, sceneVersion, selection]);
+  }, [assignedCharacters, details, sceneVersion, selection, videoKind]);
 
   const refreshAfterAction = useCallback(
     async (result: SceneImageActionResult): Promise<SceneImageActionResult> => {

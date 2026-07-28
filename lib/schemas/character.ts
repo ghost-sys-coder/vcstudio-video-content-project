@@ -59,6 +59,25 @@ export const assignSceneCharactersSchema = z.object({
   characterIds: z.array(z.uuid()).max(50),
 });
 
+export const sceneCharacterStageSlotSchema = z.enum([
+  "left",
+  "center",
+  "right",
+]);
+
+/** Where an already-assigned character stands, and whether it speaks. */
+export const setSceneCharacterStagingSchema = z.object({
+  projectId: z.uuid(),
+  sceneId: z.uuid(),
+  sceneVersionId: z.uuid(),
+  characterId: z.uuid(),
+  stageSlot: sceneCharacterStageSlotSchema,
+  // Checkboxes submit "on"/absent rather than a boolean.
+  isSpeaker: z
+    .union([z.literal("true"), z.literal("false"), z.boolean()])
+    .transform((value) => value === true || value === "true"),
+});
+
 export const projectCastMemberSchema = z.object({
   projectId: z.uuid(),
   characterId: z.uuid(),

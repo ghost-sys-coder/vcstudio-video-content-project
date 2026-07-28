@@ -1,0 +1,1 @@
+ALTER TABLE "scene_audio_generations" ADD COLUMN "amplitude_envelope" jsonb;

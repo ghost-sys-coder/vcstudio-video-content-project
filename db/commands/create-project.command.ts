@@ -8,6 +8,7 @@ import {
   projects,
   type ContentPlatform,
   type ProjectAspectRatio,
+  type ProjectVideoKind,
 } from "@/db/schema";
 import { getProjectDimensions } from "@/lib/schemas/project";
 import { OUTPUT_VARIANT_DEFINITIONS } from "@/lib/output-variants/output-variant";
@@ -17,6 +18,7 @@ export async function createProject(input: {
   name: string;
   description: string;
   aspectRatio: ProjectAspectRatio;
+  videoKind?: ProjectVideoKind;
   framesPerSecond: number;
   language: string;
   maximumBudgetCents: number;
@@ -48,6 +50,7 @@ export async function createProject(input: {
         name: input.name,
         description: input.description,
         aspectRatio: input.aspectRatio,
+        ...(input.videoKind ? { videoKind: input.videoKind } : {}),
         width: dimensions.width,
         height: dimensions.height,
         framesPerSecond: input.framesPerSecond,

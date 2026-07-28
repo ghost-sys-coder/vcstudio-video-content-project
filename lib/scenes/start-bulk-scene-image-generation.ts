@@ -47,7 +47,10 @@ import {
   createSceneImageOutputCostMatrix,
   getSceneImageCompression,
 } from "@/lib/scenes/scene-image-configuration";
-import { createSceneImagePromptPreview } from "@/lib/scenes/scene-image-prompt";
+import {
+  createSceneImagePromptPreview,
+  sceneImagePromptModeForVideoKind,
+} from "@/lib/scenes/scene-image-prompt";
 import { classifySceneBulkEligibility } from "@/lib/scenes/scene-image-eligibility";
 import {
   getAspectRatioForSceneImageSize,
@@ -282,6 +285,7 @@ export async function startBulkSceneImageGeneration(input: {
             sceneVersion: row.version,
             size,
             aspectRatio: getAspectRatioForSceneImageSize(size),
+            mode: sceneImagePromptModeForVideoKind(input.project.videoKind),
           });
           const estimate = estimateSceneImageCost({
             prompt: finalPrompt,

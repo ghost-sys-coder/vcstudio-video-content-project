@@ -144,6 +144,14 @@ export const videoRenderTask = task({
     const objectKeys = render.timelineSnapshot.scenes.flatMap((scene) => [
       scene.image.objectKey,
       scene.audio.objectKey,
+      // Animated scenes also need their four pose stills signed; absent for
+      // static-image projects.
+      ...(scene.characters ?? []).flatMap((character) => [
+        character.poses.idle,
+        character.poses.talkOpen,
+        character.poses.talkClosed,
+        character.poses.blink,
+      ]),
     ]);
     // Sign for the full render window, not the short default download TTL. The
     // worker downloads Chromium, bundles the composition, and renders every

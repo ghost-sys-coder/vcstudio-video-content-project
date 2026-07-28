@@ -27,6 +27,12 @@ export interface TimelineAudioAsset {
   objectKey: string;
   durationMilliseconds: number | null;
   format: string;
+  /**
+   * Fixed-rate loudness envelope measured when the audio was produced, used to
+   * drive animated lip-sync. Null for audio recorded before this existed, or
+   * where ffmpeg was unavailable — the character then idles.
+   */
+  amplitudeEnvelope?: number[] | null;
 }
 
 export interface TimelineSceneAssetInput {

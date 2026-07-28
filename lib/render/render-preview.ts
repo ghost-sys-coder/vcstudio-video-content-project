@@ -3,6 +3,7 @@ import "server-only";
 import type { Project } from "@/db/schema";
 import { getRenderEnvironment } from "@/lib/env/server";
 import { buildRenderTimelineSnapshot } from "@/lib/render/build-render-snapshot";
+import { resolveSceneCharactersBySceneVersion } from "@/lib/render/resolve-scene-characters";
 import {
   buildVideoCompositionInput,
   parseVideoCompositionInput,
@@ -66,16 +67,34 @@ export async function loadRenderPreview(input: {
     }).timeline;
   }
 
+  const charactersBySceneVersionId =
+    input.project.videoKind === "animatedCharacter"
+      ? await resolveSceneCharactersBySceneVersion({
+          workspaceId: input.workspaceId,
+          projectId: input.project.id,
+          sceneVersionIds: renderTimeline.scenes.map(
+            (scene) => scene.sceneVersionId,
+          ),
+        })
+      : undefined;
+
   const snapshot = buildRenderTimelineSnapshot({
     timeline: renderTimeline,
     captionStyle: context.captionStyle,
     includeCaptions: true,
     includeWatermark: environment.VIDEO_WATERMARK_TEXT.length > 0,
+    charactersBySceneVersionId,
   });
 
   const objectKeys = snapshot.scenes.flatMap((scene) => [
     scene.image.objectKey,
     scene.audio.objectKey,
+    ...(scene.characters ?? []).flatMap((character) => [
+      character.poses.idle,
+      character.poses.talkOpen,
+      character.poses.talkClosed,
+      character.poses.blink,
+    ]),
   ]);
   // Sign for the whole preview session: a full-length preview can play and be
   // replayed for minutes, and the rolling preloader fetches later scenes on

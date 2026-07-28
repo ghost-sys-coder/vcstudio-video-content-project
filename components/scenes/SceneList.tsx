@@ -1,8 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Character, Scene, SceneVersion } from "@/db/schema";
+import type {
+  Character,
+  ProjectVideoKind,
+  Scene,
+  SceneVersion,
+} from "@/db/schema";
 import type { SceneImageIndicator } from "@/lib/scenes/scene-image-indicator";
+import type { SceneCharacterStaging } from "@/lib/scenes/scene-character-staging";
 import { SceneCard } from "@/components/scenes/SceneCard";
 import { SceneNavigator } from "@/components/scenes/SceneNavigator";
 import { SceneWorkspaceHeader } from "@/components/scenes/SceneWorkspaceHeader";
@@ -20,11 +26,13 @@ export function SceneList({
   availableCharacters,
   canGenerateImages,
   canReviewImages,
+  videoKind,
 }: {
   rows: Array<{
     scene: Scene;
     version: SceneVersion;
     assignedCharacters: Character[];
+    characterStaging: SceneCharacterStaging[];
     imageIndicator: SceneImageIndicator;
   }>;
   canEdit: boolean;
@@ -32,6 +40,7 @@ export function SceneList({
   availableCharacters: Character[];
   canGenerateImages: boolean;
   canReviewImages: boolean;
+  videoKind: ProjectVideoKind;
 }) {
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(() =>
     findInitialSceneId(rows, initialSceneNumber),
@@ -184,10 +193,12 @@ export function SceneList({
           scene={selectedRow.scene}
           version={selectedRow.version}
           assignedCharacters={selectedRow.assignedCharacters}
+          characterStaging={selectedRow.characterStaging}
           availableCharacters={availableCharacters}
           canGenerateImages={canGenerateImages}
           canReviewImages={canReviewImages}
           imageIndicator={selectedRow.imageIndicator}
+          videoKind={videoKind}
         />
       </div>
     </div>

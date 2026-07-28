@@ -10,6 +10,7 @@ import { findSceneAudioGenerationWorkflowContext } from "@/db/repositories/scene
 import { calculateActualSceneAudioCostCents } from "@/lib/costs/scene-audio-cost";
 import { assertAiGeneratedSceneAudio } from "@/lib/domain/scene-audio";
 import { getSceneAudioEnvironment } from "@/lib/env/server";
+import { computeAudioAmplitudeEnvelope } from "@/lib/media/audio-amplitude";
 import {
   probeAudioDurationMilliseconds,
   FfprobeUnavailableError,
@@ -196,6 +197,15 @@ export const sceneAudioGenerationTask = task({
         durationMilliseconds = null;
       }
 
+      // Measured here, while the decoded bytes are already in hand, because the
+      // browser preview cannot run ffmpeg and the render worker would otherwise
+      // repeat this decode on every attempt. Already null-safe internally.
+      const amplitudeEnvelope = await computeAudioAmplitudeEnvelope({
+        bytes: result.bytes,
+        extension: result.format,
+        ffmpegPath: environment.FFMPEG_PATH,
+      });
+
       stored = await putSceneAudio({
         objectKey,
         generationId: generation.id,
@@ -212,6 +222,7 @@ export const sceneAudioGenerationTask = task({
         providerRequestId: result.requestId,
         actualCostCents,
         durationMilliseconds,
+        amplitudeEnvelope,
         asset: {
           objectKey: stored.objectKey,
           contentType: stored.contentType,

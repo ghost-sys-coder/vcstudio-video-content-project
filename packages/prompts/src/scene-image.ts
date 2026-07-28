@@ -1,12 +1,17 @@
-export const SCENE_IMAGE_PROMPT_VERSION = "scene-image-v2";
+export const SCENE_IMAGE_PROMPT_VERSION = "scene-image-v3";
 export const SCENE_IMAGE_PROMPT_TEMPLATE_SOURCE_HASH =
-  "d1d0224d441c3ceaa941ca8da724cce56ebd7f2de4e8ea795d567f1cbd459fea";
+  "b508549a8aa0b6b1f9bd7f2a53a776bda53dc20080ba36b8d59fbfe244ea9479";
 
 export const SCENE_IMAGE_PROMPT_TEMPLATE_SOURCE = `VCStudio scene image prompt
 Layers: global style, character identity, character reference requirements,
 scene setting, scene action, camera composition, emotional tone, composition
 focus (clean, uncluttered, single clear subject), continuity, negative
-constraints, output dimensions, aspect ratio, and text exclusion.`;
+constraints, output dimensions, aspect ratio, and text exclusion.
+In backgroundPlate mode the character identity and reference layers are
+replaced with an explicit no-characters instruction, the action is given as
+context only, the composition keeps the character area clear, and the negative
+constraints forbid any human presence — the cast is composited over the still
+during video rendering instead of being generated into it.`;
 
 export type SceneImagePromptCharacter = {
   id: string;
@@ -30,6 +35,14 @@ export type SceneImagePromptReference = {
   referenceType: string;
 };
 
+/**
+ * `scene` renders the characters performing the action, the original behavior.
+ * `backgroundPlate` renders the empty setting only, for animated projects where
+ * character sprites are composited over the still at render time — a character
+ * baked into the plate would appear twice.
+ */
+export type SceneImagePromptMode = "scene" | "backgroundPlate";
+
 export type SceneImagePromptInput = {
   stylePreset: {
     name: string;
@@ -38,6 +51,7 @@ export type SceneImagePromptInput = {
     negativePrompt: string;
     version: number;
   };
+  mode?: SceneImagePromptMode;
   characters: SceneImagePromptCharacter[];
   references: SceneImagePromptReference[];
   scene: {
@@ -139,9 +153,10 @@ export function renderSceneImagePrompt(input: SceneImagePromptInput): string {
     .map(escapePromptValue)
     .filter((name) => name.length > 0)
     .sort((left, right) => left.localeCompare(right));
-  const characterNegativeConstraints = renderCharacterNegativeConstraints(
-    input.characters,
-  );
+  const isBackgroundPlate = input.mode === "backgroundPlate";
+  const characterNegativeConstraints = isBackgroundPlate
+    ? []
+    : renderCharacterNegativeConstraints(input.characters);
 
   return `${SCENE_IMAGE_PROMPT_TEMPLATE_SOURCE}
 Template version: ${SCENE_IMAGE_PROMPT_VERSION}
@@ -156,11 +171,19 @@ ${compactLines([
 </global_style_preset>
 
 <character_identity>
-${renderCharacters(input.characters)}
+${
+  isBackgroundPlate
+    ? "This image is an empty background plate. Render no characters at all — the cast is drawn separately and placed over this image afterwards."
+    : renderCharacters(input.characters)
+}
 </character_identity>
 
 <character_reference_requirements>
-${renderReferences(input.references)}
+${
+  isBackgroundPlate
+    ? "No character references apply. Render the setting only."
+    : renderReferences(input.references)
+}
 </character_reference_requirements>
 
 <scene_setting>
@@ -174,7 +197,18 @@ ${compactLines([
 </scene_setting>
 
 <scene_action>
-${compactLines([renderField("Action", input.scene.actionDescription)])}
+${
+  isBackgroundPlate
+    ? compactLines([
+        renderField(
+          "Action that will take place here (for context only)",
+          input.scene.actionDescription,
+        ),
+        "- Render only the empty setting where this action happens. Do not depict the action itself or anyone performing it.",
+        "- Leave the area where the action occurs clear and unobstructed so characters can be placed there later.",
+      ])
+    : compactLines([renderField("Action", input.scene.actionDescription)])
+}
 </scene_action>
 
 <camera_composition>
@@ -191,10 +225,17 @@ ${escapePromptValue(input.scene.emotionalTone)}
 
 <composition_focus>
 - Keep the composition clean, simple, and uncluttered. Clarity beats detail.
-- Show a single clear focal subject: the character(s) and action described above must dominate the frame and read instantly at a glance.
+${
+  isBackgroundPlate
+    ? `- Render an empty environment with no inhabitants. The setting itself is the subject.
+- Keep the middle and lower-middle of the frame visually calm and free of detail: characters are composited there, and busy content behind them reads as clutter.
+- Use simple, readable environment detail that establishes the location at a glance; never busy or crowded scenery.
+- Do not invent extra props, signage, decoration, or incidental clutter that the scene did not call for.`
+    : `- Show a single clear focal subject: the character(s) and action described above must dominate the frame and read instantly at a glance.
 - Use a simple, minimal background that supports the subject; include only environment detail essential to the location, never busy or crowded scenery.
 - Leave generous negative space and breathing room around the subject; do not fill the frame edge to edge with objects.
-- Do not invent extra props, background characters, crowds, signage, decoration, or incidental clutter that the scene did not call for.
+- Do not invent extra props, background characters, crowds, signage, decoration, or incidental clutter that the scene did not call for.`
+}
 - Prefer one strong idea per image over many competing elements.
 </composition_focus>
 
@@ -207,7 +248,12 @@ ${compactLines([
   renderField("Style exclusions", input.stylePreset.negativePrompt),
   ...characterNegativeConstraints,
   "- No cluttered, busy, or crowded compositions; no visual noise, no densely packed background detail, no extra background characters or crowds, and no unrequested props or decoration.",
-  "- No duplicate characters, extra limbs, malformed hands, distorted faces, conflicting light directions, accidental borders, watermarks, logos, or interface chrome.",
+  isBackgroundPlate
+    ? "- Absolutely no people, characters, figures, faces, hands, silhouettes, shadows of people, reflections of people, statues, mannequins, portraits, or photographs of people anywhere in the image. The setting must be completely empty of any living presence."
+    : "- No duplicate characters, extra limbs, malformed hands, distorted faces, conflicting light directions, accidental borders, watermarks, logos, or interface chrome.",
+  isBackgroundPlate
+    ? "- No conflicting light directions, accidental borders, watermarks, logos, or interface chrome."
+    : null,
 ])}
 </negative_constraints>
 

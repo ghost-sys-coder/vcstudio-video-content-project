@@ -9,6 +9,7 @@ import {
   sceneVersionCharacters,
   type CharacterReferenceType,
   type CharacterStatus,
+  type SceneCharacterStageSlot,
 } from "@/db/schema";
 import {
   createCharacterSlug,
@@ -261,4 +262,59 @@ export async function assignSceneCharacters(input: {
       ),
     ...insert,
   ]);
+}
+
+/**
+ * Sets where an assigned character stands in an animated scene and whether it
+ * is the one speaking this scene's narration.
+ *
+ * Promoting a speaker demotes the previous one in the same batch rather than
+ * relying on the caller to clear it first: `scene_version_characters_single_speaker_unique`
+ * would otherwise reject the write, and a scene must always be able to change
+ * who is talking without a delete step in between.
+ */
+export async function setSceneCharacterStaging(input: {
+  workspaceId: string;
+  projectId: string;
+  sceneId: string;
+  sceneVersionId: string;
+  characterId: string;
+  stageSlot: SceneCharacterStageSlot;
+  isSpeaker: boolean;
+}) {
+  const current = await findCurrentScene(input);
+  if (!current || current.version.id !== input.sceneVersionId)
+    throw new Error("SCENE_VERSION_NOT_CURRENT");
+
+  const scopeToVersion = and(
+    eq(sceneVersionCharacters.workspaceId, input.workspaceId),
+    eq(sceneVersionCharacters.projectId, input.projectId),
+    eq(sceneVersionCharacters.sceneVersionId, input.sceneVersionId),
+  );
+
+  const applyStaging = getDatabase()
+    .update(sceneVersionCharacters)
+    .set({ stageSlot: input.stageSlot, isSpeaker: input.isSpeaker })
+    .where(
+      and(
+        scopeToVersion,
+        eq(sceneVersionCharacters.characterId, input.characterId),
+      ),
+    )
+    .returning({ id: sceneVersionCharacters.id });
+
+  // Demoting every other character first keeps the batch within the single
+  // speaker constraint; when clearing the flag there is nobody to demote.
+  const results = input.isSpeaker
+    ? await getDatabase().batch([
+        getDatabase()
+          .update(sceneVersionCharacters)
+          .set({ isSpeaker: false })
+          .where(scopeToVersion),
+        applyStaging,
+      ])
+    : await getDatabase().batch([applyStaging]);
+
+  const updated = results[results.length - 1] as { id: string }[];
+  if (!updated.length) throw new Error("CHARACTER_NOT_ASSIGNED");
 }

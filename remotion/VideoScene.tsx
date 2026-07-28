@@ -1,6 +1,7 @@
 import { AbsoluteFill, Sequence } from "remotion";
 import { CameraMotion } from "@/remotion/CameraMotion";
 import { CaptionOverlay } from "@/remotion/CaptionOverlay";
+import { CharacterSpriteLayer } from "@/remotion/CharacterSpriteLayer";
 import { SceneAudioTrack } from "@/remotion/SceneAudioTrack";
 import { SceneImage } from "@/remotion/SceneImage";
 import { SceneTransition } from "@/remotion/SceneTransition";
@@ -43,6 +44,14 @@ export function VideoScene({
             sceneId={scene.sceneId}
           />
         </CameraMotion>
+        {/* Over the plate but inside the transition, so a character fades in
+            with its scene rather than popping. */}
+        {scene.characters?.length ? (
+          <CharacterSpriteLayer
+            characters={scene.characters}
+            sceneId={scene.sceneId}
+          />
+        ) : null}
       </SceneTransition>
 
       <Sequence durationInFrames={scene.durationFrames} name="Narration">

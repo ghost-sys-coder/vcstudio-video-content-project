@@ -6,6 +6,10 @@ import type {
   VideoCompositionScene,
 } from "@/lib/render/video-composition-data";
 import { DEFAULT_SCENE_FRAMING } from "@/lib/output-variants/scene-framing";
+import {
+  AMPLITUDE_ENVELOPE_SAMPLE_RATE_HZ,
+  resampleAmplitudeEnvelope,
+} from "@/lib/media/amplitude-envelope";
 
 export const renderCameraMotionSchema = z.enum([
   "none",
@@ -39,6 +43,21 @@ export const renderCaptionSchema = z
     message: "Caption endFrame must not precede startFrame.",
   });
 
+export const videoCompositionSceneCharacterSchema = z
+  .object({
+    characterId: z.uuid(),
+    stageSlot: z.enum(["left", "center", "right"]),
+    isSpeaker: z.boolean(),
+    faceLeft: z.boolean(),
+    idleUrl: z.url(),
+    talkOpenUrl: z.url(),
+    talkClosedUrl: z.url(),
+    blinkUrl: z.url(),
+    // Already resampled to one value per frame, 0..1.
+    amplitudeEnvelope: z.array(z.number().min(0).max(1)),
+  })
+  .strict();
+
 const videoCompositionSceneSchema = z
   .object({
     sceneId: z.uuid(),
@@ -52,6 +71,7 @@ const videoCompositionSceneSchema = z
     audioUrl: z.url(),
     audioTrimBeforeFrames: z.number().int().nonnegative().optional(),
     captions: z.array(renderCaptionSchema),
+    characters: z.array(videoCompositionSceneCharacterSchema).optional(),
   })
   .strict();
 
@@ -83,6 +103,25 @@ export function parseVideoCompositionInput(
   value: unknown,
 ): ValidatedVideoCompositionInput {
   return videoCompositionInputSchema.parse(value);
+}
+
+/**
+ * Which way a character should face so a two-hander reads as a conversation.
+ *
+ * Pose stills are all generated facing the camera, so facing is a free
+ * horizontal mirror rather than extra generated art: a character on the right
+ * turns to its left (toward the rest of the cast), one on the left stays as
+ * drawn, and a character alone on stage keeps facing the viewer.
+ */
+export function resolveCharacterFacing(
+  stageSlot: "left" | "center" | "right",
+  allCharacters: readonly { stageSlot: string }[],
+): boolean {
+  if (allCharacters.length < 2) return false;
+  if (stageSlot === "right") return true;
+  if (stageSlot === "left") return false;
+  // A centered character turns only if someone is actually to its left.
+  return allCharacters.some((other) => other.stageSlot === "left");
 }
 
 /**
@@ -119,6 +158,49 @@ export function buildVideoCompositionInput(input: {
       audioUrl,
       audioTrimBeforeFrames: scene.audio.trimBeforeFrames ?? 0,
       captions: input.snapshot.includeCaptions ? scene.captions : [],
+      ...(scene.characters?.length
+        ? {
+            characters: scene.characters.map((character) => {
+              const poses = {
+                idleUrl: input.imageUrlByObjectKey[character.poses.idle],
+                talkOpenUrl:
+                  input.imageUrlByObjectKey[character.poses.talkOpen],
+                talkClosedUrl:
+                  input.imageUrlByObjectKey[character.poses.talkClosed],
+                blinkUrl: input.imageUrlByObjectKey[character.poses.blink],
+              };
+              if (
+                !poses.idleUrl ||
+                !poses.talkOpenUrl ||
+                !poses.talkClosedUrl ||
+                !poses.blinkUrl
+              )
+                throw new Error(
+                  `Missing signed pose URL for ${character.name} in scene ${scene.sceneNumber}.`,
+                );
+              return {
+                characterId: character.characterId,
+                stageSlot: character.stageSlot,
+                isSpeaker: character.isSpeaker,
+                faceLeft: resolveCharacterFacing(
+                  character.stageSlot,
+                  scene.characters ?? [],
+                ),
+                ...poses,
+                amplitudeEnvelope: character.amplitudeEnvelope?.length
+                  ? resampleAmplitudeEnvelope({
+                      envelope: character.amplitudeEnvelope,
+                      envelopeSampleRateHz:
+                        character.amplitudeSampleRateHz ??
+                        AMPLITUDE_ENVELOPE_SAMPLE_RATE_HZ,
+                      frameCount: scene.durationFrames,
+                      framesPerSecond: input.snapshot.framesPerSecond,
+                    })
+                  : [],
+              };
+            }),
+          }
+        : {}),
     };
   });
 

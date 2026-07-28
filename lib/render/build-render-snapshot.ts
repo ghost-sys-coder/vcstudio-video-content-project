@@ -4,7 +4,11 @@ import {
   deriveSceneCameraMotion,
   deriveSceneTransition,
 } from "@/lib/render/scene-motion";
-import type { RenderTimelineSnapshot } from "@/lib/render/render-timeline-snapshot";
+import type {
+  RenderSceneCharacterData,
+  RenderTimelineSnapshot,
+} from "@/lib/render/render-timeline-snapshot";
+import { AMPLITUDE_ENVELOPE_SAMPLE_RATE_HZ } from "@/lib/media/amplitude-envelope";
 import { DEFAULT_SCENE_FRAMING } from "@/lib/output-variants/scene-framing";
 
 /**
@@ -18,6 +22,11 @@ export function buildRenderTimelineSnapshot(input: {
   captionStyle: CaptionStyleData;
   includeCaptions: boolean;
   includeWatermark: boolean;
+  /**
+   * Animated characters per scene version. Omitted for static-image projects,
+   * which leaves `characters` absent on every scene exactly as before.
+   */
+  charactersBySceneVersionId?: ReadonlyMap<string, RenderSceneCharacterData[]>;
 }): RenderTimelineSnapshot {
   const { timeline } = input;
   return {
@@ -29,40 +38,60 @@ export function buildRenderTimelineSnapshot(input: {
     includeCaptions: input.includeCaptions,
     includeWatermark: input.includeWatermark,
     captionStyle: input.captionStyle,
-    scenes: timeline.scenes.map((scene) => ({
-      sceneId: scene.sceneId,
-      sceneNumber: scene.sceneNumber,
-      startMilliseconds: scene.startMilliseconds,
-      endMilliseconds: scene.endMilliseconds,
-      startFrame: scene.startFrame,
-      endFrame: scene.endFrame,
-      durationFrames: scene.durationFrames,
-      cameraMotion: deriveSceneCameraMotion(scene.sceneNumber),
-      transition: deriveSceneTransition(scene.sceneNumber),
-      image: {
-        objectKey: scene.image.objectKey,
-        width: scene.image.width,
-        height: scene.image.height,
-        framing: scene.image.framing ?? DEFAULT_SCENE_FRAMING,
-      },
-      audio: {
-        objectKey: scene.audio.objectKey,
-        // A ready timeline guarantees a measured duration; the scene slot
-        // equals the audio length, so it is an exact, non-null fallback.
-        durationMilliseconds:
-          scene.audio.durationMilliseconds ?? scene.durationMilliseconds,
-        format: scene.audio.format,
-        trimBeforeFrames: scene.audioTrimBeforeFrames ?? 0,
-      },
-      captions: input.includeCaptions
-        ? scene.captions.map((caption) => ({
-            text: caption.text,
-            startMs: caption.startMs,
-            endMs: caption.endMs,
-            startFrame: caption.startFrame,
-            endFrame: caption.endFrame,
-          }))
-        : [],
-    })),
+    scenes: timeline.scenes.map((scene) => {
+      const characters = input.charactersBySceneVersionId?.get(
+        scene.sceneVersionId,
+      );
+      return {
+        sceneId: scene.sceneId,
+        sceneNumber: scene.sceneNumber,
+        startMilliseconds: scene.startMilliseconds,
+        endMilliseconds: scene.endMilliseconds,
+        startFrame: scene.startFrame,
+        endFrame: scene.endFrame,
+        durationFrames: scene.durationFrames,
+        cameraMotion: deriveSceneCameraMotion(scene.sceneNumber),
+        transition: deriveSceneTransition(scene.sceneNumber),
+        image: {
+          objectKey: scene.image.objectKey,
+          width: scene.image.width,
+          height: scene.image.height,
+          framing: scene.image.framing ?? DEFAULT_SCENE_FRAMING,
+        },
+        audio: {
+          objectKey: scene.audio.objectKey,
+          // A ready timeline guarantees a measured duration; the scene slot
+          // equals the audio length, so it is an exact, non-null fallback.
+          durationMilliseconds:
+            scene.audio.durationMilliseconds ?? scene.durationMilliseconds,
+          format: scene.audio.format,
+          trimBeforeFrames: scene.audioTrimBeforeFrames ?? 0,
+        },
+        captions: input.includeCaptions
+          ? scene.captions.map((caption) => ({
+              text: caption.text,
+              startMs: caption.startMs,
+              endMs: caption.endMs,
+              startFrame: caption.startFrame,
+              endFrame: caption.endFrame,
+            }))
+          : [],
+        // Only the speaker gets the envelope, and only if one was measured, so
+        // the frozen snapshot never carries an array nothing reads.
+        ...(characters?.length
+          ? {
+              characters: characters.map((character) =>
+                character.isSpeaker && scene.audio.amplitudeEnvelope?.length
+                  ? {
+                      ...character,
+                      amplitudeEnvelope: scene.audio.amplitudeEnvelope,
+                      amplitudeSampleRateHz: AMPLITUDE_ENVELOPE_SAMPLE_RATE_HZ,
+                    }
+                  : character,
+              ),
+            }
+          : {}),
+      };
+    }),
   };
 }
