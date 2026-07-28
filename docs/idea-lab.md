@@ -3,9 +3,12 @@
 ## What it is
 
 A top-level, workspace-scoped page (outside the projects tree) where a user generates
-**idea cards** for a niche in one shot, saves the good ones grouped by niche, and later
-pulls an idea into a project's script screen — which auto-fills the brief that already
-exists. No chat, no Trigger.dev task, no reservation ledger, no second AI provider.
+**idea cards** for a niche in one shot, saves the good ones grouped by niche, and starts
+a new project directly from one — the **Create project** dialog's "Start from a saved
+idea" selector seeds the new project's brief. No chat, no Trigger.dev task, no
+reservation ledger, no second AI provider. There is deliberately no way to apply a saved
+idea to an _existing_ project's brief after creation — a blank project has no use for it,
+and a project already has a brief once it exists.
 
 An "idea" is deliberately a **pre-project brief**: it carries the exact six fields the
 `briefSchema` already defines (`lib/schemas/project.ts`), so "use this idea" is just a
@@ -66,30 +69,30 @@ hookAngle, rationale, hookType }] }` (~5 cards).
 ## Routes & components (one component per file, PascalCase)
 
 - `app/(authenticated)/app/ideas/page.tsx` (thin) + sidebar entry.
-- Server actions: `generateIdeasAction`, `saveIdeaAction`, `archiveIdeaAction`,
-  `applyIdeaToBriefAction` — thin wrappers over `lib/ideas/*`,
-  `db/commands/idea-commands.ts`, `db/repositories/content-ideas.repository.ts`.
+- Server actions: `generateIdeasAction`, `saveIdeaAction`, `archiveIdeaAction` — thin
+  wrappers over `lib/ideas/*`, `db/commands/idea-commands.ts`,
+  `db/repositories/content-ideas.repository.ts`.
 - Components: `IdeaGeneratorPanel`, `IdeaCard`, `IdeaLibrary`, `NicheSection`,
   `EmptyIdeasState`, loading/error states.
-- Script screen: `StartFromIdeaSelect` lists workspace ideas grouped by niche;
-  selecting one calls `applyIdeaToBriefAction`, which writes the six fields into
-  `project_briefs` via the existing brief upsert, then the user runs the existing
-  script generator.
+- Project creation: `CreateProjectForm`'s "Start from a saved idea" selector lists
+  workspace ideas grouped by niche; picking one seeds the new project's brief via
+  `createProject`'s optional `brief` param (`db/commands/create-project.command.ts`).
+  A saved idea's `id` can also be passed as `?ideaId=…` (from the Idea Lab library's
+  **Start project** link) to auto-open the dialog pre-filled.
 
 ## Security
 
 - Every `content_ideas` query scoped by server-resolved `workspaceId`; never trust a
   browser-supplied id.
-- `applyIdeaToBrief` verifies both `idea.workspaceId` and `project.workspaceId` equal
-  the authorized workspace before copying (cross-workspace guard for the autofill hop).
+- `createProjectAction` resolves a submitted `ideaId` workspace-scoped before seeding
+  the new project's brief, so a browser cannot seed from another tenant's idea.
 - Same role check that gates script/brief editing gates idea generation.
 
 ## Testing
 
 - Unit: prompt render + `IDEA_GENERATION_PROMPT_VERSION` pin; output-schema parse;
   idea→brief field mapping; cost calc.
-- Integration (opt-in Postgres): create/list-by-niche, workspace isolation, and the
-  apply-to-brief cross-workspace rejection.
+- Integration (opt-in Postgres): create/list-by-niche, workspace isolation.
 - Rate-limit test. No snapshot-only tests.
 
 ## Env / migrations / README

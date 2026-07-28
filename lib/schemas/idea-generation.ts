@@ -54,9 +54,3 @@ export const saveIdeaSchema = z.object({
 });
 
 export const archiveIdeaSchema = z.object({ ideaId: z.uuid() });
-
-/** Server-action input: copy a saved idea into a project's brief. */
-export const applyIdeaToBriefSchema = z.object({
-  projectId: z.uuid(),
-  ideaId: z.uuid(),
-});
