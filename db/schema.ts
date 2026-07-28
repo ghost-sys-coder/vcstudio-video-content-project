@@ -1640,46 +1640,6 @@ export const sceneVersionCharacters = pgTable(
   ],
 );
 
-// Marks a scene version as using animated-character rendering (pose-swap,
-// audio-driven) instead of the default static-image + camera-motion render
-// path. One row per scene version — Phase 0 has no per-line direction yet,
-// so this is the whole "animation direction" for now; a later phase can add
-// per-line pose picks alongside this without reshaping `sceneVersions`.
-export const sceneAnimationDirections = pgTable(
-  "scene_animation_directions",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    workspaceId: uuid("workspace_id")
-      .notNull()
-      .references(() => workspaces.id, { onDelete: "cascade" }),
-    projectId: uuid("project_id")
-      .notNull()
-      .references(() => projects.id, { onDelete: "cascade" }),
-    sceneVersionId: uuid("scene_version_id")
-      .notNull()
-      .references(() => sceneVersions.id, { onDelete: "cascade" }),
-    characterId: uuid("character_id")
-      .notNull()
-      .references(() => characters.id, { onDelete: "restrict" }),
-    createdByUserId: uuid("created_by_user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "restrict" }),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-  },
-  (table) => [
-    uniqueIndex("scene_animation_directions_version_unique").on(
-      table.sceneVersionId,
-    ),
-    index("scene_animation_directions_workspace_project_index").on(
-      table.workspaceId,
-      table.projectId,
-    ),
-    index("scene_animation_directions_character_index").on(table.characterId),
-  ],
-);
-
 // The durable project "cast": which characters a project uses. Survives scene
 // re-analysis (which creates new `sceneVersions`) so the roster can be
 // re-applied to freshly generated scene versions.
@@ -3307,8 +3267,6 @@ export type Scene = typeof scenes.$inferSelect;
 export type SceneVersion = typeof sceneVersions.$inferSelect;
 export type SceneStatus = (typeof sceneStatusEnum.enumValues)[number];
 export type ProjectCharacter = typeof projectCharacters.$inferSelect;
-export type SceneAnimationDirection =
-  typeof sceneAnimationDirections.$inferSelect;
 export type StylePreset = typeof stylePresets.$inferSelect;
 export type StylePresetVersion = typeof stylePresetVersions.$inferSelect;
 export type PromptTemplateVersion = typeof promptTemplateVersions.$inferSelect;

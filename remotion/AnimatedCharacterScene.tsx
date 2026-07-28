@@ -45,6 +45,12 @@ function resolveActivePose(input: {
 }
 
 /**
+ * Reserved for the standalone Animated Videos feature (not yet built) — no
+ * current caller. Animated and static-image videos are no longer mixed
+ * within one render, so this isn't wired into `VideoScene.tsx` today; kept
+ * because it's generic (no dependency on scenes/projects beyond `sceneId`,
+ * used only for telemetry labeling) and already debugged.
+ *
  * Renders an animated character by swapping between four pre-generated pose
  * stills (idle / talk-open / talk-closed / blink) instead of showing one
  * static image. All four are mounted and decoded up front, stacked and

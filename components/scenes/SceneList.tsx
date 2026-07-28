@@ -18,7 +18,6 @@ export function SceneList({
   canEdit,
   initialSceneNumber,
   availableCharacters,
-  animationReadyCharacters,
   canGenerateImages,
   canReviewImages,
 }: {
@@ -27,12 +26,10 @@ export function SceneList({
     version: SceneVersion;
     assignedCharacters: Character[];
     imageIndicator: SceneImageIndicator;
-    animatedCharacter: Character | null;
   }>;
   canEdit: boolean;
   initialSceneNumber: number | null;
   availableCharacters: Character[];
-  animationReadyCharacters: Character[];
   canGenerateImages: boolean;
   canReviewImages: boolean;
 }) {
@@ -188,8 +185,6 @@ export function SceneList({
           version={selectedRow.version}
           assignedCharacters={selectedRow.assignedCharacters}
           availableCharacters={availableCharacters}
-          animationReadyCharacters={animationReadyCharacters}
-          animatedCharacter={selectedRow.animatedCharacter}
           canGenerateImages={canGenerateImages}
           canReviewImages={canReviewImages}
           imageIndicator={selectedRow.imageIndicator}

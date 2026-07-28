@@ -14,17 +14,6 @@ import type {
  * components can share them in both the browser preview (via @remotion/player)
  * and the render worker bundle without pulling in server-only code.
  */
-export type VideoCompositionAnimatedCharacter = {
-  idleUrl: string;
-  talkOpenUrl: string;
-  talkClosedUrl: string;
-  blinkUrl: string;
-  // Per-frame amplitude (0..1), measured server-side once at render time from
-  // the scene's narration audio. Empty when analysis was unavailable or
-  // failed, in which case the character falls back to idle/blink only.
-  amplitudeEnvelope: number[];
-};
-
 export type VideoCompositionScene = {
   sceneId: string;
   sceneNumber: number;
@@ -42,7 +31,6 @@ export type VideoCompositionScene = {
   };
   audioUrl: string;
   audioTrimBeforeFrames?: number;
-  animatedCharacter?: VideoCompositionAnimatedCharacter;
   captions: RenderCaptionData[];
 };
 

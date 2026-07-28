@@ -1,0 +1,1 @@
+DROP TABLE "scene_animation_directions";

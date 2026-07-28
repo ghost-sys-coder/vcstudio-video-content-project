@@ -1,5 +1,4 @@
 import { AbsoluteFill, Sequence } from "remotion";
-import { AnimatedCharacterScene } from "@/remotion/AnimatedCharacterScene";
 import { CameraMotion } from "@/remotion/CameraMotion";
 import { CaptionOverlay } from "@/remotion/CaptionOverlay";
 import { SceneAudioTrack } from "@/remotion/SceneAudioTrack";
@@ -38,23 +37,11 @@ export function VideoScene({
           motion={scene.cameraMotion}
           durationInFrames={visibleDurationFrames}
         >
-          {scene.animatedCharacter ? (
-            <AnimatedCharacterScene
-              amplitudeEnvelope={scene.animatedCharacter.amplitudeEnvelope}
-              blinkUrl={scene.animatedCharacter.blinkUrl}
-              framing={scene.imageFraming}
-              idleUrl={scene.animatedCharacter.idleUrl}
-              sceneId={scene.sceneId}
-              talkClosedUrl={scene.animatedCharacter.talkClosedUrl}
-              talkOpenUrl={scene.animatedCharacter.talkOpenUrl}
-            />
-          ) : (
-            <SceneImage
-              framing={scene.imageFraming}
-              src={scene.imageUrl}
-              sceneId={scene.sceneId}
-            />
-          )}
+          <SceneImage
+            framing={scene.imageFraming}
+            src={scene.imageUrl}
+            sceneId={scene.sceneId}
+          />
         </CameraMotion>
       </SceneTransition>
 

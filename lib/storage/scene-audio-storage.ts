@@ -131,6 +131,11 @@ export async function findStoredSceneAudio(input: {
 }
 
 /**
+ * Reserved for the standalone Animated Videos feature (not yet built) — no
+ * current caller now that animated and static-image videos are no longer
+ * mixed within one render. Kept because it's a generic, already-debugged
+ * "read this object's bytes" helper with no scene/animation-specific logic.
+ *
  * Reads a scene audio object's raw bytes directly (not a signed URL), for
  * server-side analysis such as amplitude-envelope computation for animated
  * characters. There is no billing/audit trail to pin against here, unlike

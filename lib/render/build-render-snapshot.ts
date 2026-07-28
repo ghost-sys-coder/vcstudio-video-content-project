@@ -4,10 +4,7 @@ import {
   deriveSceneCameraMotion,
   deriveSceneTransition,
 } from "@/lib/render/scene-motion";
-import type {
-  RenderAnimatedCharacterData,
-  RenderTimelineSnapshot,
-} from "@/lib/render/render-timeline-snapshot";
+import type { RenderTimelineSnapshot } from "@/lib/render/render-timeline-snapshot";
 import { DEFAULT_SCENE_FRAMING } from "@/lib/output-variants/scene-framing";
 
 /**
@@ -21,9 +18,6 @@ export function buildRenderTimelineSnapshot(input: {
   captionStyle: CaptionStyleData;
   includeCaptions: boolean;
   includeWatermark: boolean;
-  animatedCharactersBySceneVersionId?: Readonly<
-    Record<string, RenderAnimatedCharacterData>
-  >;
 }): RenderTimelineSnapshot {
   const { timeline } = input;
   return {
@@ -60,8 +54,6 @@ export function buildRenderTimelineSnapshot(input: {
         format: scene.audio.format,
         trimBeforeFrames: scene.audioTrimBeforeFrames ?? 0,
       },
-      animatedCharacter:
-        input.animatedCharactersBySceneVersionId?.[scene.sceneVersionId],
       captions: input.includeCaptions
         ? scene.captions.map((caption) => ({
             text: caption.text,

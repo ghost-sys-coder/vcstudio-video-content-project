@@ -27,14 +27,6 @@ export const renderImageFramingSchema = z.object({
   backgroundColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
 });
 
-export const renderAnimatedCharacterSchema = z.object({
-  idleUrl: z.url(),
-  talkOpenUrl: z.url(),
-  talkClosedUrl: z.url(),
-  blinkUrl: z.url(),
-  amplitudeEnvelope: z.array(z.number().min(0).max(1)),
-});
-
 export const renderCaptionSchema = z
   .object({
     text: z.string(),
@@ -59,7 +51,6 @@ const videoCompositionSceneSchema = z
     imageFraming: renderImageFramingSchema.optional(),
     audioUrl: z.url(),
     audioTrimBeforeFrames: z.number().int().nonnegative().optional(),
-    animatedCharacter: renderAnimatedCharacterSchema.optional(),
     captions: z.array(renderCaptionSchema),
   })
   .strict();
@@ -103,7 +94,6 @@ export function buildVideoCompositionInput(input: {
   snapshot: RenderTimelineSnapshot;
   imageUrlByObjectKey: Readonly<Record<string, string>>;
   audioUrlByObjectKey: Readonly<Record<string, string>>;
-  amplitudeEnvelopeBySceneId?: Readonly<Record<string, number[]>>;
   watermarkText: string;
 }): VideoCompositionInput {
   const scenes: VideoCompositionScene[] = input.snapshot.scenes.map((scene) => {
@@ -117,28 +107,6 @@ export function buildVideoCompositionInput(input: {
       throw new Error(
         `Missing signed audio URL for scene ${scene.sceneNumber}.`,
       );
-    const pose = scene.animatedCharacter;
-    const animatedCharacter = pose
-      ? (() => {
-          const idleUrl = input.imageUrlByObjectKey[pose.idleObjectKey];
-          const talkOpenUrl = input.imageUrlByObjectKey[pose.talkOpenObjectKey];
-          const talkClosedUrl =
-            input.imageUrlByObjectKey[pose.talkClosedObjectKey];
-          const blinkUrl = input.imageUrlByObjectKey[pose.blinkObjectKey];
-          if (!idleUrl || !talkOpenUrl || !talkClosedUrl || !blinkUrl)
-            throw new Error(
-              `Missing signed pose URL for scene ${scene.sceneNumber}.`,
-            );
-          return {
-            idleUrl,
-            talkOpenUrl,
-            talkClosedUrl,
-            blinkUrl,
-            amplitudeEnvelope:
-              input.amplitudeEnvelopeBySceneId?.[scene.sceneId] ?? [],
-          };
-        })()
-      : undefined;
     return {
       sceneId: scene.sceneId,
       sceneNumber: scene.sceneNumber,
@@ -150,7 +118,6 @@ export function buildVideoCompositionInput(input: {
       imageFraming: scene.image.framing ?? DEFAULT_SCENE_FRAMING,
       audioUrl,
       audioTrimBeforeFrames: scene.audio.trimBeforeFrames ?? 0,
-      animatedCharacter,
       captions: input.snapshot.includeCaptions ? scene.captions : [],
     };
   });

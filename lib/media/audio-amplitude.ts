@@ -61,6 +61,11 @@ export function computeAmplitudeEnvelopeFromPcm(input: {
 }
 
 /**
+ * Reserved for the standalone Animated Videos feature (not yet built) — no
+ * current caller now that animated and static-image videos are no longer
+ * mixed within one render. Kept because it's generic (raw bytes + frame
+ * timing in, envelope out, no scene/project coupling) and already debugged.
+ *
  * Decodes encoded narration audio with ffmpeg and returns a per-frame
  * amplitude envelope, or null when ffmpeg itself is unavailable or the audio
  * could not be decoded. This exists so animated-character lip-sync timing is

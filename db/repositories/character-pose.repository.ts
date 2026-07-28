@@ -5,7 +5,6 @@ import { getDatabase } from "@/db/drizzle";
 import {
   characterReferenceAssets,
   characters,
-  sceneAnimationDirections,
   type Character,
   type CharacterReferenceType,
 } from "@/db/schema";
@@ -17,45 +16,15 @@ export const ANIMATION_POSE_TYPES = [
   "poseBlink",
 ] as const satisfies readonly CharacterReferenceType[];
 
-export async function findSceneAnimationDirection(input: {
-  workspaceId: string;
-  sceneVersionId: string;
-}) {
-  const [direction] = await getDatabase()
-    .select()
-    .from(sceneAnimationDirections)
-    .where(
-      and(
-        eq(sceneAnimationDirections.workspaceId, input.workspaceId),
-        eq(sceneAnimationDirections.sceneVersionId, input.sceneVersionId),
-      ),
-    )
-    .limit(1);
-  return direction ?? null;
-}
-
-export async function listSceneAnimationDirectionsForVersions(input: {
-  workspaceId: string;
-  projectId: string;
-  sceneVersionIds: string[];
-}) {
-  if (!input.sceneVersionIds.length) return [];
-  return getDatabase()
-    .select()
-    .from(sceneAnimationDirections)
-    .where(
-      and(
-        eq(sceneAnimationDirections.workspaceId, input.workspaceId),
-        eq(sceneAnimationDirections.projectId, input.projectId),
-        inArray(sceneAnimationDirections.sceneVersionId, input.sceneVersionIds),
-      ),
-    );
-}
+// Reserved for the standalone Animated Videos feature (not yet built) — no
+// current caller. Kept because it's generic character/workspace-scoped
+// infrastructure with zero coupling to the (removed) per-scene animate
+// picker, not because anything uses it today.
 
 /**
  * Active characters that have all four pose stills generated — the only
- * characters eligible to animate a scene, since a partial pose set can't be
- * rendered (see resolveAnimatedCharactersBySceneVersion).
+ * characters eligible to drive an animated video, since a partial pose set
+ * can't be rendered.
  */
 export async function listAnimationReadyCharacters(input: {
   workspaceId: string;

@@ -24,7 +24,6 @@ export function ScenePlanner({
   canEdit,
   initialSceneNumber,
   availableCharacters,
-  animationReadyCharacters,
   cast,
   castAvailableCharacters,
   canGenerateImages,
@@ -38,13 +37,11 @@ export function ScenePlanner({
     version: SceneVersion;
     assignedCharacters: Character[];
     imageIndicator: SceneImageIndicator;
-    animatedCharacter: Character | null;
   }>;
   estimatedCostCents: number;
   canEdit: boolean;
   initialSceneNumber: number | null;
   availableCharacters: Character[];
-  animationReadyCharacters: Character[];
   cast: ProjectCastEntry[];
   castAvailableCharacters: Character[];
   canGenerateImages: boolean;
@@ -82,7 +79,6 @@ export function ScenePlanner({
         initialSceneNumber={initialSceneNumber}
         rows={rows}
         availableCharacters={availableCharacters}
-        animationReadyCharacters={animationReadyCharacters}
         canGenerateImages={canGenerateImages}
         canReviewImages={canReviewImages}
       />

@@ -6,7 +6,6 @@ import { SceneStatusBadge } from "@/components/scenes/SceneStatusBadge";
 import { SceneEditor } from "@/components/scenes/SceneEditor";
 import { ApproveSceneButton } from "@/components/scenes/ApproveSceneButton";
 import { SceneCharacterList } from "@/components/scenes/SceneCharacterList";
-import { SceneAnimationPanel } from "@/components/scenes/SceneAnimationPanel";
 import { SceneImageWorkspace } from "@/components/scenes/SceneImageWorkspace";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -17,8 +16,6 @@ export function SceneCard({
   onDirtyChange,
   assignedCharacters,
   availableCharacters,
-  animationReadyCharacters,
-  animatedCharacter,
   canGenerateImages,
   canReviewImages,
   imageIndicator,
@@ -29,8 +26,6 @@ export function SceneCard({
   onDirtyChange?: (dirty: boolean) => void;
   assignedCharacters: Character[];
   availableCharacters: Character[];
-  animationReadyCharacters: Character[];
-  animatedCharacter: Character | null;
   canGenerateImages: boolean;
   canReviewImages: boolean;
   imageIndicator?: SceneImageIndicator;
@@ -63,14 +58,6 @@ export function SceneCard({
             <SceneCharacterList
               assignedCharacters={assignedCharacters}
               availableCharacters={availableCharacters}
-              canEdit={canEdit}
-              projectId={scene.projectId}
-              sceneId={scene.id}
-              sceneVersionId={version.id}
-            />
-            <SceneAnimationPanel
-              animatedCharacter={animatedCharacter}
-              animationReadyCharacters={animationReadyCharacters}
               canEdit={canEdit}
               projectId={scene.projectId}
               sceneId={scene.id}

@@ -12,7 +12,6 @@ import {
 } from "@/db/commands/video-render-commands";
 import { findVideoRenderWorkflowContext } from "@/db/repositories/video-render.repository";
 import { getRenderEnvironment } from "@/lib/env/server";
-import { computeAudioAmplitudeEnvelope } from "@/lib/media/audio-amplitude";
 import { VIDEO_COMPOSITION_ID } from "@/lib/render/composition-id";
 import {
   buildVideoCompositionInput,
@@ -21,7 +20,6 @@ import {
 import { estimateRenderCostCents } from "@/lib/render/render-cost";
 import { RemotionVideoRenderProvider } from "@/lib/render/remotion-video-render-provider";
 import { createVideoExportObjectKey } from "@/lib/storage/object-key";
-import { downloadSceneAudioBytes } from "@/lib/storage/scene-audio-storage";
 import {
   createRenderAssetDownloadUrls,
   findStoredVideoExport,
@@ -146,14 +144,6 @@ export const videoRenderTask = task({
     const objectKeys = render.timelineSnapshot.scenes.flatMap((scene) => [
       scene.image.objectKey,
       scene.audio.objectKey,
-      ...(scene.animatedCharacter
-        ? [
-            scene.animatedCharacter.idleObjectKey,
-            scene.animatedCharacter.talkOpenObjectKey,
-            scene.animatedCharacter.talkClosedObjectKey,
-            scene.animatedCharacter.blinkObjectKey,
-          ]
-        : []),
     ]);
     // Sign for the full render window, not the short default download TTL. The
     // worker downloads Chromium, bundles the composition, and renders every
@@ -168,43 +158,11 @@ export const videoRenderTask = task({
       MAX_RENDER_WALL_CLOCK_SECONDS,
     );
 
-    // Measured server-side, once, from the real narration audio bytes — never
-    // fetched client-side during rendering (that previously required the R2
-    // bucket to serve CORS headers it doesn't have, crashing every render with
-    // an animated character). A decode failure degrades to no amplitude data
-    // for that scene rather than failing the render.
-    const amplitudeEnvelopeBySceneId: Record<string, number[]> = {};
-    for (const scene of render.timelineSnapshot.scenes) {
-      if (!scene.animatedCharacter) continue;
-      try {
-        const bytes = await downloadSceneAudioBytes(scene.audio.objectKey);
-        const envelope = await computeAudioAmplitudeEnvelope({
-          bytes,
-          extension: scene.audio.format,
-          ffmpegPath: environment.FFMPEG_PATH,
-          frameCount: scene.durationFrames,
-          framesPerSecond: render.timelineSnapshot.framesPerSecond,
-        });
-        amplitudeEnvelopeBySceneId[scene.sceneId] = envelope ?? [];
-      } catch (error) {
-        console.error(
-          "Audio amplitude analysis failed; this scene's animated character will use idle/blink poses only.",
-          {
-            renderId: render.id,
-            sceneId: scene.sceneId,
-            error: error instanceof Error ? error.message : error,
-          },
-        );
-        amplitudeEnvelopeBySceneId[scene.sceneId] = [];
-      }
-    }
-
     const compositionInput = parseVideoCompositionInput(
       buildVideoCompositionInput({
         snapshot: render.timelineSnapshot,
         imageUrlByObjectKey: assetUrls,
         audioUrlByObjectKey: assetUrls,
-        amplitudeEnvelopeBySceneId,
         watermarkText: render.timelineSnapshot.includeWatermark
           ? environment.VIDEO_WATERMARK_TEXT
           : "",
