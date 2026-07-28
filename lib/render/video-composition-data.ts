@@ -19,6 +19,10 @@ export type VideoCompositionAnimatedCharacter = {
   talkOpenUrl: string;
   talkClosedUrl: string;
   blinkUrl: string;
+  // Per-frame amplitude (0..1), measured server-side once at render time from
+  // the scene's narration audio. Empty when analysis was unavailable or
+  // failed, in which case the character falls back to idle/blink only.
+  amplitudeEnvelope: number[];
 };
 
 export type VideoCompositionScene = {

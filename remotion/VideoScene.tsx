@@ -40,7 +40,7 @@ export function VideoScene({
         >
           {scene.animatedCharacter ? (
             <AnimatedCharacterScene
-              audioUrl={scene.audioUrl}
+              amplitudeEnvelope={scene.animatedCharacter.amplitudeEnvelope}
               blinkUrl={scene.animatedCharacter.blinkUrl}
               framing={scene.imageFraming}
               idleUrl={scene.animatedCharacter.idleUrl}

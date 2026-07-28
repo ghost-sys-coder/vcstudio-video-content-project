@@ -130,6 +130,26 @@ export async function findStoredSceneAudio(input: {
   };
 }
 
+/**
+ * Reads a scene audio object's raw bytes directly (not a signed URL), for
+ * server-side analysis such as amplitude-envelope computation for animated
+ * characters. There is no billing/audit trail to pin against here, unlike
+ * character-reference downloads, so no etag check is required.
+ */
+export async function downloadSceneAudioBytes(
+  objectKey: string,
+): Promise<Buffer> {
+  const environment = getStorageEnvironment();
+  const response = await getR2Client().send(
+    new GetObjectCommand({
+      Bucket: environment.R2_BUCKET_NAME,
+      Key: objectKey,
+    }),
+  );
+  if (!response.Body) throw new Error("SCENE_AUDIO_BODY_MISSING");
+  return Buffer.from(await response.Body.transformToByteArray());
+}
+
 export async function createSceneAudioDownloadUrl(
   objectKey: string,
 ): Promise<string> {

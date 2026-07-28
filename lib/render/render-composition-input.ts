@@ -32,6 +32,7 @@ export const renderAnimatedCharacterSchema = z.object({
   talkOpenUrl: z.url(),
   talkClosedUrl: z.url(),
   blinkUrl: z.url(),
+  amplitudeEnvelope: z.array(z.number().min(0).max(1)),
 });
 
 export const renderCaptionSchema = z
@@ -102,6 +103,7 @@ export function buildVideoCompositionInput(input: {
   snapshot: RenderTimelineSnapshot;
   imageUrlByObjectKey: Readonly<Record<string, string>>;
   audioUrlByObjectKey: Readonly<Record<string, string>>;
+  amplitudeEnvelopeBySceneId?: Readonly<Record<string, number[]>>;
   watermarkText: string;
 }): VideoCompositionInput {
   const scenes: VideoCompositionScene[] = input.snapshot.scenes.map((scene) => {
@@ -127,7 +129,14 @@ export function buildVideoCompositionInput(input: {
             throw new Error(
               `Missing signed pose URL for scene ${scene.sceneNumber}.`,
             );
-          return { idleUrl, talkOpenUrl, talkClosedUrl, blinkUrl };
+          return {
+            idleUrl,
+            talkOpenUrl,
+            talkClosedUrl,
+            blinkUrl,
+            amplitudeEnvelope:
+              input.amplitudeEnvelopeBySceneId?.[scene.sceneId] ?? [],
+          };
         })()
       : undefined;
     return {

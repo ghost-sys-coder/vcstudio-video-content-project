@@ -7,7 +7,6 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
-import { getWaveformPortion, useAudioData } from "@remotion/media-utils";
 import { recordPreviewEvent } from "@/lib/render/preview-telemetry";
 import {
   DEFAULT_SCENE_FRAMING,
@@ -53,9 +52,14 @@ function resolveActivePose(input: {
  * would re-trigger Remotion's decode/buffer-stall logic on every pose change.
  *
  * The talk/idle choice is driven by the narration audio's measured amplitude
- * at the current frame (via `@remotion/media-utils`), never fabricated
- * timing — the same principle this app already applies to subtitle timing.
- * Blinking is a fixed-interval timer, independent of amplitude.
+ * at the current frame, never fabricated timing — the same principle this app
+ * already applies to subtitle timing. The amplitude envelope itself is
+ * computed server-side, once, at render time (see
+ * `lib/media/audio-amplitude.ts`) and passed in as a plain array indexed by
+ * scene-relative frame — this component never fetches audio itself, since
+ * doing so in-browser during rendering requires the asset bucket to serve
+ * CORS headers it doesn't have. Blinking is a fixed-interval timer,
+ * independent of amplitude.
  */
 export function AnimatedCharacterScene({
   sceneId,
@@ -63,7 +67,7 @@ export function AnimatedCharacterScene({
   talkOpenUrl,
   talkClosedUrl,
   blinkUrl,
-  audioUrl,
+  amplitudeEnvelope,
   framing,
 }: {
   sceneId: string;
@@ -71,7 +75,7 @@ export function AnimatedCharacterScene({
   talkOpenUrl: string;
   talkClosedUrl: string;
   blinkUrl: string;
-  audioUrl: string;
+  amplitudeEnvelope: number[];
   framing?: SceneFramingData;
 }) {
   const effectiveFraming = framing ?? DEFAULT_SCENE_FRAMING;
@@ -107,22 +111,10 @@ export function AnimatedCharacterScene({
     };
   }, [isPlayer, isActive, allLoaded, delayPlayback]);
 
-  const audioData = useAudioData(audioUrl);
-  let amplitude: number | null = null;
-  if (audioData) {
-    try {
-      const bars = getWaveformPortion({
-        audioData,
-        startTimeInSeconds: Math.max(frame / fps, 0),
-        durationInSeconds: 1 / fps,
-        numberOfSamples: 4,
-        outputRange: "zero-to-one",
-      });
-      amplitude = bars.reduce((max, bar) => Math.max(max, bar.amplitude), 0);
-    } catch {
-      amplitude = null;
-    }
-  }
+  const amplitude =
+    frame >= 0 && frame < amplitudeEnvelope.length
+      ? amplitudeEnvelope[frame]!
+      : null;
 
   const activePose = resolveActivePose({ frame, fps, amplitude });
 

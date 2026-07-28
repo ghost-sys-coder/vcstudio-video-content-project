@@ -434,6 +434,10 @@ export const renderEnvironmentSchema = z.object({
     .max(100)
     .default(80),
   REMOTION_CHROMIUM_EXECUTABLE: z.string().min(1).optional(),
+  // Used only to compute an animated character's lip-sync amplitude envelope
+  // from narration audio, server-side, once per render. Worker-only, like the
+  // Chromium path above.
+  FFMPEG_PATH: z.string().min(1).default("ffmpeg"),
   VIDEO_WATERMARK_ENABLED: z
     .enum(["true", "false"])
     .default("false")
