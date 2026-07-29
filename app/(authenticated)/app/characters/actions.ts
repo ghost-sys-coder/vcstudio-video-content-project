@@ -18,6 +18,11 @@ import {
   updateCharacterSchema,
 } from "@/lib/schemas/character";
 import { startCharacterReferenceGeneration } from "@/lib/characters/start-character-reference-generation";
+import {
+  CharacterAnimationCheckError,
+  loadCharacterAnimationCheck,
+} from "@/lib/characters/character-animation-check";
+import type { CharacterAnimationCheckView } from "@/lib/characters/animation-check-view";
 import { BudgetExceededError } from "@/lib/domain/errors";
 
 export type CharacterActionState = { success: boolean; error: string | null };
@@ -91,6 +96,48 @@ export async function generateCharacterReferenceAction(
             : "This portrait would exceed the workspace monthly budget.",
       };
     return { success: false, error: "The portrait could not be started." };
+  }
+}
+
+export type CharacterAnimationCheckState =
+  | { success: true; view: CharacterAnimationCheckView; error: null }
+  | { success: false; view: null; error: string };
+
+/**
+ * Inspects what is actually stored for this character's four pose stills, so an
+ * animated project is only set up on a character that will really animate.
+ *
+ * Read-only, but it reads objects out of storage and decodes them, so it stays
+ * behind the same manage-characters gate as the rest of this file rather than
+ * being open to viewers.
+ */
+export async function runCharacterAnimationCheckAction(
+  formData: FormData,
+): Promise<CharacterAnimationCheckState> {
+  const parsed = characterIdSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success)
+    return { success: false, view: null, error: "Invalid character." };
+  try {
+    const context = await requireCharacterManager();
+    const character = await findCharacter({
+      workspaceId: context.activeMembership.workspaceId,
+      characterId: parsed.data.characterId,
+    });
+    if (!character) throw new Error("CHARACTER_NOT_FOUND");
+    const view = await loadCharacterAnimationCheck({
+      workspaceId: context.activeMembership.workspaceId,
+      character,
+    });
+    return { success: true, view, error: null };
+  } catch (error) {
+    return {
+      success: false,
+      view: null,
+      error:
+        error instanceof CharacterAnimationCheckError
+          ? "A pose image could not be read from storage. Try regenerating the poses."
+          : "The animation check could not be run.",
+    };
   }
 }
 

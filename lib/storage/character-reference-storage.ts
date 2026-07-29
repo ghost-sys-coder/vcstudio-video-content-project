@@ -104,6 +104,25 @@ export async function putCharacterReferenceImage(input: {
   };
 }
 
+/**
+ * Reads a stored reference image back as bytes so it can be inspected
+ * server-side (see the character animation check, which measures whether a pose
+ * still is genuinely cut out rather than trusting its content type).
+ */
+export async function downloadCharacterReferenceBytes(
+  objectKey: string,
+): Promise<Uint8Array> {
+  const environment = getStorageEnvironment();
+  const response = await getR2Client().send(
+    new GetObjectCommand({
+      Bucket: environment.R2_BUCKET_NAME,
+      Key: objectKey,
+    }),
+  );
+  if (!response.Body) throw new Error("REFERENCE_BODY_MISSING");
+  return response.Body.transformToByteArray();
+}
+
 export async function deleteCharacterReferenceObject(objectKey: string) {
   const environment = getStorageEnvironment();
   await getR2Client().send(

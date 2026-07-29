@@ -1,6 +1,7 @@
 import type { Character, CharacterReferenceAsset } from "@/db/schema";
 import type { CharacterPortraitView } from "@/lib/characters/character-reference-generation-view";
 import { ArchiveCharacterDialog } from "@/components/characters/ArchiveCharacterDialog";
+import { CharacterAnimationCheckSection } from "@/components/characters/CharacterAnimationCheckSection";
 import { CharacterForm } from "@/components/characters/CharacterForm";
 import { CharacterPortraitGenerationList } from "@/components/characters/CharacterPortraitGenerationList";
 import { CharacterPortraitStatusPoller } from "@/components/characters/CharacterPortraitStatusPoller";
@@ -98,6 +99,9 @@ export function CharacterDetails({
             </p>
           )}
         </section>
+      ) : null}
+      {editable ? (
+        <CharacterAnimationCheckSection characterId={character.id} />
       ) : null}
     </div>
   );

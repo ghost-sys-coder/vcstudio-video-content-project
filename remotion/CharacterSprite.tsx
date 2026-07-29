@@ -117,18 +117,7 @@ export function CharacterSprite({
   });
 
   return (
-    <div
-      style={{
-        position: "absolute",
-        bottom: 0,
-        left: `${STAGE_SLOT_CENTER[character.stageSlot] * 100}%`,
-        height: `${SPRITE_HEIGHT_RATIO * 100}%`,
-        // Translate by half the sprite's own width so the slot value is its
-        // centre regardless of how wide the artwork turns out to be, and mirror
-        // in the same transform so facing never fights the centring.
-        transform: `translateX(-50%)${character.faceLeft ? " scaleX(-1)" : ""}`,
-      }}
-    >
+    <>
       {poses.map((pose) => (
         <Img
           key={pose.kind}
@@ -158,14 +147,21 @@ export function CharacterSprite({
           style={{
             position: "absolute",
             bottom: 0,
-            left: 0,
-            height: "100%",
+            left: `${STAGE_SLOT_CENTER[character.stageSlot] * 100}%`,
+            height: `${SPRITE_HEIGHT_RATIO * 100}%`,
             width: "auto",
-            objectFit: "contain",
+            // Positioned on the image itself rather than on a wrapper: a
+            // wrapper holding only absolutely positioned children shrinks to
+            // zero width, which silently turned `translateX(-50%)` into a no-op
+            // and pushed every character right of its slot. Sized against its
+            // own rendered width, the slot value really is the sprite's centre
+            // whatever the artwork's proportions. Mirroring rides in the same
+            // transform so facing never fights the centring.
+            transform: `translateX(-50%)${character.faceLeft ? " scaleX(-1)" : ""}`,
             opacity: activePose === pose.kind ? 1 : 0,
           }}
         />
       ))}
-    </div>
+    </>
   );
 }
