@@ -10,7 +10,7 @@ import type {
   ProjectBrief,
   ThumbnailGeneration,
 } from "@/db/schema";
-import { contentPlatformEnum } from "@/db/schema";
+import { VIDEO_CONTENT_PLATFORMS } from "@/lib/platforms/video-content-platforms";
 import { findApprovedScriptVersion } from "@/db/repositories/scenes.repository";
 import { listProjectThumbnails } from "@/db/repositories/thumbnail-generation.repository";
 import { listProjectTitleSuggestions } from "@/db/repositories/title-generation.repository";
@@ -106,7 +106,7 @@ export async function loadThumbnailsView(input: {
         projectId: input.project.id,
       }),
       Promise.all(
-        contentPlatformEnum.enumValues.map((platform) =>
+        VIDEO_CONTENT_PLATFORMS.map((platform) =>
           listProjectThumbnails({
             workspaceId: input.workspaceId,
             projectId: input.project.id,
@@ -120,8 +120,8 @@ export async function loadThumbnailsView(input: {
   const hasTopic = Boolean(input.brief && input.brief.topic.trim() !== "");
   const hasContext = hasTopic || approvedScript !== null;
 
-  const platforms: PlatformThumbnailsView[] =
-    contentPlatformEnum.enumValues.map((platform, index) => {
+  const platforms: PlatformThumbnailsView[] = VIDEO_CONTENT_PLATFORMS.map(
+    (platform, index) => {
       const size = getThumbnailSizeForPlatform(platform);
       // Estimate against the text-free variant: the two modes differ by a few
       // prompt tokens, and the output cost (which dominates) is identical.
@@ -173,7 +173,8 @@ export async function loadThumbnailsView(input: {
         }),
         thumbnails: (thumbnailsByPlatform[index] ?? []).map(toThumbnailView),
       };
-    });
+    },
+  );
 
   return {
     model: environment.OPENAI_IMAGE_MODEL,

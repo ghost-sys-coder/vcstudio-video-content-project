@@ -6,6 +6,7 @@ import { disconnectWorkspaceChannelAction } from "@/app/(authenticated)/app/sett
 import { ConnectYouTubeButton } from "@/components/publish/ConnectYouTubeButton";
 import { ConnectFacebookButton } from "@/components/publish/ConnectFacebookButton";
 import { ConnectInstagramButton } from "@/components/publish/ConnectInstagramButton";
+import { ConnectLinkedInButton } from "@/components/publish/ConnectLinkedInButton";
 import { ConnectTikTokButton } from "@/components/publish/ConnectTikTokButton";
 import { FutureChannelPlatformCard } from "@/components/workspace/FutureChannelPlatformCard";
 import { WorkspaceChannelCard } from "@/components/workspace/WorkspaceChannelCard";
@@ -36,6 +37,14 @@ const INSTAGRAM_OAUTH_MESSAGES: Record<string, string> = {
   invalid: "The Instagram authorization response was invalid or expired.",
 };
 
+const LINKEDIN_OAUTH_MESSAGES: Record<string, string> = {
+  connected: "The LinkedIn account is now connected to this workspace.",
+  cancelled: "LinkedIn connection was cancelled.",
+  failed: "The LinkedIn account could not be connected. Please try again.",
+  forbidden: "You do not have permission to connect that account.",
+  invalid: "The LinkedIn authorization response was invalid or expired.",
+};
+
 const TIKTOK_OAUTH_MESSAGES: Record<string, string> = {
   connected: "The TikTok account is now connected to this workspace.",
   cancelled: "TikTok connection was cancelled.",
@@ -52,6 +61,7 @@ export function WorkspaceChannelsSection({
   oauthStatus: {
     facebook: string | null;
     instagram: string | null;
+    linkedin: string | null;
     tiktok: string | null;
     youtube: string | null;
   };
@@ -89,6 +99,7 @@ export function WorkspaceChannelsSection({
       ? INSTAGRAM_OAUTH_MESSAGES[oauthStatus.instagram]
       : null,
     oauthStatus.tiktok ? TIKTOK_OAUTH_MESSAGES[oauthStatus.tiktok] : null,
+    oauthStatus.linkedin ? LINKEDIN_OAUTH_MESSAGES[oauthStatus.linkedin] : null,
   ].filter((message): message is string => Boolean(message));
 
   return (
@@ -109,25 +120,37 @@ export function WorkspaceChannelsSection({
           </h2>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             Manage the destinations this workspace can publish finished videos
-            to. Credentials remain encrypted and workspace-scoped.
+            and social posts to. Credentials remain encrypted and
+            workspace-scoped.
           </p>
         </div>
-        {initialData.enabled ? (
-          <div className="flex flex-wrap gap-2">
-            <ConnectYouTubeButton
-              label={activeCount > 0 ? "Add YouTube" : "Connect YouTube"}
+        <div className="flex flex-wrap gap-2">
+          {initialData.enabled ? (
+            <>
+              <ConnectYouTubeButton
+                label={activeCount > 0 ? "Add YouTube" : "Connect YouTube"}
+              />
+              <ConnectFacebookButton
+                label={activeCount > 0 ? "Add Facebook" : "Connect Facebook"}
+              />
+              <ConnectInstagramButton
+                label={activeCount > 0 ? "Add Instagram" : "Connect Instagram"}
+              />
+              <ConnectTikTokButton
+                label={activeCount > 0 ? "Add TikTok" : "Connect TikTok"}
+              />
+            </>
+          ) : null}
+          {/*
+            LinkedIn is a social-post destination only — it has no rendered-video
+            path — so it follows the posting flag rather than the video one.
+          */}
+          {initialData.socialPostingEnabled ? (
+            <ConnectLinkedInButton
+              label={activeCount > 0 ? "Add LinkedIn" : "Connect LinkedIn"}
             />
-            <ConnectFacebookButton
-              label={activeCount > 0 ? "Add Facebook" : "Connect Facebook"}
-            />
-            <ConnectInstagramButton
-              label={activeCount > 0 ? "Add Instagram" : "Connect Instagram"}
-            />
-            <ConnectTikTokButton
-              label={activeCount > 0 ? "Add TikTok" : "Connect TikTok"}
-            />
-          </div>
-        ) : null}
+          ) : null}
+        </div>
       </div>
 
       {oauthMessages.map((message) => (

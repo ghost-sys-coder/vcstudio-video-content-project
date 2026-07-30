@@ -8,6 +8,7 @@ describe("workspace channels view", () => {
   it("maps workspace connections without exposing credentials", () => {
     const view = buildWorkspaceChannelsView({
       enabled: true,
+      socialPostingEnabled: true,
       connections: [
         {
           id: "connection-1",
@@ -43,6 +44,7 @@ describe("workspace channels view", () => {
   it("exposes implemented platforms as connectable", () => {
     const view = buildWorkspaceChannelsView({
       enabled: true,
+      socialPostingEnabled: true,
       connections: [],
     });
 
@@ -51,6 +53,7 @@ describe("workspace channels view", () => {
       { platform: "facebook", label: "Facebook", available: true },
       { platform: "instagram", label: "Instagram", available: true },
       { platform: "tiktok", label: "TikTok", available: true },
+      { platform: "linkedin", label: "LinkedIn", available: true },
     ]);
   });
 });

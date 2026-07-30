@@ -11,6 +11,7 @@ import {
 
 export function ApplicationShell({
   activeMembership,
+  canComposePosts,
   canManageSettings,
   canManageUsage,
   children,
@@ -22,6 +23,7 @@ export function ApplicationShell({
   user,
 }: {
   activeMembership: WorkspaceMembershipView;
+  canComposePosts: boolean;
   canManageSettings: boolean;
   canManageUsage: boolean;
   children: React.ReactNode;
@@ -37,6 +39,7 @@ export function ApplicationShell({
       <ThemeResyncEffect targetTheme={themeResyncTarget} />
       <ApplicationSidebar
         activeMembership={activeMembership}
+        canComposePosts={canComposePosts}
         canManageSettings={canManageSettings}
         canManageUsage={canManageUsage}
         initialTheme={initialTheme}

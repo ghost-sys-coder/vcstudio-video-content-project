@@ -26,7 +26,10 @@ export type WorkspaceChannelPlatformView = {
 };
 
 export type WorkspaceChannelsView = {
+  /** Video publishing (YouTube/Facebook/Instagram/TikTok render uploads). */
   enabled: boolean;
+  /** Social posting, which is what makes LinkedIn connectable at all. */
+  socialPostingEnabled: boolean;
   channels: WorkspaceChannelView[];
   platforms: WorkspaceChannelPlatformView[];
 };
@@ -36,6 +39,7 @@ const PLATFORM_ORDER: readonly ContentPlatform[] = [
   "facebook",
   "instagram",
   "tiktok",
+  "linkedin",
 ];
 
 function formatUtc(value: Date): string {
@@ -44,10 +48,12 @@ function formatUtc(value: Date): string {
 
 export function buildWorkspaceChannelsView(input: {
   enabled: boolean;
+  socialPostingEnabled: boolean;
   connections: PlatformConnectionSummary[];
 }): WorkspaceChannelsView {
   return {
     enabled: input.enabled,
+    socialPostingEnabled: input.socialPostingEnabled,
     channels: input.connections.map((connection) => ({
       id: connection.id,
       platform: connection.platform,
@@ -75,6 +81,7 @@ export async function loadWorkspaceChannelsView(input: {
   ]);
   return buildWorkspaceChannelsView({
     enabled: environment.ENABLE_VIDEO_PUBLISHING,
+    socialPostingEnabled: environment.ENABLE_SOCIAL_POSTING,
     connections,
   });
 }

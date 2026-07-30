@@ -4,7 +4,6 @@ import {
   IDEA_GENERATION_PROMPT_VERSION,
   renderIdeaGenerationPrompt,
 } from "@studio/prompts";
-import type { ContentPlatform } from "@/db/schema";
 import {
   recordFailedIdeaGenerationRun,
   recordIdeaGenerationRun,
@@ -15,6 +14,7 @@ import { getSceneAnalysisEnvironment } from "@/lib/env/server";
 import { classifyOpenAiError } from "@/lib/openai/openai-error";
 import { OpenAiTextGenerationProvider } from "@/lib/openai/openai-text-generation-provider";
 import { enforceRateLimit } from "@/lib/rate-limit/enforce-rate-limit";
+import type { VideoContentPlatform } from "@/lib/platforms/video-content-platforms";
 import type { GeneratedIdea } from "@/lib/schemas/idea-generation";
 import type { TextGenerationProvider } from "@/lib/openai/text-generation-provider";
 
@@ -37,7 +37,7 @@ export async function generateIdeas(
     workspaceId: string;
     userId: string;
     niche: string;
-    platform: ContentPlatform | null;
+    platform: VideoContentPlatform | null;
     tonePreference: string | null;
     language: string;
     count: number;

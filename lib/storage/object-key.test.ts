@@ -10,6 +10,9 @@ import {
   isVideoExportObjectKey,
   createWorkspaceLogoObjectKey,
   isWorkspaceLogoObjectKey,
+  createMediaLibraryObjectKey,
+  isMediaLibraryObjectKey,
+  createProjectAssetPrefix,
 } from "@/lib/storage/object-key";
 
 const workspaceId = "00000000-0000-4000-8000-000000000001";
@@ -203,6 +206,83 @@ describe("thumbnail object keys", () => {
       isThumbnailObjectKey({
         ...base,
         objectKey: `workspaces/${workspaceId}/projects/${projectId}/thumbnails/youtube/../${thumbnailGenerationId}.webp`,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("media library object keys", () => {
+  const mediaAssetId = "11111111-1111-4111-8111-111111111111";
+
+  it("derives the key entirely from the asset id and content type", () => {
+    expect(
+      createMediaLibraryObjectKey({
+        workspaceId,
+        mediaAssetId,
+        contentType: "video/quicktime",
+      }),
+    ).toBe(`workspaces/${workspaceId}/library/${mediaAssetId}.mov`);
+    expect(
+      createMediaLibraryObjectKey({
+        workspaceId,
+        mediaAssetId,
+        contentType: "image/jpeg",
+      }),
+    ).toBe(`workspaces/${workspaceId}/library/${mediaAssetId}.jpg`);
+  });
+
+  it("sits outside the project asset prefix, so deleting a project cannot purge it", () => {
+    const key = createMediaLibraryObjectKey({
+      workspaceId,
+      mediaAssetId,
+      contentType: "image/png",
+    });
+    expect(
+      key.startsWith(
+        createProjectAssetPrefix({ workspaceId, projectId: "any-project" }),
+      ),
+    ).toBe(false);
+    expect(key.includes("/projects/")).toBe(false);
+  });
+
+  it("accepts only the exact key this asset and content type produce", () => {
+    const base = {
+      workspaceId,
+      mediaAssetId,
+      contentType: "image/png",
+    } as const;
+    expect(
+      isMediaLibraryObjectKey({
+        ...base,
+        objectKey: `workspaces/${workspaceId}/library/${mediaAssetId}.png`,
+      }),
+    ).toBe(true);
+    // Another workspace's object.
+    expect(
+      isMediaLibraryObjectKey({
+        ...base,
+        objectKey: `workspaces/00000000-0000-4000-8000-000000000002/library/${mediaAssetId}.png`,
+      }),
+    ).toBe(false);
+    // Another asset's object.
+    expect(
+      isMediaLibraryObjectKey({
+        ...base,
+        objectKey: `workspaces/${workspaceId}/library/22222222-2222-4222-8222-222222222222.png`,
+      }),
+    ).toBe(false);
+    // A mismatched extension.
+    expect(
+      isMediaLibraryObjectKey({
+        ...base,
+        objectKey: `workspaces/${workspaceId}/library/${mediaAssetId}.mp4`,
+      }),
+    ).toBe(false);
+    // Traversal.
+    expect(
+      isMediaLibraryObjectKey({
+        ...base,
+        objectKey: `workspaces/${workspaceId}/library/../${mediaAssetId}.png`,
       }),
     ).toBe(false);
   });

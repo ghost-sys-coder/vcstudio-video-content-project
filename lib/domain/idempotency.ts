@@ -96,6 +96,36 @@ export function createVideoPublicationIdempotencyKey(input: {
   ]);
 }
 
+/**
+ * One key per (post, destination) attempt.
+ *
+ * Keyed on the target rather than the post, because a post fans out to several
+ * accounts and each one has to be independently retriable — a LinkedIn success
+ * must not make an Instagram retry look like a duplicate. The body fingerprint
+ * is included so editing a draft and publishing again is a genuinely new
+ * attempt, while a double-click on the same content is not.
+ */
+export function createSocialPostTargetIdempotencyKey(input: {
+  secret: string;
+  workspaceId: string;
+  postId: string;
+  connectionId: string;
+  platform: string;
+  bodyFingerprint: string;
+  /** Distinct per intentional publish so a deliberate re-post is allowed. */
+  requestNonce: string;
+}): string {
+  return hash(input.secret, [
+    input.workspaceId,
+    "social-post-target",
+    input.postId,
+    input.connectionId,
+    input.platform,
+    input.bodyFingerprint,
+    input.requestNonce,
+  ]);
+}
+
 export function createThumbnailGenerationIdempotencyKey(input: {
   secret: string;
   workspaceId: string;

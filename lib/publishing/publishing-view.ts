@@ -31,6 +31,10 @@ import {
   selectPreferredGeneratedTitle,
   type GeneratedPublishingMetadata,
 } from "@/lib/publishing/generated-metadata";
+import {
+  isVideoContentPlatform,
+  type VideoContentPlatform,
+} from "@/lib/platforms/video-content-platforms";
 import { CONTENT_PLATFORM_LABELS } from "@/lib/titles/title-view";
 
 export const PUBLICATION_HISTORY_LIMIT = 20;
@@ -38,7 +42,8 @@ export const PUBLISHABLE_RENDER_LIMIT = 20;
 
 export type ConnectionView = {
   id: string;
-  platform: ContentPlatform;
+  /** Narrowed: this panel publishes rendered videos, so LinkedIn never appears here. */
+  platform: VideoContentPlatform;
   platformLabel: string;
   accountName: string;
   accountUrl: string | null;
@@ -161,15 +166,25 @@ export async function loadPublishingView(input: {
       description: run.generatedDescription ?? "",
       tags: normalizeGeneratedTags(run.generatedTags ?? []),
     })),
-    connections: connections.map((connection) => ({
-      id: connection.id,
-      platform: connection.platform,
-      platformLabel: CONTENT_PLATFORM_LABELS[connection.platform],
-      accountName: connection.externalAccountName,
-      accountUrl: connection.externalAccountUrl,
-      status: connection.status,
-      lastError: connection.lastError,
-    })),
+    connections: connections
+      // A LinkedIn connection is valid but cannot receive a rendered-video
+      // publication, so it must not appear in this picker at all.
+      .filter(
+        (
+          connection,
+        ): connection is typeof connection & {
+          platform: VideoContentPlatform;
+        } => isVideoContentPlatform(connection.platform),
+      )
+      .map((connection) => ({
+        id: connection.id,
+        platform: connection.platform,
+        platformLabel: CONTENT_PLATFORM_LABELS[connection.platform],
+        accountName: connection.externalAccountName,
+        accountUrl: connection.externalAccountUrl,
+        status: connection.status,
+        lastError: connection.lastError,
+      })),
     // Only finished renders with a stored asset can be published. Shorts and
     // repurposed variants surface here alongside the full-length export, each
     // tagged with its kind and source name so a user can tell them apart —

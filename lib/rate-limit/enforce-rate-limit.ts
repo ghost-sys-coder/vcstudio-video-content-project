@@ -18,7 +18,8 @@ export type RateLimitedOperation =
   | "title_generation"
   | "thumbnail_generation"
   | "idea_generation"
-  | "video_publication";
+  | "video_publication"
+  | "social_post_publication";
 
 /**
  * Enforces the per-workspace fixed-window rate limit for a billable operation,

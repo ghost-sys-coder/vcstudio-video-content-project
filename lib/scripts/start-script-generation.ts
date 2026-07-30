@@ -27,6 +27,7 @@ import { isHistoricalContent } from "@/lib/domain/historical-content";
 import { getSceneAnalysisEnvironment } from "@/lib/env/server";
 import { enforceRateLimit } from "@/lib/rate-limit/enforce-rate-limit";
 import type { scriptGenerationTask } from "@/trigger/script-generation";
+import { toVideoContentPlatform } from "@/lib/platforms/video-content-platforms";
 
 export class ScriptGenerationRequestError extends Error {
   constructor(message: string) {
@@ -44,7 +45,7 @@ function briefFingerprintPayload(
     targetAudience: brief.targetAudience,
     tone: brief.tone,
     targetDurationSeconds: brief.targetDurationSeconds,
-    primaryPlatform: brief.primaryPlatform,
+    primaryPlatform: toVideoContentPlatform(brief.primaryPlatform),
     hookAngle: brief.hookAngle,
     niche: brief.niche,
     language,
@@ -75,7 +76,7 @@ export async function startScriptGeneration(input: {
     targetAudience: brief.targetAudience,
     tone: brief.tone,
     targetDurationSeconds: brief.targetDurationSeconds,
-    primaryPlatform: brief.primaryPlatform,
+    primaryPlatform: toVideoContentPlatform(brief.primaryPlatform),
     hookAngle: brief.hookAngle,
     language: input.project.language,
     requireHistoricalAccuracy: isHistoricalContent({

@@ -1,4 +1,8 @@
 import type { ContentPlatform } from "@/db/schema";
+import {
+  isVideoContentPlatform,
+  type VideoContentPlatform,
+} from "@/lib/platforms/video-content-platforms";
 
 export const PUBLISHING_METADATA_UPDATED_EVENT =
   "vcstudio:publishing-metadata-updated";
@@ -17,8 +21,14 @@ export type PublishingMetadataDraft = {
   tags: string;
 };
 
+/**
+ * Keyed on the video pipeline's platforms rather than every `content_platform`:
+ * publishing metadata is generated for a rendered video, and LinkedIn is a
+ * social-post destination that this pipeline never writes a title or a
+ * description for.
+ */
 export type PublishingMetadataDraftMap = Record<
-  ContentPlatform,
+  VideoContentPlatform,
   PublishingMetadataDraft
 >;
 
@@ -107,6 +117,9 @@ export function hydrateUntouchedPublishingMetadata(input: {
   const drafts = { ...input.drafts };
   const hydratedSignatures = new Map(input.hydratedSignatures);
   for (const metadata of input.generatedMetadata) {
+    // Metadata is only ever generated for the video pipeline; a row for any
+    // other destination has no draft slot to hydrate.
+    if (!isVideoContentPlatform(metadata.platform)) continue;
     const signature = `${metadata.generationRunId}:${metadata.title}`;
     const previousSignature = hydratedSignatures.get(metadata.platform);
     if (previousSignature === signature) continue;

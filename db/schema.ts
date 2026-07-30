@@ -18,6 +18,7 @@ import type {
   SubtitleSegmentTextOverrides,
 } from "@/lib/subtitles/caption-style-data";
 import type { RenderTimelineSnapshot } from "@/lib/render/render-timeline-snapshot";
+import type { PortableDocument } from "@/lib/social/portable-document";
 
 export const workspaceRoleEnum = pgEnum("workspace_role", [
   "owner",
@@ -33,6 +34,47 @@ export const webhookStatusEnum = pgEnum("webhook_status", [
 
 export const storageObjectKindEnum = pgEnum("storage_object_kind", [
   "workspace_logo",
+]);
+
+export const mediaAssetKindEnum = pgEnum("media_asset_kind", [
+  "image",
+  "video",
+]);
+
+// Library uploads are two-phase (authorize a signed PUT, then confirm), so a row
+// exists before its object does. `pending` is that gap; a row only becomes
+// selectable in the composer once the upload was confirmed and inspected.
+export const mediaAssetStatusEnum = pgEnum("media_asset_status", [
+  "pending",
+  "ready",
+  "failed",
+]);
+
+/**
+ * A post's overall state, derived from its per-target states.
+ *
+ * `partially_failed` is deliberately its own value rather than folded into
+ * `failed`: one platform rejecting an aspect ratio while the others published is
+ * the normal case, and collapsing that into a single "failed" would hide three
+ * successful posts behind one error.
+ */
+export const socialPostStatusEnum = pgEnum("social_post_status", [
+  "draft",
+  "scheduled",
+  "publishing",
+  "published",
+  "partially_failed",
+  "failed",
+  "cancelled",
+]);
+
+export const socialPostTargetStatusEnum = pgEnum("social_post_target_status", [
+  "pending",
+  "queued",
+  "publishing",
+  "published",
+  "failed",
+  "cancelled",
 ]);
 
 export const characterStatusEnum = pgEnum("character_status", [
@@ -151,11 +193,15 @@ export const sceneAnalysisStatusEnum = pgEnum("scene_analysis_status", [
 ]);
 
 // Distribution platforms for briefs, titles, and thumbnails.
+// Every destination the app can address. Which of these a given feature offers
+// is decided by that feature's own registry, not by this enum — LinkedIn, for
+// example, is a social post destination but never a thumbnail or idea platform.
 export const contentPlatformEnum = pgEnum("content_platform", [
   "youtube",
   "tiktok",
   "facebook",
   "instagram",
+  "linkedin",
 ]);
 
 export const usageReservationStatusEnum = pgEnum("usage_reservation_status", [
@@ -338,6 +384,9 @@ export const auditActionEnum = pgEnum("audit_action", [
   "platform_connected",
   "platform_disconnected",
   "video_published",
+  "media_asset_deleted",
+  "social_post_published",
+  "social_post_scheduled",
   "member_invited",
   "invitation_revoked",
   "member_joined",
@@ -502,6 +551,79 @@ export const storageObjects = pgTable(
       table.kind,
     ),
     index("storage_objects_workspace_index").on(table.workspaceId),
+  ],
+);
+
+/**
+ * The workspace media library: reusable images and videos uploaded by hand, kept
+ * so a social post can attach them later.
+ *
+ * Deliberately NOT stored in `storage_objects`. That table carries a
+ * `(workspace_id, kind)` unique index — it holds at most one row per kind per
+ * workspace and exists to track the workspace logo, not to be an asset store.
+ *
+ * Rows are soft deleted (`deletedAt`) rather than removed, because
+ * `social_post_media` references them and a post that already went out must keep
+ * showing what it actually sent.
+ */
+export const mediaAssets = pgTable(
+  "media_assets",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    kind: mediaAssetKindEnum("kind").notNull(),
+    status: mediaAssetStatusEnum("status").notNull().default("pending"),
+    objectKey: text("object_key").notNull(),
+    contentType: text("content_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull().default(0),
+    /** As supplied by the browser, sanitized. Display only — never a storage key. */
+    originalFileName: text("original_file_name").notNull().default(""),
+    /** Editable label; falls back to the file name in the UI when empty. */
+    title: text("title").notNull().default(""),
+    /** Accessibility text carried through to platforms that accept it. */
+    altText: text("alt_text").notNull().default(""),
+    tags: jsonb("tags").$type<string[]>().notNull().default([]),
+    /** Measured server-side with sharp for images; null for video. */
+    width: integer("width"),
+    height: integer("height"),
+    /**
+     * Client-reported for video — the web runtime has no ffprobe, so this is a
+     * hint used for display and pre-flight only. Platform duration rules are
+     * enforced at publish time by each provider, as they are for renders.
+     */
+    durationMilliseconds: integer("duration_milliseconds"),
+    uploadedByUserId: uuid("uploaded_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("media_assets_object_key_unique").on(table.objectKey),
+    uniqueIndex("media_assets_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    index("media_assets_workspace_kind_index").on(
+      table.workspaceId,
+      table.kind,
+      table.createdAt,
+    ),
+    index("media_assets_workspace_status_index").on(
+      table.workspaceId,
+      table.status,
+    ),
+    check(
+      "media_assets_dimensions_non_negative",
+      sql`(${table.width} is null or ${table.width} > 0) and (${table.height} is null or ${table.height} > 0) and (${table.durationMilliseconds} is null or ${table.durationMilliseconds} >= 0)`,
+    ),
   ],
 );
 
@@ -2914,6 +3036,174 @@ export const videoPublications = pgTable(
   ],
 );
 
+/**
+ * A social post: one piece of writing, optionally with library media, sent to
+ * one or more connected accounts.
+ *
+ * Workspace-scoped, not project-scoped. `projectId` is nullable and exists only
+ * as a link back to a rendered video when a post happens to be about one — a
+ * post needs no project, and most will not have one.
+ */
+export const socialPosts = pgTable(
+  "social_posts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    /** Internal label for the posts list; never sent to a platform. */
+    name: text("name").notNull().default(""),
+    /** The structured editor document. Validated by `portableDocumentSchema`. */
+    bodyDocument: jsonb("body_document")
+      .$type<PortableDocument>()
+      .notNull()
+      .default({ type: "doc", content: [] }),
+    /**
+     * The document flattened by `renderPortableDocumentToPlainText`. Stored
+     * rather than derived on read because it is what actually gets published,
+     * and a later change to the renderer must not silently rewrite the text an
+     * already-published post was sent with.
+     */
+    bodyPlainText: text("body_plain_text").notNull().default(""),
+    status: socialPostStatusEnum("status").notNull().default("draft"),
+    /** Absolute instant the scheduler may claim this post. */
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
+    /** The author's zone, kept only so the UI can redisplay their intent. */
+    scheduledTimezone: text("scheduled_timezone").notNull().default("UTC"),
+    projectId: uuid("project_id").references(() => projects.id, {
+      onDelete: "set null",
+    }),
+    /** Optimistic lock: a stale composer tab cannot overwrite a newer edit. */
+    version: integer("version").notNull().default(1),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("social_posts_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    index("social_posts_workspace_status_index").on(
+      table.workspaceId,
+      table.status,
+      table.scheduledAt,
+    ),
+    index("social_posts_workspace_created_index").on(
+      table.workspaceId,
+      table.createdAt,
+    ),
+    // The scheduler sweeper's claim query: due, scheduled, oldest first. Not
+    // workspace-scoped, because the sweep is global by design.
+    index("social_posts_due_index").on(table.status, table.scheduledAt),
+    check(
+      "social_posts_scheduled_requires_time",
+      sql`${table.status} <> 'scheduled' or ${table.scheduledAt} is not null`,
+    ),
+  ],
+);
+
+/** Ordered library media attached to a post. */
+export const socialPostMedia = pgTable(
+  "social_post_media",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => socialPosts.id, { onDelete: "cascade" }),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    // Restricted rather than cascading: a published post must keep showing the
+    // media it sent, which is also why `media_assets` is soft deleted.
+    mediaAssetId: uuid("media_asset_id")
+      .notNull()
+      .references(() => mediaAssets.id, { onDelete: "restrict" }),
+    position: integer("position").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("social_post_media_post_position_unique").on(
+      table.postId,
+      table.position,
+    ),
+    uniqueIndex("social_post_media_post_asset_unique").on(
+      table.postId,
+      table.mediaAssetId,
+    ),
+    // Answers "is this asset still in use?" when someone removes it.
+    index("social_post_media_asset_index").on(table.mediaAssetId),
+  ],
+);
+
+/**
+ * One destination for a post: the account it goes to and how that attempt went.
+ *
+ * Per-target rather than per-post state is what lets a post report
+ * `partially_failed` honestly — see `social_post_status`.
+ */
+export const socialPostTargets = pgTable(
+  "social_post_targets",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => socialPosts.id, { onDelete: "cascade" }),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    platform: contentPlatformEnum("platform").notNull(),
+    connectionId: uuid("connection_id")
+      .notNull()
+      .references(() => platformConnections.id, { onDelete: "restrict" }),
+    status: socialPostTargetStatusEnum("status").notNull().default("pending"),
+    /** Set when this platform's copy was edited away from the shared body. */
+    overrideBodyPlainText: text("override_body_plain_text"),
+    externalPostId: text("external_post_id"),
+    externalPostUrl: text("external_post_url"),
+    /** Resumable provider operation, e.g. an Instagram media container. */
+    providerOperationId: text("provider_operation_id"),
+    /** Encrypted ephemeral provider credential, e.g. a TikTok upload URL. */
+    providerOperationSecretSealed: text("provider_operation_secret_sealed"),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    triggerRunId: text("trigger_run_id"),
+    idempotencyKey: text("idempotency_key").notNull(),
+    errorCategory: text("error_category"),
+    safeErrorMessage: text("safe_error_message"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("social_post_targets_idempotency_unique").on(
+      table.idempotencyKey,
+    ),
+    // One attempt per account per post: re-adding the same account cannot
+    // double-post it.
+    uniqueIndex("social_post_targets_post_connection_unique").on(
+      table.postId,
+      table.connectionId,
+    ),
+    index("social_post_targets_post_index").on(table.postId, table.status),
+    index("social_post_targets_workspace_status_index").on(
+      table.workspaceId,
+      table.status,
+    ),
+  ],
+);
+
 export const usageReservations = pgTable(
   "usage_reservations",
   {
@@ -3262,6 +3552,15 @@ export type Workspace = typeof workspaces.$inferSelect;
 export type WorkspaceMember = typeof workspaceMembers.$inferSelect;
 export type WorkspaceRole = (typeof workspaceRoleEnum.enumValues)[number];
 export type StorageObject = typeof storageObjects.$inferSelect;
+export type MediaAsset = typeof mediaAssets.$inferSelect;
+export type MediaAssetKind = (typeof mediaAssetKindEnum.enumValues)[number];
+export type MediaAssetStatus = (typeof mediaAssetStatusEnum.enumValues)[number];
+export type SocialPost = typeof socialPosts.$inferSelect;
+export type SocialPostStatus = (typeof socialPostStatusEnum.enumValues)[number];
+export type SocialPostMedia = typeof socialPostMedia.$inferSelect;
+export type SocialPostTarget = typeof socialPostTargets.$inferSelect;
+export type SocialPostTargetStatus =
+  (typeof socialPostTargetStatusEnum.enumValues)[number];
 export type Character = typeof characters.$inferSelect;
 export type CharacterStatus = (typeof characterStatusEnum.enumValues)[number];
 export type CharacterReferenceAsset =

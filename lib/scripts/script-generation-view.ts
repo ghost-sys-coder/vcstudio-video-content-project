@@ -6,6 +6,7 @@ import { estimateScriptGenerationCost } from "@/lib/costs/script-generation-cost
 import { isHistoricalContent } from "@/lib/domain/historical-content";
 import { getSceneAnalysisEnvironment } from "@/lib/env/server";
 import { findLatestScriptGenerationRun } from "@/db/repositories/script-generation.repository";
+import { toVideoContentPlatform } from "@/lib/platforms/video-content-platforms";
 
 export type ScriptGenerationRunView = {
   id: string;
@@ -65,7 +66,7 @@ export async function loadScriptGenerationView(input: {
       targetAudience: input.brief.targetAudience,
       tone: input.brief.tone,
       targetDurationSeconds: input.brief.targetDurationSeconds,
-      primaryPlatform: input.brief.primaryPlatform,
+      primaryPlatform: toVideoContentPlatform(input.brief.primaryPlatform),
       hookAngle: input.brief.hookAngle,
       language: input.project.language,
       requireHistoricalAccuracy,

@@ -1,9 +1,7 @@
 import type { ContentPlatform } from "@/db/schema";
 import { Badge } from "@/components/ui/badge";
-import {
-  formatDurationLabel,
-  PLATFORM_LABELS,
-} from "@/lib/ideas/platform-labels";
+import { formatDurationLabel } from "@/lib/ideas/idea-duration-label";
+import { CONTENT_PLATFORM_LABELS } from "@/lib/platforms/platform-labels";
 
 export type IdeaCardData = {
   topic: string;
@@ -23,7 +21,7 @@ export function IdeaCardBody({ idea }: { idea: IdeaCardData }) {
       <p className="font-medium leading-snug">{idea.topic}</p>
       <div className="flex flex-wrap items-center gap-1.5">
         <Badge variant="secondary">
-          {PLATFORM_LABELS[idea.primaryPlatform]}
+          {CONTENT_PLATFORM_LABELS[idea.primaryPlatform]}
         </Badge>
         <Badge variant="outline">
           {formatDurationLabel(idea.targetDurationSeconds)}

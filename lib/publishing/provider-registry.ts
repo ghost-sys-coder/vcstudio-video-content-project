@@ -42,6 +42,7 @@ const PLATFORM_DISPLAY_NAMES: Record<ContentPlatform, string> = {
   facebook: "Facebook",
   instagram: "Instagram",
   tiktok: "TikTok",
+  linkedin: "LinkedIn",
 };
 
 function requireCredential(
@@ -77,6 +78,10 @@ export function isPlatformConfigured(platform: ContentPlatform): boolean {
     case "facebook":
     case "instagram":
       return true;
+    // LinkedIn takes social posts, not rendered-video publications — see
+    // PUBLISHABLE_PLATFORMS below.
+    case "linkedin":
+      return false;
     default:
       return false;
   }
@@ -142,6 +147,13 @@ export function createVideoPublishProvider(
           platform,
         ),
       });
+    // Publishing a *rendered video* to LinkedIn is not implemented. LinkedIn is
+    // reachable through the social post pipeline instead, which is why it is
+    // absent from PUBLISHABLE_PLATFORMS and can never reach this function via
+    // `startVideoPublication`. Handled explicitly so the exhaustiveness guard
+    // below keeps catching genuinely new platforms.
+    case "linkedin":
+      throw new UnsupportedPlatformError(platform);
     default: {
       // Exhaustiveness guard: a new content_platform value must be handled here.
       const unreachable: never = platform;

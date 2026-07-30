@@ -76,6 +76,38 @@ export const sceneMediaUploadEnvironmentSchema = z.object({
     .pipe(z.array(z.enum(["audio/webm", "audio/mp4"])).min(1)),
 });
 
+/**
+ * Ceilings for the workspace media library. Kept separate from the scene upload
+ * group because these are much larger — a library video is a finished asset for
+ * a social post, not a per-scene clip — and because the library is workspace
+ * scoped rather than project scoped.
+ */
+export const mediaLibraryEnvironmentSchema = z.object({
+  MAX_MEDIA_IMAGE_BYTES: z.coerce
+    .number()
+    .int()
+    .min(1024)
+    .max(100 * 1024 * 1024)
+    .default(25 * 1024 * 1024),
+  MAX_MEDIA_VIDEO_BYTES: z.coerce
+    .number()
+    .int()
+    .min(1024)
+    .max(4 * 1024 * 1024 * 1024)
+    .default(512 * 1024 * 1024),
+  /**
+   * Advisory ceiling on a library video's client-reported duration. The web
+   * runtime has no ffprobe, so this rejects obvious nonsense early; every
+   * platform still enforces its own limit at publish time.
+   */
+  MAX_MEDIA_VIDEO_DURATION_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(24 * 60 * 60)
+    .default(60 * 60),
+});
+
 export const projectEnvironmentSchema = z.object({
   MAX_SCRIPT_CHARACTERS: z.coerce
     .number()
@@ -494,6 +526,18 @@ export const publishingEnvironmentSchema = z.object({
   /** TikTok OAuth client — used by the worker to rotate user tokens. */
   TIKTOK_API_CLIENT_KEY: z.string().optional(),
   TIKTOK_API_CLIENT_SECRET: z.string().optional(),
+  /**
+   * LinkedIn OAuth client. Optional like the others so a workspace without a
+   * LinkedIn app cannot break Facebook or YouTube publishing; validated lazily
+   * in `createSocialPostProvider`.
+   */
+  LINKEDIN_CLIENT_ID: z.string().optional(),
+  LINKEDIN_CLIENT_SECRET: z.string().optional(),
+  /** Versioned REST API date, e.g. `202506`. LinkedIn requires this header. */
+  LINKEDIN_API_VERSION: z
+    .string()
+    .regex(/^\d{6}$/, "LINKEDIN_API_VERSION must look like 202506")
+    .default("202506"),
   ENABLE_VIDEO_PUBLISHING: z
     .enum(["true", "false"])
     .default("true")
@@ -529,6 +573,39 @@ export const publishingEnvironmentSchema = z.object({
     .min(600)
     .max(3600)
     .default(3600),
+  ENABLE_SOCIAL_POSTING: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((value) => value === "true"),
+  /**
+   * Same purpose as `ENABLE_PUBLISH_SIMULATION`, for social posts: every
+   * platform is served by a simulator that returns a synthetic success without
+   * touching a real API. It exists because LinkedIn posting needs an approved
+   * app, which would otherwise block verifying the scheduler and the per-target
+   * state machine. Must be false in production.
+   */
+  ENABLE_SOCIAL_POST_SIMULATION: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
+  /**
+   * TTL for the signed media URLs handed to a platform. Must exceed the publish
+   * task's wall clock — Meta fetches image URLs itself, so a URL that expires
+   * mid-job fails the post (the same trap that stalled long renders).
+   */
+  SOCIAL_POST_ASSET_URL_TTL_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(600)
+    .max(3600)
+    .default(3600),
+  /** How many due posts one scheduler sweep claims. */
+  SOCIAL_SCHEDULER_BATCH_SIZE: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(200)
+    .default(25),
 });
 
 /**
@@ -602,6 +679,9 @@ export type StorageEnvironment = z.infer<typeof storageEnvironmentSchema>;
 export type CharacterEnvironment = z.infer<typeof characterEnvironmentSchema>;
 export type SceneMediaUploadEnvironment = z.infer<
   typeof sceneMediaUploadEnvironmentSchema
+>;
+export type MediaLibraryEnvironment = z.infer<
+  typeof mediaLibraryEnvironmentSchema
 >;
 export type ProjectEnvironment = z.infer<typeof projectEnvironmentSchema>;
 export type SceneAnalysisEnvironment = z.infer<

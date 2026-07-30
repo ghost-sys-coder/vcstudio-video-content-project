@@ -36,6 +36,7 @@ export default async function AppLayout({
   return (
     <ApplicationShell
       activeMembership={context.activeMembership}
+      canComposePosts={can(context.activeMembership.role, "composePosts")}
       canManageSettings={canManageWorkspace(context.activeMembership.role)}
       canManageUsage={can(context.activeMembership.role, "manageUsage")}
       defaultSidebarOpen={cookieStore.get("sidebar_state")?.value !== "false"}

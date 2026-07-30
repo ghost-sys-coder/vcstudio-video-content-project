@@ -5,6 +5,10 @@ import type {
   SceneAudioAssetFormat,
 } from "@/db/schema";
 import type { SceneImageOutputFormat } from "@/lib/schemas/scene-image";
+import {
+  MEDIA_FILE_EXTENSION_BY_CONTENT_TYPE,
+  type MediaContentType,
+} from "@/lib/schemas/media-asset";
 
 const extensionByContentType = {
   "image/jpeg": "jpg",
@@ -48,6 +52,38 @@ export function isWorkspaceLogoObjectKey(input: {
 }): boolean {
   const prefix = `workspaces/${input.workspaceId}/branding/logos/`;
   return input.objectKey.startsWith(prefix) && !input.objectKey.includes("..");
+}
+
+/**
+ * Object key for a media-library upload.
+ *
+ * Derived entirely from the asset's own UUID and its allow-listed content type —
+ * no part of the user-supplied file name reaches the key, so a crafted name
+ * cannot traverse or collide.
+ *
+ * Deliberately outside `createProjectAssetPrefix`: the library is a workspace
+ * asset that outlives any one project, so purging a deleted project's prefix can
+ * never take library media with it. Same reasoning as the note on that function.
+ */
+export function createMediaLibraryObjectKey(input: {
+  workspaceId: string;
+  mediaAssetId: string;
+  contentType: MediaContentType;
+}): string {
+  const extension = MEDIA_FILE_EXTENSION_BY_CONTENT_TYPE[input.contentType];
+  return `workspaces/${input.workspaceId}/library/${input.mediaAssetId}.${extension}`;
+}
+
+export function isMediaLibraryObjectKey(input: {
+  workspaceId: string;
+  mediaAssetId: string;
+  contentType: MediaContentType;
+  objectKey: string;
+}): boolean {
+  return (
+    input.objectKey === createMediaLibraryObjectKey(input) &&
+    !input.objectKey.includes("..")
+  );
 }
 
 /**

@@ -12,6 +12,7 @@ import {
   renderEnvironmentSchema,
   characterEnvironmentSchema,
   sceneMediaUploadEnvironmentSchema,
+  mediaLibraryEnvironmentSchema,
   usageEnvironmentSchema,
   publishingEnvironmentSchema,
   publishingWebEnvironmentSchema,
@@ -26,6 +27,7 @@ import {
   type RenderEnvironment,
   type CharacterEnvironment,
   type SceneMediaUploadEnvironment,
+  type MediaLibraryEnvironment,
   type UsageEnvironment,
   type PublishingEnvironment,
   type PublishingWebEnvironment,
@@ -42,6 +44,7 @@ let subtitleEnvironment: SubtitleEnvironment | null = null;
 let renderEnvironment: RenderEnvironment | null = null;
 let characterEnvironment: CharacterEnvironment | null = null;
 let sceneMediaUploadEnvironment: SceneMediaUploadEnvironment | null = null;
+let mediaLibraryEnvironment: MediaLibraryEnvironment | null = null;
 let usageEnvironment: UsageEnvironment | null = null;
 let publishingEnvironment: PublishingEnvironment | null = null;
 let publishingWebEnvironment: PublishingWebEnvironment | null = null;
@@ -115,6 +118,11 @@ export function getSceneMediaUploadEnvironment(): SceneMediaUploadEnvironment {
     process.env,
   );
   return sceneMediaUploadEnvironment;
+}
+
+export function getMediaLibraryEnvironment(): MediaLibraryEnvironment {
+  mediaLibraryEnvironment ??= mediaLibraryEnvironmentSchema.parse(process.env);
+  return mediaLibraryEnvironment;
 }
 
 export function getUsageEnvironment(): UsageEnvironment {

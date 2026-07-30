@@ -22,6 +22,9 @@ const workspaceCapabilities = {
     manageSubtitles: true,
     renderVideo: true,
     manageUsage: true,
+    manageMediaLibrary: true,
+    composePosts: true,
+    publishPosts: true,
   },
   editor: {
     editWorkspace: true,
@@ -46,6 +49,9 @@ const workspaceCapabilities = {
     manageSubtitles: true,
     renderVideo: true,
     manageUsage: true,
+    manageMediaLibrary: true,
+    composePosts: true,
+    publishPosts: true,
   },
   viewer: {
     editWorkspace: false,
@@ -67,6 +73,9 @@ const workspaceCapabilities = {
     manageSubtitles: false,
     renderVideo: false,
     manageUsage: false,
+    manageMediaLibrary: false,
+    composePosts: false,
+    publishPosts: false,
   },
 } as const satisfies Record<WorkspaceRole, Record<string, boolean>>;
 

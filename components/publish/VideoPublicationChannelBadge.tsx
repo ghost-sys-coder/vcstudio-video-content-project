@@ -7,6 +7,7 @@ const CHANNEL_CLASSNAMES: Record<ContentPlatform, string> = {
   facebook: "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300",
   instagram:
     "bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-950 dark:text-fuchsia-300",
+  linkedin: "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300",
 };
 
 export function VideoPublicationChannelBadge({

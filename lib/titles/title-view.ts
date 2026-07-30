@@ -10,7 +10,8 @@ import type {
   ProjectBrief,
   TitleGenerationRun,
 } from "@/db/schema";
-import { contentPlatformEnum } from "@/db/schema";
+import { CONTENT_PLATFORM_LABELS } from "@/lib/platforms/platform-labels";
+import { VIDEO_CONTENT_PLATFORMS } from "@/lib/platforms/video-content-platforms";
 import { estimateTitleGenerationCost } from "@/lib/costs/title-generation-cost";
 import { getSceneAnalysisEnvironment } from "@/lib/env/server";
 import { findApprovedScriptVersion } from "@/db/repositories/scenes.repository";
@@ -20,12 +21,10 @@ import {
 } from "@/db/repositories/title-generation.repository";
 import { DEFAULT_TITLE_OPTIONS } from "@/lib/schemas/title-generation";
 
-export const CONTENT_PLATFORM_LABELS: Record<ContentPlatform, string> = {
-  youtube: "YouTube",
-  tiktok: "TikTok",
-  facebook: "Facebook",
-  instagram: "Instagram",
-};
+// Re-exported so the server-side callers that already import it from here keep
+// working; the definition lives in a client-safe module because the composer's
+// previews need it in the browser.
+export { CONTENT_PLATFORM_LABELS };
 
 export type TitleSuggestionView = {
   id: string;
@@ -98,7 +97,7 @@ export async function loadTitlesView(input: {
       projectId: input.project.id,
     }),
     Promise.all(
-      contentPlatformEnum.enumValues.map((platform) =>
+      VIDEO_CONTENT_PLATFORMS.map((platform) =>
         findLatestTitleGenerationRunForPlatform({
           workspaceId: input.workspaceId,
           projectId: input.project.id,
@@ -115,7 +114,7 @@ export async function loadTitlesView(input: {
   for (const run of latestRuns)
     if (run) latestRunByPlatform.set(run.platform, run);
 
-  const platforms: PlatformTitlesView[] = contentPlatformEnum.enumValues.map(
+  const platforms: PlatformTitlesView[] = VIDEO_CONTENT_PLATFORMS.map(
     (platform) => {
       const prompt = renderTitleGenerationPrompt({
         platform,

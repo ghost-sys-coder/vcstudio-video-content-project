@@ -61,6 +61,7 @@ import {
   startThumbnailGeneration,
   ThumbnailGenerationRequestError,
 } from "@/lib/thumbnails/start-thumbnail-generation";
+import { toVideoContentPlatform } from "@/lib/platforms/video-content-platforms";
 import {
   loadThumbnailsView,
   type ThumbnailActionResult,
@@ -274,7 +275,7 @@ export async function regenerateThumbnailAction(
       workspaceId,
       project,
       brief,
-      platform: previous.platform,
+      platform: toVideoContentPlatform(previous.platform),
       textMode: previous.textMode,
       headlineText: previous.headlineText ?? "",
       requestedByUserId: context.user.id,

@@ -16,6 +16,7 @@ export default async function WorkspaceSettingsPage({
   searchParams: Promise<{
     facebook?: string;
     instagram?: string;
+    linkedin?: string;
     tiktok?: string;
     youtube?: string;
   }>;
@@ -27,7 +28,7 @@ export default async function WorkspaceSettingsPage({
   }
 
   const [
-    { facebook, instagram, tiktok, youtube },
+    { facebook, instagram, linkedin, tiktok, youtube },
     logo,
     channelsView,
     members,
@@ -54,6 +55,7 @@ export default async function WorkspaceSettingsPage({
       oauthStatus={{
         facebook: facebook ?? null,
         instagram: instagram ?? null,
+        linkedin: linkedin ?? null,
         tiktok: tiktok ?? null,
         youtube: youtube ?? null,
       }}

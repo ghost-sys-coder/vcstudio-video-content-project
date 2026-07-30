@@ -15,6 +15,7 @@ import { usePathname } from "next/navigation";
 import type { WorkspaceMembershipView } from "@/db/repositories/workspaces.repository";
 import type { UserThemePreference } from "@/db/schema";
 import { getUserInitials } from "@/lib/users/user-initials";
+import { SocialNavigationGroup } from "@/components/application/SocialNavigationGroup";
 import { ThemeToggle } from "@/components/application/ThemeToggle";
 import { WorkspaceLogoImage } from "@/components/application/WorkspaceLogoImage";
 import { WorkspaceSelector } from "@/components/application/WorkspaceSelector";
@@ -34,6 +35,7 @@ import {
 
 export function ApplicationSidebar({
   activeMembership,
+  canComposePosts,
   canManageSettings,
   canManageUsage,
   initialTheme,
@@ -43,6 +45,7 @@ export function ApplicationSidebar({
   userEmail,
 }: {
   activeMembership: WorkspaceMembershipView;
+  canComposePosts: boolean;
   canManageSettings: boolean;
   canManageUsage: boolean;
   initialTheme: UserThemePreference;
@@ -159,6 +162,7 @@ export function ApplicationSidebar({
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        {canComposePosts ? <SocialNavigationGroup /> : null}
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
