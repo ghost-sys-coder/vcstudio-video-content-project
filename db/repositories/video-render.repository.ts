@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, desc, eq, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, lte, sql } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
 import {
   projectOutputVariants,
@@ -197,6 +197,33 @@ export async function listRendersWithSource(input: {
     )
     .orderBy(desc(videoRenders.createdAt))
     .limit(Math.min(input.limit ?? 50, MAX_LIST_LIMIT));
+}
+
+/**
+ * The subset of the given renders that this workspace owns and that finished
+ * with a stored file.
+ *
+ * Used before attaching a render to a social post: comparing the returned count
+ * against the requested count is what rejects another tenant's render id, and
+ * the status/asset conditions reject one that never produced a file.
+ */
+export async function findPublishableRenders(input: {
+  workspaceId: string;
+  renderIds: string[];
+}) {
+  if (input.renderIds.length === 0) return [];
+  return getDatabase()
+    .select()
+    .from(videoRenders)
+    .where(
+      and(
+        eq(videoRenders.workspaceId, input.workspaceId),
+        inArray(videoRenders.id, input.renderIds),
+        eq(videoRenders.status, "succeeded"),
+        isNotNull(videoRenders.assetObjectKey),
+      ),
+    )
+    .limit(MAX_LIST_LIMIT);
 }
 
 export async function listExpiredActiveVideoRenders(input: {

@@ -7,12 +7,16 @@ import {
   socialPostMedia,
   socialPostTargets,
   socialPosts,
-  type MediaAsset,
+  videoRenders,
   type SocialPost,
-  type SocialPostMedia,
   type SocialPostStatus,
   type SocialPostTarget,
 } from "@/db/schema";
+import {
+  toLibraryAttachment,
+  toRenderAttachment,
+  type SocialPostAttachment,
+} from "@/lib/social/post-attachment";
 
 export const SOCIAL_POST_PAGE_SIZE = 50;
 
@@ -55,25 +59,34 @@ export async function findSocialPost(input: {
 }
 
 /**
- * A post's attachments in their authored order, joined to the assets themselves
- * so a caller gets both the ordering and the media in one round trip.
+ * A post's attachments in their authored order, resolved to whichever source
+ * each one came from — a library upload or a finished project render.
  *
- * Soft-deleted assets are deliberately included: a published post must keep
- * showing what it sent, and the composer needs to be able to tell the author
- * that an attachment has since been removed from the library.
+ * Both joins are outer, because `social_post_media` guarantees exactly one of
+ * the two is set (see the `social_post_media_single_source` check) rather than
+ * both. Soft-deleted assets and missing render outputs are deliberately
+ * included: a published post must keep showing what it sent, and the composer
+ * needs to be able to say that an attachment is no longer usable.
  */
 export async function listSocialPostMedia(input: {
   workspaceId: string;
   postId: string;
-}): Promise<{ link: SocialPostMedia; asset: MediaAsset }[]> {
+}): Promise<SocialPostAttachment[]> {
   const rows = await getDatabase()
-    .select({ link: socialPostMedia, asset: mediaAssets })
+    .select({ link: socialPostMedia, asset: mediaAssets, render: videoRenders })
     .from(socialPostMedia)
-    .innerJoin(
+    .leftJoin(
       mediaAssets,
       and(
         eq(mediaAssets.id, socialPostMedia.mediaAssetId),
         eq(mediaAssets.workspaceId, socialPostMedia.workspaceId),
+      ),
+    )
+    .leftJoin(
+      videoRenders,
+      and(
+        eq(videoRenders.id, socialPostMedia.renderId),
+        eq(videoRenders.workspaceId, socialPostMedia.workspaceId),
       ),
     )
     .where(
@@ -83,7 +96,30 @@ export async function listSocialPostMedia(input: {
       ),
     )
     .orderBy(asc(socialPostMedia.position));
-  return rows;
+
+  const attachments: SocialPostAttachment[] = [];
+  for (const row of rows) {
+    if (row.asset)
+      attachments.push(
+        toLibraryAttachment({
+          linkId: row.link.id,
+          position: row.link.position,
+          asset: row.asset,
+        }),
+      );
+    else if (row.render)
+      attachments.push(
+        toRenderAttachment({
+          linkId: row.link.id,
+          position: row.link.position,
+          render: row.render,
+        }),
+      );
+    // A row whose source resolved to neither belongs to another workspace's
+    // asset or render and is dropped rather than surfaced — the join conditions
+    // are the cross-workspace guard.
+  }
+  return attachments;
 }
 
 export async function listSocialPostTargets(input: {

@@ -9,6 +9,7 @@ import {
   type SocialPostStatus,
 } from "@/db/schema";
 import type { PortableDocument } from "@/lib/social/portable-document";
+import type { SocialPostAttachmentRef } from "@/lib/social/post-attachment";
 
 export async function createSocialPost(input: {
   workspaceId: string;
@@ -29,6 +30,45 @@ export async function createSocialPost(input: {
 }
 
 /**
+ * Creates a draft that already carries one of the project's finished renders.
+ *
+ * The entry point from a project's publish page: the author picks a render and
+ * gets a normal draft, so scheduling, per-platform previews, and the capability
+ * matrix all apply without a parallel code path.
+ */
+export async function createSocialPostForRender(input: {
+  workspaceId: string;
+  name: string;
+  createdByUserId: string;
+  projectId: string;
+  renderId: string;
+  bodyDocument: PortableDocument;
+  bodyPlainText: string;
+}): Promise<SocialPost> {
+  const database = getDatabase();
+  const [post] = await database
+    .insert(socialPosts)
+    .values({
+      workspaceId: input.workspaceId,
+      name: input.name,
+      createdByUserId: input.createdByUserId,
+      projectId: input.projectId,
+      bodyDocument: input.bodyDocument,
+      bodyPlainText: input.bodyPlainText,
+    })
+    .returning();
+
+  await database.insert(socialPostMedia).values({
+    postId: post.id,
+    workspaceId: input.workspaceId,
+    renderId: input.renderId,
+    position: 0,
+  });
+
+  return post;
+}
+
+/**
  * Saves the body and attachment list of a draft.
  *
  * Optimistically locked on `version`: two composer tabs open on the same post
@@ -43,7 +83,11 @@ export async function updateSocialPostDraft(input: {
   name: string;
   bodyDocument: PortableDocument;
   bodyPlainText: string;
-  mediaAssetIds: string[];
+  /**
+   * The attachment list in send order. Each entry names its source, because a
+   * post can carry both library uploads and project renders.
+   */
+  attachments: SocialPostAttachmentRef[];
 }): Promise<
   | { outcome: "updated"; post: SocialPost }
   | { outcome: "conflict" }
@@ -94,12 +138,13 @@ export async function updateSocialPostDraft(input: {
         eq(socialPostMedia.workspaceId, input.workspaceId),
       ),
     );
-  if (input.mediaAssetIds.length > 0)
+  if (input.attachments.length > 0)
     await database.insert(socialPostMedia).values(
-      input.mediaAssetIds.map((mediaAssetId, position) => ({
+      input.attachments.map((attachment, position) => ({
         postId: input.postId,
         workspaceId: input.workspaceId,
-        mediaAssetId,
+        mediaAssetId: attachment.source === "library" ? attachment.id : null,
+        renderId: attachment.source === "render" ? attachment.id : null,
         position,
       })),
     );

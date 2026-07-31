@@ -23,6 +23,11 @@ import {
   disconnectPlatformSchema,
   publishVideoSchema,
 } from "@/lib/schemas/publishing";
+import { createPostFromRenderSchema } from "@/lib/schemas/social-post";
+import {
+  createPostFromRender,
+  CreatePostFromRenderError,
+} from "@/lib/social/create-post-from-render";
 import {
   cancelTitleGeneration,
   setTitleSuggestionFavorite,
@@ -540,4 +545,52 @@ export async function loadTitlesViewAction(
     project,
     brief,
   });
+}
+
+export type CreatePostFromRenderResult =
+  { ok: true; postId: string } | { ok: false; error: string };
+
+/**
+ * Turns a finished render into a draft social post and hands back its id so the
+ * caller can open it in the composer.
+ *
+ * `composePosts` rather than `publishPosts`: this creates a draft, it does not
+ * put anything in front of an audience.
+ */
+export async function createPostFromRenderAction(
+  formData: FormData,
+): Promise<CreatePostFromRenderResult> {
+  const parsed = createPostFromRenderSchema.safeParse({
+    projectId: formData.get("projectId"),
+    renderId: formData.get("renderId"),
+    commentary: formData.get("commentary") ?? "",
+  });
+  if (!parsed.success)
+    return {
+      ok: false,
+      error: parsed.error.issues[0]?.message ?? "That post is not valid.",
+    };
+
+  try {
+    const context = await getAuthenticatedWorkspaceContext();
+    if (!context)
+      return { ok: false, error: "Workspace context is unavailable." };
+    requireCapability(context.activeMembership.role, "composePosts");
+
+    const result = await createPostFromRender({
+      workspaceId: context.activeMembership.workspaceId,
+      projectId: parsed.data.projectId,
+      renderId: parsed.data.renderId,
+      commentary: parsed.data.commentary,
+      createdByUserId: context.user.id,
+    });
+
+    revalidatePath("/app/social/posts");
+    revalidatePath(`/app/projects/${parsed.data.projectId}/publish`);
+    return { ok: true, postId: result.postId };
+  } catch (error) {
+    if (error instanceof CreatePostFromRenderError)
+      return { ok: false, error: error.message };
+    return { ok: false, error: "That post could not be created." };
+  }
 }

@@ -35,10 +35,8 @@ import {
   hydrateUntouchedPublishingMetadata,
   PUBLISHING_METADATA_UPDATED_EVENT,
 } from "@/lib/publishing/generated-metadata";
-import type {
-  PublishableRenderView,
-  PublishingView,
-} from "@/lib/publishing/publishing-view";
+import { groupRendersByKind } from "@/lib/publishing/group-renders";
+import type { PublishingView } from "@/lib/publishing/publishing-view";
 import {
   findActivePublicationForTarget,
   isActivePublicationStatus,
@@ -112,20 +110,10 @@ export function PublishToPlatformPanel({
       Object.fromEntries(data.renders.map((entry) => [entry.id, entry.label])),
     [data.renders],
   );
-  // Preserve the view's shorts→variants→full-video order while collecting each
-  // kind under one heading, so the picker reads as titled sections.
-  const renderGroups = useMemo(() => {
-    const groups: { groupLabel: string; renders: PublishableRenderView[] }[] =
-      [];
-    for (const render of data.renders) {
-      const existing = groups.find(
-        (group) => group.groupLabel === render.groupLabel,
-      );
-      if (existing) existing.renders.push(render);
-      else groups.push({ groupLabel: render.groupLabel, renders: [render] });
-    }
-    return groups;
-  }, [data.renders]);
+  const renderGroups = useMemo(
+    () => groupRendersByKind(data.renders),
+    [data.renders],
+  );
   const selectedRender = useMemo(
     () => data.renders.find((entry) => entry.id === renderId) ?? null,
     [data.renders, renderId],

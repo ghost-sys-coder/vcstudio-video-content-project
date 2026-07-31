@@ -75,22 +75,33 @@ export async function scheduleSocialPostPublication(input: {
     workspaceId: input.workspaceId,
     postId: post.id,
   });
+  if (media.some((attachment) => attachment.unavailable))
+    throw new SocialPostScheduleError(
+      "An attached file is no longer available. Remove it and try again.",
+    );
+  const libraryAttachments = media.filter(
+    (attachment) => attachment.source === "library",
+  );
   const readyAssets = await findReadyMediaAssets({
     workspaceId: input.workspaceId,
-    mediaAssetIds: media.map((entry) => entry.asset.id),
+    mediaAssetIds: libraryAttachments.map((attachment) => attachment.sourceId),
   });
-  if (readyAssets.length !== media.length)
+  if (readyAssets.length !== libraryAttachments.length)
     throw new SocialPostScheduleError(
       "An attached file is no longer available. Remove it and try again.",
     );
 
   const attachments = summarizeAttachments(
-    media.map((entry) => entry.asset.kind),
+    media.map((attachment) => attachment.kind),
   );
   const bodyFingerprint = createHash("sha256")
     .update(post.bodyPlainText)
     .update(" ")
-    .update(media.map((entry) => entry.asset.id).join(","))
+    .update(
+      media
+        .map((attachment) => `${attachment.source}:${attachment.sourceId}`)
+        .join(","),
+    )
     .digest("hex");
 
   const resolved = [];

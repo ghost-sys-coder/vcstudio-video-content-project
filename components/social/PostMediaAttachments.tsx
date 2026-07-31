@@ -38,9 +38,14 @@ export function PostMediaAttachments({
           <p className="truncate text-xs" title={attachment.asset.title}>
             {attachment.asset.title}
           </p>
-          {attachment.removedFromLibrary ? (
+          {attachment.source === "render" ? (
+            <p className="text-xs text-muted-foreground">Project render</p>
+          ) : null}
+          {attachment.unavailable ? (
             <p className="text-xs text-amber-700 dark:text-amber-500">
-              Removed from the library — still attached to this post.
+              {attachment.source === "render"
+                ? "This render is no longer available — re-render before posting."
+                : "Removed from the library — still attached to this post."}
             </p>
           ) : null}
           {editable ? (

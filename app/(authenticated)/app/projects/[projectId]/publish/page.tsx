@@ -2,11 +2,13 @@ import { notFound } from "next/navigation";
 import { PlatformThumbnailsPanel } from "@/components/publish/PlatformThumbnailsPanel";
 import { PlatformTitlesPanel } from "@/components/publish/PlatformTitlesPanel";
 import { PublishToPlatformPanel } from "@/components/publish/PublishToPlatformPanel";
+import { ShareRenderAsPostPanel } from "@/components/publish/ShareRenderAsPostPanel";
 import { loadPublishingView } from "@/lib/publishing/publishing-view";
 import { findProject } from "@/db/repositories/projects.repository";
 import { findProjectBrief } from "@/db/repositories/project-briefs.repository";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import {
+  can,
   canEditProject,
   canManageWorkspace,
 } from "@/lib/policies/workspace-policy";
@@ -54,6 +56,12 @@ export default async function ProjectPublishPage({
         canManageConnections={canManageWorkspace(context.activeMembership.role)}
         canPublish={canGenerate}
         initialData={publishingView}
+        projectId={project.id}
+      />
+      <ShareRenderAsPostPanel
+        canCompose={can(context.activeMembership.role, "composePosts")}
+        canManageConnections={canManageWorkspace(context.activeMembership.role)}
+        data={publishingView}
         projectId={project.id}
       />
     </div>

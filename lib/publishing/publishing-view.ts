@@ -36,6 +36,8 @@ import {
   type VideoContentPlatform,
 } from "@/lib/platforms/video-content-platforms";
 import { CONTENT_PLATFORM_LABELS } from "@/lib/titles/title-view";
+import { isSocialPostPlatform } from "@/lib/social/platform-post-capabilities";
+import type { PostConnectionView } from "@/lib/social/social-post-view";
 
 export const PUBLICATION_HISTORY_LIMIT = 20;
 export const PUBLISHABLE_RENDER_LIMIT = 20;
@@ -94,9 +96,20 @@ export type PublicationView = {
 
 export type PublishingView = {
   enabled: boolean;
+  /**
+   * Whether social posting is turned on. Separate from `enabled`, which governs
+   * rendered-video publishing — LinkedIn has no video path and follows this one.
+   */
+  socialPostingEnabled: boolean;
   /** Platforms that can actually be published to today. */
   publishablePlatforms: { platform: ContentPlatform; label: string }[];
   connections: ConnectionView[];
+  /**
+   * Live accounts that take social posts, LinkedIn included. Kept apart from
+   * `connections` because these receive a post carrying a render, not a video
+   * upload, and the two lists are never interchangeable.
+   */
+  socialPostConnections: PostConnectionView[];
   renders: PublishableRenderView[];
   publications: PublicationView[];
   generatedMetadata: GeneratedPublishingMetadata[];
@@ -150,6 +163,20 @@ export async function loadPublishingView(input: {
 
   return {
     enabled: environment.ENABLE_VIDEO_PUBLISHING,
+    socialPostingEnabled: environment.ENABLE_SOCIAL_POSTING,
+    socialPostConnections: connections
+      .filter(
+        (connection) =>
+          isSocialPostPlatform(connection.platform) &&
+          connection.status === "active",
+      )
+      .map((connection) => ({
+        id: connection.id,
+        platform: connection.platform,
+        platformLabel: CONTENT_PLATFORM_LABELS[connection.platform],
+        accountName: connection.externalAccountName,
+        status: connection.status,
+      })),
     publishablePlatforms: PUBLISHABLE_PLATFORMS.map((platform) => ({
       platform,
       label: CONTENT_PLATFORM_LABELS[platform],

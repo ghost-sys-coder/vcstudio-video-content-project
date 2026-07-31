@@ -81,7 +81,10 @@ export function PostComposer({
       data.set("name", name);
       data.set("bodyDocument", JSON.stringify(document));
       for (const attachment of attachments)
-        data.append("mediaAssetIds", attachment.asset.id);
+        data.append(
+          "attachments",
+          `${attachment.source}:${attachment.asset.id}`,
+        );
 
       const result = await saveSocialPostAction(data);
       if (result.ok) {
@@ -200,16 +203,17 @@ export function PostComposer({
               <p className="text-sm font-medium">Media</p>
               {view.editable ? (
                 <MediaPickerDialog
-                  attachedIds={attachments.map(
-                    (attachment) => attachment.asset.id,
-                  )}
+                  attachedIds={attachments
+                    .filter((attachment) => attachment.source === "library")
+                    .map((attachment) => attachment.asset.id)}
                   library={library}
                   onConfirm={(assets) =>
                     setAttachments((current) => [
                       ...current,
                       ...assets.map((asset) => ({
                         asset,
-                        removedFromLibrary: false,
+                        source: "library" as const,
+                        unavailable: false,
                       })),
                     ])
                   }

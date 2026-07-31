@@ -3122,9 +3122,20 @@ export const socialPostMedia = pgTable(
       .references(() => workspaces.id, { onDelete: "cascade" }),
     // Restricted rather than cascading: a published post must keep showing the
     // media it sent, which is also why `media_assets` is soft deleted.
-    mediaAssetId: uuid("media_asset_id")
-      .notNull()
-      .references(() => mediaAssets.id, { onDelete: "restrict" }),
+    mediaAssetId: uuid("media_asset_id").references(() => mediaAssets.id, {
+      onDelete: "restrict",
+    }),
+    /**
+     * A finished project render, attached instead of a library asset.
+     *
+     * Modelled as a second reference rather than by copying the render into the
+     * library: renders are large, and duplicating one per post would double the
+     * storage bill for no gain. The XOR check below is what keeps "an attachment
+     * has exactly one source" true in the database rather than only in code.
+     */
+    renderId: uuid("render_id").references(() => videoRenders.id, {
+      onDelete: "restrict",
+    }),
     position: integer("position").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -3139,8 +3150,17 @@ export const socialPostMedia = pgTable(
       table.postId,
       table.mediaAssetId,
     ),
+    uniqueIndex("social_post_media_post_render_unique").on(
+      table.postId,
+      table.renderId,
+    ),
     // Answers "is this asset still in use?" when someone removes it.
     index("social_post_media_asset_index").on(table.mediaAssetId),
+    index("social_post_media_render_index").on(table.renderId),
+    check(
+      "social_post_media_single_source",
+      sql`(${table.mediaAssetId} is not null) <> (${table.renderId} is not null)`,
+    ),
   ],
 );
 

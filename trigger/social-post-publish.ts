@@ -173,18 +173,31 @@ export const socialPostPublishTask = task({
         workspaceId: input.workspaceId,
         postId: post.id,
       });
+      // A file that vanished between dispatch and now would otherwise be signed
+      // into a URL that 404s at the platform, which reads as a provider fault.
+      const missing = media.find((attachment) => attachment.unavailable);
+      if (missing) {
+        await settleFailed(
+          "asset_unavailable",
+          missing.source === "render"
+            ? "The attached render is no longer available. Re-render it and post again."
+            : "An attached file is no longer available. Re-attach it and post again.",
+        );
+        return { targetId: target.id, status: "failed" as const };
+      }
+
       // TTL deliberately exceeds this task's maxDuration.
       const resolvedMedia = await Promise.all(
-        media.map(async ({ asset }) => ({
-          kind: asset.kind,
+        media.map(async (attachment) => ({
+          kind: attachment.kind,
           sourceUrl: await createMediaAssetDownloadUrl(
-            asset.objectKey,
+            attachment.objectKey,
             environment.SOCIAL_POST_ASSET_URL_TTL_SECONDS,
           ),
-          contentType: asset.contentType,
-          sizeBytes: asset.sizeBytes,
-          altText: asset.altText,
-          fileName: asset.originalFileName,
+          contentType: attachment.contentType,
+          sizeBytes: attachment.sizeBytes,
+          altText: attachment.altText,
+          fileName: attachment.originalFileName,
         })),
       );
 

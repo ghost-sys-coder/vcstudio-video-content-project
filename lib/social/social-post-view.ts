@@ -7,6 +7,7 @@ import type {
 } from "@/db/schema";
 import type { MediaAssetView } from "@/lib/media/media-asset-view";
 import type { PortableDocument } from "@/lib/social/portable-document";
+import type { SocialPostAttachment } from "@/lib/social/post-attachment";
 
 /**
  * Client-safe projections for the social screens.
@@ -66,13 +67,45 @@ export type PostConnectionView = {
 
 export type PostAttachmentView = {
   asset: MediaAssetView;
+  /** Where the file came from, so the composer can label a render as one. */
+  source: "library" | "render";
   /**
-   * True when the asset has since been removed from the library. The post keeps
-   * it — a published post must show what it sent — but the composer says so
+   * True when the file can no longer be sent — a library asset removed after
+   * the fact, or a render whose output is gone. The post keeps the attachment,
+   * because a published post must show what it sent, but the composer says so
    * rather than presenting it as a normal, reusable attachment.
    */
-  removedFromLibrary: boolean;
+  unavailable: boolean;
 };
+
+/**
+ * Projects an attachment for the browser. The signed URL is passed in rather
+ * than derived here so this stays free of storage and `server-only`.
+ */
+export function toPostAttachmentView(
+  attachment: SocialPostAttachment,
+  previewUrl: string,
+): PostAttachmentView {
+  return {
+    asset: {
+      id: attachment.sourceId,
+      kind: attachment.kind,
+      title: attachment.title,
+      altText: attachment.altText,
+      tags: [],
+      contentType: attachment.contentType,
+      sizeBytes: attachment.sizeBytes,
+      width: attachment.width,
+      height: attachment.height,
+      durationMilliseconds: attachment.durationMilliseconds,
+      originalFileName: attachment.originalFileName,
+      createdAt: attachment.createdAt.toISOString(),
+      previewUrl,
+    },
+    source: attachment.source,
+    unavailable: attachment.unavailable,
+  };
+}
 
 const EXCERPT_LENGTH = 140;
 

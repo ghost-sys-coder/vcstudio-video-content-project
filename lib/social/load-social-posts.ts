@@ -10,10 +10,10 @@ import {
   findSocialPost,
 } from "@/db/repositories/social-posts.repository";
 import { isEditableStatus } from "@/db/commands/social-post-commands";
-import { toMediaAssetView } from "@/lib/media/media-asset-view";
 import { createMediaAssetDownloadUrl } from "@/lib/storage/media-asset-storage";
 import { isSocialPostPlatform } from "@/lib/social/platform-post-capabilities";
 import {
+  toPostAttachmentView,
   toSocialPostSummaryView,
   toSocialPostTargetView,
   type PostConnectionView,
@@ -135,13 +135,16 @@ export async function loadSocialPostComposerView(input: {
   ]);
 
   const attachments = await Promise.all(
-    media.map(async ({ asset }) => ({
-      asset: toMediaAssetView(
-        asset,
-        await createMediaAssetDownloadUrl(asset.objectKey),
+    media.map(async (attachment) =>
+      toPostAttachmentView(
+        attachment,
+        // An attachment whose file is gone has no key to sign; the view marks it
+        // unavailable and the preview falls back rather than 403-ing.
+        attachment.objectKey === ""
+          ? ""
+          : await createMediaAssetDownloadUrl(attachment.objectKey),
       ),
-      removedFromLibrary: asset.deletedAt !== null,
-    })),
+    ),
   );
 
   return {

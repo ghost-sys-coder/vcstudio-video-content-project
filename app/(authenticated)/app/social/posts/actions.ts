@@ -8,6 +8,7 @@ import {
   updateSocialPostDraft,
 } from "@/db/commands/social-post-commands";
 import { findReadyMediaAssets } from "@/db/repositories/media-assets.repository";
+import { findPublishableRenders } from "@/db/repositories/video-render.repository";
 import { recordAuditEvent } from "@/lib/audit/record-audit-event";
 import { RateLimitExceededError } from "@/lib/domain/errors";
 import {
@@ -94,10 +95,19 @@ export async function saveSocialPostAction(
     expectedVersion: formData.get("expectedVersion"),
     name: formData.get("name") ?? "",
     bodyDocument,
-    mediaAssetIds: formData
-      .getAll("mediaAssetIds")
+    // Sent as `source:id` pairs so one repeated field carries both, matching how
+    // the rest of this form is encoded.
+    attachments: formData
+      .getAll("attachments")
       .map((value) => String(value))
-      .filter((value) => value !== ""),
+      .filter((value) => value !== "")
+      .map((value) => {
+        const separator = value.indexOf(":");
+        return {
+          source: value.slice(0, separator),
+          id: value.slice(separator + 1),
+        };
+      }),
   });
   if (!parsed.success)
     return {
@@ -112,18 +122,35 @@ export async function saveSocialPostAction(
     requireCapability(context.activeMembership.role, "composePosts");
     const workspaceId = context.activeMembership.workspaceId;
 
-    // Every attachment must still be a live asset in *this* workspace. Checking
-    // here rather than relying on the foreign key is what stops a crafted
-    // request from attaching another tenant's media.
-    if (parsed.data.mediaAssetIds.length > 0) {
+    // Every attachment must still be live in *this* workspace. Checking here
+    // rather than relying on the foreign key is what stops a crafted request
+    // from attaching another tenant's media or another project's render.
+    const libraryIds = parsed.data.attachments
+      .filter((attachment) => attachment.source === "library")
+      .map((attachment) => attachment.id);
+    if (libraryIds.length > 0) {
       const assets = await findReadyMediaAssets({
         workspaceId,
-        mediaAssetIds: parsed.data.mediaAssetIds,
+        mediaAssetIds: libraryIds,
       });
-      if (assets.length !== parsed.data.mediaAssetIds.length)
+      if (assets.length !== libraryIds.length)
         return {
           ok: false,
           error: "One of those attachments is no longer in the library.",
+        };
+    }
+    const renderIds = parsed.data.attachments
+      .filter((attachment) => attachment.source === "render")
+      .map((attachment) => attachment.id);
+    if (renderIds.length > 0) {
+      const renders = await findPublishableRenders({
+        workspaceId,
+        renderIds,
+      });
+      if (renders.length !== renderIds.length)
+        return {
+          ok: false,
+          error: "One of those renders is no longer available.",
         };
     }
 
@@ -137,7 +164,7 @@ export async function saveSocialPostAction(
       name: parsed.data.name,
       bodyDocument: parsed.data.bodyDocument,
       bodyPlainText: plainText,
-      mediaAssetIds: parsed.data.mediaAssetIds,
+      attachments: parsed.data.attachments,
     });
 
     if (result.outcome === "not_editable")
