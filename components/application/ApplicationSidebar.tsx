@@ -15,7 +15,7 @@ import type { UserThemePreference } from "@/db/schema";
 import { getUserInitials } from "@/lib/users/user-initials";
 import { LogoutConfirmDialog } from "@/components/application/LogoutConfirmDialog";
 import { SocialNavigationGroup } from "@/components/application/SocialNavigationGroup";
-import { ThemeToggle } from "@/components/application/ThemeToggle";
+import { ThemeSwitcher } from "@/components/application/ThemeSwitcher";
 import { WorkspaceLogoImage } from "@/components/application/WorkspaceLogoImage";
 import { WorkspaceSelector } from "@/components/application/WorkspaceSelector";
 import {
@@ -164,9 +164,7 @@ export function ApplicationSidebar({
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
-          <SidebarMenuItem>
-            <ThemeToggle initialTheme={initialTheme} />
-          </SidebarMenuItem>
+          <ThemeSwitcher initialTheme={initialTheme} />
           <SidebarMenuItem>
             <LogoutConfirmDialog
               initials={initials}
