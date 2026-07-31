@@ -7,6 +7,10 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { THEME_COOKIE } from "@/lib/theme/theme-cookie";
+import {
+  isValidThemePreference,
+  themeClassName,
+} from "@/lib/theme/theme-classes";
 import { cn } from "@/lib/utils";
 
 const geistSans = Geist({
@@ -30,7 +34,8 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const cookieStore = await cookies();
-  const isDark = cookieStore.get(THEME_COOKIE)?.value === "dark";
+  const cookieValue = cookieStore.get(THEME_COOKIE)?.value;
+  const theme = isValidThemePreference(cookieValue) ? cookieValue : "light";
 
   return (
     <html
@@ -38,7 +43,7 @@ export default async function RootLayout({
         geistSans.variable,
         geistMono.variable,
         "h-full antialiased",
-        isDark && "dark",
+        themeClassName(theme),
       )}
       lang="en"
     >

@@ -1,11 +1,9 @@
 "use client";
 
-import { useClerk } from "@clerk/nextjs";
 import {
   FolderKanban,
   LayoutDashboard,
   Lightbulb,
-  LogOut,
   ReceiptText,
   Settings,
   UsersIcon,
@@ -15,6 +13,7 @@ import { usePathname } from "next/navigation";
 import type { WorkspaceMembershipView } from "@/db/repositories/workspaces.repository";
 import type { UserThemePreference } from "@/db/schema";
 import { getUserInitials } from "@/lib/users/user-initials";
+import { LogoutConfirmDialog } from "@/components/application/LogoutConfirmDialog";
 import { SocialNavigationGroup } from "@/components/application/SocialNavigationGroup";
 import { ThemeToggle } from "@/components/application/ThemeToggle";
 import { WorkspaceLogoImage } from "@/components/application/WorkspaceLogoImage";
@@ -55,7 +54,6 @@ export function ApplicationSidebar({
   userEmail: string;
 }) {
   const pathname = usePathname();
-  const { signOut } = useClerk();
   const initials = getUserInitials(userDisplayName, userEmail);
 
   return (
@@ -170,27 +168,10 @@ export function ApplicationSidebar({
             <ThemeToggle initialTheme={initialTheme} />
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton
-              onClick={() => void signOut({ redirectUrl: "/" })}
-              size="lg"
-              tooltip={`Log out ${userDisplayName}`}
-            >
-              <span
-                aria-hidden="true"
-                className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-xs font-semibold text-primary-foreground"
-              >
-                {initials}
-              </span>
-              <span className="min-w-0 flex-1 text-left">
-                <span className="block truncate font-medium">
-                  {userDisplayName}
-                </span>
-                <span className="block truncate text-xs text-muted-foreground">
-                  Log out
-                </span>
-              </span>
-              <LogOut className="ml-auto text-muted-foreground" />
-            </SidebarMenuButton>
+            <LogoutConfirmDialog
+              initials={initials}
+              userDisplayName={userDisplayName}
+            />
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>

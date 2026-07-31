@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import { updateThemePreferenceSchema } from "@/lib/schemas/user";
 
 describe("theme preference validation", () => {
-  it("accepts light and dark", () => {
+  it("accepts light, dim, and dark", () => {
     expect(
       updateThemePreferenceSchema.safeParse({ theme: "light" }).success,
+    ).toBe(true);
+    expect(
+      updateThemePreferenceSchema.safeParse({ theme: "dim" }).success,
     ).toBe(true);
     expect(
       updateThemePreferenceSchema.safeParse({ theme: "dark" }).success,

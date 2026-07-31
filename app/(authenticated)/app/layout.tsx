@@ -6,6 +6,7 @@ import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import { can, canManageWorkspace } from "@/lib/policies/workspace-policy";
 import { createWorkspaceLogoDownloadUrl } from "@/lib/storage/workspace-logo-storage";
 import { THEME_COOKIE } from "@/lib/theme/theme-cookie";
+import { isValidThemePreference } from "@/lib/theme/theme-classes";
 
 export default async function AppLayout({
   children,
@@ -26,8 +27,10 @@ export default async function AppLayout({
     ? await createWorkspaceLogoDownloadUrl(logo.objectKey)
     : null;
 
-  const cookieTheme =
-    cookieStore.get(THEME_COOKIE)?.value === "dark" ? "dark" : "light";
+  const cookieValue = cookieStore.get(THEME_COOKIE)?.value;
+  const cookieTheme = isValidThemePreference(cookieValue)
+    ? cookieValue
+    : "light";
   const themeResyncTarget =
     context.user.themePreference !== cookieTheme
       ? context.user.themePreference

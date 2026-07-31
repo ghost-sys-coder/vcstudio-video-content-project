@@ -118,6 +118,53 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/**
+ * A third theme between light and dark — closer in spirit to GitHub's "dark
+ * dimmed" than to a literal 50/50 blend of the other two blocks. Averaging
+ * `:root` and `.dark` variable-by-variable does not work: light is dark text
+ * on a white page and dark is light text on a near-black page, so the two
+ * schemes run in opposite contrast directions and averaging them component-
+ * wise cancels the contrast out (both background and foreground would land
+ * within a few percent of the same mid-grey). Dim instead keeps dark's
+ * light-on-a-dark-surface direction, just at a background lightness roughly
+ * midway between the two extremes rather than dark's near-black. Chart
+ * colors are unchanged because light and dark already share the same five
+ * values, so there is nothing to sit between.
+ */
+.dim {
+  --background: oklch(0.55 0 0);
+  --foreground: oklch(0.95 0 0);
+  --card: oklch(0.58 0 0);
+  --card-foreground: oklch(0.95 0 0);
+  --popover: oklch(0.58 0 0);
+  --popover-foreground: oklch(0.95 0 0);
+  --primary: oklch(0.75 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.62 0 0);
+  --secondary-foreground: oklch(0.95 0 0);
+  --muted: oklch(0.62 0 0);
+  --muted-foreground: oklch(0.78 0 0);
+  --accent: oklch(0.62 0 0);
+  --accent-foreground: oklch(0.95 0 0);
+  --destructive: oklch(0.64 0.218 24.771);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 18%);
+  --ring: oklch(0.65 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.6 0 0);
+  --sidebar-foreground: oklch(0.95 0 0);
+  --sidebar-primary: oklch(0.75 0 0);
+  --sidebar-primary-foreground: oklch(0.205 0 0);
+  --sidebar-accent: oklch(0.65 0 0);
+  --sidebar-accent-foreground: oklch(0.95 0 0);
+  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-ring: oklch(0.65 0 0);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

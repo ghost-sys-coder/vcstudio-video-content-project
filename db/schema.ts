@@ -395,6 +395,7 @@ export const auditActionEnum = pgEnum("audit_action", [
 
 export const userThemePreferenceEnum = pgEnum("user_theme_preference", [
   "light",
+  "dim",
   "dark",
 ]);
 
