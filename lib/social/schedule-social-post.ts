@@ -5,6 +5,7 @@ import {
   cancelSocialPostSchedule,
   scheduleSocialPost,
 } from "@/db/commands/social-post-schedule-commands";
+import { isRepublishableStatus } from "@/db/commands/social-post-commands";
 import { replaceSocialPostTargets } from "@/db/commands/social-post-target-commands";
 import { findReadyMediaAssets } from "@/db/repositories/media-assets.repository";
 import { findPlatformConnectionSummary } from "@/db/repositories/publishing.repository";
@@ -66,7 +67,7 @@ export async function scheduleSocialPostPublication(input: {
     postId: input.postId,
   });
   if (!post) throw new SocialPostScheduleError("That post no longer exists.");
-  if (post.status !== "draft" && post.status !== "scheduled")
+  if (!isRepublishableStatus(post.status))
     throw new SocialPostScheduleError(
       "This post has already been sent or is on its way.",
     );

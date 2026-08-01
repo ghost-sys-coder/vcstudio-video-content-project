@@ -533,11 +533,18 @@ export const publishingEnvironmentSchema = z.object({
    */
   LINKEDIN_CLIENT_ID: z.string().optional(),
   LINKEDIN_CLIENT_SECRET: z.string().optional(),
-  /** Versioned REST API date, e.g. `202506`. LinkedIn requires this header. */
+  /**
+   * Versioned REST API date, e.g. `202607`. LinkedIn requires this header.
+   *
+   * LinkedIn retires versions on a rolling ~1 year schedule and a retired value
+   * fails **every** request with `426 NONEXISTENT_VERSION` — it is not a
+   * deprecation warning. This default therefore needs periodic review; see the
+   * README's LinkedIn setup notes.
+   */
   LINKEDIN_API_VERSION: z
     .string()
-    .regex(/^\d{6}$/, "LINKEDIN_API_VERSION must look like 202506")
-    .default("202506"),
+    .regex(/^\d{6}$/, "LINKEDIN_API_VERSION must look like 202607")
+    .default("202607"),
   ENABLE_VIDEO_PUBLISHING: z
     .enum(["true", "false"])
     .default("true")

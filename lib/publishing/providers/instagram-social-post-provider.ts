@@ -7,6 +7,7 @@ import type {
   PublishPostResult,
   SocialPostProvider,
 } from "@/lib/publishing/social-post-provider";
+import { isNeverSentNetworkError } from "@/lib/publishing/network-failure";
 import { toVideoPublishRequest } from "@/lib/publishing/providers/video-post-adapter";
 import {
   PublishProviderError,
@@ -191,7 +192,17 @@ export class InstagramSocialPostProvider implements SocialPostProvider {
           body: new URLSearchParams({ creation_id: containerId }),
         },
       );
-    } catch {
+    } catch (error) {
+      // A connection that was never established cannot have published the
+      // container, so it is safe to retry and wrong to report as ambiguous.
+      if (isNeverSentNetworkError(error))
+        fail({
+          category: "network_unreachable",
+          safeMessage:
+            "Could not reach Instagram. The post was not published; it will be retried.",
+          retriable: true,
+          mayHavePublished: false,
+        });
       fail({
         category: "transport_ambiguous",
         safeMessage:

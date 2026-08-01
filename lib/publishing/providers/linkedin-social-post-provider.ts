@@ -2,6 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 import type { ContentPlatform } from "@/db/schema";
+import { isNeverSentNetworkError } from "@/lib/publishing/network-failure";
 import type {
   PublishPostRequest,
   PublishPostResult,
@@ -58,6 +59,19 @@ function failureForResponse(
     return {
       category: "invalid_metadata",
       safeMessage: "LinkedIn rejected the post content.",
+      retriable: false,
+      mayHavePublished,
+    };
+  // LinkedIn retires API versions on a rolling ~1 year schedule, and a retired
+  // `LinkedIn-Version` fails every request outright rather than degrading. Called
+  // out explicitly because it is a server misconfiguration, not a problem with
+  // the post or the account — without this it fell through to the generic
+  // "could not be created" and looked like a content or permission fault.
+  if (response.status === 426)
+    return {
+      category: "provider_version_retired",
+      safeMessage:
+        "LinkedIn is no longer accepting the configured API version. An administrator needs to update LINKEDIN_API_VERSION.",
       retriable: false,
       mayHavePublished,
     };
@@ -228,9 +242,19 @@ export class LinkedInSocialPostProvider implements SocialPostProvider {
           ...(content ? { content } : {}),
         }),
       });
-    } catch {
-      // The request left; whether LinkedIn acted on it is unknown. Marked
-      // ambiguous so the task refuses to retry and double-post.
+    } catch (error) {
+      // A connection that was never established cannot have posted anything, so
+      // it is safe to retry and wrong to report as ambiguous.
+      if (isNeverSentNetworkError(error))
+        fail({
+          category: "network_unreachable",
+          safeMessage:
+            "Could not reach LinkedIn. The post was not sent; it will be retried.",
+          retriable: true,
+          mayHavePublished: false,
+        });
+      // Otherwise the request left; whether LinkedIn acted on it is unknown.
+      // Marked ambiguous so the task refuses to retry and double-post.
       fail({
         category: "transport_ambiguous",
         safeMessage:

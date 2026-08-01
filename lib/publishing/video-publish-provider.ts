@@ -70,6 +70,10 @@ export type PublishFailureCategory =
   | "video_rejected"
   | "asset_unavailable"
   | "provider_server_error"
+  /** The request provably never reached the provider (DNS, refused, connect timeout). */
+  | "network_unreachable"
+  /** The configured provider API version is retired and must be updated. */
+  | "provider_version_retired"
   | "transport_ambiguous"
   | "provider_error";
 

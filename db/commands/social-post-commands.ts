@@ -152,8 +152,36 @@ export async function updateSocialPostDraft(input: {
   return { outcome: "updated", post: updated };
 }
 
+/**
+ * Whether the body and attachments can still be changed.
+ *
+ * `failed` is included because nothing reached any platform — the post is
+ * effectively a draft again, and a failure caused by its content (too long for
+ * one destination, a rejected image) is unfixable if the post freezes on the way
+ * out. `partially_failed` is deliberately excluded: some destinations already
+ * carry the current text, and editing it would make the stored body disagree
+ * with what is publicly live.
+ */
 export function isEditableStatus(status: SocialPostStatus): boolean {
-  return status === "draft" || status === "scheduled";
+  return status === "draft" || status === "scheduled" || status === "failed";
+}
+
+/**
+ * Whether publishing or scheduling may be started again.
+ *
+ * A terminal failure has to be recoverable, otherwise a transient provider
+ * outage permanently destroys the post — the author's only recourse being to
+ * retype it. `partially_failed` is included and is safe: the dispatch path skips
+ * any destination that already published, so a retry can only ever fill in the
+ * gaps.
+ */
+export function isRepublishableStatus(status: SocialPostStatus): boolean {
+  return (
+    status === "draft" ||
+    status === "scheduled" ||
+    status === "failed" ||
+    status === "partially_failed"
+  );
 }
 
 export async function renameSocialPost(input: {

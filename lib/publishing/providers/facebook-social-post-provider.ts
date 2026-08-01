@@ -7,6 +7,7 @@ import type {
   PublishPostResult,
   SocialPostProvider,
 } from "@/lib/publishing/social-post-provider";
+import { isNeverSentNetworkError } from "@/lib/publishing/network-failure";
 import { toVideoPublishRequest } from "@/lib/publishing/providers/video-post-adapter";
 import {
   PublishProviderError,
@@ -158,7 +159,18 @@ export class FacebookSocialPostProvider implements SocialPostProvider {
           body,
         },
       );
-    } catch {
+    } catch (error) {
+      // A connection that was never established cannot have posted anything, so
+      // it is safe to retry and wrong to report as ambiguous. Anything else that
+      // throws here may have gone out already.
+      if (isNeverSentNetworkError(error))
+        fail({
+          category: "network_unreachable",
+          safeMessage:
+            "Could not reach Facebook. The post was not sent; it will be retried.",
+          retriable: true,
+          mayHavePublished: false,
+        });
       fail({
         category: "transport_ambiguous",
         safeMessage:
