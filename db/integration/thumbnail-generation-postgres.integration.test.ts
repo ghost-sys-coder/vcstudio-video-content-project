@@ -14,6 +14,7 @@ import {
   cancelThumbnailGeneration,
   completeThumbnailGeneration,
   createThumbnailGenerationReservation,
+  deleteThumbnailGeneration,
   dismissThumbnailGeneration,
   failThumbnailGeneration,
   markThumbnailGenerationRunning,
@@ -447,6 +448,133 @@ describeDatabase("thumbnail generation ledger (postgres)", () => {
         limit: 20,
       });
       expect(visible.map((row) => row.id)).toContain(input.id);
+    },
+  );
+
+  it(
+    "deletes a succeeded thumbnail, returning its object key and keeping its spend",
+    { timeout: 60_000 },
+    async () => {
+      const templateId = await ensurePromptTemplate();
+      const fixture = await createFixture(1_000);
+      const input = reservationInput(fixture, templateId, 40);
+      const objectKey = `workspaces/${fixture.workspaceId}/projects/${fixture.projectId}/thumbnails/youtube/${input.id}.webp`;
+      await createThumbnailGenerationReservation(input);
+      await completeThumbnailGeneration({
+        thumbnailGenerationId: input.id,
+        asset: {
+          objectKey,
+          contentType: "image/webp",
+          sizeBytes: 2_048,
+          width: 1536,
+          height: 1024,
+          etag: '"etag"',
+        },
+        actualCostCents: 30,
+        providerRequestId: null,
+      });
+
+      const removal = await deleteThumbnailGeneration({
+        workspaceId: fixture.workspaceId,
+        projectId: fixture.projectId,
+        thumbnailGenerationId: input.id,
+      });
+      // The caller needs the pre-clear key to delete the object from storage.
+      expect(removal).toEqual({ deleted: true, assetObjectKey: objectKey });
+
+      const visible = await listProjectThumbnails({
+        workspaceId: fixture.workspaceId,
+        projectId: fixture.projectId,
+        platform: "youtube",
+        limit: 20,
+      });
+      expect(visible.map((row) => row.id)).not.toContain(input.id);
+
+      const [generation] = await getDatabase()
+        .select()
+        .from(thumbnailGenerations)
+        .where(eq(thumbnailGenerations.id, input.id));
+      expect(generation?.dismissedAt).not.toBeNull();
+      expect(generation?.assetObjectKey).toBeNull();
+      expect(generation?.assetEtag).toBeNull();
+      // Describes what was generated and charged for, so it survives.
+      expect(generation?.assetWidth).toBe(1536);
+
+      // The ledger keeps both the spend and the link the CHECK constraint
+      // requires — deleting the image must not refund the workspace.
+      const [reservation] = await getDatabase()
+        .select()
+        .from(usageReservations)
+        .where(eq(usageReservations.thumbnailGenerationId, input.id));
+      expect(reservation?.status).toBe("reconciled");
+      expect(reservation?.actualCostCents).toBe(30);
+    },
+  );
+
+  it("does not delete twice", { timeout: 60_000 }, async () => {
+    const templateId = await ensurePromptTemplate();
+    const fixture = await createFixture(1_000);
+    const input = reservationInput(fixture, templateId, 40);
+    await createThumbnailGenerationReservation(input);
+    await failThumbnailGeneration({
+      thumbnailGenerationId: input.id,
+      category: "provider_error",
+      message: "failed",
+    });
+
+    const first = await deleteThumbnailGeneration({
+      workspaceId: fixture.workspaceId,
+      projectId: fixture.projectId,
+      thumbnailGenerationId: input.id,
+    });
+    expect(first.deleted).toBe(true);
+    const second = await deleteThumbnailGeneration({
+      workspaceId: fixture.workspaceId,
+      projectId: fixture.projectId,
+      thumbnailGenerationId: input.id,
+    });
+    expect(second.deleted).toBe(false);
+  });
+
+  it("does not delete across workspaces", { timeout: 60_000 }, async () => {
+    const templateId = await ensurePromptTemplate();
+    const owner = await createFixture(1_000);
+    const stranger = await createFixture(1_000);
+    const input = reservationInput(owner, templateId, 40);
+    await createThumbnailGenerationReservation(input);
+    await failThumbnailGeneration({
+      thumbnailGenerationId: input.id,
+      category: "provider_error",
+      message: "failed",
+    });
+
+    const removal = await deleteThumbnailGeneration({
+      workspaceId: stranger.workspaceId,
+      projectId: stranger.projectId,
+      thumbnailGenerationId: input.id,
+    });
+    expect(removal.deleted).toBe(false);
+  });
+
+  it(
+    "refuses to delete a generation that is still running",
+    { timeout: 60_000 },
+    async () => {
+      const templateId = await ensurePromptTemplate();
+      const fixture = await createFixture(1_000);
+      const input = reservationInput(fixture, templateId, 40);
+      await createThumbnailGenerationReservation(input);
+      await markThumbnailGenerationRunning({
+        thumbnailGenerationId: input.id,
+        attemptCount: 1,
+      });
+
+      const removal = await deleteThumbnailGeneration({
+        workspaceId: fixture.workspaceId,
+        projectId: fixture.projectId,
+        thumbnailGenerationId: input.id,
+      });
+      expect(removal.deleted).toBe(false);
     },
   );
 

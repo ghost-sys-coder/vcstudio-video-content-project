@@ -438,64 +438,70 @@ export async function dismissThumbnailGeneration(input: {
 }
 
 /**
- * Permanently remove a thumbnail, returning its stored object key so the caller
- * can delete the file too.
+ * Remove a thumbnail from the gallery and return its stored object key so the
+ * caller can delete the image from R2 too.
  *
- * A hard delete rather than the soft `dismissedAt` flag: dismiss exists to hide
- * a *failed* attempt that produced nothing, whereas this is the owner/editor
- * deliberately discarding an image, and leaving the bytes in R2 would mean the
- * workspace keeps paying to store something it deleted.
+ * The image really is destroyed; the *row* is retained and flagged instead of
+ * being deleted, because `usage_reservations` — the spend ledger behind
+ * `/app/usage` and `getProjectCommittedCostCents` — points at it, and the
+ * `usage_reservations_single_operation` CHECK requires a reservation with
+ * `operation_type = 'thumbnail_generation'` to carry a non-null
+ * `thumbnail_generation_id`. That constraint is right: a reservation must always
+ * name the operation it paid for. So the pointer can be neither deleted (the
+ * foreign key cascades, erasing money genuinely spent and handing the project
+ * back budget it had already used) nor nulled (it violates the CHECK). Keeping
+ * the row satisfies both, and the gallery already hides `dismissedAt` rows, so
+ * from the user's side the thumbnail is gone.
+ *
+ * `assetObjectKey` and `assetEtag` are cleared because they name bytes that no
+ * longer exist. The dimensions and byte size stay: they describe what was
+ * generated and charged for, and dangle at nothing.
  *
  * In-flight generations are excluded — cancel first, so a running task cannot
- * write an asset back after the row is gone.
- *
- * The usage reservation is **detached before the delete, not cascaded away**.
- * `usage_reservations` is the spend ledger: it is what `/app/usage` reports and
- * what `getProjectCommittedCostCents` charges budgets against. The foreign key
- * cascades, so deleting the generation directly would erase the record of money
- * that was genuinely spent and hand the project back budget it had already used
- * — letting a workspace generate past its cap by deleting its own history.
- * Nulling the link keeps the row, its cost, and its `thumbnail_generation`
- * operation type; only the pointer to a row that no longer exists is lost.
+ * write an asset back over a row the user has already discarded. Rows already
+ * flagged are excluded, so a double submit reports "not deleted" rather than
+ * re-deleting an object key it no longer holds.
  */
 export async function deleteThumbnailGeneration(input: {
   workspaceId: string;
   projectId: string;
   thumbnailGenerationId: string;
 }): Promise<{ deleted: boolean; assetObjectKey: string | null }> {
-  const database = getDatabase();
-
-  await database
-    .update(usageReservations)
-    .set({ thumbnailGenerationId: null })
-    .where(
-      and(
-        eq(
-          usageReservations.thumbnailGenerationId,
-          input.thumbnailGenerationId,
-        ),
-        eq(usageReservations.workspaceId, input.workspaceId),
-      ),
-    );
-
-  const [row] = await database
-    .delete(thumbnailGenerations)
-    .where(
-      and(
-        eq(thumbnailGenerations.id, input.thumbnailGenerationId),
-        eq(thumbnailGenerations.workspaceId, input.workspaceId),
-        eq(thumbnailGenerations.projectId, input.projectId),
-        inArray(thumbnailGenerations.status, [
-          "succeeded",
-          "failed",
-          "cancelled",
-        ]),
-      ),
+  // A CTE, because `UPDATE … RETURNING` yields the *new* row: the object key has
+  // to be captured before the same statement clears it.
+  const result = await getDatabase().execute<{
+    asset_object_key: string | null;
+  }>(sql`
+    with target as materialized (
+      select id, asset_object_key
+      from thumbnail_generations
+      where id = ${input.thumbnailGenerationId}
+        and workspace_id = ${input.workspaceId}
+        and project_id = ${input.projectId}
+        and status in ('succeeded', 'failed', 'cancelled')
+        and dismissed_at is null
+      for update
+    ),
+    removed as (
+      update thumbnail_generations generation
+      set
+        dismissed_at = now(),
+        updated_at = now(),
+        asset_object_key = null,
+        asset_etag = null
+      from target
+      where generation.id = target.id
+      returning generation.id
     )
-    .returning({ assetObjectKey: thumbnailGenerations.assetObjectKey });
+    select target.asset_object_key
+    from target
+    inner join removed on removed.id = target.id
+  `);
+
+  const row = result.rows[0];
   return {
     deleted: row !== undefined,
-    assetObjectKey: row?.assetObjectKey ?? null,
+    assetObjectKey: row?.asset_object_key ?? null,
   };
 }
 
