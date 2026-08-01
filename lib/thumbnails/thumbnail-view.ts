@@ -11,6 +11,7 @@ import type {
   ThumbnailGeneration,
 } from "@/db/schema";
 import { VIDEO_CONTENT_PLATFORMS } from "@/lib/platforms/video-content-platforms";
+import { listProjectCharacters } from "@/db/repositories/characters.repository";
 import { findApprovedScriptVersion } from "@/db/repositories/scenes.repository";
 import { listProjectThumbnails } from "@/db/repositories/thumbnail-generation.repository";
 import { listProjectTitleSuggestions } from "@/db/repositories/title-generation.repository";
@@ -95,27 +96,45 @@ export async function loadThumbnailsView(input: {
   const outputCostMatrix = createSceneImageOutputCostMatrix(environment);
   const quality = environment.OPENAI_IMAGE_FINAL_QUALITY;
 
-  const [approvedScript, titleSuggestions, thumbnailsByPlatform] =
-    await Promise.all([
-      findApprovedScriptVersion({
-        workspaceId: input.workspaceId,
-        projectId: input.project.id,
-      }),
-      listProjectTitleSuggestions({
-        workspaceId: input.workspaceId,
-        projectId: input.project.id,
-      }),
-      Promise.all(
-        VIDEO_CONTENT_PLATFORMS.map((platform) =>
-          listProjectThumbnails({
-            workspaceId: input.workspaceId,
-            projectId: input.project.id,
-            platform,
-            limit: THUMBNAIL_GALLERY_LIMIT,
-          }),
-        ),
+  const [
+    approvedScript,
+    titleSuggestions,
+    thumbnailsByPlatform,
+    projectCharacters,
+  ] = await Promise.all([
+    findApprovedScriptVersion({
+      workspaceId: input.workspaceId,
+      projectId: input.project.id,
+    }),
+    listProjectTitleSuggestions({
+      workspaceId: input.workspaceId,
+      projectId: input.project.id,
+    }),
+    Promise.all(
+      VIDEO_CONTENT_PLATFORMS.map((platform) =>
+        listProjectThumbnails({
+          workspaceId: input.workspaceId,
+          projectId: input.project.id,
+          platform,
+          limit: THUMBNAIL_GALLERY_LIMIT,
+        }),
       ),
-    ]);
+    ),
+    listProjectCharacters({
+      workspaceId: input.workspaceId,
+      projectId: input.project.id,
+    }),
+  ]);
+
+  const promptCharacters = projectCharacters.map(({ character }) => ({
+    name: character.name,
+    visualIdentity: character.visualIdentity,
+    faceDescription: character.faceDescription,
+    hairDescription: character.hairDescription,
+    skinToneDescription: character.skinToneDescription,
+    defaultOutfitDescription: character.defaultOutfitDescription,
+    negativeConstraints: character.negativeConstraints,
+  }));
 
   const hasTopic = Boolean(input.brief && input.brief.topic.trim() !== "");
   const hasContext = hasTopic || approvedScript !== null;
@@ -135,6 +154,10 @@ export async function loadThumbnailsView(input: {
         scriptExcerpt: approvedScript?.content ?? null,
         textMode: "clean",
         headlineText: null,
+        // Same cast the real generation will use, so the quoted estimate covers
+        // the character block's tokens rather than under-quoting every project
+        // that casts someone.
+        characters: promptCharacters,
         output: getSceneImageDimensions(size),
       });
       const estimatedCostCents = estimateSceneImageCost({

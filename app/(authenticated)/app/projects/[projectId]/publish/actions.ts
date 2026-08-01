@@ -3,9 +3,11 @@
 import { revalidatePath } from "next/cache";
 import {
   cancelThumbnailGeneration,
+  deleteThumbnailGeneration,
   dismissThumbnailGeneration,
   setThumbnailFavorite,
 } from "@/db/commands/thumbnail-generation-commands";
+import { deleteUploadedSceneImageObject } from "@/lib/storage/scene-image-storage";
 import { findThumbnailGeneration } from "@/db/repositories/thumbnail-generation.repository";
 import { cancelVideoPublication } from "@/db/commands/video-publication-commands";
 import {
@@ -57,6 +59,7 @@ import {
 } from "@/lib/schemas/title-generation";
 import {
   cancelThumbnailGenerationSchema,
+  deleteThumbnailSchema,
   dismissThumbnailSchema,
   generateThumbnailSchema,
   regenerateThumbnailSchema,
@@ -592,5 +595,58 @@ export async function createPostFromRenderAction(
     if (error instanceof CreatePostFromRenderError)
       return { ok: false, error: error.message };
     return { ok: false, error: "That post could not be created." };
+  }
+}
+
+/**
+ * Permanently removes a thumbnail and its stored image.
+ *
+ * Gated by `requirePublishMutation`, so it needs `mutateWorkspaceData` — owners
+ * and editors, never viewers — and refuses on an archived project. Audited,
+ * because it destroys a generated asset the workspace paid for.
+ */
+export async function deleteThumbnailAction(
+  formData: FormData,
+): Promise<ThumbnailActionResult> {
+  const parsed = deleteThumbnailSchema.safeParse({
+    projectId: formData.get("projectId"),
+    thumbnailGenerationId: formData.get("thumbnailGenerationId"),
+  });
+  if (!parsed.success)
+    return { success: false, error: "The request is invalid." };
+  try {
+    const { context } = await requirePublishMutation(parsed.data.projectId);
+    const result = await deleteThumbnailGeneration({
+      workspaceId: context.activeMembership.workspaceId,
+      projectId: parsed.data.projectId,
+      thumbnailGenerationId: parsed.data.thumbnailGenerationId,
+    });
+    if (!result.deleted)
+      return {
+        success: false,
+        error:
+          "That thumbnail could not be deleted. Cancel it first if it is still generating.",
+      };
+
+    // The row is already gone, so a storage failure must not report failure to
+    // the user — it would invite a retry that can no longer succeed. The orphan
+    // is picked up by ordinary bucket housekeeping instead.
+    if (result.assetObjectKey)
+      await deleteUploadedSceneImageObject(result.assetObjectKey).catch(
+        () => undefined,
+      );
+
+    await recordAuditEvent({
+      workspaceId: context.activeMembership.workspaceId,
+      actorUserId: context.user.id,
+      projectId: parsed.data.projectId,
+      action: "thumbnail_deleted",
+      targetType: "thumbnail_generation",
+      targetId: parsed.data.thumbnailGenerationId,
+    });
+    revalidatePath(`/app/projects/${parsed.data.projectId}/publish`);
+    return { success: true, error: null };
+  } catch {
+    return { success: false, error: "The thumbnail could not be deleted." };
   }
 }

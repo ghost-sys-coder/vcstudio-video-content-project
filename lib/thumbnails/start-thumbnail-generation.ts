@@ -16,6 +16,7 @@ import {
   ensureThumbnailPromptTemplate,
   findThumbnailGenerationByIdempotencyKey,
 } from "@/db/repositories/thumbnail-generation.repository";
+import { listProjectCharacters } from "@/db/repositories/characters.repository";
 import {
   findApprovedScriptVersion,
   getProjectCommittedCostCents,
@@ -79,10 +80,27 @@ export async function startThumbnailGeneration(input: {
     );
 
   const brief = input.brief;
-  const approvedScript = await findApprovedScriptVersion({
-    workspaceId: input.workspaceId,
-    projectId: input.project.id,
-  });
+  const [approvedScript, projectCharacters] = await Promise.all([
+    findApprovedScriptVersion({
+      workspaceId: input.workspaceId,
+      projectId: input.project.id,
+    }),
+    listProjectCharacters({
+      workspaceId: input.workspaceId,
+      projectId: input.project.id,
+    }),
+  ]);
+  // Ordered lead-first by the repository. Projects that cast nobody get an empty
+  // list and the prompt falls back to a generic subject.
+  const promptCharacters = projectCharacters.map(({ character }) => ({
+    name: character.name,
+    visualIdentity: character.visualIdentity,
+    faceDescription: character.faceDescription,
+    hairDescription: character.hairDescription,
+    skinToneDescription: character.skinToneDescription,
+    defaultOutfitDescription: character.defaultOutfitDescription,
+    negativeConstraints: character.negativeConstraints,
+  }));
   const hasTopic = Boolean(brief && brief.topic.trim() !== "");
   if (!hasTopic && !approvedScript)
     throw new ThumbnailGenerationRequestError(
@@ -110,6 +128,7 @@ export async function startThumbnailGeneration(input: {
     scriptExcerpt: approvedScript?.content ?? null,
     textMode: input.textMode,
     headlineText: headline,
+    characters: promptCharacters,
     output: dimensions,
   });
 
@@ -175,6 +194,10 @@ export async function startThumbnailGeneration(input: {
       tone: brief?.tone ?? "",
       hookAngle: brief?.hookAngle ?? "",
       scriptVersionId: approvedScript?.id ?? null,
+      // Part of the fingerprint so recasting the project, or editing the lead's
+      // appearance, produces a genuinely new generation instead of deduping onto
+      // a thumbnail that depicts the old character.
+      characters: promptCharacters,
     }),
   );
   const idempotencyKey = createThumbnailGenerationIdempotencyKey({

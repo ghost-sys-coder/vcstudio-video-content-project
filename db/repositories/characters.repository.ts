@@ -150,6 +150,45 @@ export async function listSceneVersionCharacters(input: {
     .orderBy(asc(characters.name));
 }
 
+/**
+ * The distinct characters a project actually casts, across every scene.
+ *
+ * Ordered by how many scenes each appears in (most first, then name for a
+ * stable tie-break) so the lead comes out on top — thumbnail generation shows
+ * one face, and "appears in the most scenes" is the closest thing the data has
+ * to a protagonist. The count is folded in here rather than by the caller
+ * because doing it in SQL keeps the per-scene rows out of the application.
+ */
+export async function listProjectCharacters(input: {
+  workspaceId: string;
+  projectId: string;
+}) {
+  return getDatabase()
+    .select({
+      character: characters,
+      sceneCount: sql<number>`count(distinct ${sceneVersionCharacters.sceneVersionId})::int`,
+    })
+    .from(sceneVersionCharacters)
+    .innerJoin(
+      characters,
+      and(
+        eq(characters.id, sceneVersionCharacters.characterId),
+        eq(characters.workspaceId, input.workspaceId),
+      ),
+    )
+    .where(
+      and(
+        eq(sceneVersionCharacters.workspaceId, input.workspaceId),
+        eq(sceneVersionCharacters.projectId, input.projectId),
+      ),
+    )
+    .groupBy(characters.id)
+    .orderBy(
+      desc(sql`count(distinct ${sceneVersionCharacters.sceneVersionId})`),
+      asc(characters.name),
+    );
+}
+
 export async function listCharactersByIds(input: {
   workspaceId: string;
   characterIds: string[];

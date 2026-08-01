@@ -1,6 +1,7 @@
 "use client";
 
 import { DownloadIcon, RefreshCwIcon, StarIcon } from "lucide-react";
+import { ThumbnailDeleteDialog } from "@/components/publish/ThumbnailDeleteDialog";
 import { Button, buttonVariants } from "@/components/ui/button";
 import type { ThumbnailView } from "@/lib/thumbnails/thumbnail-view";
 
@@ -16,6 +17,7 @@ export function ThumbnailGenerationCard({
   onToggleFavorite,
   onRegenerate,
   onDismiss,
+  onDelete,
 }: {
   projectId: string;
   thumbnail: ThumbnailView;
@@ -24,6 +26,7 @@ export function ThumbnailGenerationCard({
   onToggleFavorite: (thumbnailId: string, isFavorite: boolean) => void;
   onRegenerate: (thumbnailId: string) => void;
   onDismiss: (thumbnailId: string) => void;
+  onDelete: (thumbnailId: string) => void;
 }) {
   const assetUrl = `/api/projects/${projectId}/thumbnails/${thumbnail.id}/asset`;
   const isActive =
@@ -144,6 +147,16 @@ export function ThumbnailGenerationCard({
                   Regenerate
                 </Button>
               </>
+            ) : null}
+            {/* Available on any settled thumbnail, including a successful one —
+                dismiss only ever hid failures. */}
+            {!isActive && canManage ? (
+              <ThumbnailDeleteDialog
+                busy={busy}
+                onDelete={onDelete}
+                thumbnailId={thumbnail.id}
+                thumbnailLabel={thumbnail.headlineText ?? modeLabel}
+              />
             ) : null}
           </div>
         </div>

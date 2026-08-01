@@ -1,21 +1,37 @@
 import type { ScriptGenerationPlatform } from "./script-generation";
 
-export const THUMBNAIL_PROMPT_VERSION = "thumbnail-v1";
+export const THUMBNAIL_PROMPT_VERSION = "thumbnail-v2";
 
 export const THUMBNAIL_PROMPT_TEMPLATE_KEY = "thumbnail";
 
 export const THUMBNAIL_PROMPT_TEMPLATE_SOURCE = `VCStudio publish thumbnail prompt
-Layers: platform framing, subject and emotion, composition heuristics, colour and
-contrast, content grounding, text mode (baked headline or text-free), negative
-constraints, and output dimensions.`;
+Layers: platform framing, character identity (when the project casts characters),
+subject and emotion, composition heuristics, colour and contrast, content
+grounding, text mode (baked headline or text-free), negative constraints, and
+output dimensions.`;
 
 // SHA-256 of THUMBNAIL_PROMPT_TEMPLATE_SOURCE. Any change to the template's
 // meaning must bump the version and this hash, or generation fails
 // `prompt_template_mismatch` (reproducibility guard, mirroring scene images).
 export const THUMBNAIL_PROMPT_TEMPLATE_SOURCE_HASH =
-  "4058fbb108a90e0ba4f7b5742140c4f7e70621545059ee31fd73aeda499fdda8";
+  "935f8ca83a2ccc14d91c223a48d6ebfd779446d8f9cda0f94f74f78a78a01805";
 
 export type ThumbnailTextMode = "baked" | "clean";
+
+/**
+ * A character the project actually casts, projected down to the fields that
+ * describe how they *look*. Personality and continuity notes are deliberately
+ * left out — a thumbnail is one frame, so only appearance carries over.
+ */
+export type ThumbnailPromptCharacter = {
+  name: string;
+  visualIdentity: string;
+  faceDescription: string;
+  hairDescription: string;
+  skinToneDescription: string;
+  defaultOutfitDescription: string;
+  negativeConstraints: string;
+};
 
 export type ThumbnailPromptInput = {
   platform: ScriptGenerationPlatform;
@@ -27,6 +43,11 @@ export type ThumbnailPromptInput = {
   scriptExcerpt: string | null;
   textMode: ThumbnailTextMode;
   headlineText: string | null;
+  /**
+   * Characters cast in this project, in a stable order. Empty for projects that
+   * use none, in which case the subject stays a generic single human.
+   */
+  characters: ThumbnailPromptCharacter[];
   output: { width: number; height: number };
 };
 
@@ -98,9 +119,44 @@ function textModeBlock(
   return [
     `Render exactly one short headline baked into the image, reading precisely: "${headline}"`,
     "Set it in a heavy, bold, sans-serif typeface with a strong outline or drop shadow so it separates from the background.",
-    "Place the headline so it never covers the subject's eyes or mouth. Keep it to a single line, or two at most.",
+    "Place the headline so it never covers the subject's eyes or mouth. Break it across as many lines as the wording needs, sizing the type so every word stays legible at feed size rather than shrinking to fit one line.",
     "Do not add any other text, letters, numbers, logos, watermarks, or signage anywhere in the frame.",
   ].join("\n");
+}
+
+/**
+ * Describes the cast so the thumbnail shows the same person the video does.
+ *
+ * Only the lead is rendered as the subject even when several characters exist:
+ * the composition rules below are built on a single large face, and a thumbnail
+ * that crams in the whole cast loses at feed size. The rest are named as
+ * explicitly excluded rather than silently dropped, because the image model
+ * otherwise tends to add background figures once it knows they exist.
+ */
+function characterBlock(characters: ThumbnailPromptCharacter[]): string {
+  const [lead, ...rest] = characters;
+  const lines = [
+    `The subject is the project's character "${escapePromptValue(lead.name)}". Depict this specific person, not a generic stock subject.`,
+    compactLines([
+      renderField("Overall look", lead.visualIdentity),
+      renderField("Face", lead.faceDescription),
+      renderField("Hair", lead.hairDescription),
+      renderField("Skin tone", lead.skinToneDescription),
+      renderField("Outfit", lead.defaultOutfitDescription),
+    ]),
+    "Keep these features exact and recognisable — this is the same character the video's scenes depict, so the thumbnail must match them.",
+  ].filter((line) => line.length > 0);
+
+  const leadNegatives = escapePromptValue(lead.negativeConstraints);
+  if (leadNegatives.length > 0)
+    lines.push(`Never depict this character as: ${leadNegatives}`);
+
+  if (rest.length > 0)
+    lines.push(
+      `This project also casts ${rest.map((character) => `"${escapePromptValue(character.name)}"`).join(", ")}. Do not show them — the frame holds one face only.`,
+    );
+
+  return lines.join("\n");
 }
 
 function contentBlock(input: ThumbnailPromptInput): string {
@@ -144,8 +200,17 @@ export function renderThumbnailPrompt(input: ThumbnailPromptInput): string {
     platform.framing,
     platform.safeArea,
     "</platform_framing>",
+    ...(input.characters.length > 0
+      ? [
+          "<character_identity>",
+          characterBlock(input.characters),
+          "</character_identity>",
+        ]
+      : []),
     "<subject_and_emotion>",
-    "Feature a single human subject as the focal point, framed from the chest or shoulders up so the face is large in the frame.",
+    input.characters.length > 0
+      ? "Feature that character as the focal point, framed from the chest or shoulders up so the face is large in the frame."
+      : "Feature a single human subject as the focal point, framed from the chest or shoulders up so the face is large in the frame.",
     "The face must carry one strong, unambiguous emotion that matches the tone below — readable at a glance, not a neutral expression.",
     "Point the subject's gaze either straight at the viewer or toward the most important element in the frame.",
     "</subject_and_emotion>",

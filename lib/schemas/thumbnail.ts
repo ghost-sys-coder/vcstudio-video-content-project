@@ -2,7 +2,17 @@ import { z } from "zod";
 import { contentPlatformSchema } from "@/lib/schemas/title-generation";
 import type { SceneImageApiSize } from "@/lib/schemas/scene-image";
 
-export const MAX_THUMBNAIL_HEADLINE_LENGTH = 40;
+/**
+ * Upper bound on a baked headline.
+ *
+ * There is deliberately no word limit — the previous 40-character ceiling forced
+ * headlines to 2–4 words, which the composition guidance now handles by wrapping
+ * across lines instead. This remains a *character* bound rather than being
+ * removed entirely because the value is persisted and interpolated into an image
+ * prompt, so it still has to be validated like any other external input; 200 is
+ * far beyond anything that stays legible at feed size.
+ */
+export const MAX_THUMBNAIL_HEADLINE_LENGTH = 200;
 
 export const thumbnailTextModeSchema = z.enum(["baked", "clean"]);
 
@@ -40,6 +50,11 @@ export const regenerateThumbnailSchema = z.object({
 });
 
 export const dismissThumbnailSchema = z.object({
+  projectId: z.uuid(),
+  thumbnailGenerationId: z.uuid(),
+});
+
+export const deleteThumbnailSchema = z.object({
   projectId: z.uuid(),
   thumbnailGenerationId: z.uuid(),
 });

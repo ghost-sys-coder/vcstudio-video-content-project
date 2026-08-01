@@ -438,6 +438,68 @@ export async function dismissThumbnailGeneration(input: {
 }
 
 /**
+ * Permanently remove a thumbnail, returning its stored object key so the caller
+ * can delete the file too.
+ *
+ * A hard delete rather than the soft `dismissedAt` flag: dismiss exists to hide
+ * a *failed* attempt that produced nothing, whereas this is the owner/editor
+ * deliberately discarding an image, and leaving the bytes in R2 would mean the
+ * workspace keeps paying to store something it deleted.
+ *
+ * In-flight generations are excluded — cancel first, so a running task cannot
+ * write an asset back after the row is gone.
+ *
+ * The usage reservation is **detached before the delete, not cascaded away**.
+ * `usage_reservations` is the spend ledger: it is what `/app/usage` reports and
+ * what `getProjectCommittedCostCents` charges budgets against. The foreign key
+ * cascades, so deleting the generation directly would erase the record of money
+ * that was genuinely spent and hand the project back budget it had already used
+ * — letting a workspace generate past its cap by deleting its own history.
+ * Nulling the link keeps the row, its cost, and its `thumbnail_generation`
+ * operation type; only the pointer to a row that no longer exists is lost.
+ */
+export async function deleteThumbnailGeneration(input: {
+  workspaceId: string;
+  projectId: string;
+  thumbnailGenerationId: string;
+}): Promise<{ deleted: boolean; assetObjectKey: string | null }> {
+  const database = getDatabase();
+
+  await database
+    .update(usageReservations)
+    .set({ thumbnailGenerationId: null })
+    .where(
+      and(
+        eq(
+          usageReservations.thumbnailGenerationId,
+          input.thumbnailGenerationId,
+        ),
+        eq(usageReservations.workspaceId, input.workspaceId),
+      ),
+    );
+
+  const [row] = await database
+    .delete(thumbnailGenerations)
+    .where(
+      and(
+        eq(thumbnailGenerations.id, input.thumbnailGenerationId),
+        eq(thumbnailGenerations.workspaceId, input.workspaceId),
+        eq(thumbnailGenerations.projectId, input.projectId),
+        inArray(thumbnailGenerations.status, [
+          "succeeded",
+          "failed",
+          "cancelled",
+        ]),
+      ),
+    )
+    .returning({ assetObjectKey: thumbnailGenerations.assetObjectKey });
+  return {
+    deleted: row !== undefined,
+    assetObjectKey: row?.assetObjectKey ?? null,
+  };
+}
+
+/**
  * Toggle a thumbnail's favorite flag. Workspace/project scoped so a browser
  * cannot flip favorites across tenants.
  */

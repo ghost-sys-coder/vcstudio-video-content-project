@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   cancelThumbnailGenerationAction,
+  deleteThumbnailAction,
   dismissThumbnailAction,
   generateThumbnailAction,
   loadThumbnailsViewAction,
@@ -217,6 +218,24 @@ export function PlatformThumbnailsPanel({
     }
   }
 
+  async function remove(thumbnailId: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const formData = new FormData();
+      formData.set("projectId", projectId);
+      formData.set("thumbnailGenerationId", thumbnailId);
+      const result = await deleteThumbnailAction(formData);
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function toggleFavorite(thumbnailId: string, isFavorite: boolean) {
     // Optimistically flip, then reconcile from the server.
     setData((previous) => ({
@@ -347,13 +366,17 @@ export function PlatformThumbnailsPanel({
               Headline
             </Label>
             <Input
-              className="min-w-56"
+              className="min-w-72"
               id="thumbnail-headline"
               maxLength={MAX_THUMBNAIL_HEADLINE_LENGTH}
               onChange={(event) => setHeadline(event.target.value)}
-              placeholder="2–4 punchy words"
+              placeholder="Say as much as you need"
               value={headline}
             />
+            <p className="text-xs text-muted-foreground">
+              {headline.length}/{MAX_THUMBNAIL_HEADLINE_LENGTH} characters.
+              Longer headlines wrap onto more lines, so they render smaller.
+            </p>
           </div>
         ) : null}
 
@@ -436,6 +459,7 @@ export function PlatformThumbnailsPanel({
               busy={busy}
               canManage={canGenerate}
               key={thumbnail.id}
+              onDelete={remove}
               onDismiss={dismiss}
               onRegenerate={regenerate}
               onToggleFavorite={toggleFavorite}
