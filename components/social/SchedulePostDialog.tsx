@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarClockIcon, Loader2Icon } from "lucide-react";
+import { toast } from "sonner";
 import { scheduleSocialPostAction } from "@/app/(authenticated)/app/social/posts/actions";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,6 +29,12 @@ import {
  * The picker works in the viewer's own local time and the browser's timezone is
  * sent alongside the instant — the server stores an absolute `timestamptz`, and
  * the zone is kept only so the schedule can be redisplayed the way it was meant.
+ *
+ * `open` is controlled rather than left to the dialog, for the same reason the
+ * workspace confirmation dialogs control theirs: a failure has to keep the
+ * dialog open and report the error where the user acted, while a success has to
+ * close it — otherwise the scheduled-post banner the refresh reveals is hidden
+ * behind the dialog that is still covering it.
  */
 export function SchedulePostDialog({
   disabled,
@@ -48,8 +55,15 @@ export function SchedulePostDialog({
         : new Date(Date.now() + 60 * 60 * 1000),
     ),
   );
+  const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  function changeOpen(next: boolean) {
+    // Clearing on open means a previous failure never greets the next attempt.
+    if (next) setError(null);
+    setOpen(next);
+  }
 
   function schedule() {
     setError(null);
@@ -68,13 +82,22 @@ export function SchedulePostDialog({
       data.set("requestNonce", crypto.randomUUID());
 
       const result = await scheduleSocialPostAction(data);
-      if (result.ok) router.refresh();
-      else setError(result.error);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setOpen(false);
+      // The instant comes back from the server rather than being echoed from the
+      // picker, so the confirmation states what was actually stored.
+      toast.success(
+        `Scheduled for ${new Date(result.scheduledAt).toLocaleString()}.`,
+      );
+      router.refresh();
     });
   }
 
   return (
-    <Dialog>
+    <Dialog onOpenChange={changeOpen} open={open}>
       <DialogTrigger render={<Button disabled={disabled} variant="outline" />}>
         <CalendarClockIcon />
         Schedule
@@ -110,7 +133,7 @@ export function SchedulePostDialog({
         ) : null}
 
         <DialogFooter>
-          <DialogClose render={<Button variant="outline" />}>
+          <DialogClose disabled={pending} render={<Button variant="outline" />}>
             Cancel
           </DialogClose>
           <Button
