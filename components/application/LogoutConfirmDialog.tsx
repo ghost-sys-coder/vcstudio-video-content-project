@@ -15,6 +15,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { SidebarMenuButton } from "@/components/ui/sidebar";
+import { signOutAndLeave } from "@/lib/auth/sign-out-and-leave";
 
 /**
  * The sidebar's account row, gated behind a confirmation before it signs the
@@ -33,7 +34,7 @@ export function LogoutConfirmDialog({
 
   function confirmLogout() {
     startTransition(async () => {
-      await signOut({ redirectUrl: "/" });
+      await signOutAndLeave({ destination: "/", signOut });
     });
   }
 

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { acceptWorkspaceInvitationAction } from "@/app/(authenticated)/invite/[invitationId]/accept/actions";
 import { Button } from "@/components/ui/button";
+import { signOutAndLeave } from "@/lib/auth/sign-out-and-leave";
 import type { InvitationAcceptanceState } from "@/lib/workspace/invitation-acceptance-state";
 
 const INVALID_STATE_COPY: Record<
@@ -54,7 +55,10 @@ export function InvitationAcceptCard({
         <Button
           className="w-full"
           onClick={() =>
-            void signOut({ redirectUrl: `/invite/${invitationId}/accept` })
+            void signOutAndLeave({
+              destination: `/invite/${invitationId}/accept`,
+              signOut,
+            })
           }
           type="button"
         >
