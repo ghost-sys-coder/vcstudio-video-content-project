@@ -2,6 +2,7 @@ import { Music2Icon } from "lucide-react";
 import { FacebookMarkIcon } from "@/components/brand/FacebookMarkIcon";
 import { InstagramMarkIcon } from "@/components/brand/InstagramMarkIcon";
 import { LinkedInMarkIcon } from "@/components/brand/LinkedInMarkIcon";
+import { XMarkIcon } from "@/components/brand/XMarkIcon";
 import { YouTubeMarkIcon } from "@/components/brand/YouTubeMarkIcon";
 import type { ContentPlatform } from "@/db/schema";
 
@@ -28,6 +29,8 @@ export function PlatformMarkIcon({
       return <InstagramMarkIcon className={className} />;
     case "linkedin":
       return <LinkedInMarkIcon className={className} />;
+    case "twitter":
+      return <XMarkIcon className={className} />;
     case "tiktok":
       // TikTok's note mark is not redistributable the way the others are, so the
       // generic music glyph stands in — as it already did before this component.

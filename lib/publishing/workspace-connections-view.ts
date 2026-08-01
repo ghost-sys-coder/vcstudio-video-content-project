@@ -40,6 +40,7 @@ const PLATFORM_ORDER: readonly ContentPlatform[] = [
   "instagram",
   "tiktok",
   "linkedin",
+  "twitter",
 ];
 
 function formatUtc(value: Date): string {

@@ -3,10 +3,12 @@ import type { ContentPlatform } from "@/db/schema";
 /**
  * What each destination will actually accept as a post.
  *
- * The five platforms are **not interchangeable**, and pretending otherwise in
+ * The six platforms are **not interchangeable**, and pretending otherwise in
  * the UI would mean discovering it at publish time, after a schedule fired:
  *
- * - **LinkedIn** and **Facebook** take text on its own, with or without media.
+ * - **LinkedIn**, **X**, and **Facebook** take text on its own, with or without
+ *   media. X is the only one with a *short* text ceiling, so it is routinely the
+ *   platform that drops out of a selection the others accept.
  * - **Instagram** requires media. There is no text-only Instagram post.
  * - **TikTok** requires a video. There is no image or text-only TikTok post
  *   through the Content Posting API this app is approved for.
@@ -35,6 +37,7 @@ export type PlatformPostCapability = {
 
 export const SOCIAL_POST_PLATFORMS = [
   "linkedin",
+  "twitter",
   "facebook",
   "instagram",
   "tiktok",
@@ -51,6 +54,20 @@ export const PLATFORM_POST_CAPABILITIES = {
     requiresSingleMediaKind: true,
     maxCharacters: 3000,
     mediaRequirement: "Text on its own, up to 20 images, or one video.",
+  },
+  twitter: {
+    allowsTextOnly: true,
+    images: { min: 1, max: 4 },
+    allowsVideo: true,
+    requiresSingleMediaKind: true,
+    // 280 is the limit for every account X does not charge for. Premium raises
+    // it to 25,000, but the ceiling belongs to the *connected account*, not to
+    // this app, and there is no way to read an account's tier from the posting
+    // API. So the composer holds everyone to the limit that always works: a
+    // Premium author is asked to shorten a post that would have fit, which is a
+    // far better failure than a scheduled post rejected at 3am for everyone else.
+    maxCharacters: 280,
+    mediaRequirement: "Text on its own, up to 4 images, or one video.",
   },
   facebook: {
     allowsTextOnly: true,

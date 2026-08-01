@@ -4,7 +4,7 @@ import { LoaderCircle, MessageSquareShare } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { createPostFromRenderAction } from "@/app/(authenticated)/app/projects/[projectId]/publish/actions";
-import { ConnectLinkedInButton } from "@/components/publish/ConnectLinkedInButton";
+import { ConnectPlatformChip } from "@/components/publish/ConnectPlatformChip";
 import { SocialPostAccountList } from "@/components/publish/SocialPostAccountList";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -20,14 +20,15 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { MAX_QUICK_COMMENTARY_LENGTH } from "@/lib/schemas/social-post";
 import { groupRendersByKind } from "@/lib/publishing/group-renders";
+import { selectConnectablePostPlatforms } from "@/lib/social/select-connectable-post-platforms";
 import type {
   PublishableRenderView,
   PublishingView,
 } from "@/lib/publishing/publishing-view";
 
 /**
- * Shares a finished render as a social post — the only path to LinkedIn, which
- * takes posts rather than video uploads and so never appears in the channel
+ * Shares a finished render as a social post — the only path to LinkedIn and X,
+ * which take posts rather than video uploads and so never appear in the channel
  * picker above.
  *
  * Creates a draft and opens the composer rather than publishing here. The
@@ -59,6 +60,9 @@ export function ShareRenderAsPostPanel({
     postableRenders.map((render) => [render.id, render.label]),
   );
   const groups = groupRendersByKind(postableRenders);
+  const unconnectedPostPlatforms = selectConnectablePostPlatforms(
+    data.socialPostConnections.map((connection) => connection.platform),
+  );
 
   function create() {
     setError(null);
@@ -78,8 +82,9 @@ export function ShareRenderAsPostPanel({
       <div>
         <h2 className="text-sm font-semibold">Share as a social post</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Post a finished render to LinkedIn, Facebook, or Instagram. LinkedIn
-          accepts posts rather than video uploads, so this is how it is reached.
+          Post a finished render to LinkedIn, X, Facebook, or Instagram.
+          LinkedIn and X accept posts rather than video uploads, so this is how
+          they are reached.
         </p>
       </div>
 
@@ -94,11 +99,18 @@ export function ShareRenderAsPostPanel({
               Post-capable accounts
             </h3>
             <SocialPostAccountList connections={data.socialPostConnections} />
-            {canManageConnections &&
-            !data.socialPostConnections.some(
-              (connection) => connection.platform === "linkedin",
-            ) ? (
-              <ConnectLinkedInButton />
+            {canManageConnections && unconnectedPostPlatforms.length > 0 ? (
+              <ul className="flex flex-wrap gap-2">
+                {unconnectedPostPlatforms.map((platform) => (
+                  <li key={platform.platform}>
+                    <ConnectPlatformChip
+                      href={platform.href}
+                      label={`Connect ${platform.label}`}
+                      platform={platform.platform}
+                    />
+                  </li>
+                ))}
+              </ul>
             ) : null}
           </div>
 

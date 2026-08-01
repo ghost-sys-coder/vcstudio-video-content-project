@@ -545,6 +545,20 @@ export const publishingEnvironmentSchema = z.object({
     .string()
     .regex(/^\d{6}$/, "LINKEDIN_API_VERSION must look like 202607")
     .default("202607"),
+  /**
+   * X (Twitter) OAuth 2.0 client. Optional for the same reason as the others.
+   *
+   * Named `TWITTER_*` to match what the platform's own developer portal, token
+   * endpoints, and stored `content_platform` value still call it — only the
+   * user-facing label is "X".
+   *
+   * Read in **both** runtimes: the web app for the connect flow, and the worker
+   * to rotate access tokens, which X expires after roughly two hours. A worker
+   * missing these cannot refresh, and every scheduled X post fails once the
+   * first token lapses.
+   */
+  TWITTER_CLIENT_ID: z.string().optional(),
+  TWITTER_CLIENT_SECRET: z.string().optional(),
   ENABLE_VIDEO_PUBLISHING: z
     .enum(["true", "false"])
     .default("true")

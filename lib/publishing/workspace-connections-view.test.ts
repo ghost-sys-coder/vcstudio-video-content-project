@@ -54,6 +54,7 @@ describe("workspace channels view", () => {
       { platform: "instagram", label: "Instagram", available: true },
       { platform: "tiktok", label: "TikTok", available: true },
       { platform: "linkedin", label: "LinkedIn", available: true },
+      { platform: "twitter", label: "X", available: true },
     ]);
   });
 });

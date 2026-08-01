@@ -202,6 +202,7 @@ export const contentPlatformEnum = pgEnum("content_platform", [
   "facebook",
   "instagram",
   "linkedin",
+  "twitter",
 ]);
 
 export const usageReservationStatusEnum = pgEnum("usage_reservation_status", [

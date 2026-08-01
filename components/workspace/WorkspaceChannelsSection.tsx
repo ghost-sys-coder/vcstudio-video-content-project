@@ -8,6 +8,7 @@ import { ConnectFacebookButton } from "@/components/publish/ConnectFacebookButto
 import { ConnectInstagramButton } from "@/components/publish/ConnectInstagramButton";
 import { ConnectLinkedInButton } from "@/components/publish/ConnectLinkedInButton";
 import { ConnectTikTokButton } from "@/components/publish/ConnectTikTokButton";
+import { ConnectXButton } from "@/components/publish/ConnectXButton";
 import { FutureChannelPlatformCard } from "@/components/workspace/FutureChannelPlatformCard";
 import { WorkspaceChannelCard } from "@/components/workspace/WorkspaceChannelCard";
 import type { WorkspaceChannelsView } from "@/lib/publishing/workspace-connections-view";
@@ -45,6 +46,14 @@ const LINKEDIN_OAUTH_MESSAGES: Record<string, string> = {
   invalid: "The LinkedIn authorization response was invalid or expired.",
 };
 
+const X_OAUTH_MESSAGES: Record<string, string> = {
+  connected: "The X account is now connected to this workspace.",
+  cancelled: "X connection was cancelled.",
+  failed: "The X account could not be connected. Please try again.",
+  forbidden: "You do not have permission to connect that account.",
+  invalid: "The X authorization response was invalid or expired.",
+};
+
 const TIKTOK_OAUTH_MESSAGES: Record<string, string> = {
   connected: "The TikTok account is now connected to this workspace.",
   cancelled: "TikTok connection was cancelled.",
@@ -63,6 +72,7 @@ export function WorkspaceChannelsSection({
     instagram: string | null;
     linkedin: string | null;
     tiktok: string | null;
+    x: string | null;
     youtube: string | null;
   };
 }) {
@@ -100,6 +110,7 @@ export function WorkspaceChannelsSection({
       : null,
     oauthStatus.tiktok ? TIKTOK_OAUTH_MESSAGES[oauthStatus.tiktok] : null,
     oauthStatus.linkedin ? LINKEDIN_OAUTH_MESSAGES[oauthStatus.linkedin] : null,
+    oauthStatus.x ? X_OAUTH_MESSAGES[oauthStatus.x] : null,
   ].filter((message): message is string => Boolean(message));
 
   return (
@@ -142,13 +153,17 @@ export function WorkspaceChannelsSection({
             </>
           ) : null}
           {/*
-            LinkedIn is a social-post destination only — it has no rendered-video
-            path — so it follows the posting flag rather than the video one.
+            LinkedIn and X are social-post destinations only — neither has a
+            rendered-video path — so they follow the posting flag rather than the
+            video one.
           */}
           {initialData.socialPostingEnabled ? (
-            <ConnectLinkedInButton
-              label={activeCount > 0 ? "Add LinkedIn" : "Connect LinkedIn"}
-            />
+            <>
+              <ConnectLinkedInButton
+                label={activeCount > 0 ? "Add LinkedIn" : "Connect LinkedIn"}
+              />
+              <ConnectXButton label={activeCount > 0 ? "Add X" : "Connect X"} />
+            </>
           ) : null}
         </div>
       </div>

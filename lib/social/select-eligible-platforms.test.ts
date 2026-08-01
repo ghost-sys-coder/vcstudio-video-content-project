@@ -37,6 +37,7 @@ describe("summarizeAttachments", () => {
 describe("checkPlatformEligibility", () => {
   it("allows text on its own only where the platform accepts it", () => {
     expect(eligible({ platform: "linkedin" }).eligible).toBe(true);
+    expect(eligible({ platform: "twitter" }).eligible).toBe(true);
     expect(eligible({ platform: "facebook" }).eligible).toBe(true);
 
     for (const platform of ["instagram", "tiktok", "youtube"] as const) {
@@ -47,6 +48,27 @@ describe("checkPlatformEligibility", () => {
           PLATFORM_POST_CAPABILITIES[platform].mediaRequirement,
         );
     }
+  });
+
+  it("drops X, and only X, when a post runs past 280 characters", () => {
+    const body = { plainTextLength: 500 };
+    expect(eligible({ platform: "linkedin", ...body }).eligible).toBe(true);
+    expect(eligible({ platform: "facebook", ...body }).eligible).toBe(true);
+
+    // X's ceiling is an order of magnitude below every other text destination,
+    // so it is routinely the one platform a perfectly valid post cannot go to.
+    const result = eligible({ platform: "twitter", ...body });
+    expect(result.eligible).toBe(false);
+    if (!result.eligible) expect(result.reason).toContain("280");
+  });
+
+  it("caps X at four images", () => {
+    expect(eligible({ platform: "twitter", imageCount: 4 }).eligible).toBe(
+      true,
+    );
+    const tooMany = eligible({ platform: "twitter", imageCount: 5 });
+    expect(tooMany.eligible).toBe(false);
+    if (!tooMany.eligible) expect(tooMany.reason).toContain("4 images");
   });
 
   it("explains that YouTube has no community-post API rather than just failing", () => {

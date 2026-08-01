@@ -18,6 +18,7 @@ export default async function WorkspaceSettingsPage({
     instagram?: string;
     linkedin?: string;
     tiktok?: string;
+    x?: string;
     youtube?: string;
   }>;
 }) {
@@ -28,7 +29,7 @@ export default async function WorkspaceSettingsPage({
   }
 
   const [
-    { facebook, instagram, linkedin, tiktok, youtube },
+    { facebook, instagram, linkedin, tiktok, x, youtube },
     logo,
     channelsView,
     members,
@@ -57,6 +58,7 @@ export default async function WorkspaceSettingsPage({
         instagram: instagram ?? null,
         linkedin: linkedin ?? null,
         tiktok: tiktok ?? null,
+        x: x ?? null,
         youtube: youtube ?? null,
       }}
       pendingInvitations={pendingInvitations}

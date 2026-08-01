@@ -26,6 +26,7 @@ export function WorkspaceProfilePage({
     instagram: string | null;
     linkedin: string | null;
     tiktok: string | null;
+    x: string | null;
     youtube: string | null;
   };
   pendingInvitations: WorkspaceInvitationView[];
