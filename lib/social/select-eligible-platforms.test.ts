@@ -50,16 +50,24 @@ describe("checkPlatformEligibility", () => {
     }
   });
 
-  it("drops X, and only X, when a post runs past 280 characters", () => {
-    const body = { plainTextLength: 500 };
+  it("accepts a long post on X up to the connected account's ceiling", () => {
+    // Configured for a Premium account. A post that a non-Premium account could
+    // never send is deliberately allowed — see the capability comment.
+    expect(
+      eligible({ platform: "twitter", plainTextLength: 2000 }).eligible,
+    ).toBe(true);
+  });
+
+  it("drops X, and only X, once a post runs past its ceiling", () => {
+    const body = { plainTextLength: 2500 };
     expect(eligible({ platform: "linkedin", ...body }).eligible).toBe(true);
     expect(eligible({ platform: "facebook", ...body }).eligible).toBe(true);
 
-    // X's ceiling is an order of magnitude below every other text destination,
-    // so it is routinely the one platform a perfectly valid post cannot go to.
+    // X still has the tightest ceiling of the three text destinations, so it
+    // stays the one a long post drops out of first.
     const result = eligible({ platform: "twitter", ...body });
     expect(result.eligible).toBe(false);
-    if (!result.eligible) expect(result.reason).toContain("280");
+    if (!result.eligible) expect(result.reason).toContain("2,000");
   });
 
   it("caps X at four images", () => {

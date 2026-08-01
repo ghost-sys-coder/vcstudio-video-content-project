@@ -60,13 +60,19 @@ export const PLATFORM_POST_CAPABILITIES = {
     images: { min: 1, max: 4 },
     allowsVideo: true,
     requiresSingleMediaKind: true,
-    // 280 is the limit for every account X does not charge for. Premium raises
-    // it to 25,000, but the ceiling belongs to the *connected account*, not to
-    // this app, and there is no way to read an account's tier from the posting
-    // API. So the composer holds everyone to the limit that always works: a
-    // Premium author is asked to shorten a post that would have fit, which is a
-    // far better failure than a scheduled post rejected at 3am for everyone else.
-    maxCharacters: 280,
+    // Set for a **Premium** account, on the owner's instruction (2026-08-02).
+    //
+    // X's ceiling belongs to the connected account, not to this app, and the
+    // posting API exposes no way to read an account's tier — so this number is a
+    // statement about who is connected, and it is only correct while that stays
+    // true. 2,000 is deliberately short of Premium's full 25,000, leaving room
+    // before the real limit rather than sitting on it.
+    //
+    // The consequence to know: a **non-Premium** account connected to this
+    // workspace is capped at 280 by X, and anything longer is rejected at
+    // publish time rather than caught here. If one is ever connected, this drops
+    // back to 280 — which is why it is one number in one place.
+    maxCharacters: 2000,
     mediaRequirement: "Text on its own, up to 4 images, or one video.",
   },
   facebook: {
