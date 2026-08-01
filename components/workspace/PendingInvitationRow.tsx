@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { revokeWorkspaceInvitationAction } from "@/app/(authenticated)/app/settings/workspace/actions";
-import { Button } from "@/components/ui/button";
+import { RevokeInvitationDialog } from "@/components/workspace/RevokeInvitationDialog";
 import type { WorkspaceInvitationView } from "@/db/repositories/workspaces.repository";
 import { formatShortDate } from "@/lib/format/date";
 
@@ -15,12 +15,17 @@ export function PendingInvitationRow({
   workspaceId: string;
 }) {
   const router = useRouter();
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  function openConfirm(open: boolean) {
+    // Clearing on open means a previous failure never greets the next attempt.
+    if (open) setError(null);
+    setConfirmOpen(open);
+  }
+
   function revoke() {
-    if (!window.confirm(`Revoke the invitation sent to ${invitation.email}?`))
-      return;
     setError(null);
     const formData = new FormData();
     formData.set("workspaceId", workspaceId);
@@ -31,6 +36,7 @@ export function PendingInvitationRow({
         setError(result.error ?? "The invitation could not be revoked.");
         return;
       }
+      setConfirmOpen(false);
       router.refresh();
     });
   }
@@ -43,22 +49,16 @@ export function PendingInvitationRow({
           {invitation.role} · invited by {invitation.invitedByDisplayName} ·
           expires {formatShortDate(invitation.expiresAt)}
         </p>
-        {error ? (
-          <p className="mt-1 text-xs text-destructive" role="alert">
-            {error}
-          </p>
-        ) : null}
       </div>
-      <Button
-        className="shrink-0"
-        disabled={pending}
-        onClick={revoke}
-        size="sm"
-        type="button"
-        variant="ghost"
-      >
-        Revoke
-      </Button>
+      <RevokeInvitationDialog
+        email={invitation.email}
+        error={error}
+        onConfirm={revoke}
+        onOpenChange={openConfirm}
+        open={confirmOpen}
+        pending={pending}
+        role={invitation.role}
+      />
     </li>
   );
 }

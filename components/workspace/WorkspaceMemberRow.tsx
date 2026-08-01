@@ -6,7 +6,6 @@ import {
   removeWorkspaceMemberAction,
   updateWorkspaceMemberRoleAction,
 } from "@/app/(authenticated)/app/settings/workspace/actions";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -14,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { RemoveMemberDialog } from "@/components/workspace/RemoveMemberDialog";
 import type { WorkspaceMemberView } from "@/db/repositories/workspaces.repository";
 import type { WorkspaceRole } from "@/db/schema";
 
@@ -35,9 +35,20 @@ export function WorkspaceMemberRow({
   isSoleOwner: boolean;
 }) {
   const router = useRouter();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  // Two error slots: a role change reports inline in the row, a removal reports
+  // inside its own dialog. Sharing one would surface a failure in the wrong
+  // place depending on which action ran last.
   const [error, setError] = useState<string | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const locked = member.role === "owner" && isSoleOwner;
+
+  function openConfirm(open: boolean) {
+    // Clearing on open means a previous failure never greets the next attempt.
+    if (open) setRemoveError(null);
+    setConfirmOpen(open);
+  }
 
   function changeRole(role: WorkspaceRole) {
     setError(null);
@@ -56,22 +67,17 @@ export function WorkspaceMemberRow({
   }
 
   function remove() {
-    if (
-      !window.confirm(
-        `Remove ${member.displayName} from this workspace? They will lose access immediately.`,
-      )
-    )
-      return;
-    setError(null);
+    setRemoveError(null);
     const formData = new FormData();
     formData.set("workspaceId", workspaceId);
     formData.set("membershipId", member.membershipId);
     startTransition(async () => {
       const result = await removeWorkspaceMemberAction(formData);
       if (!result.success) {
-        setError(result.error ?? "The member could not be removed.");
+        setRemoveError(result.error ?? "The member could not be removed.");
         return;
       }
+      setConfirmOpen(false);
       router.refresh();
     });
   }
@@ -112,15 +118,17 @@ export function WorkspaceMemberRow({
             ))}
           </SelectContent>
         </Select>
-        <Button
+        <RemoveMemberDialog
           disabled={pending || locked}
-          onClick={remove}
-          size="sm"
-          type="button"
-          variant="ghost"
-        >
-          Remove
-        </Button>
+          displayName={member.displayName}
+          email={member.email}
+          error={removeError}
+          onConfirm={remove}
+          onOpenChange={openConfirm}
+          open={confirmOpen}
+          pending={pending}
+          role={member.role}
+        />
       </div>
     </li>
   );
