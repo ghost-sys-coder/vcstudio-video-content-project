@@ -12,6 +12,8 @@ import { ConnectYouTubeButton } from "@/components/publish/ConnectYouTubeButton"
 import { ConnectFacebookButton } from "@/components/publish/ConnectFacebookButton";
 import { ConnectInstagramButton } from "@/components/publish/ConnectInstagramButton";
 import { ConnectTikTokButton } from "@/components/publish/ConnectTikTokButton";
+import { ConnectLinkedInButton } from "@/components/publish/ConnectLinkedInButton";
+import { ConnectXButton } from "@/components/publish/ConnectXButton";
 import { PlatformConnectionRow } from "@/components/publish/PlatformConnectionRow";
 import { VideoPublicationRow } from "@/components/publish/VideoPublicationRow";
 import { Button } from "@/components/ui/button";
@@ -37,6 +39,7 @@ import {
 } from "@/lib/publishing/generated-metadata";
 import { groupRendersByKind } from "@/lib/publishing/group-renders";
 import type { PublishingView } from "@/lib/publishing/publishing-view";
+import { selectConnectablePostPlatforms } from "@/lib/social/select-connectable-post-platforms";
 import {
   findActivePublicationForTarget,
   isActivePublicationStatus,
@@ -132,6 +135,16 @@ export function PublishToPlatformPanel({
         renderId: selectedRender?.id ?? "",
       }),
     [activeConnection?.id, data.publications, selectedRender?.id],
+  );
+  // LinkedIn and X are absent from `data.connections` by design — they have no
+  // video provider — so their connected state has to be read from the social
+  // post list, or the row would offer to connect an account that already exists.
+  const unconnectedPostPlatforms = useMemo(
+    () =>
+      selectConnectablePostPlatforms(
+        data.socialPostConnections.map((connection) => connection.platform),
+      ),
+    [data.socialPostConnections],
   );
   const facebookSelected = activeConnection?.platform === "facebook";
   const instagramSelected = activeConnection?.platform === "instagram";
@@ -380,6 +393,37 @@ export function PublishToPlatformPanel({
                 activeConnections.length > 0 ? "Add TikTok" : "Connect TikTok"
               }
             />
+          </div>
+        ) : null}
+        {/*
+          LinkedIn and X belong in this row because it is where a user looks to
+          add a destination — but they take posts, not rendered video uploads,
+          so they follow the *posting* flag rather than the video one and never
+          reach the channel picker below. Shown only while unconnected, since
+          neither carries a second account on the same workspace.
+        */}
+        {canManageConnections &&
+        data.socialPostingEnabled &&
+        unconnectedPostPlatforms.length > 0 ? (
+          <div className="space-y-2">
+            <div className="flex flex-wrap gap-2">
+              {unconnectedPostPlatforms.map((platform) =>
+                platform.platform === "linkedin" ? (
+                  <ConnectLinkedInButton key={platform.platform} />
+                ) : (
+                  <ConnectXButton key={platform.platform} />
+                ),
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {unconnectedPostPlatforms
+                .map((platform) => platform.label)
+                .join(" and ")}{" "}
+              accept posts rather than video uploads. Connect here, then send a
+              render from the{" "}
+              <span className="font-medium">Share as a social post</span> panel
+              below.
+            </p>
           </div>
         ) : null}
       </div>

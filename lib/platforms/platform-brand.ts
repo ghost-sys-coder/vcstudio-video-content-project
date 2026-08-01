@@ -14,4 +14,5 @@ export const PLATFORM_BRAND_BACKGROUND_CLASS: Record<ContentPlatform, string> =
     instagram: "bg-linear-to-br from-[#833ab4] via-[#e1306c] to-[#f77737]",
     linkedin: "bg-[#0a66c2]",
     tiktok: "bg-black",
+    twitter: "bg-black",
   };

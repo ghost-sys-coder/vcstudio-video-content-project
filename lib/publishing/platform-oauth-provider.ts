@@ -40,6 +40,15 @@ export interface PlatformOAuthProvider {
   exchangeCode(input: {
     code: string;
     redirectUri: string;
+    /**
+     * The same signed `state` that started the flow, for providers that require
+     * PKCE. X is the only one today: PKCE binds the authorization code to the
+     * client that requested it, which means the code verifier has to survive a
+     * redirect through the browser. Rather than storing it, the X provider
+     * derives it from this value — see `TwitterOAuthProvider`. Optional because
+     * the other four platforms neither need nor read it.
+     */
+    state?: string;
   }): Promise<{ tokens: PlatformTokens; account: PlatformAccount }>;
   refreshTokens(input: { refreshToken: string }): Promise<PlatformTokens>;
   revokeAuthorization?(input: { accessToken: string }): Promise<void>;

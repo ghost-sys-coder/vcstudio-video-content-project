@@ -17,4 +17,8 @@ export const CONTENT_PLATFORM_LABELS: Record<ContentPlatform, string> = {
   facebook: "Facebook",
   instagram: "Instagram",
   linkedin: "LinkedIn",
+  // Stored as `twitter` because that is what the platform's own credentials,
+  // scopes, and token endpoints are still named; shown as "X" because that is
+  // what a user sees when they get there.
+  twitter: "X",
 };

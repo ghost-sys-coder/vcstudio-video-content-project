@@ -14,6 +14,8 @@ import { LinkedInOAuthProvider } from "@/lib/publishing/providers/linkedin-oauth
 import { LinkedInSocialPostProvider } from "@/lib/publishing/providers/linkedin-social-post-provider";
 import { SimulatedSocialPostProvider } from "@/lib/publishing/providers/simulated-social-post-provider";
 import { TikTokSocialPostProvider } from "@/lib/publishing/providers/tiktok-social-post-provider";
+import { TwitterOAuthProvider } from "@/lib/publishing/providers/twitter-oauth-provider";
+import { TwitterSocialPostProvider } from "@/lib/publishing/providers/twitter-social-post-provider";
 import { YouTubeSocialPostProvider } from "@/lib/publishing/providers/youtube-social-post-provider";
 import type { PlatformOAuthProvider } from "@/lib/publishing/platform-oauth-provider";
 import type { SocialPostProvider } from "@/lib/publishing/social-post-provider";
@@ -34,7 +36,7 @@ function requireCredential(
 /**
  * Whether a platform's server-side credentials are present for social posting.
  *
- * LinkedIn adds a credential requirement the video path never had; the other
+ * LinkedIn and X add credential requirements the video path never had; the other
  * four reuse exactly the same configuration they already use for publishing a
  * render, so this defers to that check.
  */
@@ -48,14 +50,19 @@ export function isSocialPostPlatformConfigured(
       Boolean(environment.LINKEDIN_CLIENT_ID?.trim()) &&
       Boolean(environment.LINKEDIN_CLIENT_SECRET?.trim())
     );
+  if (platform === "twitter")
+    return (
+      Boolean(environment.TWITTER_CLIENT_ID?.trim()) &&
+      Boolean(environment.TWITTER_CLIENT_SECRET?.trim())
+    );
   return isPlatformConfigured(platform);
 }
 
 /**
  * The OAuth half of a platform integration, for the connect/callback routes.
  *
- * The four existing platforms reuse their video provider, which already
- * implements `PlatformOAuthProvider`; LinkedIn gets its own, because it has no
+ * The four video platforms reuse their video provider, which already implements
+ * `PlatformOAuthProvider`; LinkedIn and X get their own, because neither has a
  * video-publishing implementation.
  */
 export function createPlatformOAuthProvider(
@@ -67,6 +74,16 @@ export function createPlatformOAuthProvider(
       clientId: requireCredential(environment.LINKEDIN_CLIENT_ID, platform),
       clientSecret: requireCredential(
         environment.LINKEDIN_CLIENT_SECRET,
+        platform,
+      ),
+    });
+  }
+  if (platform === "twitter") {
+    const environment = getPublishingEnvironment();
+    return new TwitterOAuthProvider({
+      clientId: requireCredential(environment.TWITTER_CLIENT_ID, platform),
+      clientSecret: requireCredential(
+        environment.TWITTER_CLIENT_SECRET,
         platform,
       ),
     });
@@ -93,6 +110,8 @@ export function createSocialPostProvider(
       return new LinkedInSocialPostProvider({
         apiVersion: environment.LINKEDIN_API_VERSION,
       });
+    case "twitter":
+      return new TwitterSocialPostProvider();
     case "facebook":
       return new FacebookSocialPostProvider({
         apiVersion: environment.FACEBOOK_GRAPH_API_VERSION,

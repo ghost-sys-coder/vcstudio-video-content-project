@@ -5,6 +5,7 @@ import {
   getPublishingEnvironment,
   getPublishingWebEnvironment,
 } from "@/lib/env/server";
+import { createPlatformCallbackPath } from "@/lib/platforms/platform-routes";
 import { YouTubeVideoPublishProvider } from "@/lib/publishing/providers/youtube-video-publish-provider";
 import { FacebookVideoPublishProvider } from "@/lib/publishing/providers/facebook-video-publish-provider";
 import { InstagramVideoPublishProvider } from "@/lib/publishing/providers/instagram-video-publish-provider";
@@ -43,6 +44,7 @@ const PLATFORM_DISPLAY_NAMES: Record<ContentPlatform, string> = {
   instagram: "Instagram",
   tiktok: "TikTok",
   linkedin: "LinkedIn",
+  twitter: "X",
 };
 
 function requireCredential(
@@ -78,9 +80,10 @@ export function isPlatformConfigured(platform: ContentPlatform): boolean {
     case "facebook":
     case "instagram":
       return true;
-    // LinkedIn takes social posts, not rendered-video publications — see
+    // LinkedIn and X take social posts, not rendered-video publications — see
     // PUBLISHABLE_PLATFORMS below.
     case "linkedin":
+    case "twitter":
       return false;
     default:
       return false;
@@ -147,12 +150,13 @@ export function createVideoPublishProvider(
           platform,
         ),
       });
-    // Publishing a *rendered video* to LinkedIn is not implemented. LinkedIn is
-    // reachable through the social post pipeline instead, which is why it is
-    // absent from PUBLISHABLE_PLATFORMS and can never reach this function via
-    // `startVideoPublication`. Handled explicitly so the exhaustiveness guard
-    // below keeps catching genuinely new platforms.
+    // Publishing a *rendered video* to LinkedIn or X is not implemented. Both
+    // are reachable through the social post pipeline instead, which is why they
+    // are absent from PUBLISHABLE_PLATFORMS and can never reach this function
+    // via `startVideoPublication`. Handled explicitly so the exhaustiveness
+    // guard below keeps catching genuinely new platforms.
     case "linkedin":
+    case "twitter":
       throw new UnsupportedPlatformError(platform);
     default: {
       // Exhaustiveness guard: a new content_platform value must be handled here.
@@ -166,8 +170,13 @@ export function createVideoPublishProvider(
  * Redirect URI for a platform's OAuth callback, derived from the app origin.
  * Web-runtime only — resolved lazily so the worker, which imports this module
  * for `createVideoPublishProvider`, never parses the web-only environment.
+ *
+ * The path comes from the shared `PLATFORM_ROUTE_SEGMENTS` record rather than
+ * from the platform id, because the two differ for X (stored `twitter`, routed
+ * `x`) and because the browser's connect links read the same record — so the
+ * link a user clicks and the callback URI sent to the platform cannot drift.
  */
 export function createRedirectUri(platform: ContentPlatform): string {
   const { APP_BASE_URL } = getPublishingWebEnvironment();
-  return new URL(`/api/${platform}/callback`, APP_BASE_URL).toString();
+  return new URL(createPlatformCallbackPath(platform), APP_BASE_URL).toString();
 }
