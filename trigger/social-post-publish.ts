@@ -1,4 +1,4 @@
-import { task, wait } from "@trigger.dev/sdk";
+import { logger, task, wait } from "@trigger.dev/sdk";
 import { z } from "zod";
 import {
   markPlatformConnectionUnusable,
@@ -70,6 +70,15 @@ export const socialPostPublishTask = task({
     const input = socialPostPublishTaskPayloadSchema.parse(payload);
 
     const settleFailed = async (category: string, message: string) => {
+      // Without this the run reports only `status: "failed"` and the reason is
+      // reachable solely by querying the database, which is a poor position to
+      // debug a live posting failure from.
+      logger.error("Social post target failed", {
+        targetId: input.targetId,
+        postId: input.postId,
+        category,
+        message,
+      });
       await markSocialPostTargetFailed({
         targetId: input.targetId,
         category,

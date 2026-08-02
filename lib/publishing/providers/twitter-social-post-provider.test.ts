@@ -248,6 +248,90 @@ describe("TwitterSocialPostProvider", () => {
     );
   });
 
+  it("separates exhausted API credits from momentary rate limiting", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      Response.json({ detail: "credits depleted" }, { status: 402 }),
+    );
+    const error = await provider()
+      .publishPost(request())
+      .catch((caught: unknown) => caught);
+    const failure = (error as PublishProviderError).failure;
+    expect(failure.category).toBe("quota_exceeded");
+    // A 429 clears on its own; a depleted balance does not, so retrying would
+    // burn attempts against a wall.
+    expect(failure.retriable).toBe(false);
+    expect(failure.safeMessage).toContain("developer portal");
+  });
+
+  it("names the stage and status for a response it does not anticipate", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response("", { status: 409 }),
+    );
+    const error = await provider()
+      .publishPost(request())
+      .catch((caught: unknown) => caught);
+    const failure = (error as PublishProviderError).failure;
+    expect(failure.category).toBe("provider_error");
+    // The whole point: an unclassified fault has to say which call failed and
+    // with what, or every one of them reads identically.
+    expect(failure.safeMessage).toContain("post creation");
+    expect(failure.safeMessage).toContain("409");
+  });
+
+  it("surfaces X's own explanation of a rejection", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      Response.json(
+        { detail: "You currently have access to a subset of endpoints." },
+        { status: 453 },
+      ),
+    );
+    const error = await provider()
+      .publishPost(request())
+      .catch((caught: unknown) => caught);
+    expect((error as PublishProviderError).failure.safeMessage).toContain(
+      "subset of endpoints",
+    );
+  });
+
+  it("treats a 404 as an integration fault rather than an account problem", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response("", { status: 404 }),
+    );
+    const error = await provider()
+      .publishPost(request())
+      .catch((caught: unknown) => caught);
+    expect((error as PublishProviderError).failure.category).toBe(
+      "provider_endpoint_missing",
+    );
+  });
+
+  it("treats an accepted post with an unreadable body as possibly published", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      Response.json({ unexpected: "shape" }),
+    );
+    const error = await provider()
+      .publishPost(request())
+      .catch((caught: unknown) => caught);
+    const failure = (error as PublishProviderError).failure;
+    // X accepted it. Calling this a clean failure is how a live post gets
+    // retried and duplicated.
+    expect(failure.category).toBe("transport_ambiguous");
+    expect(failure.mayHavePublished).toBe(true);
+    expect(failure.retriable).toBe(false);
+  });
+
+  it("does not claim a failed media upload might have published", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(bytes())
+      .mockResolvedValueOnce(Response.json({ wrong: "shape" }));
+    const error = await provider()
+      .publishPost(request({ media: [image] }))
+      .catch((caught: unknown) => caught);
+    const failure = (error as PublishProviderError).failure;
+    expect(failure.mayHavePublished).toBe(false);
+    expect(failure.safeMessage).toContain("image upload");
+  });
+
   it("never sends the signed source URL to X", async () => {
     const fetchSpy = vi
       .spyOn(globalThis, "fetch")

@@ -74,6 +74,12 @@ export type PublishFailureCategory =
   | "network_unreachable"
   /** The configured provider API version is retired and must be updated. */
   | "provider_version_retired"
+  /**
+   * The provider does not serve the endpoint this integration called. Like
+   * `provider_version_retired`, this is a fault in our configuration or code
+   * rather than in the account, so reconnecting or retrying cannot fix it.
+   */
+  | "provider_endpoint_missing"
   | "transport_ambiguous"
   | "provider_error";
 

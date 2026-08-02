@@ -43,6 +43,44 @@ function fail(failure: PublishFailure): never {
 }
 
 /**
+ * X describes a rejection in `title`/`detail`. Only those two are surfaced, and
+ * truncated — echoing a whole provider body to a user risks leaking request data
+ * back out, but without X's own sentence a 4xx is undiagnosable from the outside.
+ */
+const problemSchema = z.object({
+  title: z.string().min(1).optional(),
+  detail: z.string().min(1).optional(),
+});
+
+function describeProblem(body: string): string {
+  const parsed = problemSchema.safeParse(safeJson(body));
+  if (!parsed.success) return "";
+  const stated = parsed.data.detail ?? parsed.data.title;
+  return stated ? ` X said: ${stated.slice(0, 200)}` : "";
+}
+
+/**
+ * A 2xx whose body does not match the documented shape is **not** a rejection —
+ * the call was accepted and X may well have acted on it. Reporting that as a
+ * plain failure is how a post that is live on the account gets recorded as
+ * failed, so the caller states whether this stage could have published.
+ */
+function failureForUnreadableBody(input: {
+  stage: string;
+  status: number;
+  mayHavePublished: boolean;
+}): PublishFailure {
+  return {
+    category: input.mayHavePublished ? "transport_ambiguous" : "provider_error",
+    safeMessage: input.mayHavePublished
+      ? `X accepted ${input.stage} (HTTP ${input.status}) but returned an unrecognised response, so the post may already be live. Check the account before trying again.`
+      : `X returned an unrecognised response to ${input.stage} (HTTP ${input.status}).`,
+    retriable: false,
+    mayHavePublished: input.mayHavePublished,
+  };
+}
+
+/**
  * X answers a repeated post with 403 and a `duplicate` detail rather than a
  * distinct status. Worth separating: a scheduled post that fires twice, or a
  * retry after an ambiguous transport failure, hits this — and "you already
@@ -56,12 +94,16 @@ function isDuplicateRejection(body: string): boolean {
 function failureForResponse(
   response: Response,
   body: string,
-  mayHavePublished = false,
+  options: { stage: string; mayHavePublished?: boolean },
 ): PublishFailure {
+  const { stage } = options;
+  const mayHavePublished = options.mayHavePublished ?? false;
+  const stated = describeProblem(body);
+
   if (response.status === 401)
     return {
       category: "authorization_expired",
-      safeMessage: "The X authorization expired. Reconnect X and try again.",
+      safeMessage: `The X authorization expired. Reconnect X and try again.${stated}`,
       retriable: false,
       mayHavePublished,
     };
@@ -76,8 +118,28 @@ function failureForResponse(
   if (response.status === 403)
     return {
       category: "insufficient_permissions",
-      safeMessage:
-        "The connected X account is not permitted to post. Check the app's access level and the granted scopes.",
+      safeMessage: `The connected X account is not permitted to perform ${stage}. Check the app's access level and the granted scopes.${stated}`,
+      retriable: false,
+      mayHavePublished,
+    };
+  // A 404 is ours, not the account's: it means the integration called an
+  // endpoint X does not serve, which no amount of reconnecting will fix.
+  if (response.status === 404)
+    return {
+      category: "provider_endpoint_missing",
+      safeMessage: `X does not recognise the endpoint used for ${stage} (HTTP 404). This is a fault in the integration rather than the connected account.${stated}`,
+      retriable: false,
+      mayHavePublished,
+    };
+  // X meters its API in credits, and answers an exhausted balance with 402
+  // rather than 429. The distinction is the whole point: 429 is a rolling
+  // window that clears on its own, while a depleted balance clears only when
+  // the billing period resets or the plan is topped up. Retrying is futile in
+  // exactly the way a retired API version is — same reasoning as LinkedIn's 426.
+  if (response.status === 402)
+    return {
+      category: "quota_exceeded",
+      safeMessage: `X rejected ${stage} because the app's API credits are exhausted. Top up or upgrade the X API plan in the developer portal — retrying will not help until the balance resets.${stated}`,
       retriable: false,
       mayHavePublished,
     };
@@ -86,15 +148,14 @@ function failureForResponse(
       category: "rate_limited",
       // X's free and basic tiers cap posts per app and per user over rolling
       // windows, so this is a routine outcome rather than an anomaly.
-      safeMessage:
-        "X is rate limiting posts. The account or app has hit its posting cap; try again later.",
+      safeMessage: `X is rate limiting posts. The account or app has hit its posting cap; try again later.${stated}`,
       retriable: !mayHavePublished,
       mayHavePublished,
     };
   if (response.status === 400 || response.status === 422)
     return {
       category: "invalid_metadata",
-      safeMessage: "X rejected the post content.",
+      safeMessage: `X rejected the content sent for ${stage}.${stated}`,
       retriable: false,
       mayHavePublished,
     };
@@ -105,15 +166,18 @@ function failureForResponse(
         : "provider_server_error",
       safeMessage: mayHavePublished
         ? "X may have created the post but did not confirm it. Check the account before retrying."
-        : "X had a server error. Try again shortly.",
+        : `X had a server error during ${stage} (HTTP ${response.status}). Try again shortly.`,
       retriable: !mayHavePublished,
       mayHavePublished,
     };
+  // Anything left is a status this integration has never seen. Naming the stage
+  // and the status is the whole diagnostic — without them this branch reports
+  // every unanticipated fault with one indistinguishable sentence.
   return {
     category: mayHavePublished ? "transport_ambiguous" : "provider_error",
     safeMessage: mayHavePublished
-      ? "X did not confirm the post. Check the account before retrying."
-      : "The X post could not be created.",
+      ? `X did not confirm ${stage} (HTTP ${response.status}). Check the account before retrying.${stated}`
+      : `The X post could not be created: ${stage} returned HTTP ${response.status}.${stated}`,
     retriable: false,
     mayHavePublished,
   };
@@ -177,9 +241,18 @@ export class TwitterSocialPostProvider implements SocialPostProvider {
       body: form,
     });
     const raw = await response.text();
+    if (!response.ok)
+      fail(failureForResponse(response, raw, { stage: "the image upload" }));
     const parsed = mediaIdSchema.safeParse(safeJson(raw));
-    if (!response.ok || !parsed.success)
-      fail(failureForResponse(response, raw));
+    if (!parsed.success)
+      fail(
+        failureForUnreadableBody({
+          stage: "the image upload",
+          status: response.status,
+          // Uploading media publishes nothing on its own.
+          mayHavePublished: false,
+        }),
+      );
     return parsed.data.data.id;
   }
 
@@ -200,9 +273,21 @@ export class TwitterSocialPostProvider implements SocialPostProvider {
       }),
     });
     const initializeRaw = await initialize.text();
+    if (!initialize.ok)
+      fail(
+        failureForResponse(initialize, initializeRaw, {
+          stage: "starting the video upload",
+        }),
+      );
     const initialized = mediaIdSchema.safeParse(safeJson(initializeRaw));
-    if (!initialize.ok || !initialized.success)
-      fail(failureForResponse(initialize, initializeRaw));
+    if (!initialized.success)
+      fail(
+        failureForUnreadableBody({
+          stage: "starting the video upload",
+          status: initialize.status,
+          mayHavePublished: false,
+        }),
+      );
     const mediaId = initialized.data.data.id;
 
     const bytes = new Uint8Array(await this.fetchBytes(input.item));
@@ -223,7 +308,12 @@ export class TwitterSocialPostProvider implements SocialPostProvider {
         `${API_BASE}/media/upload/${encodeURIComponent(mediaId)}/append`,
         { method: "POST", headers: authorization, body: form },
       );
-      if (!append.ok) fail(failureForResponse(append, await append.text()));
+      if (!append.ok)
+        fail(
+          failureForResponse(append, await append.text(), {
+            stage: `sending video chunk ${segment + 1}`,
+          }),
+        );
     }
 
     const finalize = await fetch(
@@ -231,9 +321,21 @@ export class TwitterSocialPostProvider implements SocialPostProvider {
       { method: "POST", headers: authorization },
     );
     const finalizeRaw = await finalize.text();
+    if (!finalize.ok)
+      fail(
+        failureForResponse(finalize, finalizeRaw, {
+          stage: "completing the video upload",
+        }),
+      );
     const finalized = mediaIdSchema.safeParse(safeJson(finalizeRaw));
-    if (!finalize.ok || !finalized.success)
-      fail(failureForResponse(finalize, finalizeRaw));
+    if (!finalized.success)
+      fail(
+        failureForUnreadableBody({
+          stage: "completing the video upload",
+          status: finalize.status,
+          mayHavePublished: false,
+        }),
+      );
 
     await this.waitForTranscode({
       accessToken: input.accessToken,
@@ -278,8 +380,21 @@ export class TwitterSocialPostProvider implements SocialPostProvider {
         { headers: { Authorization: `Bearer ${input.accessToken}` } },
       );
       const raw = await status.text();
+      if (!status.ok)
+        fail(
+          failureForResponse(status, raw, {
+            stage: "checking video processing",
+          }),
+        );
       const parsed = mediaIdSchema.safeParse(safeJson(raw));
-      if (!status.ok || !parsed.success) fail(failureForResponse(status, raw));
+      if (!parsed.success)
+        fail(
+          failureForUnreadableBody({
+            stage: "checking video processing",
+            status: status.status,
+            mayHavePublished: false,
+          }),
+        );
       info = parsed.data.data.processing_info;
       if (!info) return;
     }
@@ -347,9 +462,19 @@ export class TwitterSocialPostProvider implements SocialPostProvider {
     }
 
     const raw = await response.text();
+    if (!response.ok)
+      fail(failureForResponse(response, raw, { stage: "post creation" }));
     const parsed = tweetSchema.safeParse(safeJson(raw));
-    if (!response.ok || !parsed.success)
-      fail(failureForResponse(response, raw));
+    if (!parsed.success)
+      fail(
+        failureForUnreadableBody({
+          stage: "post creation",
+          status: response.status,
+          // X accepted the request. Treating this as a clean failure is how a
+          // live post gets recorded as failed and then posted a second time.
+          mayHavePublished: true,
+        }),
+      );
 
     await request.onProgress?.(100);
     const postId = parsed.data.data.id;
