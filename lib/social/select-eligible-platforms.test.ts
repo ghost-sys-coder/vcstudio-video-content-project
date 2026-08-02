@@ -82,7 +82,34 @@ describe("checkPlatformEligibility", () => {
   it("explains that YouTube has no community-post API rather than just failing", () => {
     const result = eligible({ platform: "youtube" });
     expect(result.eligible).toBe(false);
-    if (!result.eligible) expect(result.reason).toContain("no public API");
+    // The explanation moved out of the reason and into `detail`, so the reason
+    // stays one short imperative line and the rationale reads as secondary.
+    if (!result.eligible) expect(result.detail).toContain("no public API");
+  });
+
+  it("treats an unmet platform requirement as information, not a violation", () => {
+    // Nothing is wrong with an empty draft — these platforms simply need media.
+    // Reporting it at the same severity as a broken limit is what made an
+    // untouched composer look like it was full of errors.
+    for (const platform of ["instagram", "tiktok", "youtube"] as const) {
+      const result = eligible({ platform });
+      expect(result.eligible).toBe(false);
+      if (!result.eligible) expect(result.severity).toBe("requirement");
+    }
+  });
+
+  it("treats a draft that breaks a limit as a violation", () => {
+    const cases = [
+      eligible({ platform: "twitter", plainTextLength: 2500 }),
+      eligible({ platform: "twitter", imageCount: 5 }),
+      eligible({ platform: "tiktok", imageCount: 1, videoCount: 1 }),
+      eligible({ platform: "linkedin", videoCount: 2 }),
+      eligible({ platform: "tiktok", imageCount: 1 }),
+    ];
+    for (const result of cases) {
+      expect(result.eligible).toBe(false);
+      if (!result.eligible) expect(result.severity).toBe("violation");
+    }
   });
 
   it("unlocks every platform once a video is attached", () => {

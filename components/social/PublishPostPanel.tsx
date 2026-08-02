@@ -8,6 +8,7 @@ import { PostTargetRow } from "@/components/social/PostTargetRow";
 import { SchedulePostDialog } from "@/components/social/SchedulePostDialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { toneContainerClassName } from "@/lib/social/eligibility-tone";
 import type { PlatformEligibility } from "@/lib/social/select-eligible-platforms";
 import type {
   PostConnectionView,
@@ -134,7 +135,13 @@ export function PublishPostPanel({
                         Already sent to this account.
                       </span>
                     ) : entry && !entry.eligible ? (
-                      <span className="block text-xs text-destructive">
+                      // An unmet platform requirement is stated, not flagged —
+                      // only a draft that breaks a limit is worth colouring.
+                      <span
+                        className={`mt-1 block text-xs ${toneContainerClassName(
+                          entry.severity === "requirement" ? "info" : "warning",
+                        )}`}
+                      >
                         {entry.reason}
                       </span>
                     ) : null}

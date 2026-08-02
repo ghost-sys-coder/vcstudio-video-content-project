@@ -31,8 +31,19 @@ export type PlatformPostCapability = {
   requiresSingleMediaKind: boolean;
   /** Ceiling on the flattened body text. */
   maxCharacters: number;
-  /** Shown when this platform is unavailable for the current attachments. */
+  /**
+   * The short, actionable line shown when this platform cannot take the current
+   * draft. Kept to one imperative sentence: it is also the message the server
+   * throws on a rejected schedule, where prose is noise.
+   */
   mediaRequirement: string;
+  /**
+   * Why the platform demands that, when the reason is genuinely surprising.
+   * Presented as secondary text rather than folded into the requirement — the
+   * requirement is what to do, this is only why, and mixing them produced a
+   * paragraph of red that read like a failure.
+   */
+  mediaRationale?: string;
 };
 
 export const SOCIAL_POST_PLATFORMS = [
@@ -89,8 +100,8 @@ export const PLATFORM_POST_CAPABILITIES = {
     allowsVideo: true,
     requiresSingleMediaKind: true,
     maxCharacters: 2200,
-    mediaRequirement:
-      "Instagram needs media: attach 1–10 images, or one video for a Reel.",
+    mediaRequirement: "Needs 1–10 images, or one video for a Reel.",
+    mediaRationale: "There is no text-only Instagram post.",
   },
   tiktok: {
     allowsTextOnly: false,
@@ -98,7 +109,8 @@ export const PLATFORM_POST_CAPABILITIES = {
     allowsVideo: true,
     requiresSingleMediaKind: true,
     maxCharacters: 2200,
-    mediaRequirement: "TikTok needs one video. It does not take image posts.",
+    mediaRequirement: "Needs one video.",
+    mediaRationale: "TikTok takes neither image nor text-only posts.",
   },
   youtube: {
     allowsTextOnly: false,
@@ -106,8 +118,9 @@ export const PLATFORM_POST_CAPABILITIES = {
     allowsVideo: true,
     requiresSingleMediaKind: true,
     maxCharacters: 5000,
-    mediaRequirement:
-      "YouTube needs one video. Community posts have no public API, so a YouTube target is a video upload.",
+    mediaRequirement: "Needs one video.",
+    mediaRationale:
+      "Community posts have no public API, so a YouTube target is a video upload with your text as the description.",
   },
 } as const satisfies Record<SocialPostPlatform, PlatformPostCapability>;
 

@@ -28,6 +28,15 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-notice-ready: var(--notice-ready);
+  --color-notice-ready-foreground: var(--notice-ready-foreground);
+  --color-notice-ready-edge: var(--notice-ready-edge);
+  --color-notice-info: var(--notice-info);
+  --color-notice-info-foreground: var(--notice-info-foreground);
+  --color-notice-info-edge: var(--notice-info-edge);
+  --color-notice-warning: var(--notice-warning);
+  --color-notice-warning-foreground: var(--notice-warning-foreground);
+  --color-notice-warning-edge: var(--notice-warning-edge);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -65,6 +74,28 @@
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
+  /**
+   * Notice tones for the composer's per-destination messages, as real tokens
+   * rather than `amber-500/10` utilities. Two reasons. Alpha tints over a white
+   * card were barely visible, and each theme needs its own opaque fill to read
+   * as a block at all. More importantly `dim` does not receive `dark:`
+   * utilities, so any tone built from `text-amber-700 dark:text-amber-500`
+   * silently falls back to its light value on a dark dim surface. Defining the
+   * tones per theme removes the variant from the problem entirely.
+   *
+   * Hierarchy is deliberate: `warning` is the only tone asking the author to
+   * change something, so it carries the most saturated fill; `info` is a calm
+   * blue that still reads as a distinct block; `ready` is a quiet confirmation.
+   */
+  --notice-ready: oklch(0.95 0.055 155);
+  --notice-ready-foreground: oklch(0.44 0.1 155);
+  --notice-ready-edge: oklch(0.83 0.11 155);
+  --notice-info: oklch(0.95 0.028 240);
+  --notice-info-foreground: oklch(0.44 0.045 250);
+  --notice-info-edge: oklch(0.85 0.05 240);
+  --notice-warning: oklch(0.93 0.095 82);
+  --notice-warning-foreground: oklch(0.43 0.11 62);
+  --notice-warning-edge: oklch(0.8 0.15 78);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
@@ -100,6 +131,16 @@
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
+  /* Fills sit above `--muted` (0.269) so a notice separates from the card. */
+  --notice-ready: oklch(0.31 0.06 158);
+  --notice-ready-foreground: oklch(0.88 0.11 160);
+  --notice-ready-edge: oklch(0.5 0.1 158);
+  --notice-info: oklch(0.31 0.032 245);
+  --notice-info-foreground: oklch(0.85 0.04 240);
+  --notice-info-edge: oklch(0.47 0.055 245);
+  --notice-warning: oklch(0.35 0.085 75);
+  --notice-warning-foreground: oklch(0.9 0.1 88);
+  --notice-warning-edge: oklch(0.56 0.13 78);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
@@ -156,6 +197,16 @@
   --accent: oklch(0.36 0 0);
   --accent-foreground: oklch(0.87 0 0);
   --destructive: oklch(0.62 0.19 23);
+  /* Lifted above dim's lighter `--muted` (0.36) and `--card` (0.3). */
+  --notice-ready: oklch(0.39 0.058 158);
+  --notice-ready-foreground: oklch(0.88 0.1 160);
+  --notice-ready-edge: oklch(0.55 0.095 158);
+  --notice-info: oklch(0.39 0.03 245);
+  --notice-info-foreground: oklch(0.86 0.038 240);
+  --notice-info-edge: oklch(0.52 0.05 245);
+  --notice-warning: oklch(0.43 0.08 75);
+  --notice-warning-foreground: oklch(0.91 0.095 88);
+  --notice-warning-edge: oklch(0.6 0.125 78);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 14%);
   --ring: oklch(0.55 0 0);
