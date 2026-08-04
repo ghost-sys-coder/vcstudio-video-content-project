@@ -11,10 +11,8 @@ import { findMarketingRun } from "@/db/repositories/marketing-usage.repository";
 import { calculateTextCostCents } from "@/lib/costs/scene-analysis-cost";
 import { reconcileMarketingCost } from "@/lib/costs/marketing-cost";
 import { createRequestFingerprint } from "@/lib/domain/idempotency";
-import {
-  getMarketingEnvironment,
-  getSceneAnalysisEnvironment,
-} from "@/lib/env/server";
+import { getSceneAnalysisEnvironment } from "@/lib/env/server";
+import { resolveMarketingAccess } from "@/lib/marketing/marketing-access";
 import { classifyMarketingProviderError } from "@/lib/marketing/marketing-provider-error";
 import { OpenAiTextGenerationProvider } from "@/lib/openai/openai-text-generation-provider";
 
@@ -82,18 +80,22 @@ export const marketingDocumentSummaryTask = task({
       return { runId: run.id, status: "failed" as const };
     }
 
-    // The flag is enforced here as well as in the web action, because a run
-    // queued while the studio was enabled would otherwise still reach a paid
-    // provider after it was turned off. A flag honoured in only one runtime is
-    // not a flag. The reservation is released: nothing was spent.
-    if (!getMarketingEnvironment().ENABLE_MARKETING_STUDIO) {
+    // Both switches are re-checked here as well as in the web action, because a
+    // run queued while the studio was on would otherwise still reach a paid
+    // provider after it was turned off — by a redeploy or by an owner flipping
+    // the workspace toggle. A switch honoured in only one runtime is not a
+    // switch. The reservation is released: nothing was spent.
+    const access = await resolveMarketingAccess({
+      workspaceId: input.workspaceId,
+    });
+    if (!access.available) {
       await failMarketingRun({
         workspaceId: input.workspaceId,
         runId: run.id,
         reservationId: reservation.id,
         operation: run.operation,
         category: "marketing_studio_disabled",
-        message: "The Marketing Studio is currently disabled.",
+        message: "The Marketing Studio was switched off before this ran.",
         chargedCostCents: 0,
       });
       return { runId: run.id, status: "failed" as const };

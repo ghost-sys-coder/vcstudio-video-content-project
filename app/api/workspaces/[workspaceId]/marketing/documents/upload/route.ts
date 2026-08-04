@@ -4,6 +4,7 @@ import { countKnowledgeDocuments } from "@/db/repositories/marketing-documents.r
 import { requireAuthenticatedUser } from "@/lib/auth/require-authenticated-user";
 import { requireWorkspaceMembership } from "@/lib/auth/workspace-context";
 import { getMarketingEnvironment } from "@/lib/env/server";
+import { resolveMarketingAccess } from "@/lib/marketing/marketing-access";
 import { requireCapability } from "@/lib/policies/workspace-policy";
 import { requestDocumentUploadSchema } from "@/lib/schemas/marketing-document";
 import { createDocumentUploadUrl } from "@/lib/storage/marketing-document-storage";
@@ -40,6 +41,16 @@ export async function POST(
       { status: 403 },
     );
   }
+
+  // The workspace switch is honoured on the route as well as in the UI: this
+  // endpoint mints a signed upload URL, and a disabled studio should not be
+  // handing out writable storage.
+  const access = await resolveMarketingAccess({ workspaceId });
+  if (!access.available)
+    return NextResponse.json(
+      { error: "The Marketing Studio is switched off for this workspace." },
+      { status: 403 },
+    );
 
   const parsed = requestDocumentUploadSchema.safeParse(await request.json());
   if (!parsed.success)

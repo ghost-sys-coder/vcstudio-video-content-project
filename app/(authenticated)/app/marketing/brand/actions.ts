@@ -12,7 +12,7 @@ import {
   upsertBrandOffer,
 } from "@/db/commands/marketing-brand-commands";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
-import { getMarketingEnvironment } from "@/lib/env/server";
+import { resolveMarketingAccess } from "@/lib/marketing/marketing-access";
 import { WorkspacePermissionDeniedError } from "@/lib/domain/errors";
 import { calculateBrandCompleteness } from "@/lib/marketing/brand/brand-completeness";
 import { ONBOARDING_QUESTIONS } from "@/lib/marketing/brand/onboarding-questions";
@@ -39,17 +39,24 @@ export type BrandActionResult = { ok: true } | { ok: false; error: string };
  * one of them being forgotten.
  */
 async function resolveBrandContext() {
-  if (!getMarketingEnvironment().ENABLE_MARKETING_STUDIO)
-    return {
-      ok: false as const,
-      error: "The Marketing Studio is not enabled.",
-    };
-
   const context = await getAuthenticatedWorkspaceContext();
   if (!context)
     return { ok: false as const, error: "Workspace context is unavailable." };
 
   requireCapability(context.activeMembership.role, "manageBrandProfile");
+
+  // After membership, because the workspace switch is per-workspace.
+  const access = await resolveMarketingAccess({
+    workspaceId: context.activeMembership.workspaceId,
+  });
+  if (!access.available)
+    return {
+      ok: false as const,
+      error:
+        access.reason === "deployment_disabled"
+          ? "The Marketing Studio is not enabled."
+          : "The Marketing Studio is switched off for this workspace.",
+    };
 
   const profile = await ensureBrandProfile({
     workspaceId: context.activeMembership.workspaceId,

@@ -18,10 +18,8 @@ import {
   createMarketingOperationIdempotencyKey,
   createRequestFingerprint,
 } from "@/lib/domain/idempotency";
-import {
-  getMarketingEnvironment,
-  getSceneAnalysisEnvironment,
-} from "@/lib/env/server";
+import { getSceneAnalysisEnvironment } from "@/lib/env/server";
+import { resolveMarketingAccess } from "@/lib/marketing/marketing-access";
 import { reserveMarketingUsage } from "@/lib/marketing/usage/reserve-marketing-usage";
 import { enforceRateLimit } from "@/lib/rate-limit/enforce-rate-limit";
 import { MARKETING_DOCUMENT_KEY_FACT_COUNT } from "@/lib/schemas/marketing-document-summary";
@@ -49,10 +47,17 @@ export async function startDocumentSummary(input: {
   documentId: string;
   requestedByUserId: string;
 }): Promise<{ runId: string; created: boolean }> {
-  const marketingEnvironment = getMarketingEnvironment();
-  if (!marketingEnvironment.ENABLE_MARKETING_STUDIO)
+  // Both switches, not just the deployment one. A workspace that has turned the
+  // studio off must not be able to spend through it, whatever route reached
+  // here.
+  const access = await resolveMarketingAccess({
+    workspaceId: input.workspaceId,
+  });
+  if (!access.available)
     throw new MarketingDocumentSummaryRequestError(
-      "The Marketing Studio is disabled.",
+      access.reason === "deployment_disabled"
+        ? "The Marketing Studio is not available in this deployment."
+        : "The Marketing Studio is switched off for this workspace.",
     );
 
   const document = await findKnowledgeDocument({

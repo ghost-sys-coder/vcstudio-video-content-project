@@ -6,6 +6,8 @@ import {
   listWorkspaceMembers,
 } from "@/db/repositories/workspaces.repository";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
+import { getMarketingEnvironment } from "@/lib/env/server";
+import { isMarketingStudioEnabledForWorkspace } from "@/lib/marketing/marketing-access";
 import { canManageWorkspace } from "@/lib/policies/workspace-policy";
 import { loadWorkspaceChannelsView } from "@/lib/publishing/workspace-connections-view";
 import { createWorkspaceLogoDownloadUrl } from "@/lib/storage/workspace-logo-storage";
@@ -34,6 +36,7 @@ export default async function WorkspaceSettingsPage({
     channelsView,
     members,
     pendingInvitations,
+    marketingStudioEnabled,
   ] = await Promise.all([
     searchParams,
     findWorkspaceLogo(context.activeMembership.workspaceId),
@@ -42,6 +45,9 @@ export default async function WorkspaceSettingsPage({
     }),
     listWorkspaceMembers(context.activeMembership.workspaceId),
     listPendingWorkspaceInvitations(context.activeMembership.workspaceId),
+    isMarketingStudioEnabledForWorkspace({
+      workspaceId: context.activeMembership.workspaceId,
+    }),
   ]);
   const logoUrl = logo
     ? await createWorkspaceLogoDownloadUrl(logo.objectKey)
@@ -52,6 +58,10 @@ export default async function WorkspaceSettingsPage({
       channelsView={channelsView}
       currentUserId={context.user.id}
       logoUrl={logoUrl}
+      marketingDeploymentEnabled={
+        getMarketingEnvironment().ENABLE_MARKETING_STUDIO
+      }
+      marketingStudioEnabled={marketingStudioEnabled}
       members={members}
       oauthStatus={{
         facebook: facebook ?? null,

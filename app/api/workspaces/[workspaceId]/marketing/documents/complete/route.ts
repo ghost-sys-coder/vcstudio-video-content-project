@@ -33,6 +33,13 @@ export async function POST(
   if (!environment.ENABLE_MARKETING_STUDIO)
     return NextResponse.json({ error: "Not found." }, { status: 404 });
 
+  // Deliberately NOT gated on the per-workspace switch, unlike the upload route
+  // that precedes it. The bytes are already in R2 by the time this runs; if the
+  // studio were switched off mid-upload, refusing here would strand the object
+  // with its row stuck `pending` forever. Completion finishes work already
+  // authorised and spends nothing — the gate that matters is the one on the
+  // endpoint that hands out the writable URL.
+
   let workspaceId: string;
   try {
     const user = await requireAuthenticatedUser();

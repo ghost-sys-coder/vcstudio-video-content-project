@@ -1,3 +1,4 @@
+import { MarketingStudioSection } from "@/components/workspace/MarketingStudioSection";
 import { WorkspaceProfileForm } from "@/components/workspace/WorkspaceProfileForm";
 import { WorkspaceChannelsSection } from "@/components/workspace/WorkspaceChannelsSection";
 import { WorkspaceMembersSection } from "@/components/workspace/WorkspaceMembersSection";
@@ -11,6 +12,8 @@ export function WorkspaceProfilePage({
   channelsView,
   currentUserId,
   logoUrl,
+  marketingDeploymentEnabled,
+  marketingStudioEnabled,
   members,
   oauthStatus,
   pendingInvitations,
@@ -20,6 +23,8 @@ export function WorkspaceProfilePage({
   channelsView: WorkspaceChannelsView;
   currentUserId: string;
   logoUrl: string | null;
+  marketingDeploymentEnabled: boolean;
+  marketingStudioEnabled: boolean;
   members: WorkspaceMemberView[];
   oauthStatus: {
     facebook: string | null;
@@ -51,6 +56,12 @@ export function WorkspaceProfilePage({
           logoUrl={logoUrl}
           workspaceId={workspaceId}
           workspaceName={workspaceName}
+        />
+      </div>
+      <div className="mt-6">
+        <MarketingStudioSection
+          deploymentEnabled={marketingDeploymentEnabled}
+          enabled={marketingStudioEnabled}
         />
       </div>
       <div className="mt-6">

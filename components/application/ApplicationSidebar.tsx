@@ -14,6 +14,7 @@ import type { WorkspaceMembershipView } from "@/db/repositories/workspaces.repos
 import type { UserThemePreference } from "@/db/schema";
 import { getUserInitials } from "@/lib/users/user-initials";
 import { LogoutConfirmDialog } from "@/components/application/LogoutConfirmDialog";
+import { MarketingDisabledNavigationGroup } from "@/components/application/MarketingDisabledNavigationGroup";
 import { MarketingNavigationGroup } from "@/components/application/MarketingNavigationGroup";
 import { SocialNavigationGroup } from "@/components/application/SocialNavigationGroup";
 import { ThemeSwitcher } from "@/components/application/ThemeSwitcher";
@@ -41,6 +42,7 @@ export function ApplicationSidebar({
   canUseMarketingStudio,
   initialTheme,
   logoUrl,
+  marketingStudioEnabled,
   memberships,
   userDisplayName,
   userEmail,
@@ -52,6 +54,7 @@ export function ApplicationSidebar({
   canUseMarketingStudio: boolean;
   initialTheme: UserThemePreference;
   logoUrl: string | null;
+  marketingStudioEnabled: boolean;
   memberships: WorkspaceMembershipView[];
   userDisplayName: string;
   userEmail: string;
@@ -164,7 +167,18 @@ export function ApplicationSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
         {canComposePosts ? <SocialNavigationGroup /> : null}
-        {canUseMarketingStudio ? <MarketingNavigationGroup /> : null}
+        {canUseMarketingStudio ? (
+          marketingStudioEnabled ? (
+            <MarketingNavigationGroup />
+          ) : (
+            // Listed but locked rather than hidden. A user who has heard the
+            // studio exists should find out it is switched off and how to fix
+            // that, instead of concluding the app does not have the feature.
+            <MarketingDisabledNavigationGroup
+              canManageSettings={canManageSettings}
+            />
+          )
+        ) : null}
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>

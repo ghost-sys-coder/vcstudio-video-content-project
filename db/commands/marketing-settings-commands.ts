@@ -5,6 +5,39 @@ import { marketingSettings, type MarketingSettings } from "@/db/schema";
 import type { MarketingSettingsInput } from "@/lib/schemas/marketing-settings";
 
 /**
+ * Flips the workspace's own Marketing Studio switch.
+ *
+ * Deliberately its own command touching one column, rather than a field on
+ * `upsertMarketingSettings`. The two are edited from different pages by
+ * different people — the switch from workspace settings by an owner, the rest
+ * from the studio's own settings page — and folding them together would mean
+ * saving one form could silently revert the other. The upsert below omits
+ * `studioEnabled` from its `set` for exactly the same reason.
+ */
+export async function setMarketingStudioEnabled(input: {
+  workspaceId: string;
+  updatedByUserId: string;
+  enabled: boolean;
+}): Promise<void> {
+  const now = new Date();
+  await getDatabase()
+    .insert(marketingSettings)
+    .values({
+      workspaceId: input.workspaceId,
+      updatedByUserId: input.updatedByUserId,
+      studioEnabled: input.enabled,
+    })
+    .onConflictDoUpdate({
+      target: marketingSettings.workspaceId,
+      set: {
+        studioEnabled: input.enabled,
+        updatedByUserId: input.updatedByUserId,
+        updatedAt: now,
+      },
+    });
+}
+
+/**
  * Writes a workspace's marketing settings, creating the row on first save.
  *
  * An upsert rather than a create-then-update pair: the row is optional until

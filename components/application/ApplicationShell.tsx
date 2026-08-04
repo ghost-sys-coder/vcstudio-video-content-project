@@ -19,6 +19,7 @@ export function ApplicationShell({
   defaultSidebarOpen,
   initialTheme,
   logoUrl,
+  marketingStudioEnabled,
   memberships,
   themeResyncTarget,
   user,
@@ -32,6 +33,7 @@ export function ApplicationShell({
   defaultSidebarOpen: boolean;
   initialTheme: UserThemePreference;
   logoUrl: string | null;
+  marketingStudioEnabled: boolean;
   memberships: WorkspaceMembershipView[];
   themeResyncTarget: UserThemePreference | null;
   user: ApplicationUser;
@@ -47,6 +49,7 @@ export function ApplicationShell({
         canUseMarketingStudio={canUseMarketingStudio}
         initialTheme={initialTheme}
         logoUrl={logoUrl}
+        marketingStudioEnabled={marketingStudioEnabled}
         memberships={memberships}
         userDisplayName={user.displayName}
         userEmail={user.email}

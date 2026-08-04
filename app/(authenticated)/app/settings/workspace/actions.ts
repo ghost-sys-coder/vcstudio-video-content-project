@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { setMarketingStudioEnabled } from "@/db/commands/marketing-settings-commands";
 import { updateWorkspaceName } from "@/db/commands/update-workspace.command";
 import {
   inviteWorkspaceMember,
@@ -14,9 +15,17 @@ import {
   getAuthenticatedWorkspaceContext,
   requireWorkspaceMembership,
 } from "@/lib/auth/workspace-context";
-import { LastWorkspaceOwnerError } from "@/lib/domain/errors";
+import {
+  LastWorkspaceOwnerError,
+  WorkspacePermissionDeniedError,
+} from "@/lib/domain/errors";
+import { getMarketingEnvironment } from "@/lib/env/server";
 import { requireCapability } from "@/lib/policies/workspace-policy";
 import { disconnectPlatformAuthorization } from "@/lib/publishing/disconnect-platform-connection";
+import {
+  marketingStudioAccessSchema,
+  readMarketingStudioAccessForm,
+} from "@/lib/schemas/marketing-settings";
 import { disconnectPlatformSchema } from "@/lib/schemas/publishing";
 import {
   inviteWorkspaceMemberSchema,
@@ -73,6 +82,75 @@ export async function disconnectWorkspaceChannelAction(
   } catch {
     return {
       error: "The channel could not be disconnected.",
+      success: false,
+    };
+  }
+}
+
+export type MarketingStudioAccessState = {
+  error: string | null;
+  success: boolean;
+};
+
+/**
+ * Turns the Marketing Studio on or off for this workspace.
+ *
+ * Owner-only via `manageSettings`, and audited, because the switch is what lets
+ * the workspace start spending on marketing generation. It cannot override the
+ * deployment flag: if `ENABLE_MARKETING_STUDIO` is off, the feature does not
+ * exist here and the toggle refuses rather than storing a preference that
+ * appears to do something.
+ */
+export async function setMarketingStudioAccessAction(
+  formData: FormData,
+): Promise<MarketingStudioAccessState> {
+  const parsed = marketingStudioAccessSchema.safeParse(
+    readMarketingStudioAccessForm(formData),
+  );
+  if (!parsed.success)
+    return { error: "That request is invalid.", success: false };
+
+  try {
+    const context = await getAuthenticatedWorkspaceContext();
+    if (!context) throw new Error("WORKSPACE_CONTEXT_MISSING");
+    requireCapability(context.activeMembership.role, "manageSettings");
+
+    if (!getMarketingEnvironment().ENABLE_MARKETING_STUDIO)
+      return {
+        error:
+          "The Marketing Studio is not available in this deployment. Ask an administrator to enable it.",
+        success: false,
+      };
+
+    await setMarketingStudioEnabled({
+      workspaceId: context.activeMembership.workspaceId,
+      updatedByUserId: context.user.id,
+      enabled: parsed.data.enabled,
+    });
+
+    await recordAuditEvent({
+      workspaceId: context.activeMembership.workspaceId,
+      actorUserId: context.user.id,
+      // No dedicated enum value: this is a change to what the workspace is
+      // permitted to spend on, which is what `limits_changed` already records.
+      action: "limits_changed",
+      targetType: "marketing_settings",
+      targetId: context.activeMembership.workspaceId,
+      metadata: { setting: "studioEnabled", enabled: parsed.data.enabled },
+    });
+
+    // The sidebar is rendered by the authenticated layout, so the nav entry
+    // only changes shape once that layout is revalidated too.
+    revalidatePath("/app", "layout");
+    return { error: null, success: true };
+  } catch (error) {
+    if (error instanceof WorkspacePermissionDeniedError)
+      return {
+        error: "You do not have permission to change this.",
+        success: false,
+      };
+    return {
+      error: "The Marketing Studio setting could not be saved.",
       success: false,
     };
   }

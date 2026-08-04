@@ -19,6 +19,24 @@ export const SELECTABLE_AUTONOMY_LEVELS = ["manual", "assisted"] as const;
 export const MAX_DAILY_GENERATED_ITEMS = 100;
 export const MAX_RESEARCH_REFRESH_DAYS = 90;
 
+/**
+ * The workspace's own on/off switch, edited from workspace settings.
+ *
+ * Separate from `marketingSettingsSchema` because the two are edited on
+ * different pages by different roles, and a shared schema would mean saving one
+ * form could revert the other.
+ */
+export const marketingStudioAccessSchema = z.object({
+  enabled: z.boolean(),
+});
+
+/** The toggle posts a literal target state, not a checkbox's presence. */
+export function readMarketingStudioAccessForm(
+  formData: FormData,
+): Record<string, unknown> {
+  return { enabled: formData.get("enabled") === "true" };
+}
+
 export const marketingSettingsSchema = z.object({
   autonomyLevel: z.enum(SELECTABLE_AUTONOMY_LEVELS),
   requireApprovalBeforePublish: z.boolean(),

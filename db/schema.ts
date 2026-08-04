@@ -3464,6 +3464,17 @@ export const marketingSettings = pgTable(
     workspaceId: uuid("workspace_id")
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
+    /**
+     * The workspace's own on/off switch, flipped from workspace settings.
+     *
+     * Distinct from `ENABLE_MARKETING_STUDIO`, which is a deployment flag no
+     * running app can change and which the worker must agree with. This is the
+     * per-workspace layer beneath it: the deployment says the feature may exist,
+     * this says a given workspace has opted into it. Defaults to **off** so a
+     * deploy that switches the feature on does not silently hand every existing
+     * workspace something that can spend money.
+     */
+    studioEnabled: boolean("studio_enabled").notNull().default(false),
     autonomyLevel: marketingAutonomyLevelEnum("autonomy_level")
       .notNull()
       .default("manual"),

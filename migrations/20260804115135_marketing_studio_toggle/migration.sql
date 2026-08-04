@@ -1,0 +1,1 @@
+ALTER TABLE "marketing_settings" ADD COLUMN "studio_enabled" boolean DEFAULT false NOT NULL;

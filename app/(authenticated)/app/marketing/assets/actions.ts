@@ -10,7 +10,7 @@ import {
 } from "@/db/commands/marketing-document-commands";
 import { findReadyMediaAssets } from "@/db/repositories/media-assets.repository";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
-import { getMarketingEnvironment } from "@/lib/env/server";
+import { resolveMarketingAccess } from "@/lib/marketing/marketing-access";
 import {
   MarketingBudgetExceededError,
   RateLimitExceededError,
@@ -38,17 +38,26 @@ import { deleteDocumentObject } from "@/lib/storage/marketing-document-storage";
 export type AssetsActionResult = { ok: true } | { ok: false; error: string };
 
 async function resolveContext() {
-  if (!getMarketingEnvironment().ENABLE_MARKETING_STUDIO)
-    return {
-      ok: false as const,
-      error: "The Marketing Studio is not enabled.",
-    };
-
   const context = await getAuthenticatedWorkspaceContext();
   if (!context)
     return { ok: false as const, error: "Workspace context is unavailable." };
 
   requireCapability(context.activeMembership.role, "manageBrandProfile");
+
+  // Checked after membership is known, because the workspace switch is
+  // per-workspace: there is no access question to answer until we know which
+  // workspace is asking.
+  const access = await resolveMarketingAccess({
+    workspaceId: context.activeMembership.workspaceId,
+  });
+  if (!access.available)
+    return {
+      ok: false as const,
+      error:
+        access.reason === "deployment_disabled"
+          ? "The Marketing Studio is not enabled."
+          : "The Marketing Studio is switched off for this workspace.",
+    };
 
   return {
     ok: true as const,

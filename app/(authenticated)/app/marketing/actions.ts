@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { recordAuditEvent } from "@/lib/audit/record-audit-event";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
-import { getMarketingEnvironment } from "@/lib/env/server";
+import { resolveMarketingAccess } from "@/lib/marketing/marketing-access";
 import { upsertMarketingSettings } from "@/db/commands/marketing-settings-commands";
 import { WorkspacePermissionDeniedError } from "@/lib/domain/errors";
 import { requireCapability } from "@/lib/policies/workspace-policy";
@@ -25,9 +25,6 @@ export async function saveMarketingSettingsAction(
     };
 
   try {
-    if (!getMarketingEnvironment().ENABLE_MARKETING_STUDIO)
-      return { ok: false, error: "The Marketing Studio is not enabled." };
-
     const context = await getAuthenticatedWorkspaceContext();
     if (!context)
       return { ok: false, error: "Workspace context is unavailable." };
@@ -35,6 +32,18 @@ export async function saveMarketingSettingsAction(
     // Owner-only: autonomy and the marketing spend ceiling both decide what can
     // happen while nobody is present.
     requireCapability(context.activeMembership.role, "manageSettings");
+
+    const access = await resolveMarketingAccess({
+      workspaceId: context.activeMembership.workspaceId,
+    });
+    if (!access.available)
+      return {
+        ok: false,
+        error:
+          access.reason === "deployment_disabled"
+            ? "The Marketing Studio is not enabled."
+            : "The Marketing Studio is switched off for this workspace.",
+      };
 
     await upsertMarketingSettings({
       workspaceId: context.activeMembership.workspaceId,
