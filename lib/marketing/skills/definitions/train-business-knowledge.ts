@@ -19,8 +19,21 @@ export const trainBusinessKnowledgeSkill = {
     facts: z.string().trim().min(1).max(5000),
   }),
   inputFields: [
-    { key: "subject", label: "Subject", type: "text", required: true },
-    { key: "facts", label: "Business facts", type: "longtext", required: true },
+    {
+      key: "subject",
+      label: "Subject",
+      type: "text",
+      required: true,
+      defaultValue: "Website redesign service",
+    },
+    {
+      key: "facts",
+      label: "Business facts",
+      type: "longtext",
+      required: true,
+      defaultValue:
+        "Projects start at $2,500, usually take 4–6 weeks, and include strategy, design, development, and launch support.",
+    },
   ],
   billing: {
     kind: "text",

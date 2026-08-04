@@ -26,7 +26,14 @@ export const createMediaStorySkill = {
       required: true,
       options: ["instagram", "facebook", "tiktok", "youtube"],
     },
-    { key: "topic", label: "Topic", type: "longtext", required: true },
+    {
+      key: "topic",
+      label: "Topic",
+      type: "longtext",
+      required: true,
+      defaultValue:
+        "Five quick signs that a growing business has outgrown its current website.",
+    },
     {
       key: "cards",
       label: "Cards",

@@ -164,6 +164,7 @@ export function ChatComposer({
         </div>
       </div>
       <SkillInputDialog
+        key={selectedSkill?.key ?? "closed"}
         onClose={() => setSelectedSkill(null)}
         onSubmit={(inputs) => {
           if (!selectedSkill) return;

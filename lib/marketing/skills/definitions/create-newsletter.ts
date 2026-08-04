@@ -19,13 +19,27 @@ export const createNewsletterSkill = {
     highlights: z.string().trim().min(1).max(3000),
   }),
   inputFields: [
-    { key: "theme", label: "Theme", type: "text", required: true },
-    { key: "audience", label: "Audience", type: "text", required: true },
+    {
+      key: "theme",
+      label: "Theme",
+      type: "text",
+      required: true,
+      defaultValue: "Practical ways to improve website conversions",
+    },
+    {
+      key: "audience",
+      label: "Audience",
+      type: "text",
+      required: true,
+      defaultValue: "Founders of growing service businesses",
+    },
     {
       key: "highlights",
       label: "Highlights",
       type: "longtext",
       required: true,
+      defaultValue:
+        "New conversion audit service; client onboarding guide; three homepage mistakes; book a free consultation.",
     },
   ],
   billing: {

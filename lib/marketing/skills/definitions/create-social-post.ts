@@ -2,6 +2,7 @@ import { z } from "zod";
 import { MARKETING_SKILL_PROMPT_VERSION } from "@studio/prompts";
 import { MARKETING_EXPECTED_OUTPUT_TOKENS } from "@/lib/costs/marketing-cost";
 import type { MarketingSkillDefinition } from "@/lib/marketing/skills/skill-definition";
+import { SOCIAL_POST_PLATFORMS } from "@/lib/social/platform-post-capabilities";
 
 export const createSocialPostSkill = {
   key: "create_social_post",
@@ -16,14 +17,7 @@ export const createSocialPostSkill = {
   requiresBrandProfile: true,
   promptVersion: MARKETING_SKILL_PROMPT_VERSION,
   inputSchema: z.object({
-    platform: z.enum([
-      "linkedin",
-      "x",
-      "instagram",
-      "facebook",
-      "tiktok",
-      "youtube",
-    ]),
+    platform: z.enum(SOCIAL_POST_PLATFORMS),
     topic: z.string().trim().min(1).max(1000),
     goal: z.string().trim().min(1).max(500),
   }),
@@ -33,21 +27,23 @@ export const createSocialPostSkill = {
       label: "Platform",
       type: "platform",
       required: true,
-      options: ["linkedin", "x", "instagram", "facebook", "tiktok", "youtube"],
+      options: SOCIAL_POST_PLATFORMS,
     },
     {
       key: "topic",
       label: "Topic",
       type: "longtext",
       required: true,
-      placeholder: "What should the post say?",
+      defaultValue:
+        "Share three signs that a small business website is losing qualified leads.",
     },
     {
       key: "goal",
       label: "Goal",
       type: "text",
       required: true,
-      placeholder: "Awareness, engagement, leads…",
+      defaultValue:
+        "Start conversations with founders and invite them to request an audit.",
     },
   ],
   billing: {

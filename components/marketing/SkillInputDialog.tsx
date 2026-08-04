@@ -25,8 +25,15 @@ export function SkillInputDialog({
   const [values, setValues] = useState<Record<string, string>>({});
   const [confirmed, setConfirmed] = useState(false);
   if (!skill) return null;
+  const resolvedValues = Object.fromEntries(
+    skill.inputFields.map((field) => [
+      field.key,
+      values[field.key] ?? field.defaultValue ?? "",
+    ]),
+  );
   const complete = skill.inputFields.every(
-    (field) => !field.required || (values[field.key] ?? "").trim() !== "",
+    (field) =>
+      !field.required || (resolvedValues[field.key] ?? "").trim() !== "",
   );
   return (
     <Dialog
@@ -48,7 +55,7 @@ export function SkillInputDialog({
               onChange={(value) =>
                 setValues((current) => ({ ...current, [field.key]: value }))
               }
-              value={values[field.key] ?? ""}
+              value={resolvedValues[field.key] ?? ""}
             />
           ))}
           <SkillCostBadge range={skill.estimatedCostRangeCents} />
@@ -65,7 +72,7 @@ export function SkillInputDialog({
           </Button>
           <Button
             disabled={!complete || (skill.requiresConfirmation && !confirmed)}
-            onClick={() => onSubmit(values)}
+            onClick={() => onSubmit(resolvedValues)}
             type="button"
           >
             Use skill

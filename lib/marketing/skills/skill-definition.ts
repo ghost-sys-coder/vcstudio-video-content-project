@@ -10,6 +10,7 @@ export type SkillInputField = {
   type: "text" | "longtext" | "select" | "platform";
   required: boolean;
   placeholder?: string;
+  defaultValue?: string;
   options?: readonly string[];
 };
 

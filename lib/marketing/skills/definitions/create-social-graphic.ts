@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { MARKETING_SKILL_PROMPT_VERSION } from "@studio/prompts";
 import type { MarketingSkillDefinition } from "@/lib/marketing/skills/skill-definition";
+import { SOCIAL_POST_PLATFORMS } from "@/lib/social/platform-post-capabilities";
 
 export const createSocialGraphicSkill = {
   key: "create_social_graphic",
@@ -15,26 +16,34 @@ export const createSocialGraphicSkill = {
   requiresBrandProfile: true,
   promptVersion: MARKETING_SKILL_PROMPT_VERSION,
   inputSchema: z.object({
-    platform: z.enum([
-      "linkedin",
-      "x",
-      "instagram",
-      "facebook",
-      "tiktok",
-      "youtube",
-    ]),
+    platform: z.enum(SOCIAL_POST_PLATFORMS),
     topic: z.string().trim().min(1).max(1000),
     visualDirection: z.string().trim().min(1).max(1000),
     aspectRatio: z.enum(["square", "portrait", "landscape"]),
   }),
   inputFields: [
-    { key: "platform", label: "Platform", type: "platform", required: true },
-    { key: "topic", label: "Topic", type: "longtext", required: true },
+    {
+      key: "platform",
+      label: "Platform",
+      type: "platform",
+      required: true,
+      options: SOCIAL_POST_PLATFORMS,
+    },
+    {
+      key: "topic",
+      label: "Topic",
+      type: "longtext",
+      required: true,
+      defaultValue:
+        "Announce our new website redesign service for growing local businesses.",
+    },
     {
       key: "visualDirection",
       label: "Visual direction",
       type: "longtext",
       required: true,
+      defaultValue:
+        "A confident founder at a clean desk, warm natural light, deep navy and electric-blue accents, generous negative space, no text in the image.",
     },
     {
       key: "aspectRatio",

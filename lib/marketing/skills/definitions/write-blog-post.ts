@@ -19,8 +19,21 @@ export const writeBlogPostSkill = {
     length: z.enum(["short", "medium", "long"]),
   }),
   inputFields: [
-    { key: "topic", label: "Topic", type: "longtext", required: true },
-    { key: "audience", label: "Audience", type: "text", required: true },
+    {
+      key: "topic",
+      label: "Topic",
+      type: "longtext",
+      required: true,
+      defaultValue:
+        "How service businesses can turn more website visits into qualified enquiries.",
+    },
+    {
+      key: "audience",
+      label: "Audience",
+      type: "text",
+      required: true,
+      defaultValue: "Owners of established local service businesses",
+    },
     {
       key: "length",
       label: "Length",

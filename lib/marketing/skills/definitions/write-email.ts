@@ -20,13 +20,27 @@ export const writeEmailSkill = {
     callToAction: z.string().trim().min(1).max(500),
   }),
   inputFields: [
-    { key: "audience", label: "Audience", type: "text", required: true },
-    { key: "purpose", label: "Purpose", type: "longtext", required: true },
+    {
+      key: "audience",
+      label: "Audience",
+      type: "text",
+      required: true,
+      defaultValue: "Past clients whose websites are over three years old",
+    },
+    {
+      key: "purpose",
+      label: "Purpose",
+      type: "longtext",
+      required: true,
+      defaultValue:
+        "Introduce our website health-check service and explain the three issues it uncovers.",
+    },
     {
       key: "callToAction",
       label: "Call to action",
       type: "text",
       required: true,
+      defaultValue: "Book a free 20-minute website review",
     },
   ],
   billing: {

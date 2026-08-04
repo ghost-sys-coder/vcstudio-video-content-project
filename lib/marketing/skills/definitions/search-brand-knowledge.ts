@@ -14,7 +14,13 @@ export const searchBrandKnowledgeSkill = {
   promptVersion: MARKETING_CHAT_PROMPT_VERSION,
   inputSchema: searchBrandKnowledgeInputSchema,
   inputFields: [
-    { key: "query", label: "Search query", type: "text", required: true },
+    {
+      key: "query",
+      label: "Search query",
+      type: "text",
+      required: true,
+      defaultValue: "What turnaround time do we promise for website projects?",
+    },
   ],
   billing: { kind: "free" },
   instructions: "Search the workspace knowledge corpus.",
