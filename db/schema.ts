@@ -19,6 +19,7 @@ import type {
 } from "@/lib/subtitles/caption-style-data";
 import type { RenderTimelineSnapshot } from "@/lib/render/render-timeline-snapshot";
 import type { PortableDocument } from "@/lib/social/portable-document";
+import type { MarketingChatMessagePart } from "@/lib/schemas/marketing-chat-message";
 
 export const workspaceRoleEnum = pgEnum("workspace_role", [
   "owner",
@@ -3887,6 +3888,17 @@ export const marketingKnowledgeDocuments = pgTable(
       table.priority,
       table.createdAt,
     ),
+    // Full-text search over the extracted text, which is what
+    // `search_brand_knowledge` runs. Expressed as an expression index because
+    // there is no stored tsvector column: a generated column would double the
+    // storage of every document for a query that is already fast at this corpus
+    // size, and the expression must match the one in the query exactly — hence
+    // `'english'` written literally in both places rather than through a
+    // configuration variable, which would make the index unusable.
+    index("marketing_knowledge_documents_fts_index").using(
+      "gin",
+      sql`to_tsvector('english', ${table.extractedText})`,
+    ),
     check(
       "marketing_knowledge_documents_size_nonnegative",
       sql`${table.sizeBytes} >= 0`,
@@ -4165,6 +4177,164 @@ export const marketingUsageEvents = pgTable(
   ],
 );
 
+export const marketingThreadStatusEnum = pgEnum("marketing_thread_status", [
+  "active",
+  "archived",
+]);
+
+export const marketingChatRoleEnum = pgEnum("marketing_chat_role", [
+  "user",
+  "assistant",
+]);
+
+/**
+ * `system` and `tool` are deliberately absent.
+ *
+ * The system prompt is composed on the server from a versioned template and the
+ * compiled brand context, and is never a stored turn — storing one would make
+ * it look like something a client could have sent. Tool activity lives in the
+ * assistant message's `parts`, where the SDK puts it, rather than in rows of a
+ * fourth role that nothing renders.
+ */
+export const marketingChatMessageStatusEnum = pgEnum(
+  "marketing_chat_message_status",
+  ["streaming", "complete", "failed"],
+);
+
+export const marketingChatThreads = pgTable(
+  "marketing_chat_threads",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    title: text("title").notNull().default("New conversation"),
+    status: marketingThreadStatusEnum("status").notNull().default("active"),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    lastMessageAt: timestamp("last_message_at", { withTimezone: true }),
+    messageCount: integer("message_count").notNull().default(0),
+    /** Running total of reconciled turn costs; what the thread footer shows. */
+    totalCostCents: integer("total_cost_cents").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("marketing_chat_threads_recent_index").on(
+      table.workspaceId,
+      table.status,
+      table.lastMessageAt,
+    ),
+    uniqueIndex("marketing_chat_threads_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    check(
+      "marketing_chat_threads_counts_nonnegative",
+      sql`${table.messageCount} >= 0 and ${table.totalCostCents} >= 0`,
+    ),
+  ],
+);
+
+/**
+ * One conversational turn.
+ *
+ * `position` rather than ordering by `created_at`: two messages written in the
+ * same millisecond have no defined order under a timestamp sort, and a
+ * conversation replayed in the wrong order is a different conversation. The
+ * unique index makes the sequence a database invariant rather than a hope.
+ *
+ * Every assistant row records `model_id`, `prompt_version`, and
+ * `brand_context_snapshot_id`, which together make "why did it say that?"
+ * answerable months later against the exact text the model actually saw.
+ */
+export const marketingChatMessages = pgTable(
+  "marketing_chat_messages",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    threadId: uuid("thread_id").notNull(),
+    role: marketingChatRoleEnum("role").notNull(),
+    parts: jsonb("parts")
+      .$type<MarketingChatMessagePart[]>()
+      .notNull()
+      .default([]),
+    /** Projection of the text parts; what search and previews read. */
+    plainText: text("plain_text").notNull().default(""),
+    position: integer("position").notNull(),
+    /** Set on user messages only; the idempotency key for a retried send. */
+    requestNonce: uuid("request_nonce"),
+    modelId: text("model_id").notNull().default(""),
+    promptVersion: text("prompt_version").notNull().default(""),
+    brandContextSnapshotId: uuid("brand_context_snapshot_id").references(
+      () => marketingBrandContextSnapshots.id,
+      { onDelete: "set null" },
+    ),
+    runId: uuid("run_id").references(() => marketingGenerationRuns.id, {
+      onDelete: "set null",
+    }),
+    inputTokens: integer("input_tokens").notNull().default(0),
+    outputTokens: integer("output_tokens").notNull().default(0),
+    costCents: integer("cost_cents").notNull().default(0),
+    status: marketingChatMessageStatusEnum("status")
+      .notNull()
+      .default("complete"),
+    finishReason: text("finish_reason").notNull().default(""),
+    providerRequestId: text("provider_request_id"),
+    safeErrorMessage: text("safe_error_message"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("marketing_chat_messages_position_unique").on(
+      table.threadId,
+      table.position,
+    ),
+    // Partial, because only user messages carry a nonce and NULLs would
+    // otherwise be free to repeat without meaning anything.
+    uniqueIndex("marketing_chat_messages_nonce_unique")
+      .on(table.threadId, table.requestNonce)
+      .where(sql`${table.requestNonce} is not null`),
+    index("marketing_chat_messages_thread_index").on(
+      table.threadId,
+      table.position,
+    ),
+    // Drives the reconciler's "did a stream die?" sweep.
+    index("marketing_chat_messages_status_index").on(
+      table.workspaceId,
+      table.status,
+      table.createdAt,
+    ),
+    check(
+      "marketing_chat_messages_position_nonnegative",
+      sql`${table.position} >= 0`,
+    ),
+    check(
+      "marketing_chat_messages_cost_nonnegative",
+      sql`${table.costCents} >= 0`,
+    ),
+    foreignKey({
+      columns: [table.threadId, table.workspaceId],
+      foreignColumns: [
+        marketingChatThreads.id,
+        marketingChatThreads.workspaceId,
+      ],
+      name: "marketing_chat_messages_tenant_thread_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
 export const auditLogEvents = pgTable(
   "audit_log_events",
   {
@@ -4437,6 +4607,14 @@ export type MarketingGenerationRun =
 export type MarketingUsageReservation =
   typeof marketingUsageReservations.$inferSelect;
 export type MarketingUsageEvent = typeof marketingUsageEvents.$inferSelect;
+export type MarketingChatThread = typeof marketingChatThreads.$inferSelect;
+export type MarketingThreadStatus =
+  (typeof marketingThreadStatusEnum.enumValues)[number];
+export type MarketingChatMessage = typeof marketingChatMessages.$inferSelect;
+export type MarketingChatRole =
+  (typeof marketingChatRoleEnum.enumValues)[number];
+export type MarketingChatMessageStatus =
+  (typeof marketingChatMessageStatusEnum.enumValues)[number];
 export type AuditLogEvent = typeof auditLogEvents.$inferSelect;
 export type AuditAction = (typeof auditActionEnum.enumValues)[number];
 export type RateLimitCounter = typeof rateLimitCounters.$inferSelect;

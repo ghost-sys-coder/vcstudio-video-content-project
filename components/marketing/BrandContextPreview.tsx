@@ -47,7 +47,7 @@ export function BrandContextPreview({
           <CardTitle>Compiled context</CardTitle>
         </CardHeader>
         <CardContent>
-          <pre className="max-h-[32rem] overflow-auto rounded-lg bg-muted p-4 text-xs whitespace-pre-wrap">
+          <pre className="max-h-128 overflow-auto rounded-lg bg-muted p-4 text-xs whitespace-pre-wrap">
             {context.text}
           </pre>
         </CardContent>

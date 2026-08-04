@@ -674,6 +674,62 @@ export const marketingEnvironmentSchema = z.object({
     .min(500)
     .max(50_000)
     .default(2_500),
+  /**
+   * The chat model. Separate from `OPENAI_TEXT_MODEL` because the two answer to
+   * different pressures: scene analysis wants the strongest structured-output
+   * model available, while a conversation is judged on latency as much as
+   * quality and is billed per turn rather than per project.
+   */
+  MARKETING_CHAT_MODEL: z.string().min(1).default("gpt-5.6-luna"),
+  /**
+   * Chat pricing, separate from `OPENAI_TEXT_*` for one reason: the two
+   * variables above let the chat run on a different model, and a ledger that
+   * records spend at another model's rates is a ledger that quietly stops
+   * adding up. They default to the text model's rates so an unset deployment
+   * records something plausible rather than zero — but if
+   * `MARKETING_CHAT_MODEL` is changed, these must change with it.
+   */
+  MARKETING_CHAT_INPUT_COST_PER_MILLION_CENTS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(100),
+  MARKETING_CHAT_OUTPUT_COST_PER_MILLION_CENTS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(600),
+  /**
+   * How many model steps one turn may take. A step is a model call plus any
+   * tool calls it makes, so this bounds a tool loop rather than the answer.
+   */
+  MARKETING_CHAT_MAX_STEPS: z.coerce.number().int().min(1).max(20).default(6),
+  /**
+   * Per-turn spend ceiling. Crossing it drops the billable tools from the next
+   * step, so the model must summarise what it has and stop.
+   *
+   * A step limit alone does not bound cost — six image generations sit
+   * comfortably inside six steps. This is the ceiling that actually holds.
+   */
+  MARKETING_CHAT_MAX_TURN_COST_CENTS: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(1_000)
+    .default(25),
+  /**
+   * How many prior turns are replayed to the model.
+   *
+   * Bounded because history is reloaded in full on every turn, so an
+   * unbounded thread would grow its own input cost without limit — a long
+   * conversation would quietly get more expensive per message.
+   */
+  MARKETING_CHAT_HISTORY_MESSAGES: z.coerce
+    .number()
+    .int()
+    .min(2)
+    .max(200)
+    .default(40),
 });
 
 /**

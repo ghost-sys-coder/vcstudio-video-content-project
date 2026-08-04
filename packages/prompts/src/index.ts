@@ -36,6 +36,11 @@ export type {
   BrandContextRender,
 } from "./marketing-brand-context";
 export {
+  MARKETING_CHAT_PROMPT_VERSION,
+  renderMarketingChatSystemPrompt,
+} from "./marketing-chat";
+export type { MarketingChatPromptInput } from "./marketing-chat";
+export {
   MARKETING_DOCUMENT_SUMMARY_EXCERPT_CHARACTERS,
   MARKETING_DOCUMENT_SUMMARY_PROMPT_VERSION,
   renderMarketingDocumentSummaryPrompt,
