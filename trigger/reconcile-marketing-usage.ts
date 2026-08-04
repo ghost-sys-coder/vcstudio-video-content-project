@@ -1,5 +1,8 @@
 import { logger, schedules } from "@trigger.dev/sdk";
 import { releaseExpiredMarketingReservation } from "@/db/commands/marketing-usage-commands";
+import { failMarketingToolCall } from "@/db/commands/marketing-chat-tool-call-commands";
+import { appendDeferredToolResultMessage } from "@/db/commands/marketing-chat-commands";
+import { findMarketingToolCallByRun } from "@/db/repositories/marketing-chat.repository";
 import { listExpiredMarketingReservations } from "@/db/repositories/marketing-usage.repository";
 
 const RECONCILIATION_BATCH_SIZE = 100;
@@ -40,7 +43,40 @@ export const reconcileMarketingUsageTask = schedules.task({
           reservationId: reservation.id,
           now,
         });
-        if (released) releasedCount += 1;
+        if (released) {
+          releasedCount += 1;
+          const toolCall = await findMarketingToolCallByRun({
+            workspaceId: reservation.workspaceId,
+            runId: reservation.runId,
+          });
+          if (toolCall) {
+            const message =
+              "This background task stopped before it finished. Please try again.";
+            const failed = await failMarketingToolCall({
+              workspaceId: reservation.workspaceId,
+              id: toolCall.id,
+              category: "reservation_expired",
+              message,
+              actualCostCents: 0,
+            });
+            if (failed)
+              await appendDeferredToolResultMessage({
+                workspaceId: reservation.workspaceId,
+                threadId: toolCall.threadId,
+                runId: reservation.runId,
+                part: {
+                  type: "data-toolResult",
+                  data: {
+                    skillKey: toolCall.skillKey,
+                    summary: message,
+                    failed: true,
+                  },
+                },
+                plainText: message,
+                costCents: 0,
+              });
+          }
+        }
       } catch {
         errorCount += 1;
         logger.error("Expired marketing reservation release failed.", {

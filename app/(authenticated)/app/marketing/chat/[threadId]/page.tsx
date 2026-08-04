@@ -45,6 +45,8 @@ export default async function MarketingChatThreadPage({
         threadId={view.threadId}
         totalCostCents={view.totalCostCents}
         workspaceId={workspaceId}
+        initialLastPosition={view.lastPosition}
+        initialHasRunningWork={view.hasRunningWork}
       />
     </div>
   );

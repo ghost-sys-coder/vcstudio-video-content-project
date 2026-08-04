@@ -4,6 +4,7 @@ import { and, asc, desc, eq, gt, isNotNull, sql } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
 import {
   marketingChatMessages,
+  marketingChatToolCalls,
   marketingChatThreads,
   type MarketingChatMessage,
   type MarketingChatThread,
@@ -34,6 +35,57 @@ export async function listChatThreads(input: {
       )
       .limit(MARKETING_THREAD_PAGE_SIZE)
   );
+}
+
+export async function findMarketingToolCall(input: {
+  workspaceId: string;
+  toolCallId: string;
+}) {
+  const [row] = await getDatabase()
+    .select()
+    .from(marketingChatToolCalls)
+    .where(
+      and(
+        eq(marketingChatToolCalls.id, input.toolCallId),
+        eq(marketingChatToolCalls.workspaceId, input.workspaceId),
+      ),
+    )
+    .limit(1);
+  return row ?? null;
+}
+
+export async function findMarketingToolCallByRun(input: {
+  workspaceId: string;
+  runId: string;
+}) {
+  const [row] = await getDatabase()
+    .select()
+    .from(marketingChatToolCalls)
+    .where(
+      and(
+        eq(marketingChatToolCalls.workspaceId, input.workspaceId),
+        eq(marketingChatToolCalls.runId, input.runId),
+      ),
+    )
+    .limit(1);
+  return row ?? null;
+}
+
+export async function listMarketingToolCallsForThread(input: {
+  workspaceId: string;
+  threadId: string;
+}) {
+  return getDatabase()
+    .select()
+    .from(marketingChatToolCalls)
+    .where(
+      and(
+        eq(marketingChatToolCalls.workspaceId, input.workspaceId),
+        eq(marketingChatToolCalls.threadId, input.threadId),
+      ),
+    )
+    .orderBy(asc(marketingChatToolCalls.createdAt))
+    .limit(100);
 }
 
 export async function findChatThread(input: {

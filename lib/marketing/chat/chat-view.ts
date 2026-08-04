@@ -6,9 +6,11 @@ import {
   findChatThread,
   listChatMessages,
   listChatThreads,
+  listMarketingToolCallsForThread,
 } from "@/db/repositories/marketing-chat.repository";
 import type { ChatThreadRowData } from "@/components/marketing/ChatThreadRow";
 import { getMarketingEnvironment } from "@/lib/env/server";
+import { hasRunningMarketingWork } from "@/lib/marketing/chat/tool-call-status";
 
 export async function loadChatThreadRows(input: {
   workspaceId: string;
@@ -29,6 +31,8 @@ export type ChatThreadView = {
   totalCostCents: number;
   messages: UIMessage[];
   hasBrandProfile: boolean;
+  lastPosition: number;
+  hasRunningWork: boolean;
 };
 
 /**
@@ -47,13 +51,14 @@ export async function loadChatThreadView(input: {
   const thread = await findChatThread(input);
   if (!thread) return null;
 
-  const [rows, profile] = await Promise.all([
+  const [rows, profile, toolCalls] = await Promise.all([
     listChatMessages({
       workspaceId: input.workspaceId,
       threadId: input.threadId,
       limit: getMarketingEnvironment().MARKETING_CHAT_HISTORY_MESSAGES,
     }),
     findBrandProfile({ workspaceId: input.workspaceId }),
+    listMarketingToolCallsForThread(input),
   ]);
 
   // Validated by the SDK rather than asserted into shape. These rows were
@@ -73,5 +78,7 @@ export async function loadChatThreadView(input: {
     totalCostCents: thread.totalCostCents,
     messages: validated.success ? validated.data : [],
     hasBrandProfile: profile !== null,
+    lastPosition: rows.at(-1)?.position ?? -1,
+    hasRunningWork: hasRunningMarketingWork(toolCalls),
   };
 }

@@ -3,6 +3,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
 import {
   marketingContentItems,
+  marketingContentMedia,
   marketingContentRevisions,
   type ContentPlatform,
   type MarketingContentKind,
@@ -44,6 +45,19 @@ export async function createMarketingContentItem(input: {
     runId: input.sourceRunId ?? null,
   });
   return item;
+}
+
+export async function attachMediaToMarketingContent(input: {
+  workspaceId: string;
+  contentItemId: string;
+  mediaAssetId: string;
+}): Promise<void> {
+  await getDatabase().insert(marketingContentMedia).values({
+    workspaceId: input.workspaceId,
+    contentItemId: input.contentItemId,
+    mediaAssetId: input.mediaAssetId,
+    position: 0,
+  });
 }
 
 export async function transitionMarketingContent(input: {

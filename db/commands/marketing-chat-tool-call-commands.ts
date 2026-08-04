@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
 import { marketingChatToolCalls } from "@/db/schema";
 
@@ -11,6 +11,7 @@ export async function beginMarketingToolCall(input: {
   skillKey: string;
   toolInput: Record<string, unknown>;
   estimatedCostCents: number;
+  status?: "pending" | "running";
 }) {
   const [row] = await getDatabase()
     .insert(marketingChatToolCalls)
@@ -21,7 +22,7 @@ export async function beginMarketingToolCall(input: {
       toolCallId: input.toolCallId,
       skillKey: input.skillKey,
       input: input.toolInput,
-      status: "running",
+      status: input.status ?? "running",
       estimatedCostCents: input.estimatedCostCents,
       startedAt: new Date(),
     })
@@ -41,6 +42,28 @@ export async function beginMarketingToolCall(input: {
     .limit(1);
   if (!existing) throw new Error("MARKETING_TOOL_CALL_NOT_CREATED");
   return existing;
+}
+
+export async function attachMarketingToolCallTriggerRun(input: {
+  workspaceId: string;
+  id: string;
+  triggerRunId: string;
+}): Promise<void> {
+  await getDatabase()
+    .update(marketingChatToolCalls)
+    .set({
+      triggerRunId: input.triggerRunId,
+      status: "running",
+      startedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(marketingChatToolCalls.id, input.id),
+        eq(marketingChatToolCalls.workspaceId, input.workspaceId),
+        eq(marketingChatToolCalls.status, "pending"),
+      ),
+    );
 }
 
 export async function attachMarketingToolCallRun(input: {
@@ -64,8 +87,8 @@ export async function completeMarketingToolCall(input: {
   id: string;
   output: Record<string, unknown>;
   actualCostCents: number;
-}): Promise<void> {
-  await getDatabase()
+}): Promise<boolean> {
+  const rows = await getDatabase()
     .update(marketingChatToolCalls)
     .set({
       status: "succeeded",
@@ -78,9 +101,11 @@ export async function completeMarketingToolCall(input: {
       and(
         eq(marketingChatToolCalls.id, input.id),
         eq(marketingChatToolCalls.workspaceId, input.workspaceId),
-        eq(marketingChatToolCalls.status, "running"),
+        inArray(marketingChatToolCalls.status, ["pending", "running"]),
       ),
-    );
+    )
+    .returning({ id: marketingChatToolCalls.id });
+  return rows.length === 1;
 }
 
 export async function failMarketingToolCall(input: {
@@ -89,8 +114,8 @@ export async function failMarketingToolCall(input: {
   category: string;
   message: string;
   actualCostCents: number;
-}): Promise<void> {
-  await getDatabase()
+}): Promise<boolean> {
+  const rows = await getDatabase()
     .update(marketingChatToolCalls)
     .set({
       status: "failed",
@@ -104,7 +129,9 @@ export async function failMarketingToolCall(input: {
       and(
         eq(marketingChatToolCalls.id, input.id),
         eq(marketingChatToolCalls.workspaceId, input.workspaceId),
-        eq(marketingChatToolCalls.status, "running"),
+        inArray(marketingChatToolCalls.status, ["pending", "running"]),
       ),
-    );
+    )
+    .returning({ id: marketingChatToolCalls.id });
+  return rows.length === 1;
 }

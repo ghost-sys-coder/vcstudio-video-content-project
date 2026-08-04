@@ -82,6 +82,7 @@ type InsertMessageInput = {
   promptVersion?: string;
   brandContextSnapshotId?: string | null;
   runId?: string | null;
+  costCents?: number;
 };
 
 /**
@@ -113,6 +114,7 @@ async function insertChatMessage(
       promptVersion: input.promptVersion ?? "",
       brandContextSnapshotId: input.brandContextSnapshotId ?? null,
       runId: input.runId ?? null,
+      costCents: input.costCents ?? 0,
     })
     .onConflictDoNothing()
     .returning();
@@ -189,6 +191,48 @@ export async function beginAssistantMessage(input: {
       status: "streaming",
     });
     if (inserted) return inserted;
+  }
+  throw new Error("MARKETING_CHAT_POSITION_CONTENTION");
+}
+
+/** Appends the durable result of a deferred skill after its Trigger task ends. */
+export async function appendDeferredToolResultMessage(input: {
+  workspaceId: string;
+  threadId: string;
+  runId: string;
+  part: MarketingChatMessagePart;
+  plainText: string;
+  costCents: number;
+}): Promise<void> {
+  for (let attempt = 0; attempt < POSITION_RETRY_LIMIT; attempt += 1) {
+    const inserted = await insertChatMessage({
+      workspaceId: input.workspaceId,
+      threadId: input.threadId,
+      role: "assistant",
+      parts: [input.part],
+      plainText: input.plainText,
+      status: "complete",
+      runId: input.runId,
+      costCents: input.costCents,
+    });
+    if (inserted) {
+      const now = new Date();
+      await getDatabase()
+        .update(marketingChatThreads)
+        .set({
+          lastMessageAt: now,
+          updatedAt: now,
+          messageCount: sql`(select count(*) from ${marketingChatMessages} where thread_id = ${input.threadId})`,
+          totalCostCents: sql`(select coalesce(sum(cost_cents), 0) from ${marketingChatMessages} where thread_id = ${input.threadId})`,
+        })
+        .where(
+          and(
+            eq(marketingChatThreads.id, input.threadId),
+            eq(marketingChatThreads.workspaceId, input.workspaceId),
+          ),
+        );
+      return;
+    }
   }
   throw new Error("MARKETING_CHAT_POSITION_CONTENTION");
 }

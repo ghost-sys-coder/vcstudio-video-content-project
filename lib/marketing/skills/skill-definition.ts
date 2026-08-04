@@ -21,8 +21,11 @@ export type MarketingSkillDefinition = {
   capability: WorkspaceCapability;
   inputSchema: z.ZodObject;
   inputFields: readonly SkillInputField[];
-  billing: { kind: "free" } | { kind: "text"; expectedOutputTokens: number };
-  execution: "inline";
+  billing:
+    | { kind: "free" }
+    | { kind: "text"; expectedOutputTokens: number }
+    | { kind: "image"; quality: "low" | "medium" | "high" };
+  execution: "inline" | "deferred";
   operation: MarketingOperation | null;
   rateLimitOperation: RateLimitedOperation | null;
   requiresBrandProfile: boolean;

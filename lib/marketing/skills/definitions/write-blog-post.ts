@@ -8,7 +8,7 @@ export const writeBlogPostSkill = {
   group: "Content",
   description: "Draft a useful, structured, on-brand blog article.",
   capability: "useMarketingChat",
-  execution: "inline",
+  execution: "deferred",
   operation: "blog_post",
   rateLimitOperation: "marketing_content_generation",
   requiresBrandProfile: true,

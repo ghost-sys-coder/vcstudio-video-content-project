@@ -124,3 +124,20 @@ export async function deleteMediaAssetObject(objectKey: string): Promise<void> {
     }),
   );
 }
+
+export async function putGeneratedMediaAsset(input: {
+  objectKey: string;
+  bytes: Uint8Array;
+  contentType: "image/png" | "image/jpeg" | "image/webp";
+}): Promise<void> {
+  const environment = getStorageEnvironment();
+  await getR2Client().send(
+    new PutObjectCommand({
+      Bucket: environment.R2_BUCKET_NAME,
+      Key: input.objectKey,
+      Body: input.bytes,
+      ContentLength: input.bytes.byteLength,
+      ContentType: input.contentType,
+    }),
+  );
+}

@@ -3,13 +3,14 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useRouter } from "next/navigation";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChatComposer } from "@/components/marketing/ChatComposer";
 import { ChatCostFooter } from "@/components/marketing/ChatCostFooter";
 import { ChatEmptyState } from "@/components/marketing/ChatEmptyState";
 import { ChatErrorState } from "@/components/marketing/ChatErrorState";
 import { ChatMessageList } from "@/components/marketing/ChatMessageList";
 import type { MarketingSkillCatalogueItem } from "@/lib/marketing/skills/skill-definition";
+import { useMarketingThreadEvents } from "@/hooks/useMarketingThreadEvents";
 
 /**
  * The chat surface.
@@ -35,6 +36,8 @@ export function ChatThreadView({
   messageCount,
   totalCostCents,
   catalogue,
+  initialLastPosition,
+  initialHasRunningWork,
 }: {
   workspaceId: string;
   threadId: string;
@@ -43,12 +46,15 @@ export function ChatThreadView({
   messageCount: number;
   totalCostCents: number;
   catalogue: MarketingSkillCatalogueItem[];
+  initialLastPosition: number;
+  initialHasRunningWork: boolean;
 }) {
   const router = useRouter();
   const [transportError, setTransportError] = useState<string | null>(null);
   const lastSendRef = useRef<{ text: string; requestNonce: string } | null>(
     null,
   );
+  const resumeEventsRef = useRef<() => void>(() => undefined);
 
   const transport = useMemo(
     () =>
@@ -78,7 +84,7 @@ export function ChatThreadView({
     [workspaceId, threadId],
   );
 
-  const { messages, sendMessage, status, stop, error } = useChat({
+  const { messages, setMessages, sendMessage, status, stop, error } = useChat({
     id: threadId,
     messages: initialMessages,
     transport,
@@ -89,8 +95,27 @@ export function ChatThreadView({
       // cheaper than mirroring the same arithmetic in the client and hoping the
       // two agree.
       router.refresh();
+      resumeEventsRef.current();
     },
   });
+
+  const events = useMarketingThreadEvents({
+    workspaceId,
+    threadId,
+    initialLastPosition,
+    initialHasRunningWork,
+    onMessages: (incoming) =>
+      setMessages((current) => {
+        const ids = new Set(current.map((message) => message.id));
+        return [
+          ...current,
+          ...incoming.filter((message) => !ids.has(message.id)),
+        ];
+      }),
+  });
+  useEffect(() => {
+    resumeEventsRef.current = events.resume;
+  }, [events.resume]);
 
   const streaming = status === "streaming" || status === "submitted";
 
@@ -155,6 +180,7 @@ export function ChatThreadView({
               },
             },
           );
+          events.resume();
         }}
         onSend={send}
         onStop={() => void stop()}

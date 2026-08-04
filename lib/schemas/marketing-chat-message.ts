@@ -58,11 +58,26 @@ export const marketingChatToolPartSchema = z.object({
   errorText: z.string().max(4_000).optional(),
 });
 
+export const marketingChatToolResultPartSchema = z.object({
+  type: z.literal("data-toolResult"),
+  data: z.object({
+    skillKey: z.string().min(1).max(100),
+    summary: z.string().min(1).max(4_000),
+    contentItemId: z.uuid().optional(),
+    mediaAssetId: z.uuid().optional(),
+    failed: z.boolean().optional(),
+  }),
+});
+export type MarketingChatToolResultData = z.infer<
+  typeof marketingChatToolResultPartSchema
+>["data"];
+
 export const marketingChatMessagePartSchema = z.union([
   marketingChatTextPartSchema,
   marketingChatReasoningPartSchema,
   marketingChatStepStartPartSchema,
   marketingChatToolPartSchema,
+  marketingChatToolResultPartSchema,
 ]);
 
 export const marketingChatMessagePartsSchema = z

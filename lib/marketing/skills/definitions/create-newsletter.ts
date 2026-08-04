@@ -8,7 +8,7 @@ export const createNewsletterSkill = {
   group: "Content",
   description: "Draft a complete branded newsletter edition.",
   capability: "useMarketingChat",
-  execution: "inline",
+  execution: "deferred",
   operation: "newsletter_draft",
   rateLimitOperation: "marketing_content_generation",
   requiresBrandProfile: true,

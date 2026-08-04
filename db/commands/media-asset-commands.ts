@@ -42,6 +42,40 @@ export async function createPendingMediaAsset(input: {
   return asset;
 }
 
+export async function createGeneratedMediaAsset(input: {
+  id: string;
+  workspaceId: string;
+  objectKey: string;
+  contentType: "image/png" | "image/jpeg" | "image/webp";
+  sizeBytes: number;
+  width: number;
+  height: number;
+  title: string;
+  altText: string;
+  createdByUserId: string;
+}): Promise<MediaAsset> {
+  const [asset] = await getDatabase()
+    .insert(mediaAssets)
+    .values({
+      id: input.id,
+      workspaceId: input.workspaceId,
+      kind: "image",
+      status: "ready",
+      objectKey: input.objectKey,
+      contentType: input.contentType,
+      sizeBytes: input.sizeBytes,
+      originalFileName: "generated-social-graphic",
+      title: input.title,
+      altText: input.altText,
+      width: input.width,
+      height: input.height,
+      uploadedByUserId: input.createdByUserId,
+    })
+    .returning();
+  if (!asset) throw new Error("GENERATED_MEDIA_ASSET_NOT_CREATED");
+  return asset;
+}
+
 /**
  * Promote a reserved row to `ready` using what storage actually reports.
  *

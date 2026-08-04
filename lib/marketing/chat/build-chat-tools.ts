@@ -2,6 +2,7 @@ import "server-only";
 import { tool, type ToolSet } from "ai";
 import { searchBrandKnowledge } from "@/lib/marketing/chat/search-brand-knowledge";
 import { executeInlineMarketingSkill } from "@/lib/marketing/skills/execute-inline-skill";
+import { executeDeferredMarketingSkill } from "@/lib/marketing/skills/execute-deferred-skill";
 import type {
   MarketingSkillDefinition,
   SkillExecutionContext,
@@ -30,7 +31,11 @@ export function buildChatTools(input: {
               query: String(parsed.query),
             });
           }
-          return executeInlineMarketingSkill({
+          const execute =
+            definition.execution === "deferred"
+              ? executeDeferredMarketingSkill
+              : executeInlineMarketingSkill;
+          return execute({
             definition,
             values: parsed,
             toolCallId: options.toolCallId,
