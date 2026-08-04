@@ -24,6 +24,13 @@ export type {
   IdeaGenerationPromptInput,
 } from "./idea-generation";
 export {
+  MARKETING_DOCUMENT_SUMMARY_EXCERPT_CHARACTERS,
+  MARKETING_DOCUMENT_SUMMARY_PROMPT_VERSION,
+  renderMarketingDocumentSummaryPrompt,
+  truncateForSummary,
+} from "./marketing-document-summary";
+export type { MarketingDocumentSummaryPromptInput } from "./marketing-document-summary";
+export {
   renderThumbnailPrompt,
   THUMBNAIL_PROMPT_TEMPLATE_KEY,
   THUMBNAIL_PROMPT_TEMPLATE_SOURCE,

@@ -3442,6 +3442,657 @@ export const workspaceBudgetSettings = pgTable(
   ],
 );
 
+/**
+ * How much the Marketing Studio is allowed to do without a human.
+ *
+ * `manual` generates only on request and publishes nothing by itself.
+ * `assisted` lets schedule rules generate and lets approved items publish
+ * themselves. `autonomous` additionally approves within caps. A schedule rule
+ * may sit below the workspace level but never above it, and setting this back
+ * to `manual` is the kill switch. See `docs/marketing/09-automation.md`.
+ */
+export const marketingAutonomyLevelEnum = pgEnum("marketing_autonomy_level", [
+  "manual",
+  "assisted",
+  "autonomous",
+]);
+
+export const marketingSettings = pgTable(
+  "marketing_settings",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    autonomyLevel: marketingAutonomyLevelEnum("autonomy_level")
+      .notNull()
+      .default("manual"),
+    requireApprovalBeforePublish: boolean("require_approval_before_publish")
+      .notNull()
+      .default(true),
+    defaultTimezone: text("default_timezone").notNull().default("UTC"),
+    defaultLanguage: text("default_language").notNull().default("English"),
+    brandedDefault: boolean("branded_default").notNull().default(true),
+    /** A ceiling inside the workspace budget, not a second budget. */
+    monthlyMarketingBudgetCents: integer("monthly_marketing_budget_cents"),
+    dailyMaxGeneratedItems: integer("daily_max_generated_items")
+      .notNull()
+      .default(10),
+    researchRefreshDays: integer("research_refresh_days").notNull().default(7),
+    updatedByUserId: uuid("updated_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("marketing_settings_workspace_unique").on(table.workspaceId),
+    check(
+      "marketing_settings_daily_items_positive",
+      sql`${table.dailyMaxGeneratedItems} > 0`,
+    ),
+    check(
+      "marketing_settings_research_refresh_positive",
+      sql`${table.researchRefreshDays} > 0`,
+    ),
+    check(
+      "marketing_settings_budget_nonnegative",
+      sql`${table.monthlyMarketingBudgetCents} is null or ${table.monthlyMarketingBudgetCents} >= 0`,
+    ),
+  ],
+);
+
+export const marketingOnboardingStatusEnum = pgEnum(
+  "marketing_onboarding_status",
+  ["not_started", "in_progress", "complete"],
+);
+
+/**
+ * The synthesised description of a business, one row per workspace.
+ *
+ * `contextVersion` is load-bearing rather than decorative: it is bumped by any
+ * change that would alter the compiled brand context, and every generation
+ * records which version it used. That is what keeps a past generation
+ * explainable after the profile has moved on.
+ */
+export const marketingBrandProfiles = pgTable(
+  "marketing_brand_profiles",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    businessName: text("business_name").notNull().default(""),
+    websiteUrl: text("website_url"),
+    oneLiner: text("one_liner").notNull().default(""),
+    longDescription: text("long_description").notNull().default(""),
+    industry: text("industry").notNull().default(""),
+    primaryLanguage: text("primary_language").notNull().default("English"),
+    timezone: text("timezone").notNull().default("UTC"),
+    brandVoiceSummary: text("brand_voice_summary").notNull().default(""),
+    toneAttributes: jsonb("tone_attributes")
+      .$type<string[]>()
+      .notNull()
+      .default([]),
+    writingRules: jsonb("writing_rules")
+      .$type<string[]>()
+      .notNull()
+      .default([]),
+    /** Never-use phrases. Reach the prompt as negative constraints. */
+    bannedPhrases: jsonb("banned_phrases")
+      .$type<string[]>()
+      .notNull()
+      .default([]),
+    valueProps: jsonb("value_props").$type<string[]>().notNull().default([]),
+    proofPoints: jsonb("proof_points").$type<string[]>().notNull().default([]),
+    complianceNotes: text("compliance_notes").notNull().default(""),
+    onboardingStatus: marketingOnboardingStatusEnum("onboarding_status")
+      .notNull()
+      .default("not_started"),
+    onboardingCompletedAt: timestamp("onboarding_completed_at", {
+      withTimezone: true,
+    }),
+    contextVersion: integer("context_version").notNull().default(1),
+    updatedByUserId: uuid("updated_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("marketing_brand_profiles_workspace_unique").on(
+      table.workspaceId,
+    ),
+    uniqueIndex("marketing_brand_profiles_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    check(
+      "marketing_brand_profiles_context_version_positive",
+      sql`${table.contextVersion} > 0`,
+    ),
+  ],
+);
+
+export const marketingBrandAudiences = pgTable(
+  "marketing_brand_audiences",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    brandProfileId: uuid("brand_profile_id")
+      .notNull()
+      .references(() => marketingBrandProfiles.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    painPoints: jsonb("pain_points").$type<string[]>().notNull().default([]),
+    geography: text("geography").notNull().default(""),
+    buyingTriggers: jsonb("buying_triggers")
+      .$type<string[]>()
+      .notNull()
+      .default([]),
+    isPrimary: boolean("is_primary").notNull().default(false),
+    position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("marketing_brand_audiences_profile_index").on(
+      table.workspaceId,
+      table.brandProfileId,
+      table.position,
+    ),
+    // Exactly one primary audience per profile, enforced by the database rather
+    // than by whichever code path happened to write last.
+    uniqueIndex("marketing_brand_audiences_primary_unique")
+      .on(table.brandProfileId)
+      .where(sql`${table.isPrimary}`),
+  ],
+);
+
+export const marketingBrandOffers = pgTable(
+  "marketing_brand_offers",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    brandProfileId: uuid("brand_profile_id")
+      .notNull()
+      .references(() => marketingBrandProfiles.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    summary: text("summary").notNull().default(""),
+    priceModel: text("price_model").notNull().default(""),
+    audienceId: uuid("audience_id").references(
+      () => marketingBrandAudiences.id,
+      { onDelete: "set null" },
+    ),
+    differentiators: jsonb("differentiators")
+      .$type<string[]>()
+      .notNull()
+      .default([]),
+    position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("marketing_brand_offers_profile_index").on(
+      table.workspaceId,
+      table.brandProfileId,
+      table.position,
+    ),
+  ],
+);
+
+export const marketingBrandChannels = pgTable(
+  "marketing_brand_channels",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    platform: contentPlatformEnum("platform").notNull(),
+    handle: text("handle").notNull().default(""),
+    cadencePerWeek: integer("cadence_per_week").notNull().default(0),
+    toneOverride: text("tone_override").notNull().default(""),
+    hashtagStrategy: text("hashtag_strategy").notNull().default(""),
+    isBrandedDefault: boolean("is_branded_default").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("marketing_brand_channels_workspace_platform_unique").on(
+      table.workspaceId,
+      table.platform,
+    ),
+    check(
+      "marketing_brand_channels_cadence_range",
+      sql`${table.cadencePerWeek} >= 0 and ${table.cadencePerWeek} <= 50`,
+    ),
+  ],
+);
+
+/**
+ * The raw onboarding answers, kept deliberately separate from the synthesised
+ * profile above.
+ *
+ * Re-synthesising a profile — after a prompt improvement, or after three more
+ * answers arrive — must never destroy what the user actually typed. The
+ * question catalogue itself is code (`lib/marketing/brand/onboarding-questions.ts`),
+ * so adding a question later cannot invalidate stored answers and removing one
+ * does not delete them.
+ */
+export const marketingOnboardingAnswers = pgTable(
+  "marketing_onboarding_answers",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    questionKey: text("question_key").notNull(),
+    answerText: text("answer_text").notNull().default(""),
+    answeredByUserId: uuid("answered_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("marketing_onboarding_answers_workspace_question_unique").on(
+      table.workspaceId,
+      table.questionKey,
+    ),
+  ],
+);
+
+export const marketingBrandAssetRoleEnum = pgEnum(
+  "marketing_brand_asset_role",
+  [
+    "logo_primary",
+    "logo_alt",
+    "logo_mark",
+    "wordmark",
+    "product_shot",
+    "team_photo",
+    "brand_pattern",
+    "font_specimen",
+    "screenshot",
+    "other",
+  ],
+);
+
+/**
+ * Gives an existing library asset a brand role.
+ *
+ * A join rather than a copy: the bytes already live in `media_assets`, and
+ * duplicating them would mean two places to keep in step and two places to
+ * delete from.
+ */
+export const marketingBrandAssets = pgTable(
+  "marketing_brand_assets",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    mediaAssetId: uuid("media_asset_id").notNull(),
+    role: marketingBrandAssetRoleEnum("role").notNull(),
+    notes: text("notes").notNull().default(""),
+    position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("marketing_brand_assets_workspace_asset_unique").on(
+      table.workspaceId,
+      table.mediaAssetId,
+    ),
+    // One primary logo per workspace. Every other role may repeat.
+    uniqueIndex("marketing_brand_assets_primary_logo_unique")
+      .on(table.workspaceId)
+      .where(sql`${table.role} = 'logo_primary'`),
+    index("marketing_brand_assets_role_index").on(
+      table.workspaceId,
+      table.role,
+      table.position,
+    ),
+    // Composite tenant FK: makes attaching another workspace's asset impossible
+    // in the database, not merely in the query layer. Uses the existing
+    // media_assets_id_workspace_unique index.
+    foreignKey({
+      columns: [table.mediaAssetId, table.workspaceId],
+      foreignColumns: [mediaAssets.id, mediaAssets.workspaceId],
+      name: "marketing_brand_assets_tenant_media_fkey",
+    }).onDelete("restrict"),
+  ],
+);
+
+export const marketingDocumentSourceEnum = pgEnum("marketing_document_source", [
+  "upload",
+  "pasted",
+  "url_capture",
+]);
+
+export const marketingDocumentStatusEnum = pgEnum("marketing_document_status", [
+  "pending",
+  "extracting",
+  "ready",
+  "failed",
+]);
+
+/**
+ * Written material the studio treats as fact about the business.
+ *
+ * Deliberately **not** a `media_assets` kind. Eight call sites branch on
+ * `image | video`, and a document reachable from the post composer's media
+ * picker is a bug waiting to happen — documents are never attached to a post.
+ * Its own table and its own storage prefix keep the two apart.
+ *
+ * `checksum` is the sha256 of the extracted text and is what makes
+ * summarisation idempotent: unchanged text skips the model call entirely.
+ */
+export const marketingKnowledgeDocuments = pgTable(
+  "marketing_knowledge_documents",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    sourceKind: marketingDocumentSourceEnum("source_kind")
+      .notNull()
+      .default("upload"),
+    sourceUrl: text("source_url"),
+    /** Null for pasted text, which has no stored object. */
+    objectKey: text("object_key"),
+    contentType: text("content_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull().default(0),
+    originalFileName: text("original_file_name").notNull().default(""),
+    status: marketingDocumentStatusEnum("status").notNull().default("pending"),
+    extractedText: text("extracted_text").notNull().default(""),
+    extractedCharacterCount: integer("extracted_character_count")
+      .notNull()
+      .default(0),
+    tokenEstimate: integer("token_estimate").notNull().default(0),
+    /** Written by the summariser in a later slice; empty until then. */
+    summary: text("summary").notNull().default(""),
+    keyFacts: jsonb("key_facts").$type<string[]>().notNull().default([]),
+    checksum: text("checksum").notNull().default(""),
+    includeInContext: boolean("include_in_context").notNull().default(true),
+    priority: integer("priority").notNull().default(0),
+    errorCategory: text("error_category"),
+    safeErrorMessage: text("safe_error_message"),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("marketing_knowledge_documents_object_key_unique")
+      .on(table.objectKey)
+      .where(sql`${table.objectKey} is not null`),
+    index("marketing_knowledge_documents_status_index").on(
+      table.workspaceId,
+      table.status,
+    ),
+    index("marketing_knowledge_documents_context_index").on(
+      table.workspaceId,
+      table.includeInContext,
+      table.priority,
+      table.createdAt,
+    ),
+    check(
+      "marketing_knowledge_documents_size_nonnegative",
+      sql`${table.sizeBytes} >= 0`,
+    ),
+    // A stored document must name its object; pasted text must not.
+    check(
+      "marketing_knowledge_documents_source_object",
+      sql`(${table.sourceKind} = 'pasted') = (${table.objectKey} is null)`,
+    ),
+  ],
+);
+
+export const marketingOperationEnum = pgEnum("marketing_operation", [
+  "chat_turn",
+  "content_draft",
+  "ad_creative_copy",
+  "blog_post",
+  "email_draft",
+  "newsletter_draft",
+  "campaign_plan",
+  "media_story",
+  "document_summary",
+  "competitor_analysis",
+  "trend_scan",
+  "image_generation",
+]);
+
+export const marketingRunStatusEnum = pgEnum("marketing_run_status", [
+  "pending",
+  "queued",
+  "running",
+  "succeeded",
+  "failed",
+  "cancelled",
+]);
+
+export const marketingReservationStatusEnum = pgEnum(
+  "marketing_reservation_status",
+  ["pending", "reconciled", "released"],
+);
+
+/**
+ * One row per billable marketing operation.
+ *
+ * Every marketing spend has a run; nothing may call a provider without one. The
+ * `finalPrompt` and `requestFingerprint` pair is what the Trigger preflight
+ * re-verifies, so a prompt edited between reservation and execution is caught
+ * rather than silently paid for.
+ */
+export const marketingGenerationRuns = pgTable(
+  "marketing_generation_runs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    operation: marketingOperationEnum("operation").notNull(),
+    status: marketingRunStatusEnum("status").notNull().default("pending"),
+    /** Free-form pointer to whatever the run is about; no FK, by design. */
+    subjectKind: text("subject_kind").notNull().default(""),
+    subjectId: uuid("subject_id"),
+    requestedByUserId: uuid("requested_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    model: text("model").notNull().default(""),
+    promptVersion: text("prompt_version").notNull().default(""),
+    finalPrompt: text("final_prompt").notNull().default(""),
+    requestFingerprint: text("request_fingerprint").notNull().default(""),
+    idempotencyKey: text("idempotency_key").notNull(),
+    estimatedCostCents: integer("estimated_cost_cents").notNull(),
+    actualCostCents: integer("actual_cost_cents"),
+    inputTokens: integer("input_tokens").notNull().default(0),
+    outputTokens: integer("output_tokens").notNull().default(0),
+    providerRequestId: text("provider_request_id"),
+    triggerRunId: text("trigger_run_id"),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    errorCategory: text("error_category"),
+    safeErrorMessage: text("safe_error_message"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("marketing_generation_runs_idempotency_unique").on(
+      table.idempotencyKey,
+    ),
+    uniqueIndex("marketing_generation_runs_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    index("marketing_generation_runs_workspace_created_index").on(
+      table.workspaceId,
+      table.createdAt,
+    ),
+    index("marketing_generation_runs_status_index").on(
+      table.status,
+      table.createdAt,
+    ),
+    check(
+      "marketing_generation_runs_cost_nonnegative",
+      sql`${table.estimatedCostCents} >= 0 and (${table.actualCostCents} is null or ${table.actualCostCents} >= 0)`,
+    ),
+  ],
+);
+
+/**
+ * The marketing money ledger.
+ *
+ * Deliberately **not** `usage_reservations`. That table's `project_id` is NOT
+ * NULL and marketing work belongs to no project; more importantly its
+ * `single_operation` CHECK is a seven-branch OR that has broken twice under
+ * `drizzle-kit push`, each time producing a silent constraint violation that
+ * rolled back an entire reservation. This table has one non-null FK to one
+ * table, the polymorphism lives in an enum column, and the unique index is a
+ * plain total one — there is no multi-column predicate for a schema differ to
+ * serialise wrongly.
+ *
+ * The workspace budget is still **one budget**: `lib/budgets/committed-spend.ts`
+ * sums both ledgers. Without that, the video pipeline and the marketing studio
+ * each observe the full daily allowance and together spend double it.
+ */
+export const marketingUsageReservations = pgTable(
+  "marketing_usage_reservations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    runId: uuid("run_id").notNull(),
+    operation: marketingOperationEnum("operation").notNull(),
+    status: marketingReservationStatusEnum("status")
+      .notNull()
+      .default("pending"),
+    reservedCostCents: integer("reserved_cost_cents").notNull(),
+    actualCostCents: integer("actual_cost_cents"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("marketing_usage_reservations_run_unique").on(table.runId),
+    uniqueIndex("marketing_usage_reservations_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    // The committed-spend query's index: workspace + window + status.
+    index("marketing_usage_reservations_committed_index").on(
+      table.workspaceId,
+      table.createdAt,
+      table.status,
+    ),
+    index("marketing_usage_reservations_expiry_index").on(
+      table.status,
+      table.expiresAt,
+    ),
+    check(
+      "marketing_usage_reservations_cost_nonnegative",
+      sql`${table.reservedCostCents} >= 0 and (${table.actualCostCents} is null or ${table.actualCostCents} >= 0)`,
+    ),
+    foreignKey({
+      columns: [table.runId, table.workspaceId],
+      foreignColumns: [
+        marketingGenerationRuns.id,
+        marketingGenerationRuns.workspaceId,
+      ],
+      name: "marketing_usage_reservations_tenant_run_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
+export const marketingUsageEvents = pgTable(
+  "marketing_usage_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    reservationId: uuid("reservation_id").notNull(),
+    operation: marketingOperationEnum("operation").notNull(),
+    eventType: text("event_type").notNull(),
+    estimatedCostCents: integer("estimated_cost_cents").notNull().default(0),
+    actualCostCents: integer("actual_cost_cents").notNull().default(0),
+    safeMetadata: jsonb("safe_metadata")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    // One event per kind per reservation makes the ledger append-only in
+    // practice: a replayed reconcile cannot double-count.
+    uniqueIndex("marketing_usage_events_reservation_type_unique").on(
+      table.reservationId,
+      table.eventType,
+    ),
+    foreignKey({
+      columns: [table.reservationId, table.workspaceId],
+      foreignColumns: [
+        marketingUsageReservations.id,
+        marketingUsageReservations.workspaceId,
+      ],
+      name: "marketing_usage_events_tenant_reservation_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
 export const auditLogEvents = pgTable(
   "audit_log_events",
   {
@@ -3680,6 +4331,38 @@ export type VideoRender = typeof videoRenders.$inferSelect;
 export type RenderStatus = (typeof renderStatusEnum.enumValues)[number];
 export type WorkspaceBudgetSettings =
   typeof workspaceBudgetSettings.$inferSelect;
+export type MarketingSettings = typeof marketingSettings.$inferSelect;
+export type MarketingAutonomyLevel =
+  (typeof marketingAutonomyLevelEnum.enumValues)[number];
+export type MarketingBrandProfile = typeof marketingBrandProfiles.$inferSelect;
+export type MarketingOnboardingStatus =
+  (typeof marketingOnboardingStatusEnum.enumValues)[number];
+export type MarketingBrandAudience =
+  typeof marketingBrandAudiences.$inferSelect;
+export type MarketingBrandOffer = typeof marketingBrandOffers.$inferSelect;
+export type MarketingBrandChannel = typeof marketingBrandChannels.$inferSelect;
+export type MarketingOnboardingAnswer =
+  typeof marketingOnboardingAnswers.$inferSelect;
+export type MarketingBrandAsset = typeof marketingBrandAssets.$inferSelect;
+export type MarketingBrandAssetRole =
+  (typeof marketingBrandAssetRoleEnum.enumValues)[number];
+export type MarketingKnowledgeDocument =
+  typeof marketingKnowledgeDocuments.$inferSelect;
+export type MarketingDocumentStatus =
+  (typeof marketingDocumentStatusEnum.enumValues)[number];
+export type MarketingDocumentSource =
+  (typeof marketingDocumentSourceEnum.enumValues)[number];
+export type MarketingOperation =
+  (typeof marketingOperationEnum.enumValues)[number];
+export type MarketingRunStatus =
+  (typeof marketingRunStatusEnum.enumValues)[number];
+export type MarketingReservationStatus =
+  (typeof marketingReservationStatusEnum.enumValues)[number];
+export type MarketingGenerationRun =
+  typeof marketingGenerationRuns.$inferSelect;
+export type MarketingUsageReservation =
+  typeof marketingUsageReservations.$inferSelect;
+export type MarketingUsageEvent = typeof marketingUsageEvents.$inferSelect;
 export type AuditLogEvent = typeof auditLogEvents.$inferSelect;
 export type AuditAction = (typeof auditActionEnum.enumValues)[number];
 export type RateLimitCounter = typeof rateLimitCounters.$inferSelect;

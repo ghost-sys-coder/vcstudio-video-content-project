@@ -630,6 +630,40 @@ export const publishingEnvironmentSchema = z.object({
 });
 
 /**
+ * Marketing Studio. Read in both runtimes: the web app gates routes and the
+ * worker gates its scheduled sweeps, and a flag honoured in only one of them is
+ * not a flag.
+ *
+ * Slice 0 defines the flag alone. The generation, research, and scheduling
+ * variables in `docs/marketing/07-cost-governance.md` land with the slices that
+ * first read them, so an unset variable never sits in the schema pretending a
+ * feature exists.
+ */
+export const marketingEnvironmentSchema = z.object({
+  ENABLE_MARKETING_STUDIO: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
+  /**
+   * The corpus ceiling. Also the documented threshold at which a vector store
+   * stops being over-engineering — see docs/marketing/02-brand-grounding.md.
+   */
+  MARKETING_MAX_DOCUMENTS: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(2000)
+    .default(200),
+  /** 2 MB of plain text is roughly 500k tokens — far past any context budget. */
+  MARKETING_MAX_DOCUMENT_BYTES: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(20_971_520)
+    .default(2_097_152),
+});
+
+/**
  * OAuth values only the **web runtime** needs: the Trigger.dev worker never
  * mints or verifies an authorization `state`, and never builds a redirect URI.
  * Kept separate so the state-signing secret is not shipped to a second runtime
@@ -689,6 +723,16 @@ export const usageEnvironmentSchema = z.object({
     .min(1)
     .max(1000)
     .default(10),
+  /**
+   * Marketing chat gets its own ceiling. A conversation is chatty by nature, so
+   * sharing the generation limit would make ordinary use look like abuse.
+   */
+  RATE_LIMIT_MARKETING_CHAT_PER_WINDOW: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(1000)
+    .default(20),
 });
 
 export type ServerEnvironment = z.infer<typeof serverEnvironmentSchema>;
@@ -709,6 +753,7 @@ export type SceneAnalysisEnvironment = z.infer<
   typeof sceneAnalysisEnvironmentSchema
 >;
 export type SceneImageEnvironment = z.infer<typeof sceneImageEnvironmentSchema>;
+export type MarketingEnvironment = z.infer<typeof marketingEnvironmentSchema>;
 export type PublishingEnvironment = z.infer<typeof publishingEnvironmentSchema>;
 export type PublishingWebEnvironment = z.infer<
   typeof publishingWebEnvironmentSchema

@@ -37,6 +37,27 @@ export class BudgetExceededError extends Error {
   }
 }
 
+export type MarketingBudgetLimitScope =
+  | "workspace_daily"
+  | "workspace_monthly"
+  | "marketing_monthly"
+  | "schedule_rule";
+
+/**
+ * Separate from `BudgetExceededError` because the marketing path can hit two
+ * limits the project pipeline has no concept of — the marketing sub-cap and a
+ * single schedule rule's cap — and the UI has to say which, or the user is left
+ * guessing why an action they can afford was refused.
+ */
+export class MarketingBudgetExceededError extends Error {
+  readonly code = "MARKETING_BUDGET_EXCEEDED";
+
+  constructor(readonly scope: MarketingBudgetLimitScope) {
+    super(`The ${scope.replaceAll("_", " ")} budget would be exceeded.`);
+    this.name = "MarketingBudgetExceededError";
+  }
+}
+
 export class RateLimitExceededError extends Error {
   readonly code = "RATE_LIMIT_EXCEEDED";
 

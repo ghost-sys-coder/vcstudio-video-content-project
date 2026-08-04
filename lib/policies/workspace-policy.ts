@@ -25,6 +25,12 @@ const workspaceCapabilities = {
     manageMediaLibrary: true,
     composePosts: true,
     publishPosts: true,
+    useMarketingChat: true,
+    manageBrandProfile: true,
+    approveMarketingContent: true,
+    runMarketingResearch: true,
+    manageMarketingSchedules: true,
+    manageMarketingSkills: true,
   },
   editor: {
     editWorkspace: true,
@@ -52,6 +58,15 @@ const workspaceCapabilities = {
     manageMediaLibrary: true,
     composePosts: true,
     publishPosts: true,
+    useMarketingChat: true,
+    manageBrandProfile: true,
+    approveMarketingContent: true,
+    runMarketingResearch: true,
+    // Owner-only for one shared reason: both let somebody who is not present
+    // cause spending. A schedule rule generates on a timer, and a user-authored
+    // skill is prompt text that a later run will execute.
+    manageMarketingSchedules: false,
+    manageMarketingSkills: false,
   },
   viewer: {
     editWorkspace: false,
@@ -76,6 +91,12 @@ const workspaceCapabilities = {
     manageMediaLibrary: false,
     composePosts: false,
     publishPosts: false,
+    useMarketingChat: false,
+    manageBrandProfile: false,
+    approveMarketingContent: false,
+    runMarketingResearch: false,
+    manageMarketingSchedules: false,
+    manageMarketingSkills: false,
   },
 } as const satisfies Record<WorkspaceRole, Record<string, boolean>>;
 

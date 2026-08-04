@@ -74,7 +74,7 @@ export function SocialNavigationGroup() {
               >
                 <Megaphone />
                 <span>Publishing</span>
-                <ChevronRight className="ml-auto transition-transform duration-200 group-data-[panel-open]/collapsible:rotate-90 data-[panel-open]:rotate-90" />
+                <ChevronRight className="ml-auto transition-transform duration-200 group-data-panel-open/collapsible:rotate-90 data-panel-open:rotate-90" />
               </CollapsibleTrigger>
               <CollapsiblePanel>
                 <SidebarMenuSub>

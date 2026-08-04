@@ -14,6 +14,7 @@ import type { WorkspaceMembershipView } from "@/db/repositories/workspaces.repos
 import type { UserThemePreference } from "@/db/schema";
 import { getUserInitials } from "@/lib/users/user-initials";
 import { LogoutConfirmDialog } from "@/components/application/LogoutConfirmDialog";
+import { MarketingNavigationGroup } from "@/components/application/MarketingNavigationGroup";
 import { SocialNavigationGroup } from "@/components/application/SocialNavigationGroup";
 import { ThemeSwitcher } from "@/components/application/ThemeSwitcher";
 import { WorkspaceLogoImage } from "@/components/application/WorkspaceLogoImage";
@@ -37,6 +38,7 @@ export function ApplicationSidebar({
   canComposePosts,
   canManageSettings,
   canManageUsage,
+  canUseMarketingStudio,
   initialTheme,
   logoUrl,
   memberships,
@@ -47,6 +49,7 @@ export function ApplicationSidebar({
   canComposePosts: boolean;
   canManageSettings: boolean;
   canManageUsage: boolean;
+  canUseMarketingStudio: boolean;
   initialTheme: UserThemePreference;
   logoUrl: string | null;
   memberships: WorkspaceMembershipView[];
@@ -161,6 +164,7 @@ export function ApplicationSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
         {canComposePosts ? <SocialNavigationGroup /> : null}
+        {canUseMarketingStudio ? <MarketingNavigationGroup /> : null}
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>

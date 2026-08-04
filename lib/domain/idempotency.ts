@@ -262,6 +262,36 @@ export function createVideoRenderIdempotencyKey(input: {
   return hash(input.secret, elements);
 }
 
+/**
+ * One key per marketing operation on one subject.
+ *
+ * `subjectFingerprint` is the load-bearing element and its meaning is chosen per
+ * operation: for a document summary it is the checksum of the extracted text, so
+ * re-uploading identical text costs nothing while genuinely edited text is a new
+ * operation. Operations that a user may legitimately repeat on unchanged input —
+ * asking for a second draft of the same brief — pass a nonce instead, the same
+ * way script and title generation already do.
+ */
+export function createMarketingOperationIdempotencyKey(input: {
+  secret: string;
+  workspaceId: string;
+  operation: string;
+  subjectId: string;
+  subjectFingerprint: string;
+  model: string;
+  promptVersion: string;
+}): string {
+  return hash(input.secret, [
+    input.workspaceId,
+    "marketing",
+    input.operation,
+    input.subjectId,
+    input.subjectFingerprint,
+    input.model,
+    input.promptVersion,
+  ]);
+}
+
 export function createRequestFingerprint(
   secret: string,
   prompt: string,

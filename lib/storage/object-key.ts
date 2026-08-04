@@ -9,6 +9,10 @@ import {
   MEDIA_FILE_EXTENSION_BY_CONTENT_TYPE,
   type MediaContentType,
 } from "@/lib/schemas/media-asset";
+import {
+  MARKETING_DOCUMENT_EXTENSIONS,
+  type MarketingDocumentContentType,
+} from "@/lib/schemas/marketing-document";
 
 const extensionByContentType = {
   "image/jpeg": "jpg",
@@ -82,6 +86,38 @@ export function isMediaLibraryObjectKey(input: {
 }): boolean {
   return (
     input.objectKey === createMediaLibraryObjectKey(input) &&
+    !input.objectKey.includes("..")
+  );
+}
+
+/**
+ * Object key for a Marketing Studio knowledge document.
+ *
+ * Derived from the document's own UUID and its allow-listed content type — no
+ * part of the uploaded file name reaches the key, so a crafted name can neither
+ * traverse nor collide.
+ *
+ * Deliberately outside `createProjectAssetPrefix` **and** outside the media
+ * library prefix: brand knowledge outlives any project, and it is not library
+ * media that a post could attach.
+ */
+export function createMarketingDocumentObjectKey(input: {
+  workspaceId: string;
+  documentId: string;
+  contentType: MarketingDocumentContentType;
+}): string {
+  const extension = MARKETING_DOCUMENT_EXTENSIONS[input.contentType];
+  return `workspaces/${input.workspaceId}/marketing/documents/${input.documentId}.${extension}`;
+}
+
+export function isMarketingDocumentObjectKey(input: {
+  workspaceId: string;
+  documentId: string;
+  contentType: MarketingDocumentContentType;
+  objectKey: string;
+}): boolean {
+  return (
+    input.objectKey === createMarketingDocumentObjectKey(input) &&
     !input.objectKey.includes("..")
   );
 }

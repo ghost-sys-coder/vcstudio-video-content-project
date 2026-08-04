@@ -2,6 +2,7 @@ import { AuditLogFilters } from "@/components/usage/AuditLogFilters";
 import { AuditLogTable } from "@/components/usage/AuditLogTable";
 import { BudgetProgress } from "@/components/usage/BudgetProgress";
 import { BudgetSettingsForm } from "@/components/usage/BudgetSettingsForm";
+import { MarketingUsageSection } from "@/components/usage/MarketingUsageSection";
 import { OperationalLimitsForm } from "@/components/usage/OperationalLimitsForm";
 import { UsageByOperationChart } from "@/components/usage/UsageByOperationChart";
 import { UsageByProjectTable } from "@/components/usage/UsageByProjectTable";
@@ -20,7 +21,7 @@ export function UsageDashboard({
   ledgerNav: { prevHref: string | null; nextHref: string | null };
   auditNav: { prevHref: string | null; nextHref: string | null };
 }) {
-  const { summary, settings, limitDefaults, ledger, audit } = view;
+  const { summary, settings, limitDefaults, ledger, audit, marketing } = view;
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-8">
@@ -53,6 +54,8 @@ export function UsageDashboard({
       </div>
 
       <UsageByProjectTable rows={summary.byProject} />
+
+      {marketing && <MarketingUsageSection view={marketing} />}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <BudgetSettingsForm

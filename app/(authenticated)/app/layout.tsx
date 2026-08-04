@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { findWorkspaceLogo } from "@/db/repositories/storage-objects.repository";
 import { ApplicationShell } from "@/components/application/ApplicationShell";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
+import { getMarketingEnvironment } from "@/lib/env/server";
 import { can, canManageWorkspace } from "@/lib/policies/workspace-policy";
 import { createWorkspaceLogoDownloadUrl } from "@/lib/storage/workspace-logo-storage";
 import { THEME_COOKIE } from "@/lib/theme/theme-cookie";
@@ -42,6 +43,10 @@ export default async function AppLayout({
       canComposePosts={can(context.activeMembership.role, "composePosts")}
       canManageSettings={canManageWorkspace(context.activeMembership.role)}
       canManageUsage={can(context.activeMembership.role, "manageUsage")}
+      canUseMarketingStudio={
+        getMarketingEnvironment().ENABLE_MARKETING_STUDIO &&
+        can(context.activeMembership.role, "useMarketingChat")
+      }
       defaultSidebarOpen={cookieStore.get("sidebar_state")?.value !== "false"}
       initialTheme={cookieTheme}
       logoUrl={logoUrl}

@@ -15,6 +15,11 @@ import {
 } from "@/lib/budgets/current-settings";
 import type { BudgetSettingsInput } from "@/lib/budgets/budget-settings";
 import type { AuditAction } from "@/lib/audit/audit-actions";
+import { getMarketingEnvironment } from "@/lib/env/server";
+import {
+  loadMarketingUsageView,
+  type MarketingUsageView,
+} from "@/lib/usage/marketing-usage-view";
 import type { UsageLedgerEntry } from "@/lib/usage/usage-ledger";
 
 export const USAGE_LEDGER_PAGE_SIZE = 20;
@@ -37,6 +42,8 @@ export type UsageDashboardView = {
     total: number;
     action: AuditAction | null;
   };
+  /** Null when the Marketing Studio is disabled for this deployment. */
+  marketing: MarketingUsageView | null;
 };
 
 /**
@@ -57,7 +64,9 @@ export async function loadUsageDashboard(input: {
   const auditPage = Math.max(1, Math.trunc(input.auditPage ?? 1));
   const auditAction = input.auditAction ?? null;
 
-  const [summary, settings, ledger, audit] = await Promise.all([
+  const marketingEnabled = getMarketingEnvironment().ENABLE_MARKETING_STUDIO;
+
+  const [summary, settings, ledger, audit, marketing] = await Promise.all([
     getWorkspaceUsageSummary({
       workspaceId: input.workspaceId,
       now: input.now,
@@ -74,6 +83,12 @@ export async function loadUsageDashboard(input: {
       pageSize: USAGE_AUDIT_PAGE_SIZE,
       action: auditAction,
     }),
+    marketingEnabled
+      ? loadMarketingUsageView({
+          workspaceId: input.workspaceId,
+          now: input.now,
+        })
+      : Promise.resolve(null),
   ]);
 
   return {
@@ -93,5 +108,6 @@ export async function loadUsageDashboard(input: {
       total: audit.total,
       action: auditAction,
     },
+    marketing,
   };
 }

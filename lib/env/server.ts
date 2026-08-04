@@ -14,6 +14,7 @@ import {
   sceneMediaUploadEnvironmentSchema,
   mediaLibraryEnvironmentSchema,
   usageEnvironmentSchema,
+  marketingEnvironmentSchema,
   publishingEnvironmentSchema,
   publishingWebEnvironmentSchema,
   type ClerkWebhookEnvironment,
@@ -29,6 +30,7 @@ import {
   type SceneMediaUploadEnvironment,
   type MediaLibraryEnvironment,
   type UsageEnvironment,
+  type MarketingEnvironment,
   type PublishingEnvironment,
   type PublishingWebEnvironment,
 } from "@/lib/env/server-schema";
@@ -46,8 +48,14 @@ let characterEnvironment: CharacterEnvironment | null = null;
 let sceneMediaUploadEnvironment: SceneMediaUploadEnvironment | null = null;
 let mediaLibraryEnvironment: MediaLibraryEnvironment | null = null;
 let usageEnvironment: UsageEnvironment | null = null;
+let marketingEnvironment: MarketingEnvironment | null = null;
 let publishingEnvironment: PublishingEnvironment | null = null;
 let publishingWebEnvironment: PublishingWebEnvironment | null = null;
+
+export function getMarketingEnvironment(): MarketingEnvironment {
+  marketingEnvironment ??= marketingEnvironmentSchema.parse(process.env);
+  return marketingEnvironment;
+}
 
 export function getPublishingEnvironment(): PublishingEnvironment {
   publishingEnvironment ??= publishingEnvironmentSchema.parse(process.env);

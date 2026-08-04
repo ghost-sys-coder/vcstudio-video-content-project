@@ -83,4 +83,35 @@ describe("workspace policy", () => {
     expect(canEditProject("editor")).toBe(true);
     expect(canDeleteProject("editor")).toBe(false);
   });
+
+  it("gates day-to-day marketing work to owners and editors", () => {
+    for (const capability of [
+      "useMarketingChat",
+      "manageBrandProfile",
+      "approveMarketingContent",
+      "runMarketingResearch",
+    ] as const) {
+      expect(can("owner", capability)).toBe(true);
+      expect(can("editor", capability)).toBe(true);
+      expect(can("viewer", capability)).toBe(false);
+    }
+  });
+
+  it("gates unattended spending to owners only", () => {
+    // Both let somebody who is not present cause spending: a schedule rule
+    // generates on a timer, and a user-authored skill is prompt text that a
+    // later run executes.
+    for (const capability of [
+      "manageMarketingSchedules",
+      "manageMarketingSkills",
+    ] as const) {
+      expect(can("owner", capability)).toBe(true);
+      expect(can("editor", capability)).toBe(false);
+      expect(can("viewer", capability)).toBe(false);
+      for (const role of ["editor", "viewer"] as const)
+        expect(() => requireCapability(role, capability)).toThrow(
+          WorkspacePermissionDeniedError,
+        );
+    }
+  });
 });

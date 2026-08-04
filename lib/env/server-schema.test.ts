@@ -79,6 +79,10 @@ describe("usage environment validation", () => {
       RATE_LIMIT_WINDOW_SECONDS: 60,
       RATE_LIMIT_GENERATIONS_PER_WINDOW: 30,
       RATE_LIMIT_RENDERS_PER_WINDOW: 10,
+      // Marketing chat gets its own ceiling: a conversation is chatty by
+      // nature, and sharing the generation limit would read ordinary use as
+      // abuse.
+      RATE_LIMIT_MARKETING_CHAT_PER_WINDOW: 20,
     });
   });
 
