@@ -3899,6 +3899,67 @@ export const marketingKnowledgeDocuments = pgTable(
   ],
 );
 
+/**
+ * A frozen copy of the brand context block, addressed by its fingerprint.
+ *
+ * Immutable by convention: a snapshot is never edited, only superseded. This is
+ * what makes a past generation explainable after the brand has moved on — every
+ * run and every assistant message stores the snapshot id it was grounded on, so
+ * "why did it say that?" is answerable months later against the exact text the
+ * model actually saw, not against today's profile.
+ *
+ * `sourceFingerprint` is unique per workspace, which is the whole mechanism:
+ * recompiling after an unrelated touch produces the same fingerprint and
+ * therefore no new row, so snapshots accumulate only when the business's
+ * description of itself genuinely changed.
+ */
+export const marketingBrandContextSnapshots = pgTable(
+  "marketing_brand_context_snapshots",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    /** sha256 over every contributing field; identical inputs reuse the row. */
+    sourceFingerprint: text("source_fingerprint").notNull(),
+    promptVersion: text("prompt_version").notNull(),
+    contextVersion: integer("context_version").notNull().default(1),
+    compiledText: text("compiled_text").notNull(),
+    tokenEstimate: integer("token_estimate").notNull().default(0),
+    includedDocumentIds: jsonb("included_document_ids")
+      .$type<string[]>()
+      .notNull()
+      .default([]),
+    omittedDocumentCount: integer("omitted_document_count")
+      .notNull()
+      .default(0),
+    truncated: boolean("truncated").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    // Per workspace, not global: two workspaces with identical brand text must
+    // still own separate snapshots, or one could read the other's context.
+    uniqueIndex("marketing_brand_context_snapshots_fingerprint_unique").on(
+      table.workspaceId,
+      table.sourceFingerprint,
+    ),
+    uniqueIndex("marketing_brand_context_snapshots_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    index("marketing_brand_context_snapshots_recent_index").on(
+      table.workspaceId,
+      table.createdAt,
+    ),
+    check(
+      "marketing_brand_context_snapshots_counts_nonnegative",
+      sql`${table.tokenEstimate} >= 0 and ${table.omittedDocumentCount} >= 0`,
+    ),
+  ],
+);
+
 export const marketingOperationEnum = pgEnum("marketing_operation", [
   "chat_turn",
   "content_draft",
@@ -4363,6 +4424,8 @@ export type MarketingDocumentStatus =
   (typeof marketingDocumentStatusEnum.enumValues)[number];
 export type MarketingDocumentSource =
   (typeof marketingDocumentSourceEnum.enumValues)[number];
+export type MarketingBrandContextSnapshot =
+  typeof marketingBrandContextSnapshots.$inferSelect;
 export type MarketingOperation =
   (typeof marketingOperationEnum.enumValues)[number];
 export type MarketingRunStatus =

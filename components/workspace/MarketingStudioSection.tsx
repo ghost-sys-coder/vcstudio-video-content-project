@@ -62,10 +62,20 @@ export function MarketingStudioSection({
           role="switch"
           type="button"
         >
+          {/*
+            The knob takes the *foreground* token of whichever track it sits on,
+            rather than a fixed `bg-background`. A background-coloured knob is
+            nearly invisible on the off-state track — `--background` and
+            `--muted` differ by 0.03 lightness in the light theme and about 0.1
+            in dark and dim — whereas each `-foreground` token is defined to
+            contrast with its own surface in every theme, `.dim` included.
+          */}
           <span
             aria-hidden
-            className={`pointer-events-none inline-block size-4 rounded-full bg-background shadow transition-transform ${
-              enabled ? "translate-x-6" : "translate-x-1"
+            className={`pointer-events-none inline-block size-4 rounded-full shadow transition-transform ${
+              enabled
+                ? "translate-x-6 bg-primary-foreground"
+                : "translate-x-1 bg-muted-foreground"
             }`}
           />
         </button>

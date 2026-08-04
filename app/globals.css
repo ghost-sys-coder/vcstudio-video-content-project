@@ -59,6 +59,19 @@
 }
 
 :root {
+  /**
+   * Tells the browser which palette to paint UA-rendered chrome with.
+   *
+   * Load-bearing, and its absence was a real bug: a native `<select>`'s option
+   * list is drawn by the operating system, not by our CSS, so without this it
+   * defaults to light. On a dark page that produced a white popup whose options
+   * were unreadable — the closed control was styled by us and looked correct,
+   * which is why it read as "the options are invisible" rather than as an
+   * unstyled widget. Twenty components use a native `<select>`; one declaration
+   * per theme fixes all of them, and scrollbars, date pickers, spinners and
+   * autofill backgrounds along with them.
+   */
+  color-scheme: light;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -116,6 +129,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
@@ -160,69 +174,81 @@
 }
 
 /**
- * A third theme between light and dark — closer in spirit to GitHub's "dark
- * dimmed" than to a literal 50/50 blend of the other two blocks. Averaging
- * `:root` and `.dark` variable-by-variable does not work: light is dark text
- * on a white page and dark is light text on a near-black page, so the two
- * schemes run in opposite contrast directions and averaging them component-
- * wise cancels the contrast out (both background and foreground would land
- * within a few percent of the same mid-grey). Dim instead keeps dark's
- * light-on-a-dark-surface direction.
+ * The third theme, styled after Stripe's product surfaces.
  *
- * The background sits closer to dark's near-black than to a literal midpoint
- * lightness — a first pass used a genuinely mid-grey background (L 0.55) with
- * near-white text (L 0.95), which read as glary rather than "dim": a bright,
- * high-average-luminance surface is the opposite of what a low-light theme is
- * for, regardless of how comfortable the contrast ratio is on paper. This
- * version lowers overall luminance (background L 0.26, well below the old
- * 0.55) and softens the foreground off pure white (L 0.87 instead of 0.95),
- * which is what actually reduces eye strain — a large, low-luminance surface
- * with moderated-brightness text, not a maximum-contrast pairing. Chart
- * colors are unchanged because light and dark already share the same five
- * values, so there is nothing to sit between.
+ * It began as a neutral-grey middle ground between light and dark. It keeps
+ * that job — dark's light-on-dark contrast direction at a lower overall
+ * luminance than `.dark` — but the greys are now Stripe's deep navy
+ * (`#0A2540`), the accent is their blurple (`#635BFF`), and the neutrals carry
+ * a slight blue cast rather than being fully desaturated.
+ *
+ * Two things stay true from the previous version, because they were the reason
+ * it worked. Averaging `:root` and `.dark` variable-by-variable is still not
+ * how this is built: the two run in opposite contrast directions, so a
+ * component-wise average cancels the contrast out and lands both background
+ * and foreground in the same mid-tone. And the foreground stays *off* pure
+ * white (L 0.94 with a hint of blue rather than L 1.0), because a large
+ * low-luminance surface with moderated-brightness text is what reduces eye
+ * strain — not a maximum-contrast pairing.
+ *
+ * The chroma is deliberately restrained: 0.03–0.05 on the surfaces. Navy
+ * carries the identity, but a saturated background is fatiguing to read
+ * against for hours, which is exactly what Stripe's own dark surfaces avoid.
+ * Chart colours become a real spectrum here (blurple → cyan) instead of the
+ * greyscale ramp light and dark share, since a tinted theme can carry hue
+ * without the charts reading as decoration.
  */
 .dim {
-  --background: oklch(0.26 0 0);
-  --foreground: oklch(0.87 0 0);
-  --card: oklch(0.3 0 0);
-  --card-foreground: oklch(0.87 0 0);
-  --popover: oklch(0.3 0 0);
-  --popover-foreground: oklch(0.87 0 0);
-  --primary: oklch(0.8 0 0);
-  --primary-foreground: oklch(0.22 0 0);
-  --secondary: oklch(0.36 0 0);
-  --secondary-foreground: oklch(0.87 0 0);
-  --muted: oklch(0.36 0 0);
-  --muted-foreground: oklch(0.65 0 0);
-  --accent: oklch(0.36 0 0);
-  --accent-foreground: oklch(0.87 0 0);
-  --destructive: oklch(0.62 0.19 23);
-  /* Lifted above dim's lighter `--muted` (0.36) and `--card` (0.3). */
-  --notice-ready: oklch(0.39 0.058 158);
-  --notice-ready-foreground: oklch(0.88 0.1 160);
-  --notice-ready-edge: oklch(0.55 0.095 158);
-  --notice-info: oklch(0.39 0.03 245);
-  --notice-info-foreground: oklch(0.86 0.038 240);
-  --notice-info-edge: oklch(0.52 0.05 245);
-  --notice-warning: oklch(0.43 0.08 75);
-  --notice-warning-foreground: oklch(0.91 0.095 88);
-  --notice-warning-edge: oklch(0.6 0.125 78);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 14%);
-  --ring: oklch(0.55 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.3 0 0);
-  --sidebar-foreground: oklch(0.87 0 0);
-  --sidebar-primary: oklch(0.8 0 0);
-  --sidebar-primary-foreground: oklch(0.22 0 0);
-  --sidebar-accent: oklch(0.36 0 0);
-  --sidebar-accent-foreground: oklch(0.87 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.55 0 0);
+  color-scheme: dark;
+  /* Stripe's signature navy, #0A2540, and one step up for raised surfaces. */
+  --background: oklch(0.26 0.042 252);
+  --foreground: oklch(0.94 0.012 250);
+  --card: oklch(0.31 0.045 252);
+  --card-foreground: oklch(0.94 0.012 250);
+  --popover: oklch(0.31 0.045 252);
+  --popover-foreground: oklch(0.94 0.012 250);
+  /* #635BFF. The one genuinely saturated token, reserved for action. */
+  --primary: oklch(0.56 0.225 279);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.37 0.045 252);
+  --secondary-foreground: oklch(0.94 0.012 250);
+  --muted: oklch(0.37 0.042 252);
+  --muted-foreground: oklch(0.73 0.03 250);
+  --accent: oklch(0.4 0.06 265);
+  --accent-foreground: oklch(0.96 0.01 250);
+  --destructive: oklch(0.63 0.2 22);
+  /*
+   * Lifted above dim's `--muted` (0.37) and `--card` (0.31) so a notice still
+   * separates from the surface it sits on. `info` carries more chroma than it
+   * did as a grey theme: a blue notice on a blue-tinted navy card needs the
+   * saturation gap to stay legible as its own block.
+   */
+  --notice-ready: oklch(0.4 0.065 158);
+  --notice-ready-foreground: oklch(0.89 0.11 160);
+  --notice-ready-edge: oklch(0.56 0.1 158);
+  --notice-info: oklch(0.42 0.075 245);
+  --notice-info-foreground: oklch(0.88 0.06 235);
+  --notice-info-edge: oklch(0.55 0.105 245);
+  --notice-warning: oklch(0.44 0.085 75);
+  --notice-warning-foreground: oklch(0.92 0.1 88);
+  --notice-warning-edge: oklch(0.61 0.13 78);
+  /* Cool-tinted rather than neutral white, so edges sit in the navy family. */
+  --border: oklch(0.75 0.05 250 / 16%);
+  --input: oklch(0.75 0.05 250 / 20%);
+  --ring: oklch(0.56 0.225 279);
+  --chart-1: oklch(0.56 0.225 279);
+  --chart-2: oklch(0.68 0.15 240);
+  --chart-3: oklch(0.79 0.13 210);
+  --chart-4: oklch(0.72 0.12 190);
+  --chart-5: oklch(0.62 0.1 265);
+  --sidebar: oklch(0.22 0.045 254);
+  --sidebar-foreground: oklch(0.94 0.012 250);
+  --sidebar-primary: oklch(0.56 0.225 279);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.37 0.05 258);
+  --sidebar-accent-foreground: oklch(0.96 0.01 250);
+  --sidebar-border: oklch(0.75 0.05 250 / 14%);
+  --sidebar-ring: oklch(0.56 0.225 279);
 }
 
 @layer base {

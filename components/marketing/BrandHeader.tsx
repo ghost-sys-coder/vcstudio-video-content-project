@@ -10,6 +10,7 @@ const BRAND_TABS = [
   { value: "audiences", label: "Audiences", segment: "audiences" },
   { value: "offers", label: "What you sell", segment: "offers" },
   { value: "voice", label: "Voice", segment: "voice" },
+  { value: "context", label: "Context", segment: "context" },
 ] as const;
 
 /**

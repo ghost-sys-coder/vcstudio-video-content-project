@@ -661,6 +661,19 @@ export const marketingEnvironmentSchema = z.object({
     .positive()
     .max(20_971_520)
     .default(2_097_152),
+  /**
+   * Ceiling for the compiled brand context block.
+   *
+   * Documents are dropped to fit, lowest priority first, and the block says how
+   * many were omitted. Identity, voice, banned phrases and compliance notes are
+   * never dropped, so this bounds the corpus rather than the constraints.
+   */
+  MARKETING_BRAND_CONTEXT_MAX_TOKENS: z.coerce
+    .number()
+    .int()
+    .min(500)
+    .max(50_000)
+    .default(2_500),
 });
 
 /**

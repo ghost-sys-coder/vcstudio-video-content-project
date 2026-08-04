@@ -24,6 +24,18 @@ export type {
   IdeaGenerationPromptInput,
 } from "./idea-generation";
 export {
+  estimateBrandContextTokens,
+  MARKETING_BRAND_CONTEXT_VERSION,
+  renderBrandContextBlock,
+} from "./marketing-brand-context";
+export type {
+  BrandContextAudience,
+  BrandContextDocument,
+  BrandContextInput,
+  BrandContextOffer,
+  BrandContextRender,
+} from "./marketing-brand-context";
+export {
   MARKETING_DOCUMENT_SUMMARY_EXCERPT_CHARACTERS,
   MARKETING_DOCUMENT_SUMMARY_PROMPT_VERSION,
   renderMarketingDocumentSummaryPrompt,
