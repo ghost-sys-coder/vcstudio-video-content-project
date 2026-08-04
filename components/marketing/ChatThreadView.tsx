@@ -9,6 +9,7 @@ import { ChatCostFooter } from "@/components/marketing/ChatCostFooter";
 import { ChatEmptyState } from "@/components/marketing/ChatEmptyState";
 import { ChatErrorState } from "@/components/marketing/ChatErrorState";
 import { ChatMessageList } from "@/components/marketing/ChatMessageList";
+import type { MarketingSkillCatalogueItem } from "@/lib/marketing/skills/skill-definition";
 
 /**
  * The chat surface.
@@ -33,6 +34,7 @@ export function ChatThreadView({
   hasBrandProfile,
   messageCount,
   totalCostCents,
+  catalogue,
 }: {
   workspaceId: string;
   threadId: string;
@@ -40,6 +42,7 @@ export function ChatThreadView({
   hasBrandProfile: boolean;
   messageCount: number;
   totalCostCents: number;
+  catalogue: MarketingSkillCatalogueItem[];
 }) {
   const router = useRouter();
   const [transportError, setTransportError] = useState<string | null>(null);
@@ -62,7 +65,10 @@ export function ChatThreadView({
                 ? {
                     id: newest.id,
                     role: "user",
-                    parts: newest.parts.filter((part) => part.type === "text"),
+                    parts: [
+                      ...newest.parts.filter((part) => part.type === "text"),
+                      ...(body?.skillInvocation ? [body.skillInvocation] : []),
+                    ],
                   }
                 : undefined,
             },
@@ -129,7 +135,27 @@ export function ChatThreadView({
       ) : null}
 
       <ChatComposer
+        catalogue={catalogue}
         disabled={false}
+        onInvokeSkill={(skill, inputs) => {
+          setTransportError(null);
+          const requestNonce = crypto.randomUUID();
+          const text = `/${skill.key}: ${Object.values(inputs).filter(Boolean).join(" · ")}`;
+          lastSendRef.current = { text, requestNonce };
+          void sendMessage(
+            { text },
+            {
+              body: {
+                requestNonce,
+                skillInvocation: {
+                  type: "data-skillInvocation",
+                  skillKey: skill.key,
+                  inputs,
+                },
+              },
+            },
+          );
+        }}
         onSend={send}
         onStop={() => void stop()}
         streaming={streaming}

@@ -30,7 +30,7 @@ import {
   findChatThread,
   listChatMessages,
 } from "@/db/repositories/marketing-chat.repository";
-import type { MarketingChatMessage } from "@/db/schema";
+import type { MarketingChatMessage, WorkspaceRole } from "@/db/schema";
 import {
   estimateMarketingTextCost,
   MARKETING_EXPECTED_OUTPUT_TOKENS,
@@ -45,16 +45,16 @@ import {
 } from "@/lib/env/server";
 import { ensureBrandContextSnapshot } from "@/lib/marketing/brand/compile-brand-context";
 import {
-  BILLABLE_CHAT_TOOL_NAMES,
   buildChatTools,
-  CHAT_TOOL_DESCRIPTIONS,
-  CHAT_TOOL_NAMES,
+  getBillableChatToolNames,
 } from "@/lib/marketing/chat/build-chat-tools";
 import {
   resolveActiveChatTools,
   sumChatUsageCostCents,
 } from "@/lib/marketing/chat/chat-turn-cost";
 import { classifyMarketingProviderError } from "@/lib/marketing/marketing-provider-error";
+import { MARKETING_SKILL_REGISTRY } from "@/lib/marketing/skills/skill-registry";
+import { can } from "@/lib/policies/workspace-policy";
 import { reserveMarketingUsage } from "@/lib/marketing/usage/reserve-marketing-usage";
 import {
   chatPartsToPlainText,
@@ -63,6 +63,7 @@ import {
 } from "@/lib/schemas/marketing-chat-message";
 import {
   deriveThreadTitle,
+  getRequestedSkill,
   type MarketingChatRequest,
 } from "@/lib/schemas/marketing-chat-request";
 
@@ -70,6 +71,7 @@ export type ChatTurnContext = {
   workspaceId: string;
   workspaceName: string;
   userId: string;
+  role: WorkspaceRole;
 };
 
 /**
@@ -138,6 +140,7 @@ export async function startChatTurn(input: {
   const { workspaceId, workspaceName, userId } = input.context;
 
   const userText = input.request.message.parts
+    .filter((part) => part.type === "text")
     .map((part) => part.text)
     .join("\n")
     .trim();
@@ -152,9 +155,9 @@ export async function startChatTurn(input: {
 
   if (!thread) throw new Error("MARKETING_THREAD_NOT_FOUND");
 
-  const userParts: MarketingChatMessagePart[] = input.request.message.parts.map(
-    (part) => ({ type: "text", text: part.text }),
-  );
+  const userParts: MarketingChatMessagePart[] = input.request.message.parts
+    .filter((part) => part.type === "text")
+    .map((part) => ({ type: "text", text: part.text }));
 
   const accepted = await appendUserMessage({
     workspaceId,
@@ -183,11 +186,27 @@ export async function startChatTurn(input: {
     }),
   ]);
 
+  const availableDefinitions = Object.values(MARKETING_SKILL_REGISTRY).filter(
+    (definition) =>
+      can(input.context.role, definition.capability) &&
+      (!definition.requiresBrandProfile || context.text.trim() !== ""),
+  );
+  const requestedSkill = getRequestedSkill(input.request);
+  const forcedDefinition = requestedSkill
+    ? availableDefinitions.find(
+        (definition) => definition.key === requestedSkill.skillKey,
+      )
+    : undefined;
+  if (requestedSkill && !forcedDefinition)
+    throw new Error("MARKETING_SKILL_NOT_AVAILABLE");
+  if (requestedSkill)
+    forcedDefinition!.inputSchema.parse(requestedSkill.inputs);
+
   const systemPrompt = renderMarketingChatSystemPrompt({
     brandContext: context.text,
     workspaceName,
-    availableTools: CHAT_TOOL_NAMES.map(
-      (name) => `${name} — ${CHAT_TOOL_DESCRIPTIONS[name] ?? ""}`,
+    availableTools: availableDefinitions.map(
+      (definition) => `${definition.key} — ${definition.description}`,
     ),
     hasKnowledgeDocuments: documentCount > 0,
   });
@@ -263,7 +282,21 @@ export async function startChatTurn(input: {
     model: openai(environment.MARKETING_CHAT_MODEL),
     instructions: systemPrompt,
     messages: await convertToModelMessages(messages),
-    tools: buildChatTools({ workspaceId }),
+    tools: buildChatTools({
+      definitions: availableDefinitions,
+      context: {
+        workspaceId,
+        userId,
+        role: input.context.role,
+        threadId: thread.id,
+        messageId: assistant.id,
+        brandContext: context.text,
+        brandContextFingerprint: context.sourceFingerprint,
+      },
+    }),
+    toolChoice: forcedDefinition
+      ? { type: "tool", toolName: forcedDefinition.key }
+      : "auto",
     stopWhen: stepCountIs(environment.MARKETING_CHAT_MAX_STEPS),
     prepareStep: ({ steps }) => {
       const activeTools = resolveActiveChatTools({
@@ -272,8 +305,8 @@ export async function startChatTurn(input: {
           rates,
         }),
         maxTurnCostCents: environment.MARKETING_CHAT_MAX_TURN_COST_CENTS,
-        toolNames: CHAT_TOOL_NAMES,
-        billableToolNames: BILLABLE_CHAT_TOOL_NAMES,
+        toolNames: availableDefinitions.map((definition) => definition.key),
+        billableToolNames: getBillableChatToolNames(availableDefinitions),
       });
       return activeTools ? { activeTools } : {};
     },

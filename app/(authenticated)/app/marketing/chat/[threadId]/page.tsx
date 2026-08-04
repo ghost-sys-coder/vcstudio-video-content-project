@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ChatThreadView } from "@/components/marketing/ChatThreadView";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import { loadChatThreadView } from "@/lib/marketing/chat/chat-view";
+import { loadMarketingSkillCatalogue } from "@/lib/marketing/skills/skill-catalogue";
 
 const paramsSchema = z.object({ threadId: z.uuid() });
 
@@ -25,6 +26,11 @@ export default async function MarketingChatThreadPage({
     threadId: parsed.data.threadId,
   });
   if (!view) notFound();
+  const catalogue = await loadMarketingSkillCatalogue({
+    workspaceId,
+    role: context.activeMembership.role,
+    hasBrandProfile: view.hasBrandProfile,
+  });
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -32,6 +38,7 @@ export default async function MarketingChatThreadPage({
         <h1 className="truncate text-sm font-medium">{view.title}</h1>
       </header>
       <ChatThreadView
+        catalogue={catalogue}
         hasBrandProfile={view.hasBrandProfile}
         initialMessages={view.messages}
         messageCount={view.messageCount}

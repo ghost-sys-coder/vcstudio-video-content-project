@@ -4335,6 +4335,72 @@ export const marketingChatMessages = pgTable(
   ],
 );
 
+export const marketingToolCallStatusEnum = pgEnum(
+  "marketing_tool_call_status",
+  ["pending", "running", "succeeded", "failed", "cancelled"],
+);
+
+/** Queryable execution record for every chat skill invocation. */
+export const marketingChatToolCalls = pgTable(
+  "marketing_chat_tool_calls",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    threadId: uuid("thread_id").notNull(),
+    messageId: uuid("message_id")
+      .notNull()
+      .references(() => marketingChatMessages.id, { onDelete: "cascade" }),
+    toolCallId: text("tool_call_id").notNull(),
+    skillKey: text("skill_key").notNull(),
+    input: jsonb("input")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    output: jsonb("output").$type<Record<string, unknown>>(),
+    status: marketingToolCallStatusEnum("status").notNull().default("pending"),
+    runId: uuid("run_id").references(() => marketingGenerationRuns.id, {
+      onDelete: "set null",
+    }),
+    triggerRunId: text("trigger_run_id"),
+    estimatedCostCents: integer("estimated_cost_cents").notNull().default(0),
+    actualCostCents: integer("actual_cost_cents"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    errorCategory: text("error_category"),
+    safeErrorMessage: text("safe_error_message"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("marketing_chat_tool_calls_thread_call_unique").on(
+      table.threadId,
+      table.toolCallId,
+    ),
+    index("marketing_chat_tool_calls_status_index").on(
+      table.workspaceId,
+      table.status,
+    ),
+    foreignKey({
+      columns: [table.threadId, table.workspaceId],
+      foreignColumns: [
+        marketingChatThreads.id,
+        marketingChatThreads.workspaceId,
+      ],
+      name: "marketing_chat_tool_calls_tenant_thread_fkey",
+    }).onDelete("cascade"),
+    check(
+      "marketing_chat_tool_calls_cost_nonnegative",
+      sql`${table.estimatedCostCents} >= 0 and (${table.actualCostCents} is null or ${table.actualCostCents} >= 0)`,
+    ),
+  ],
+);
+
 export const auditLogEvents = pgTable(
   "audit_log_events",
   {
@@ -4611,6 +4677,7 @@ export type MarketingChatThread = typeof marketingChatThreads.$inferSelect;
 export type MarketingThreadStatus =
   (typeof marketingThreadStatusEnum.enumValues)[number];
 export type MarketingChatMessage = typeof marketingChatMessages.$inferSelect;
+export type MarketingChatToolCall = typeof marketingChatToolCalls.$inferSelect;
 export type MarketingChatRole =
   (typeof marketingChatRoleEnum.enumValues)[number];
 export type MarketingChatMessageStatus =

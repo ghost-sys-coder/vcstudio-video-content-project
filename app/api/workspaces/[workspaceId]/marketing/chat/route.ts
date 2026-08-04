@@ -43,6 +43,7 @@ export async function POST(
   let workspaceId: string;
   let workspaceName: string;
   let userId: string;
+  let role: "owner" | "editor" | "viewer";
 
   try {
     const user = await requireAuthenticatedUser();
@@ -54,6 +55,7 @@ export async function POST(
     requireCapability(membership.role, "useMarketingChat");
     workspaceName = membership.workspaceName;
     userId = user.id;
+    role = membership.role;
   } catch {
     return NextResponse.json(
       { error: "You cannot use the Marketing Studio in this workspace." },
@@ -83,7 +85,7 @@ export async function POST(
   try {
     await enforceRateLimit({ workspaceId, operation: "marketing_chat_turn" });
     const { response, threadId } = await startChatTurn({
-      context: { workspaceId, workspaceName, userId },
+      context: { workspaceId, workspaceName, userId, role },
       request: parsed.data,
     });
     // The client needs the id of a thread the server just created; a header

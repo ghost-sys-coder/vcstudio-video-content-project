@@ -36,7 +36,24 @@ export const marketingChatRequestSchema = z
         // Only `user`. The role is not a field the client gets to choose
         // between; it is a constant that exists so the payload reads clearly.
         role: z.literal("user"),
-        parts: z.array(marketingChatTextPartSchema).min(1).max(4),
+        parts: z
+          .array(
+            z.union([
+              marketingChatTextPartSchema,
+              z
+                .object({
+                  type: z.literal("data-skillInvocation"),
+                  skillKey: z.string().min(1).max(80),
+                  inputs: z.record(
+                    z.string(),
+                    z.union([z.string(), z.number()]),
+                  ),
+                })
+                .strict(),
+            ]),
+          )
+          .min(1)
+          .max(5),
       })
       .strict(),
   })
@@ -44,17 +61,26 @@ export const marketingChatRequestSchema = z
   .refine(
     (value) =>
       value.message.parts.reduce(
-        (total, part) => total + part.text.length,
+        (total, part) => total + (part.type === "text" ? part.text.length : 0),
         0,
       ) <= MARKETING_CHAT_MAX_USER_CHARACTERS,
     { message: "That message is too long." },
   )
   .refine(
-    (value) => value.message.parts.some((part) => part.text.trim() !== ""),
+    (value) =>
+      value.message.parts.some(
+        (part) => part.type === "text" && part.text.trim() !== "",
+      ),
     { message: "That message is empty." },
   );
 
 export type MarketingChatRequest = z.infer<typeof marketingChatRequestSchema>;
+
+export function getRequestedSkill(request: MarketingChatRequest) {
+  return request.message.parts.find(
+    (part) => part.type === "data-skillInvocation",
+  );
+}
 
 export const createMarketingThreadSchema = z.object({
   title: z.string().trim().max(200).optional(),

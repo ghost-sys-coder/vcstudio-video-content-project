@@ -3,7 +3,10 @@
 import { Send, Square } from "lucide-react";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { SkillInputDialog } from "@/components/marketing/SkillInputDialog";
+import { SkillPickerPopover } from "@/components/marketing/SkillPickerPopover";
 import { Textarea } from "@/components/ui/textarea";
+import type { MarketingSkillCatalogueItem } from "@/lib/marketing/skills/skill-definition";
 import { MARKETING_CHAT_MAX_USER_CHARACTERS } from "@/lib/schemas/marketing-chat-message";
 
 /**
@@ -23,18 +26,35 @@ export function ChatComposer({
   streaming,
   onSend,
   onStop,
+  catalogue,
+  onInvokeSkill,
 }: {
   disabled: boolean;
   streaming: boolean;
   onSend: (text: string) => void;
   onStop: () => void;
+  catalogue: MarketingSkillCatalogueItem[];
+  onInvokeSkill: (
+    skill: MarketingSkillCatalogueItem,
+    inputs: Record<string, string>,
+  ) => void;
 }) {
   const [value, setValue] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [selectedSkill, setSelectedSkill] =
+    useState<MarketingSkillCatalogueItem | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const trimmed = value.trim();
   const tooLong = value.length > MARKETING_CHAT_MAX_USER_CHARACTERS;
   const canSend = trimmed !== "" && !tooLong && !disabled && !streaming;
+  const query = value.startsWith("/")
+    ? value.slice(value.lastIndexOf("\n") + 2).toLowerCase()
+    : "";
+  const filteredSkills = catalogue.filter((skill) =>
+    `${skill.label} ${skill.key}`.toLowerCase().includes(query),
+  );
 
   function submit() {
     if (!canSend) return;
@@ -51,7 +71,17 @@ export function ChatComposer({
         submit();
       }}
     >
-      <div className="rounded-2xl border border-input bg-background p-2 focus-within:ring-2 focus-within:ring-ring/40">
+      <div className="relative rounded-2xl border border-input bg-background p-2 focus-within:ring-2 focus-within:ring-ring/40">
+        {pickerOpen ? (
+          <SkillPickerPopover
+            activeIndex={activeIndex}
+            onSelect={(skill) => {
+              setPickerOpen(false);
+              setSelectedSkill(skill);
+            }}
+            skills={filteredSkills}
+          />
+        ) : null}
         <label className="sr-only" htmlFor="marketing-chat-input">
           Message the marketing studio
         </label>
@@ -59,8 +89,46 @@ export function ChatComposer({
           className="min-h-20 resize-none border-0 shadow-none focus-visible:ring-0"
           disabled={disabled}
           id="marketing-chat-input"
-          onChange={(event) => setValue(event.target.value)}
+          aria-activedescendant={
+            pickerOpen && filteredSkills[activeIndex]
+              ? `skill-option-${filteredSkills[activeIndex].key}`
+              : undefined
+          }
+          onChange={(event) => {
+            const next = event.target.value;
+            setValue(next);
+            const lastLine = next.split("\n").at(-1) ?? "";
+            setPickerOpen(lastLine.startsWith("/") && !lastLine.includes(" "));
+            setActiveIndex(0);
+          }}
           onKeyDown={(event) => {
+            if (pickerOpen && event.key === "ArrowDown") {
+              event.preventDefault();
+              setActiveIndex((index) =>
+                Math.min(index + 1, filteredSkills.length - 1),
+              );
+              return;
+            }
+            if (pickerOpen && event.key === "ArrowUp") {
+              event.preventDefault();
+              setActiveIndex((index) => Math.max(index - 1, 0));
+              return;
+            }
+            if (pickerOpen && event.key === "Escape") {
+              event.preventDefault();
+              setPickerOpen(false);
+              return;
+            }
+            if (
+              pickerOpen &&
+              event.key === "Enter" &&
+              filteredSkills[activeIndex]
+            ) {
+              event.preventDefault();
+              setPickerOpen(false);
+              setSelectedSkill(filteredSkills[activeIndex]);
+              return;
+            }
             if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault();
               submit();
@@ -95,6 +163,16 @@ export function ChatComposer({
           )}
         </div>
       </div>
+      <SkillInputDialog
+        onClose={() => setSelectedSkill(null)}
+        onSubmit={(inputs) => {
+          if (!selectedSkill) return;
+          onInvokeSkill(selectedSkill, inputs);
+          setSelectedSkill(null);
+          setValue("");
+        }}
+        skill={selectedSkill}
+      />
     </form>
   );
 }
