@@ -1,15 +1,17 @@
 import "server-only";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
 import {
   socialPostMedia,
   socialPosts,
+  marketingContentItems,
   type SocialPost,
   type SocialPostStatus,
 } from "@/db/schema";
 import type { PortableDocument } from "@/lib/social/portable-document";
 import type { SocialPostAttachmentRef } from "@/lib/social/post-attachment";
+import { randomUUID } from "node:crypto";
 
 export async function createSocialPost(input: {
   workspaceId: string;
@@ -66,6 +68,84 @@ export async function createSocialPostForRender(input: {
   });
 
   return post;
+}
+
+export async function createSocialPostForContentItem(input: {
+  workspaceId: string;
+  contentItemId: string;
+  name: string;
+  createdByUserId: string;
+  bodyDocument: PortableDocument;
+  bodyPlainText: string;
+  mediaAssetIds: string[];
+}): Promise<SocialPost> {
+  const database = getDatabase();
+  const id = randomUUID();
+  const postValues = {
+    id,
+    workspaceId: input.workspaceId,
+    name: input.name,
+    createdByUserId: input.createdByUserId,
+    projectId: null,
+    bodyDocument: input.bodyDocument,
+    bodyPlainText: input.bodyPlainText,
+  };
+  const insertPost = database.execute(sql`
+    insert into ${socialPosts} (
+      id, workspace_id, name, created_by_user_id, project_id,
+      body_document, body_plain_text
+    )
+    select
+      ${id}, ${input.workspaceId}, ${input.name}, ${input.createdByUserId}, null,
+      ${JSON.stringify(input.bodyDocument)}::jsonb, ${input.bodyPlainText}
+    from ${marketingContentItems}
+    where ${marketingContentItems.id} = ${input.contentItemId}
+      and ${marketingContentItems.workspaceId} = ${input.workspaceId}
+      and ${marketingContentItems.status} = 'approved'
+      and ${marketingContentItems.socialPostId} is null
+  `);
+  const attachPost = database
+    .update(marketingContentItems)
+    .set({ socialPostId: id, updatedAt: new Date() })
+    .where(
+      and(
+        eq(marketingContentItems.id, input.contentItemId),
+        eq(marketingContentItems.workspaceId, input.workspaceId),
+        eq(marketingContentItems.status, "approved"),
+        sql`${marketingContentItems.socialPostId} is null`,
+      ),
+    )
+    .returning({ id: marketingContentItems.id });
+  let attached: { id: string }[];
+  if (input.mediaAssetIds.length > 0) {
+    const [, , linkedItems] = await database.batch([
+      insertPost,
+      database.insert(socialPostMedia).values(
+        input.mediaAssetIds.map((mediaAssetId, position) => ({
+          postId: id,
+          workspaceId: input.workspaceId,
+          mediaAssetId,
+          position,
+        })),
+      ),
+      attachPost,
+    ]);
+    attached = linkedItems;
+  } else {
+    const [, linkedItems] = await database.batch([insertPost, attachPost]);
+    attached = linkedItems;
+  }
+  if (attached.length !== 1)
+    throw new Error("Marketing content is no longer eligible for handoff.");
+  return {
+    ...postValues,
+    status: "draft",
+    scheduledAt: null,
+    scheduledTimezone: "UTC",
+    version: 1,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
 }
 
 /**

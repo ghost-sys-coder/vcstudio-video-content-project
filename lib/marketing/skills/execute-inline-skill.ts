@@ -30,13 +30,24 @@ import type {
 import { requireCapability } from "@/lib/policies/workspace-policy";
 import { enforceRateLimit } from "@/lib/rate-limit/enforce-rate-limit";
 import { reserveMarketingUsage } from "@/lib/marketing/usage/reserve-marketing-usage";
+import { createMarketingContentItem } from "@/db/commands/marketing-content-commands";
+import { plainTextToPortableDocument } from "@/lib/social/plain-text-to-document";
+import type { ContentPlatform, MarketingContentKind } from "@/db/schema";
+
+const CONTENT_KIND_BY_SKILL = {
+  create_social_post: "social_post",
+  write_email: "email",
+  write_blog_post: "blog_post",
+  create_newsletter: "newsletter",
+  create_media_story: "media_story",
+} as const satisfies Partial<Record<string, MarketingContentKind>>;
 
 export async function executeInlineMarketingSkill(input: {
   definition: MarketingSkillDefinition;
   values: Record<string, string | number>;
   toolCallId: string;
   context: SkillExecutionContext;
-}): Promise<{ text: string; skillKey: string }> {
+}): Promise<{ text: string; skillKey: string; contentItemId?: string }> {
   const { definition, context } = input;
   requireCapability(context.role, definition.capability);
   if (
@@ -81,7 +92,14 @@ export async function executeInlineMarketingSkill(input: {
     toolRow.output &&
     typeof toolRow.output.text === "string"
   )
-    return { text: toolRow.output.text, skillKey: definition.key };
+    return {
+      text: toolRow.output.text,
+      skillKey: definition.key,
+      contentItemId:
+        typeof toolRow.output.contentItemId === "string"
+          ? toolRow.output.contentItemId
+          : undefined,
+    };
   if (toolRow.runId) throw new Error("MARKETING_TOOL_CALL_ALREADY_RUNNING");
   let reservation;
   try {
@@ -129,6 +147,7 @@ export async function executeInlineMarketingSkill(input: {
     runId: reservation.runId,
     attemptCount: 1,
   });
+  let knownProviderCostCents: number | null = null;
   try {
     const result = await generateText({
       model: openai(environment.MARKETING_CHAT_MODEL),
@@ -146,10 +165,32 @@ export async function executeInlineMarketingSkill(input: {
           1_000_000,
       ),
     );
+    knownProviderCostCents = actualCostCents;
+    const contentKind =
+      CONTENT_KIND_BY_SKILL[
+        definition.key as keyof typeof CONTENT_KIND_BY_SKILL
+      ];
+    let contentItemId: string | undefined;
+    if (contentKind) {
+      const item = await createMarketingContentItem({
+        workspaceId: context.workspaceId,
+        kind: contentKind,
+        platform:
+          typeof input.values.platform === "string"
+            ? (input.values.platform as ContentPlatform)
+            : null,
+        title: definition.label,
+        bodyDocument: plainTextToPortableDocument(result.text),
+        bodyPlainText: result.text,
+        sourceRunId: reservation.runId,
+        createdByUserId: context.userId,
+      });
+      contentItemId = item.id;
+    }
     await completeMarketingToolCall({
       workspaceId: context.workspaceId,
       id: toolRow.id,
-      output: { text: result.text },
+      output: { text: result.text, contentItemId },
       actualCostCents,
     });
     await reconcileMarketingUsage({
@@ -163,10 +204,12 @@ export async function executeInlineMarketingSkill(input: {
       providerRequestId: result.response.id,
       safeMetadata: { threadId: context.threadId, skillKey: definition.key },
     });
-    return { text: result.text, skillKey: definition.key };
+    return { text: result.text, skillKey: definition.key, contentItemId };
   } catch (error) {
     const failure = classifyMarketingProviderError(error);
-    const charged = failure.mayHaveBilled ? estimatedCostCents : 0;
+    const charged =
+      knownProviderCostCents ??
+      (failure.mayHaveBilled ? estimatedCostCents : 0);
     await failMarketingToolCall({
       workspaceId: context.workspaceId,
       id: toolRow.id,

@@ -4401,6 +4401,187 @@ export const marketingChatToolCalls = pgTable(
   ],
 );
 
+export const marketingContentStatusEnum = pgEnum("marketing_content_status", [
+  "draft",
+  "needs_review",
+  "changes_requested",
+  "approved",
+  "scheduled",
+  "published",
+  "archived",
+  "failed",
+]);
+export const marketingContentKindEnum = pgEnum("marketing_content_kind", [
+  "social_post",
+  "ad_creative",
+  "blog_post",
+  "email",
+  "newsletter",
+  "media_story",
+  "graphic",
+]);
+export const marketingTrafficTypeEnum = pgEnum("marketing_traffic_type", [
+  "organic",
+  "paid",
+  "both",
+]);
+export const marketingRevisionSourceEnum = pgEnum("marketing_revision_source", [
+  "ai",
+  "human",
+]);
+
+export const marketingContentItems = pgTable(
+  "marketing_content_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    kind: marketingContentKindEnum("kind").notNull(),
+    platform: contentPlatformEnum("platform"),
+    trafficType: marketingTrafficTypeEnum("traffic_type")
+      .notNull()
+      .default("organic"),
+    isBranded: boolean("is_branded").notNull().default(true),
+    title: text("title").notNull().default(""),
+    bodyDocument: jsonb("body_document")
+      .$type<PortableDocument>()
+      .notNull()
+      .default({ type: "doc", content: [] }),
+    bodyPlainText: text("body_plain_text").notNull().default(""),
+    structuredPayload:
+      jsonb("structured_payload").$type<Record<string, unknown>>(),
+    status: marketingContentStatusEnum("status").notNull().default("draft"),
+    scheduledFor: timestamp("scheduled_for", { withTimezone: true }),
+    socialPostId: uuid("social_post_id").references(() => socialPosts.id, {
+      onDelete: "set null",
+    }),
+    sourceRunId: uuid("source_run_id").references(
+      () => marketingGenerationRuns.id,
+      { onDelete: "set null" },
+    ),
+    createdByUserId: uuid("created_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    reviewedByUserId: uuid("reviewed_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    reviewNotes: text("review_notes").notNull().default(""),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    errorCategory: text("error_category"),
+    safeErrorMessage: text("safe_error_message"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("marketing_content_items_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    uniqueIndex("marketing_content_items_social_post_unique")
+      .on(table.socialPostId)
+      .where(sql`${table.socialPostId} is not null`),
+    index("marketing_content_items_queue_index").on(
+      table.workspaceId,
+      table.status,
+      table.createdAt,
+    ),
+  ],
+);
+
+export const marketingContentMedia = pgTable(
+  "marketing_content_media",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    contentItemId: uuid("content_item_id").notNull(),
+    mediaAssetId: uuid("media_asset_id").notNull(),
+    position: integer("position").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("marketing_content_media_position_unique").on(
+      table.contentItemId,
+      table.position,
+    ),
+    uniqueIndex("marketing_content_media_asset_unique").on(
+      table.contentItemId,
+      table.mediaAssetId,
+    ),
+    foreignKey({
+      columns: [table.contentItemId, table.workspaceId],
+      foreignColumns: [
+        marketingContentItems.id,
+        marketingContentItems.workspaceId,
+      ],
+      name: "marketing_content_media_tenant_item_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.mediaAssetId, table.workspaceId],
+      foreignColumns: [mediaAssets.id, mediaAssets.workspaceId],
+      name: "marketing_content_media_tenant_asset_fkey",
+    }).onDelete("restrict"),
+  ],
+);
+
+export const marketingContentRevisions = pgTable(
+  "marketing_content_revisions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    contentItemId: uuid("content_item_id").notNull(),
+    revisionNumber: integer("revision_number").notNull(),
+    bodyDocument: jsonb("body_document").$type<PortableDocument>().notNull(),
+    bodyPlainText: text("body_plain_text").notNull(),
+    structuredPayload:
+      jsonb("structured_payload").$type<Record<string, unknown>>(),
+    changeSource: marketingRevisionSourceEnum("change_source").notNull(),
+    changedByUserId: uuid("changed_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    runId: uuid("run_id").references(() => marketingGenerationRuns.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("marketing_content_revisions_number_unique").on(
+      table.contentItemId,
+      table.revisionNumber,
+    ),
+    foreignKey({
+      columns: [table.contentItemId, table.workspaceId],
+      foreignColumns: [
+        marketingContentItems.id,
+        marketingContentItems.workspaceId,
+      ],
+      name: "marketing_content_revisions_tenant_item_fkey",
+    }).onDelete("cascade"),
+    check(
+      "marketing_content_revisions_number_positive",
+      sql`${table.revisionNumber} > 0`,
+    ),
+  ],
+);
+
 export const auditLogEvents = pgTable(
   "audit_log_events",
   {
@@ -4678,6 +4859,11 @@ export type MarketingThreadStatus =
   (typeof marketingThreadStatusEnum.enumValues)[number];
 export type MarketingChatMessage = typeof marketingChatMessages.$inferSelect;
 export type MarketingChatToolCall = typeof marketingChatToolCalls.$inferSelect;
+export type MarketingContentItem = typeof marketingContentItems.$inferSelect;
+export type MarketingContentStatus =
+  (typeof marketingContentStatusEnum.enumValues)[number];
+export type MarketingContentKind =
+  (typeof marketingContentKindEnum.enumValues)[number];
 export type MarketingChatRole =
   (typeof marketingChatRoleEnum.enumValues)[number];
 export type MarketingChatMessageStatus =
