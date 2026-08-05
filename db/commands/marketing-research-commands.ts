@@ -25,7 +25,7 @@ export async function createMarketingCompetitor(input: {
 export async function createPendingResearchSnapshot(input: {
   id: string;
   workspaceId: string;
-  kind: "competitor" | "trend";
+  kind: "company" | "competitor" | "trend";
   competitorId: string | null;
   topic: string;
   queries: string[];

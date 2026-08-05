@@ -1,5 +1,8 @@
 import { notFound } from "next/navigation";
-import { findMarketingCampaign } from "@/db/repositories/marketing-campaigns.repository";
+import {
+  findMarketingCampaign,
+  listMarketingCampaignContent,
+} from "@/db/repositories/marketing-campaigns.repository";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import { CampaignAutomationStatus } from "@/components/marketing/CampaignAutomationStatus";
 
@@ -10,14 +13,21 @@ export default async function CampaignBriefPage({
 }) {
   const context = await getAuthenticatedWorkspaceContext();
   if (!context) return null;
-  const campaign = await findMarketingCampaign({
+  const input = {
     workspaceId: context.activeMembership.workspaceId,
     campaignId: (await params).campaignId,
-  });
+  };
+  const [campaign, content] = await Promise.all([
+    findMarketingCampaign(input),
+    listMarketingCampaignContent(input),
+  ]);
   if (!campaign) notFound();
   return (
     <article className="max-w-3xl space-y-4">
-      <CampaignAutomationStatus campaign={campaign} />
+      <CampaignAutomationStatus
+        campaign={campaign}
+        contentCount={content.length}
+      />
       <section>
         <h2 className="font-medium">Key message</h2>
         <p className="whitespace-pre-wrap text-sm text-muted-foreground">

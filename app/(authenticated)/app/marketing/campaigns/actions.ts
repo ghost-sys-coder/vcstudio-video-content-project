@@ -12,6 +12,7 @@ import { requireCapability } from "@/lib/policies/workspace-policy";
 import { marketingCampaignMutationSchema } from "@/lib/schemas/marketing-campaign";
 import { dispatchCampaignAutomation } from "@/lib/marketing/campaigns/dispatch-campaign-automation";
 import { findMarketingCampaign } from "@/db/repositories/marketing-campaigns.repository";
+import { canStartCampaignAutomation } from "@/lib/marketing/campaigns/campaign-automation-presentation";
 
 function parse(formData: FormData) {
   return marketingCampaignMutationSchema.safeParse({
@@ -68,13 +69,19 @@ export async function saveMarketingCampaignAction(formData: FormData) {
   redirect(`/app/marketing/campaigns/${campaign.id}`);
 }
 
-export async function retryCampaignAutomationAction(formData: FormData) {
+export async function startCampaignAutomationAction(formData: FormData) {
   const campaignId = String(formData.get("campaignId") ?? "");
   const auth = await context();
   const workspaceId = auth.activeMembership.workspaceId;
   const campaign = await findMarketingCampaign({ workspaceId, campaignId });
-  if (!campaign || campaign.automationStatus !== "failed")
-    throw new Error("Campaign automation cannot be retried.");
+  if (
+    !campaign ||
+    !canStartCampaignAutomation({
+      status: campaign.automationStatus,
+      completedAt: campaign.automationCompletedAt,
+    })
+  )
+    throw new Error("Campaign automation cannot be started.");
   await updateCampaignAutomationState({
     workspaceId,
     campaignId,
@@ -89,3 +96,5 @@ export async function retryCampaignAutomationAction(formData: FormData) {
   });
   revalidatePath(`/app/marketing/campaigns/${campaignId}`);
 }
+
+export const retryCampaignAutomationAction = startCampaignAutomationAction;

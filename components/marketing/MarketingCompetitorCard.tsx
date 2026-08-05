@@ -1,4 +1,6 @@
 import type { MarketingCompetitor } from "@/db/schema";
+import { requestCompetitorResearchAction } from "@/app/(authenticated)/app/marketing/research/actions";
+import { Button } from "@/components/ui/button";
 
 export function MarketingCompetitorCard({
   competitor,
@@ -26,6 +28,12 @@ export function MarketingCompetitorCard({
           ? `Last researched ${competitor.lastResearchedAt.toLocaleString()}`
           : "Research begins with the next campaign automation run."}
       </p>
+      <form action={requestCompetitorResearchAction} className="mt-3">
+        <input name="competitorId" type="hidden" value={competitor.id} />
+        <Button size="sm" type="submit" variant="outline">
+          Research competitor
+        </Button>
+      </form>
     </article>
   );
 }

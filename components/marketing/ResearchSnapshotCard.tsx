@@ -31,8 +31,9 @@ export function ResearchSnapshotCard({
       {document.success && citations.success ? (
         <>
           <p className="text-sm">{document.data.summary}</p>
-          <ul className="space-y-2 text-sm">
-            {document.data.findings.slice(0, 5).map((finding) => (
+          <h4 className="text-sm font-medium">Findings</h4>
+          <ul className="list-disc space-y-2 pl-5 text-sm">
+            {document.data.findings.map((finding) => (
               <li key={finding.statement}>
                 {finding.statement}{" "}
                 {finding.sourceIndexes.map((index) => {
@@ -53,6 +54,61 @@ export function ResearchSnapshotCard({
               </li>
             ))}
           </ul>
+          {document.data.opportunities.length ? (
+            <>
+              <h4 className="text-sm font-medium">Opportunities</h4>
+              <ul className="list-disc space-y-2 pl-5 text-sm">
+                {document.data.opportunities.map((item) => (
+                  <li key={item.statement}>{item.statement}</li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+          {document.data.risks.length ? (
+            <>
+              <h4 className="text-sm font-medium">Risks</h4>
+              <ul className="list-disc space-y-2 pl-5 text-sm">
+                {document.data.risks.map((item) => (
+                  <li key={item.statement}>{item.statement}</li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+          {document.data.contentAngles.length ? (
+            <>
+              <h4 className="text-sm font-medium">Content opportunities</h4>
+              <ul className="list-disc space-y-2 pl-5 text-sm">
+                {document.data.contentAngles.map((item) => (
+                  <li key={item.angle}>
+                    <span className="font-medium">{item.angle}</span>:{" "}
+                    {item.rationale}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+          <details className="text-sm">
+            <summary className="cursor-pointer font-medium">
+              Sources ({citations.data.length})
+            </summary>
+            <ol className="mt-2 list-decimal space-y-2 pl-5">
+              {citations.data.map((citation) => (
+                <li key={citation.url}>
+                  <a
+                    className="text-primary hover:underline"
+                    href={citation.url}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    {citation.title}
+                  </a>
+                  {citation.snippet ? (
+                    <p className="text-muted-foreground">{citation.snippet}</p>
+                  ) : null}
+                </li>
+              ))}
+            </ol>
+          </details>
         </>
       ) : (
         <p className="text-sm text-muted-foreground">

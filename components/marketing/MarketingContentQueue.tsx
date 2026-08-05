@@ -4,15 +4,16 @@ import type { MediaAssetView } from "@/lib/media/media-asset-view";
 export function MarketingContentQueue({
   items,
   mediaByContentItemId,
+  emptyMessage = "No marketing content yet. Create a draft from Chat and it will appear here for review.",
 }: {
   items: MarketingContentItem[];
   mediaByContentItemId: Record<string, MediaAssetView[]>;
+  emptyMessage?: string;
 }) {
   if (items.length === 0)
     return (
       <div className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">
-        No marketing content yet. Create a draft from Chat and it will appear
-        here for review.
+        {emptyMessage}
       </div>
     );
   return (

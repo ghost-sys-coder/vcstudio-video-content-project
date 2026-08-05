@@ -32,7 +32,13 @@ function values(input: MarketingCampaignInput & { createdByUserId?: string }) {
 export async function updateCampaignAutomationState(input: {
   workspaceId: string;
   campaignId: string;
-  status: "pending" | "researching" | "generating" | "completed" | "failed";
+  status:
+    | "not_started"
+    | "pending"
+    | "researching"
+    | "generating"
+    | "completed"
+    | "failed";
   triggerRunId?: string;
   error?: string | null;
 }) {
@@ -46,6 +52,9 @@ export async function updateCampaignAutomationState(input: {
       automationError: input.error ?? null,
       ...(input.status === "researching"
         ? { automationStartedAt: new Date() }
+        : {}),
+      ...(input.status === "not_started" || input.status === "pending"
+        ? { automationCompletedAt: null }
         : {}),
       ...(["completed", "failed"].includes(input.status)
         ? { automationCompletedAt: new Date() }

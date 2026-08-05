@@ -30,6 +30,7 @@ export default async function CampaignContentPage({
   });
   return (
     <MarketingContentQueue
+      emptyMessage="No content has been generated for this campaign yet. Start or retry automation from the campaign Brief tab."
       items={items}
       mediaByContentItemId={mediaByContentItemId}
     />

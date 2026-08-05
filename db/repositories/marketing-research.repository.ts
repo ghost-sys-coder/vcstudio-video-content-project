@@ -2,6 +2,7 @@ import "server-only";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
 import { marketingCompetitors, marketingResearchSnapshots } from "@/db/schema";
+import { parseDateValue } from "@/lib/format/date";
 
 export async function listActiveMarketingCompetitors(input: {
   workspaceId: string;
@@ -57,10 +58,11 @@ export async function findMarketingCompetitor(input: {
 }
 
 export async function getMarketingResearchCurrentTime(): Promise<Date> {
-  const result = await getDatabase().execute<{ value: Date }>(
+  const result = await getDatabase().execute<{ value: unknown }>(
     sql`select now() as value`,
   );
   const row = result.rows[0];
-  if (!row) throw new Error("DATABASE_TIME_UNAVAILABLE");
-  return row.value;
+  const currentTime = parseDateValue(row?.value);
+  if (!currentTime) throw new Error("DATABASE_TIME_UNAVAILABLE");
+  return currentTime;
 }

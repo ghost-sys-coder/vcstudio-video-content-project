@@ -28,6 +28,7 @@ export default async function CampaignAdsPage({
   return (
     <div className="space-y-4">
       <Button
+        nativeButton={false}
         render={
           <Link
             href={`/api/workspaces/${input.workspaceId}/marketing/campaigns/${campaign.id}/ads.csv`}
@@ -45,8 +46,8 @@ export default async function CampaignAdsPage({
         </div>
       ) : (
         <p className="text-sm text-muted-foreground">
-          No ad variants yet. Use the campaign skill in Chat to create paid
-          creative.
+          No ad variants have been generated for this campaign yet. Start or
+          retry automation from the campaign Brief tab.
         </p>
       )}
     </div>

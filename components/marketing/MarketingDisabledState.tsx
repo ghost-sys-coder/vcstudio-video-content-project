@@ -35,11 +35,18 @@ export function MarketingDisabledState({
         on.
       </p>
       {canManageSettings ? (
-        <Button render={<Link href="/app/settings/workspace" />}>
+        <Button
+          nativeButton={false}
+          render={<Link href="/app/settings/workspace" />}
+        >
           Open workspace settings
         </Button>
       ) : (
-        <Button render={<Link href="/app" />} variant="outline">
+        <Button
+          nativeButton={false}
+          render={<Link href="/app" />}
+          variant="outline"
+        >
           Back to projects
         </Button>
       )}

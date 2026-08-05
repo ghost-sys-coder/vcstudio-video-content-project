@@ -38,12 +38,13 @@ import { researchSnapshotDocumentSchema } from "@/lib/schemas/marketing-research
 export async function runMarketingResearch(input: {
   workspaceId: string;
   requestedByUserId: string;
-  kind: "competitor" | "trend";
+  kind: "company" | "competitor" | "trend";
   topic: string;
   competitor?: MarketingCompetitor;
   campaignContext?: string;
   idempotencySubject: string;
 }) {
+  const snapshotId = crypto.randomUUID();
   const environment = getMarketingEnvironment();
   const provider = createResearchProvider();
   const queries = (
@@ -100,9 +101,8 @@ export async function runMarketingResearch(input: {
       reservationPrompt,
     ),
     subjectKind: "research_snapshot",
-    subjectId: input.idempotencySubject,
+    subjectId: snapshotId,
   });
-  const snapshotId = crypto.randomUUID();
   const expiresAt = new Date(
     Date.now() + environment.MARKETING_RESEARCH_FRESHNESS_DAYS * 86_400_000,
   );

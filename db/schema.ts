@@ -4444,10 +4444,18 @@ export const marketingCampaignStatusEnum = pgEnum("marketing_campaign_status", [
 ]);
 export const marketingCampaignAutomationStatusEnum = pgEnum(
   "marketing_campaign_automation_status",
-  ["pending", "researching", "generating", "completed", "failed"],
+  [
+    "not_started",
+    "pending",
+    "researching",
+    "generating",
+    "completed",
+    "failed",
+  ],
 );
 
 export const marketingResearchKindEnum = pgEnum("marketing_research_kind", [
+  "company",
   "competitor",
   "trend",
   "keyword",

@@ -19,7 +19,10 @@ import {
   markMarketingRunRunning,
   reconcileMarketingUsage,
 } from "@/db/commands/marketing-usage-commands";
-import { findMarketingCampaign } from "@/db/repositories/marketing-campaigns.repository";
+import {
+  findMarketingCampaign,
+  listMarketingCampaignContent,
+} from "@/db/repositories/marketing-campaigns.repository";
 import { listActiveMarketingCompetitors } from "@/db/repositories/marketing-research.repository";
 import { listMediaAssets } from "@/db/repositories/media-assets.repository";
 import { estimateMarketingTextCost } from "@/lib/costs/marketing-cost";
@@ -40,6 +43,7 @@ import { reserveMarketingUsage } from "@/lib/marketing/usage/reserve-marketing-u
 import { campaignContentPlanSchema } from "@/lib/schemas/marketing-campaign-automation";
 import { plainTextToPortableDocument } from "@/lib/social/plain-text-to-document";
 import { createMediaAssetDownloadUrl } from "@/lib/storage/media-asset-storage";
+import { getCampaignAutomationPresentation } from "@/lib/marketing/campaigns/campaign-automation-presentation";
 
 const payloadSchema = z.object({
   workspaceId: z.uuid(),
@@ -62,15 +66,24 @@ function durationDays(start: string, end: string | null) {
 
 export const marketingCampaignAutomationTask = task({
   id: "marketing-campaign-automation",
-  queue: { name: "ai-text", concurrencyLimit: 1 },
+  queue: { name: "ai-text", concurrencyLimit: 2 },
   retry: { maxAttempts: 1 },
   maxDuration: 900,
   run: async (payload: z.infer<typeof payloadSchema>) => {
     const input = payloadSchema.parse(payload);
     const campaign = await findMarketingCampaign(input);
     if (!campaign) throw new Error("Campaign not found.");
-    if (campaign.automationStatus === "completed")
-      return { campaignId: campaign.id, status: "completed" as const };
+    if (campaign.automationStatus === "completed") {
+      const existingContent = await listMarketingCampaignContent(input);
+      if (
+        getCampaignAutomationPresentation({
+          status: campaign.automationStatus,
+          completedAt: campaign.automationCompletedAt,
+          contentCount: existingContent.length,
+        }).completed
+      )
+        return { campaignId: campaign.id, status: "completed" as const };
+    }
     let contentReservation: {
       runId: string;
       reservationId: string;
@@ -375,11 +388,9 @@ export const marketingCampaignAutomationTask = task({
         status: "completed" as const,
         generatedItems: validItems.length,
       };
-    } catch (error) {
+    } catch {
       const message =
-        error instanceof Error
-          ? error.message
-          : "Campaign content generation failed.";
+        "Campaign automation failed during research or content generation. Try again.";
       if (contentReservation && !contentReconciled)
         await failMarketingRun({
           workspaceId: input.workspaceId,
