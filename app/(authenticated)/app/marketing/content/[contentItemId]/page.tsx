@@ -79,6 +79,14 @@ export default async function MarketingContentDetailPage({
               Open Social post
             </Link>
           ) : null}
+          {typeof item.structuredPayload?.projectId === "string" ? (
+            <Link
+              className="mt-3 block text-sm underline"
+              href={`/app/projects/${item.structuredPayload.projectId}/storyboard`}
+            >
+              Open video storyboard
+            </Link>
+          ) : null}
         </section>
         <section>
           <h2 className="mb-3 font-medium">History</h2>

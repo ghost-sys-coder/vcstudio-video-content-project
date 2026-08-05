@@ -24,6 +24,9 @@ export function MarketingCampaignCard({
         {campaign.objective} · {campaign.trafficType} ·{" "}
         {campaign.platforms.join(", ")}
       </p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Automation: {campaign.automationStatus}
+      </p>
     </Link>
   );
 }

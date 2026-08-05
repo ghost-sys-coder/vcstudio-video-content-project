@@ -730,6 +730,28 @@ export const marketingEnvironmentSchema = z.object({
     .min(2)
     .max(200)
     .default(40),
+  MARKETING_RESEARCH_PROVIDER: z
+    .enum(["tavily", "brave", "serpapi", "none"])
+    .default("tavily"),
+  TAVILY_API_KEY: z.string().min(1).optional(),
+  MARKETING_RESEARCH_FRESHNESS_DAYS: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(90)
+    .default(7),
+  MARKETING_RESEARCH_MAX_QUERIES: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(3)
+    .default(3),
+  MARKETING_RESEARCH_DAILY_MAX_RUNS: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .default(10),
 });
 
 /**

@@ -51,6 +51,14 @@ export {
   renderPaidCampaignPrompt,
 } from "./marketing-campaign";
 export {
+  MARKETING_RESEARCH_PROMPT_VERSION,
+  renderMarketingResearchPrompt,
+} from "./marketing-research";
+export {
+  MARKETING_CAMPAIGN_AUTOMATION_PROMPT_VERSION,
+  renderCampaignAutomationPrompt,
+} from "./marketing-campaign-automation";
+export {
   MARKETING_DOCUMENT_SUMMARY_EXCERPT_CHARACTERS,
   MARKETING_DOCUMENT_SUMMARY_PROMPT_VERSION,
   renderMarketingDocumentSummaryPrompt,

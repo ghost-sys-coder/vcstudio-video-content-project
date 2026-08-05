@@ -6,7 +6,10 @@ import {
   renderOrganicCampaignPrompt,
   renderPaidCampaignPrompt,
 } from "@studio/prompts";
-import { createMarketingCampaign } from "@/db/commands/marketing-campaign-commands";
+import {
+  createMarketingCampaign,
+  updateCampaignAutomationState,
+} from "@/db/commands/marketing-campaign-commands";
 import {
   attachMarketingToolCallRun,
   beginMarketingToolCall,
@@ -39,6 +42,7 @@ import { createMarketingContentItem } from "@/db/commands/marketing-content-comm
 import { plainTextToPortableDocument } from "@/lib/social/plain-text-to-document";
 import type { ContentPlatform, MarketingContentKind } from "@/db/schema";
 import { marketingCampaignMutationSchema } from "@/lib/schemas/marketing-campaign";
+import { dispatchCampaignAutomation } from "@/lib/marketing/campaigns/dispatch-campaign-automation";
 
 const CONTENT_KIND_BY_SKILL = {
   create_social_post: "social_post",
@@ -219,6 +223,20 @@ export async function executeInlineMarketingSkill(input: {
         createdByUserId: context.userId,
       });
       campaignId = campaign.id;
+      try {
+        await dispatchCampaignAutomation({
+          workspaceId: context.workspaceId,
+          campaignId: campaign.id,
+          requestedByUserId: context.userId,
+        });
+      } catch {
+        await updateCampaignAutomationState({
+          workspaceId: context.workspaceId,
+          campaignId: campaign.id,
+          status: "failed",
+          error: "Campaign automation could not be queued. Try again.",
+        });
+      }
       if (campaign.trafficType !== "organic") {
         for (const [index, variantLabel] of ["A", "B", "C"].entries()) {
           const headline = String(input.values.keyMessage).slice(0, 80);

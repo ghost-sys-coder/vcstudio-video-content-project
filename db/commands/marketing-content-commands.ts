@@ -25,6 +25,7 @@ export async function createMarketingContentItem(input: {
   createdByUserId?: string | null;
   trafficType?: "organic" | "paid" | "both";
   structuredPayload?: Record<string, unknown> | null;
+  scheduledFor?: Date | null;
 }) {
   const database = getDatabase();
   const [item] = await database
@@ -37,6 +38,7 @@ export async function createMarketingContentItem(input: {
       createdByUserId: input.createdByUserId ?? null,
       trafficType: input.trafficType ?? "organic",
       structuredPayload: input.structuredPayload ?? null,
+      scheduledFor: input.scheduledFor ?? null,
       status: "needs_review",
     })
     .returning();
@@ -64,6 +66,45 @@ export async function attachMediaToMarketingContent(input: {
     mediaAssetId: input.mediaAssetId,
     position: 0,
   });
+}
+
+export async function updateMarketingContentStructuredPayload(input: {
+  workspaceId: string;
+  contentItemId: string;
+  structuredPayload: Record<string, unknown>;
+}) {
+  await getDatabase()
+    .update(marketingContentItems)
+    .set({ structuredPayload: input.structuredPayload, updatedAt: new Date() })
+    .where(
+      and(
+        eq(marketingContentItems.workspaceId, input.workspaceId),
+        eq(marketingContentItems.id, input.contentItemId),
+      ),
+    );
+}
+
+export async function failMarketingContentItem(input: {
+  workspaceId: string;
+  contentItemId: string;
+  category: string;
+  message: string;
+}) {
+  await getDatabase()
+    .update(marketingContentItems)
+    .set({
+      status: "failed",
+      errorCategory: input.category,
+      safeErrorMessage: input.message,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(marketingContentItems.workspaceId, input.workspaceId),
+        eq(marketingContentItems.id, input.contentItemId),
+        eq(marketingContentItems.status, "needs_review"),
+      ),
+    );
 }
 
 export async function transitionMarketingContent(input: {

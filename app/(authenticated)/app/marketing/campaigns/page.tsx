@@ -2,13 +2,16 @@ import { MarketingCampaignCard } from "@/components/marketing/MarketingCampaignC
 import { MarketingCampaignForm } from "@/components/marketing/MarketingCampaignForm";
 import { listMarketingCampaigns } from "@/db/repositories/marketing-campaigns.repository";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
+import { listActiveMarketingCompetitors } from "@/db/repositories/marketing-research.repository";
 
 export default async function MarketingCampaignsPage() {
   const context = await getAuthenticatedWorkspaceContext();
   if (!context) return null;
-  const campaigns = await listMarketingCampaigns({
-    workspaceId: context.activeMembership.workspaceId,
-  });
+  const workspaceId = context.activeMembership.workspaceId;
+  const [campaigns, competitors] = await Promise.all([
+    listMarketingCampaigns({ workspaceId }),
+    listActiveMarketingCompetitors({ workspaceId }),
+  ]);
   return (
     <div className="space-y-8 p-6">
       <header>
@@ -19,7 +22,7 @@ export default async function MarketingCampaignsPage() {
       </header>
       <section className="space-y-3">
         <h2 className="font-medium">New campaign</h2>
-        <MarketingCampaignForm />
+        <MarketingCampaignForm automationReady={competitors.length > 0} />
       </section>
       <section className="space-y-3">
         <h2 className="font-medium">Campaign library</h2>

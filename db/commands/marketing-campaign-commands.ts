@@ -29,6 +29,37 @@ function values(input: MarketingCampaignInput & { createdByUserId?: string }) {
   };
 }
 
+export async function updateCampaignAutomationState(input: {
+  workspaceId: string;
+  campaignId: string;
+  status: "pending" | "researching" | "generating" | "completed" | "failed";
+  triggerRunId?: string;
+  error?: string | null;
+}) {
+  await getDatabase()
+    .update(marketingCampaigns)
+    .set({
+      automationStatus: input.status,
+      ...(input.triggerRunId
+        ? { automationTriggerRunId: input.triggerRunId }
+        : {}),
+      automationError: input.error ?? null,
+      ...(input.status === "researching"
+        ? { automationStartedAt: new Date() }
+        : {}),
+      ...(["completed", "failed"].includes(input.status)
+        ? { automationCompletedAt: new Date() }
+        : {}),
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(marketingCampaigns.workspaceId, input.workspaceId),
+        eq(marketingCampaigns.id, input.campaignId),
+      ),
+    );
+}
+
 export async function createMarketingCampaign(
   input: MarketingCampaignInput & {
     workspaceId: string;

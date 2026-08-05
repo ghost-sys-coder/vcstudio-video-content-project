@@ -4,11 +4,14 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   createMarketingCampaign,
+  updateCampaignAutomationState,
   updateMarketingCampaign,
 } from "@/db/commands/marketing-campaign-commands";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import { requireCapability } from "@/lib/policies/workspace-policy";
 import { marketingCampaignMutationSchema } from "@/lib/schemas/marketing-campaign";
+import { dispatchCampaignAutomation } from "@/lib/marketing/campaigns/dispatch-campaign-automation";
+import { findMarketingCampaign } from "@/db/repositories/marketing-campaigns.repository";
 
 function parse(formData: FormData) {
   return marketingCampaignMutationSchema.safeParse({
@@ -28,6 +31,11 @@ async function context() {
 export async function saveMarketingCampaignAction(formData: FormData) {
   const parsed = parse(formData);
   if (!parsed.success) throw new Error("Invalid campaign details.");
+  if (
+    !parsed.data.campaignId &&
+    formData.get("confirmAutomationSpend") !== "on"
+  )
+    throw new Error("Confirm automatic campaign generation before creating.");
   const auth = await context();
   const workspaceId = auth.activeMembership.workspaceId;
   const campaign = parsed.data.campaignId
@@ -41,6 +49,43 @@ export async function saveMarketingCampaignAction(formData: FormData) {
         workspaceId,
         createdByUserId: auth.user.id,
       });
+  if (!parsed.data.campaignId)
+    try {
+      await dispatchCampaignAutomation({
+        workspaceId,
+        campaignId: campaign.id,
+        requestedByUserId: auth.user.id,
+      });
+    } catch {
+      await updateCampaignAutomationState({
+        workspaceId,
+        campaignId: campaign.id,
+        status: "failed",
+        error: "Campaign automation could not be queued. Try again.",
+      });
+    }
   revalidatePath("/app/marketing/campaigns");
   redirect(`/app/marketing/campaigns/${campaign.id}`);
+}
+
+export async function retryCampaignAutomationAction(formData: FormData) {
+  const campaignId = String(formData.get("campaignId") ?? "");
+  const auth = await context();
+  const workspaceId = auth.activeMembership.workspaceId;
+  const campaign = await findMarketingCampaign({ workspaceId, campaignId });
+  if (!campaign || campaign.automationStatus !== "failed")
+    throw new Error("Campaign automation cannot be retried.");
+  await updateCampaignAutomationState({
+    workspaceId,
+    campaignId,
+    status: "pending",
+    error: null,
+  });
+  await dispatchCampaignAutomation({
+    workspaceId,
+    campaignId,
+    requestedByUserId: auth.user.id,
+    attempt: Date.now(),
+  });
+  revalidatePath(`/app/marketing/campaigns/${campaignId}`);
 }

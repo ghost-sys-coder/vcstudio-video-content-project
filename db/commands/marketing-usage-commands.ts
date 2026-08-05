@@ -50,6 +50,28 @@ export async function markMarketingRunRunning(input: {
     );
 }
 
+export async function setMarketingRunPrompt(input: {
+  workspaceId: string;
+  runId: string;
+  finalPrompt: string;
+  requestFingerprint: string;
+}) {
+  await getDatabase()
+    .update(marketingGenerationRuns)
+    .set({
+      finalPrompt: input.finalPrompt,
+      requestFingerprint: input.requestFingerprint,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(marketingGenerationRuns.workspaceId, input.workspaceId),
+        eq(marketingGenerationRuns.id, input.runId),
+        eq(marketingGenerationRuns.status, "running"),
+      ),
+    );
+}
+
 /**
  * Settles a successful run at its actual cost.
  *

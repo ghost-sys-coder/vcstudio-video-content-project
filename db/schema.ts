@@ -4442,6 +4442,141 @@ export const marketingCampaignStatusEnum = pgEnum("marketing_campaign_status", [
   "completed",
   "archived",
 ]);
+export const marketingCampaignAutomationStatusEnum = pgEnum(
+  "marketing_campaign_automation_status",
+  ["pending", "researching", "generating", "completed", "failed"],
+);
+
+export const marketingResearchKindEnum = pgEnum("marketing_research_kind", [
+  "competitor",
+  "trend",
+  "keyword",
+  "audience",
+]);
+export const marketingResearchStatusEnum = pgEnum("marketing_research_status", [
+  "pending",
+  "running",
+  "succeeded",
+  "failed",
+]);
+
+export const marketingCompetitors = pgTable(
+  "marketing_competitors",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    websiteUrl: text("website_url"),
+    handles: jsonb("handles")
+      .$type<Partial<Record<ContentPlatform, string>>>()
+      .notNull()
+      .default({}),
+    notes: text("notes").notNull().default(""),
+    priority: integer("priority").notNull().default(0),
+    isActive: boolean("is_active").notNull().default(true),
+    lastResearchedAt: timestamp("last_researched_at", { withTimezone: true }),
+    createdByUserId: uuid("created_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("marketing_competitors_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    uniqueIndex("marketing_competitors_active_website_unique")
+      .on(table.workspaceId, table.websiteUrl)
+      .where(
+        sql`${table.websiteUrl} is not null and ${table.deletedAt} is null`,
+      ),
+    index("marketing_competitors_active_priority_index").on(
+      table.workspaceId,
+      table.isActive,
+      table.priority,
+    ),
+  ],
+);
+
+export const marketingResearchSnapshots = pgTable(
+  "marketing_research_snapshots",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    kind: marketingResearchKindEnum("kind").notNull(),
+    competitorId: uuid("competitor_id"),
+    topic: text("topic").notNull(),
+    queries: jsonb("queries").$type<string[]>().notNull().default([]),
+    provider: text("provider").notNull().default(""),
+    providerRequestId: text("provider_request_id"),
+    status: marketingResearchStatusEnum("status").notNull().default("pending"),
+    resultDocument: jsonb("result_document").$type<Record<string, unknown>>(),
+    citations: jsonb("citations")
+      .$type<Record<string, unknown>[]>()
+      .notNull()
+      .default([]),
+    resultHash: text("result_hash"),
+    freshnessWindowDays: integer("freshness_window_days").notNull().default(7),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    runId: uuid("run_id").references(() => marketingGenerationRuns.id, {
+      onDelete: "set null",
+    }),
+    errorCategory: text("error_category"),
+    safeErrorMessage: text("safe_error_message"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("marketing_research_snapshots_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    index("marketing_research_snapshots_kind_created_index").on(
+      table.workspaceId,
+      table.kind,
+      table.createdAt,
+    ),
+    index("marketing_research_snapshots_competitor_created_index").on(
+      table.workspaceId,
+      table.competitorId,
+      table.createdAt,
+    ),
+    index("marketing_research_snapshots_expiry_index").on(
+      table.workspaceId,
+      table.expiresAt,
+    ),
+    foreignKey({
+      columns: [table.competitorId, table.workspaceId],
+      foreignColumns: [
+        marketingCompetitors.id,
+        marketingCompetitors.workspaceId,
+      ],
+      name: "marketing_research_snapshots_tenant_competitor_fkey",
+    }).onDelete("cascade"),
+    check(
+      "marketing_research_snapshots_competitor_kind",
+      sql`(${table.kind} = 'competitor') = (${table.competitorId} is not null)`,
+    ),
+    check(
+      "marketing_research_snapshots_freshness_positive",
+      sql`${table.freshnessWindowDays} > 0`,
+    ),
+  ],
+);
 
 export const marketingCampaigns = pgTable(
   "marketing_campaigns",
@@ -4475,6 +4610,17 @@ export const marketingCampaigns = pgTable(
       .default({ type: "doc", content: [] }),
     briefPlainText: text("brief_plain_text").notNull().default(""),
     isBranded: boolean("is_branded").notNull().default(true),
+    automationStatus: marketingCampaignAutomationStatusEnum("automation_status")
+      .notNull()
+      .default("pending"),
+    automationTriggerRunId: text("automation_trigger_run_id"),
+    automationError: text("automation_error"),
+    automationStartedAt: timestamp("automation_started_at", {
+      withTimezone: true,
+    }),
+    automationCompletedAt: timestamp("automation_completed_at", {
+      withTimezone: true,
+    }),
     createdByUserId: uuid("created_by_user_id").references(() => users.id, {
       onDelete: "set null",
     }),
@@ -4939,6 +5085,9 @@ export type MarketingChatMessage = typeof marketingChatMessages.$inferSelect;
 export type MarketingChatToolCall = typeof marketingChatToolCalls.$inferSelect;
 export type MarketingContentItem = typeof marketingContentItems.$inferSelect;
 export type MarketingCampaign = typeof marketingCampaigns.$inferSelect;
+export type MarketingCompetitor = typeof marketingCompetitors.$inferSelect;
+export type MarketingResearchSnapshot =
+  typeof marketingResearchSnapshots.$inferSelect;
 export type MarketingCampaignObjective =
   (typeof marketingCampaignObjectiveEnum.enumValues)[number];
 export type MarketingCampaignStatus =

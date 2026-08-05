@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { findMarketingCampaign } from "@/db/repositories/marketing-campaigns.repository";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
+import { CampaignAutomationStatus } from "@/components/marketing/CampaignAutomationStatus";
 
 export default async function CampaignBriefPage({
   params,
@@ -16,6 +17,7 @@ export default async function CampaignBriefPage({
   if (!campaign) notFound();
   return (
     <article className="max-w-3xl space-y-4">
+      <CampaignAutomationStatus campaign={campaign} />
       <section>
         <h2 className="font-medium">Key message</h2>
         <p className="whitespace-pre-wrap text-sm text-muted-foreground">

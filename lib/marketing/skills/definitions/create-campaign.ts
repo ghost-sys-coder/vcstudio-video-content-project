@@ -89,5 +89,5 @@ export const createCampaignSkill = {
   },
   instructions:
     "Create a campaign plan using the dedicated organic or paid campaign prompt selected from traffic type.",
-  estimatedCostRangeCents: [2, 8],
+  estimatedCostRangeCents: [20, 500],
 } satisfies MarketingSkillDefinition;

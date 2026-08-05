@@ -6,8 +6,10 @@ import { SOCIAL_POST_PLATFORMS } from "@/lib/social/platform-post-capabilities";
 
 export function MarketingCampaignForm({
   campaign,
+  automationReady = true,
 }: {
   campaign?: MarketingCampaign;
+  automationReady?: boolean;
 }) {
   return (
     <form action={saveMarketingCampaignAction} className="grid gap-4 max-w-3xl">
@@ -169,7 +171,33 @@ export function MarketingCampaignForm({
         />
         Use branded content
       </label>
-      <Button className="w-fit" type="submit">
+      {!campaign ? (
+        <label className="flex max-w-2xl items-start gap-2 rounded-lg border p-3 text-sm">
+          <input
+            className="mt-0.5"
+            name="confirmAutomationSpend"
+            required
+            type="checkbox"
+          />
+          <span>
+            Generate campaign content automatically after creation. This runs
+            current web research and AI text/image generation against the
+            workspace budget. Every result will require owner/editor approval
+            before scheduling.
+          </span>
+        </label>
+      ) : null}
+      {!campaign && !automationReady ? (
+        <p className="text-sm text-destructive">
+          Add at least one real competitor under Research before creating a
+          campaign. Current, cited research is required for automatic content.
+        </p>
+      ) : null}
+      <Button
+        className="w-fit"
+        disabled={!campaign && !automationReady}
+        type="submit"
+      >
         {campaign ? "Save campaign" : "Create campaign"}
       </Button>
     </form>
