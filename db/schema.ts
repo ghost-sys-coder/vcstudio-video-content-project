@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  date,
   foreignKey,
   index,
   integer,
@@ -4430,6 +4431,77 @@ export const marketingRevisionSourceEnum = pgEnum("marketing_revision_source", [
   "human",
 ]);
 
+export const marketingCampaignObjectiveEnum = pgEnum(
+  "marketing_campaign_objective",
+  ["awareness", "traffic", "leads", "sales", "retention", "hiring"],
+);
+export const marketingCampaignStatusEnum = pgEnum("marketing_campaign_status", [
+  "draft",
+  "active",
+  "paused",
+  "completed",
+  "archived",
+]);
+
+export const marketingCampaigns = pgTable(
+  "marketing_campaigns",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    objective: marketingCampaignObjectiveEnum("objective").notNull(),
+    trafficType: marketingTrafficTypeEnum("traffic_type").notNull(),
+    status: marketingCampaignStatusEnum("status").notNull().default("draft"),
+    startDate: date("start_date", { mode: "string" }).notNull(),
+    endDate: date("end_date", { mode: "string" }),
+    audienceId: uuid("audience_id").references(
+      () => marketingBrandAudiences.id,
+      { onDelete: "set null" },
+    ),
+    offerId: uuid("offer_id").references(() => marketingBrandOffers.id, {
+      onDelete: "set null",
+    }),
+    keyMessage: text("key_message").notNull().default(""),
+    hypothesis: text("hypothesis").notNull().default(""),
+    platforms: jsonb("platforms")
+      .$type<ContentPlatform[]>()
+      .notNull()
+      .default([]),
+    briefDocument: jsonb("brief_document")
+      .$type<PortableDocument>()
+      .notNull()
+      .default({ type: "doc", content: [] }),
+    briefPlainText: text("brief_plain_text").notNull().default(""),
+    isBranded: boolean("is_branded").notNull().default(true),
+    createdByUserId: uuid("created_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("marketing_campaigns_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    index("marketing_campaigns_workspace_status_start_index").on(
+      table.workspaceId,
+      table.status,
+      table.startDate,
+    ),
+    check(
+      "marketing_campaigns_date_order",
+      sql`${table.endDate} is null or ${table.endDate} >= ${table.startDate}`,
+    ),
+  ],
+);
+
 export const marketingContentItems = pgTable(
   "marketing_content_items",
   {
@@ -4437,6 +4509,7 @@ export const marketingContentItems = pgTable(
     workspaceId: uuid("workspace_id")
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
+    campaignId: uuid("campaign_id"),
     kind: marketingContentKindEnum("kind").notNull(),
     platform: contentPlatformEnum("platform"),
     trafficType: marketingTrafficTypeEnum("traffic_type")
@@ -4478,6 +4551,11 @@ export const marketingContentItems = pgTable(
       .notNull(),
   },
   (table) => [
+    foreignKey({
+      columns: [table.campaignId, table.workspaceId],
+      foreignColumns: [marketingCampaigns.id, marketingCampaigns.workspaceId],
+      name: "marketing_content_items_tenant_campaign_fkey",
+    }).onDelete("restrict"),
     uniqueIndex("marketing_content_items_id_workspace_unique").on(
       table.id,
       table.workspaceId,
@@ -4860,6 +4938,11 @@ export type MarketingThreadStatus =
 export type MarketingChatMessage = typeof marketingChatMessages.$inferSelect;
 export type MarketingChatToolCall = typeof marketingChatToolCalls.$inferSelect;
 export type MarketingContentItem = typeof marketingContentItems.$inferSelect;
+export type MarketingCampaign = typeof marketingCampaigns.$inferSelect;
+export type MarketingCampaignObjective =
+  (typeof marketingCampaignObjectiveEnum.enumValues)[number];
+export type MarketingCampaignStatus =
+  (typeof marketingCampaignStatusEnum.enumValues)[number];
 export type MarketingContentStatus =
   (typeof marketingContentStatusEnum.enumValues)[number];
 export type MarketingContentKind =

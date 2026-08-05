@@ -1,3 +1,5 @@
+import { createCampaignSkill } from "@/lib/marketing/skills/definitions/create-campaign";
+import { createVideoDraftSkill } from "@/lib/marketing/skills/definitions/create-video-draft";
 import { createMediaStorySkill } from "@/lib/marketing/skills/definitions/create-media-story";
 import { createNewsletterSkill } from "@/lib/marketing/skills/definitions/create-newsletter";
 import { createSocialPostSkill } from "@/lib/marketing/skills/definitions/create-social-post";
@@ -10,6 +12,8 @@ import type { MarketingSkillDefinition } from "@/lib/marketing/skills/skill-defi
 import type { MarketingSkillKey } from "@/lib/marketing/skills/skill-key";
 
 export const MARKETING_SKILL_REGISTRY = {
+  create_campaign: createCampaignSkill,
+  create_video_draft: createVideoDraftSkill,
   create_social_post: createSocialPostSkill,
   create_social_graphic: createSocialGraphicSkill,
   write_email: writeEmailSkill,

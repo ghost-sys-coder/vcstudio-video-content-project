@@ -46,6 +46,11 @@ export {
 } from "./marketing-skill";
 export type { MarketingSkillPromptInput } from "./marketing-skill";
 export {
+  MARKETING_CAMPAIGN_PROMPT_VERSION,
+  renderOrganicCampaignPrompt,
+  renderPaidCampaignPrompt,
+} from "./marketing-campaign";
+export {
   MARKETING_DOCUMENT_SUMMARY_EXCERPT_CHARACTERS,
   MARKETING_DOCUMENT_SUMMARY_PROMPT_VERSION,
   renderMarketingDocumentSummaryPrompt,

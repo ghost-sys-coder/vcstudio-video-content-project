@@ -63,7 +63,8 @@ describe("buildChatTools", () => {
   it("registers every paid skill with the turn cost ceiling", () => {
     expect(getBillableChatToolNames(definitions).sort()).toEqual(
       MARKETING_SKILL_KEYS.filter(
-        (key) => key !== "search_brand_knowledge",
+        (key) =>
+          key !== "search_brand_knowledge" && key !== "create_video_draft",
       ).sort(),
     );
   });

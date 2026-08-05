@@ -199,7 +199,7 @@ export async function beginAssistantMessage(input: {
 export async function appendDeferredToolResultMessage(input: {
   workspaceId: string;
   threadId: string;
-  runId: string;
+  runId: string | null;
   part: MarketingChatMessagePart;
   plainText: string;
   costCents: number;

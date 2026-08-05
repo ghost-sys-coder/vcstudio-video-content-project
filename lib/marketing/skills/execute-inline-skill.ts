@@ -1,7 +1,12 @@
 import "server-only";
 import { openai } from "@ai-sdk/openai";
 import { generateText } from "ai";
-import { renderMarketingSkillPrompt } from "@studio/prompts";
+import {
+  renderMarketingSkillPrompt,
+  renderOrganicCampaignPrompt,
+  renderPaidCampaignPrompt,
+} from "@studio/prompts";
+import { createMarketingCampaign } from "@/db/commands/marketing-campaign-commands";
 import {
   attachMarketingToolCallRun,
   beginMarketingToolCall,
@@ -33,6 +38,7 @@ import { reserveMarketingUsage } from "@/lib/marketing/usage/reserve-marketing-u
 import { createMarketingContentItem } from "@/db/commands/marketing-content-commands";
 import { plainTextToPortableDocument } from "@/lib/social/plain-text-to-document";
 import type { ContentPlatform, MarketingContentKind } from "@/db/schema";
+import { marketingCampaignMutationSchema } from "@/lib/schemas/marketing-campaign";
 
 const CONTENT_KIND_BY_SKILL = {
   create_social_post: "social_post",
@@ -47,7 +53,12 @@ export async function executeInlineMarketingSkill(input: {
   values: Record<string, string | number>;
   toolCallId: string;
   context: SkillExecutionContext;
-}): Promise<{ text: string; skillKey: string; contentItemId?: string }> {
+}): Promise<{
+  text: string;
+  skillKey: string;
+  contentItemId?: string;
+  campaignId?: string;
+}> {
   const { definition, context } = input;
   requireCapability(context.role, definition.capability);
   if (
@@ -62,12 +73,25 @@ export async function executeInlineMarketingSkill(input: {
   });
   const environment = getMarketingEnvironment();
   const hashEnvironment = getSceneAnalysisEnvironment();
-  const prompt = renderMarketingSkillPrompt({
-    skillLabel: definition.label,
-    instructions: definition.instructions,
-    inputs: input.values,
+  const campaignPromptInput = {
+    name: String(input.values.name ?? ""),
+    objective: String(input.values.objective ?? ""),
+    platform: String(input.values.platform ?? ""),
+    keyMessage: String(input.values.keyMessage ?? ""),
+    audience: String(input.values.audience ?? ""),
     brandContext: context.brandContext,
-  });
+  };
+  const prompt =
+    definition.key === "create_campaign"
+      ? input.values.trafficType === "organic"
+        ? renderOrganicCampaignPrompt(campaignPromptInput)
+        : renderPaidCampaignPrompt(campaignPromptInput)
+      : renderMarketingSkillPrompt({
+          skillLabel: definition.label,
+          instructions: definition.instructions,
+          inputs: input.values,
+          brandContext: context.brandContext,
+        });
   const estimatedCostCents = estimateMarketingTextCost({
     prompt,
     expectedOutputTokens: definition.billing.expectedOutputTokens,
@@ -98,6 +122,10 @@ export async function executeInlineMarketingSkill(input: {
       contentItemId:
         typeof toolRow.output.contentItemId === "string"
           ? toolRow.output.contentItemId
+          : undefined,
+      campaignId:
+        typeof toolRow.output.campaignId === "string"
+          ? toolRow.output.campaignId
           : undefined,
     };
   if (toolRow.runId) throw new Error("MARKETING_TOOL_CALL_ALREADY_RUNNING");
@@ -171,6 +199,54 @@ export async function executeInlineMarketingSkill(input: {
         definition.key as keyof typeof CONTENT_KIND_BY_SKILL
       ];
     let contentItemId: string | undefined;
+    let campaignId: string | undefined;
+    if (definition.key === "create_campaign") {
+      const campaignInput = marketingCampaignMutationSchema.parse({
+        name: input.values.name,
+        objective: input.values.objective,
+        trafficType: input.values.trafficType,
+        status: "draft",
+        startDate: new Date().toISOString().slice(0, 10),
+        platforms: [input.values.platform],
+        keyMessage: input.values.keyMessage,
+        hypothesis: `If we communicate ${String(input.values.keyMessage)}, the campaign will improve ${String(input.values.objective)} among ${String(input.values.audience)}.`,
+        briefPlainText: result.text,
+        isBranded: true,
+      });
+      const campaign = await createMarketingCampaign({
+        ...campaignInput,
+        workspaceId: context.workspaceId,
+        createdByUserId: context.userId,
+      });
+      campaignId = campaign.id;
+      if (campaign.trafficType !== "organic") {
+        for (const [index, variantLabel] of ["A", "B", "C"].entries()) {
+          const headline = String(input.values.keyMessage).slice(0, 80);
+          const primaryText = `${String(input.values.audience)}: ${String(input.values.keyMessage)} ${index === 0 ? "Learn what changes next." : index === 1 ? "See the practical difference." : "Explore a clearer path forward."}`;
+          await createMarketingContentItem({
+            workspaceId: context.workspaceId,
+            campaignId: campaign.id,
+            kind: "ad_creative",
+            platform: campaign.platforms[0] ?? null,
+            trafficType: "paid",
+            title: `${campaign.name} · Variant ${variantLabel}`,
+            bodyDocument: plainTextToPortableDocument(primaryText),
+            bodyPlainText: primaryText,
+            structuredPayload: {
+              headline,
+              primaryText,
+              description: "Campaign creative for review and export.",
+              cta: campaign.objective === "sales" ? "Shop now" : "Learn more",
+              platform: campaign.platforms[0],
+              placement: "feed",
+              variantLabel,
+            },
+            sourceRunId: reservation.runId,
+            createdByUserId: context.userId,
+          });
+        }
+      }
+    }
     if (contentKind) {
       const item = await createMarketingContentItem({
         workspaceId: context.workspaceId,
@@ -190,7 +266,7 @@ export async function executeInlineMarketingSkill(input: {
     await completeMarketingToolCall({
       workspaceId: context.workspaceId,
       id: toolRow.id,
-      output: { text: result.text, contentItemId },
+      output: { text: result.text, contentItemId, campaignId },
       actualCostCents,
     });
     await reconcileMarketingUsage({
@@ -204,7 +280,12 @@ export async function executeInlineMarketingSkill(input: {
       providerRequestId: result.response.id,
       safeMetadata: { threadId: context.threadId, skillKey: definition.key },
     });
-    return { text: result.text, skillKey: definition.key, contentItemId };
+    return {
+      text: result.text,
+      skillKey: definition.key,
+      contentItemId,
+      campaignId,
+    };
   } catch (error) {
     const failure = classifyMarketingProviderError(error);
     const charged =

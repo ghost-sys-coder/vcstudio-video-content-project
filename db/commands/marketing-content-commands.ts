@@ -15,6 +15,7 @@ import type { PortableDocument } from "@/lib/social/portable-document";
 
 export async function createMarketingContentItem(input: {
   workspaceId: string;
+  campaignId?: string | null;
   kind: MarketingContentKind;
   platform?: ContentPlatform | null;
   title: string;
@@ -22,15 +23,20 @@ export async function createMarketingContentItem(input: {
   bodyPlainText: string;
   sourceRunId?: string | null;
   createdByUserId?: string | null;
+  trafficType?: "organic" | "paid" | "both";
+  structuredPayload?: Record<string, unknown> | null;
 }) {
   const database = getDatabase();
   const [item] = await database
     .insert(marketingContentItems)
     .values({
       ...input,
+      campaignId: input.campaignId ?? null,
       platform: input.platform ?? null,
       sourceRunId: input.sourceRunId ?? null,
       createdByUserId: input.createdByUserId ?? null,
+      trafficType: input.trafficType ?? "organic",
+      structuredPayload: input.structuredPayload ?? null,
       status: "needs_review",
     })
     .returning();

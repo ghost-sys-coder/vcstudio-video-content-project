@@ -65,6 +65,8 @@ export const marketingChatToolResultPartSchema = z.object({
     summary: z.string().min(1).max(4_000),
     contentItemId: z.uuid().optional(),
     mediaAssetId: z.uuid().optional(),
+    projectId: z.uuid().optional(),
+    campaignId: z.uuid().optional(),
     failed: z.boolean().optional(),
   }),
 });

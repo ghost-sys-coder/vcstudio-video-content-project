@@ -3,6 +3,7 @@ import { tool, type ToolSet } from "ai";
 import { searchBrandKnowledge } from "@/lib/marketing/chat/search-brand-knowledge";
 import { executeInlineMarketingSkill } from "@/lib/marketing/skills/execute-inline-skill";
 import { executeDeferredMarketingSkill } from "@/lib/marketing/skills/execute-deferred-skill";
+import { executeVideoDraftSkill } from "@/lib/marketing/skills/execute-video-draft-skill";
 import type {
   MarketingSkillDefinition,
   SkillExecutionContext,
@@ -23,6 +24,13 @@ export function buildChatTools(input: {
             string,
             string | number
           >;
+          if (definition.key === "create_video_draft")
+            return executeVideoDraftSkill({
+              definition,
+              values: parsed,
+              toolCallId: options.toolCallId,
+              context: input.context,
+            });
           if (definition.billing.kind === "free") {
             if (definition.key !== "search_brand_knowledge")
               throw new Error("MARKETING_FREE_SKILL_NOT_IMPLEMENTED");

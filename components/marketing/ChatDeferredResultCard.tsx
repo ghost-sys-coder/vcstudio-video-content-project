@@ -22,6 +22,22 @@ export function ChatDeferredResultCard({
           Open review item
         </Link>
       ) : null}
+      {result.projectId ? (
+        <Link
+          className="mt-2 inline-block text-xs font-medium text-primary underline-offset-4 hover:underline"
+          href={`/app/projects/${result.projectId}/storyboard`}
+        >
+          Open storyboard
+        </Link>
+      ) : null}
+      {result.campaignId ? (
+        <Link
+          className="mt-2 inline-block text-xs font-medium text-primary underline-offset-4 hover:underline"
+          href={`/app/marketing/campaigns/${result.campaignId}`}
+        >
+          Open campaign
+        </Link>
+      ) : null}
     </div>
   );
 }

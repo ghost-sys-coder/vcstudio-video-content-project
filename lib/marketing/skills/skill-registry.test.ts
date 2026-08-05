@@ -25,6 +25,7 @@ describe("loadMarketingSkillCatalogue", () => {
       hasBrandProfile: false,
     });
     expect(catalogue.map((item) => item.key).sort()).toEqual([
+      "create_video_draft",
       "search_brand_knowledge",
       "train_business_knowledge",
     ]);

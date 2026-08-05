@@ -1,4 +1,6 @@
 export const MARKETING_SKILL_KEYS = [
+  "create_campaign",
+  "create_video_draft",
   "create_social_post",
   "write_email",
   "write_blog_post",
