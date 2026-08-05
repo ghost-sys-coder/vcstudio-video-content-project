@@ -1,11 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
+const userSkills = vi.hoisted(() => ({ rows: [] as unknown[] }));
 vi.mock("@/lib/budgets/workspace-budget", () => ({
   loadEffectiveWorkspaceBudget: async () => ({
     dailyBudgetCents: 1000,
     monthlyBudgetCents: 10000,
     manualConfirmationThresholdCents: 3,
   }),
+}));
+vi.mock("@/db/repositories/marketing-skills.repository", () => ({
+  listMarketingSkills: async () => userSkills.rows,
 }));
 import { loadMarketingSkillCatalogue } from "@/lib/marketing/skills/skill-catalogue";
 describe("loadMarketingSkillCatalogue", () => {
@@ -95,5 +99,47 @@ describe("loadMarketingSkillCatalogue", () => {
         /^Example:/,
       );
     }
+  });
+
+  it("adds enabled workspace skills to owner and editor catalogues", async () => {
+    userSkills.rows = [
+      {
+        id: "11111111-1111-4111-8111-111111111111",
+        workspaceId: "22222222-2222-4222-8222-222222222222",
+        slug: "weekly-founder-note",
+        name: "Weekly founder note",
+        description: "Write a concise weekly note for business owners.",
+        instructions: "Summarize one useful lesson and one next action.",
+        baseSkillKey: "write_email",
+        inputFields: [
+          {
+            key: "topic",
+            label: "Topic",
+            type: "text",
+            required: true,
+            defaultValue: "A lesson from this week's client work",
+          },
+        ],
+        defaultPlatform: null,
+        defaultContentKind: "email",
+        isEnabled: true,
+        version: 1,
+        createdByUserId: "33333333-3333-4333-8333-333333333333",
+        deletedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ];
+    for (const role of ["owner", "editor"] as const) {
+      const catalogue = await loadMarketingSkillCatalogue({
+        workspaceId: "ws",
+        role,
+        hasBrandProfile: true,
+      });
+      expect(catalogue.some((item) => item.key === "weekly-founder-note")).toBe(
+        true,
+      );
+    }
+    userSkills.rows = [];
   });
 });

@@ -31,6 +31,7 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   invitation_revoked: "Invitation revoked",
   member_joined: "Member joined",
   member_removed: "Member removed",
+  marketing_skill_deleted: "Marketing skill deleted",
 };
 
 // Keys whose values are genuinely sensitive and must never be persisted to the

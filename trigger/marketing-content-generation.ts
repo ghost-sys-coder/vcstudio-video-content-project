@@ -22,8 +22,9 @@ import {
   getSceneAnalysisEnvironment,
 } from "@/lib/env/server";
 import { classifyMarketingProviderError } from "@/lib/marketing/marketing-provider-error";
-import { MARKETING_SKILL_REGISTRY } from "@/lib/marketing/skills/skill-registry";
+import { resolveMarketingSkillDefinition } from "@/lib/marketing/skills/load-skill-definitions";
 import { plainTextToPortableDocument } from "@/lib/social/plain-text-to-document";
+import { DELEGATABLE_MARKETING_SKILL_KEYS } from "@/lib/schemas/marketing-skill";
 
 const payloadSchema = z.object({ workspaceId: z.uuid(), toolCallId: z.uuid() });
 const kindBySkill = {
@@ -47,10 +48,14 @@ export const marketingContentGenerationTask = task({
       workspaceId: input.workspaceId,
       runId: toolCall.runId,
     });
-    const definition =
-      MARKETING_SKILL_REGISTRY[
-        toolCall.skillKey as keyof typeof MARKETING_SKILL_REGISTRY
-      ];
+    const definition = await resolveMarketingSkillDefinition({
+      workspaceId: input.workspaceId,
+      skillKey: toolCall.skillKey,
+      userSkillId:
+        typeof toolCall.input.__userSkillId === "string"
+          ? toolCall.input.__userSkillId
+          : undefined,
+    });
     const hashes = getSceneAnalysisEnvironment();
     if (
       !ledger ||
@@ -97,7 +102,15 @@ export const marketingContentGenerationTask = task({
             1_000_000,
         ),
       );
-      const kind = kindBySkill[toolCall.skillKey as keyof typeof kindBySkill];
+      const storedExecutorKey = toolCall.input.__executorKey;
+      const executorKey =
+        typeof storedExecutorKey === "string" &&
+        (DELEGATABLE_MARKETING_SKILL_KEYS as readonly string[]).includes(
+          storedExecutorKey,
+        )
+          ? storedExecutorKey
+          : (definition.executorKey ?? definition.key);
+      const kind = kindBySkill[executorKey as keyof typeof kindBySkill];
       if (!kind) throw new Error("Unsupported deferred content skill.");
       const item = await createMarketingContentItem({
         workspaceId: input.workspaceId,
@@ -106,7 +119,10 @@ export const marketingContentGenerationTask = task({
           typeof toolCall.input.platform === "string"
             ? (toolCall.input.platform as ContentPlatform)
             : null,
-        title: definition.label,
+        title:
+          typeof toolCall.input.__skillLabel === "string"
+            ? toolCall.input.__skillLabel
+            : definition.label,
         bodyDocument: plainTextToPortableDocument(result.text),
         bodyPlainText: result.text,
         sourceRunId: ledger.run.id,
@@ -141,11 +157,11 @@ export const marketingContentGenerationTask = task({
             type: "data-toolResult",
             data: {
               skillKey: toolCall.skillKey,
-              summary: `${definition.label} is ready for review.`,
+              summary: `${typeof toolCall.input.__skillLabel === "string" ? toolCall.input.__skillLabel : definition.label} is ready for review.`,
               contentItemId: item.id,
             },
           },
-          plainText: `${definition.label} is ready for review.`,
+          plainText: `${typeof toolCall.input.__skillLabel === "string" ? toolCall.input.__skillLabel : definition.label} is ready for review.`,
           costCents: actualCostCents,
         });
       return { toolCallId: toolCall.id, status: "succeeded" as const };

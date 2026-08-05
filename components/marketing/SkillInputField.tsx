@@ -38,8 +38,11 @@ export function SkillInputField({
       ) : (
         <Input
           id={`skill-${field.key}`}
+          max={field.type === "number" ? field.maximum : undefined}
+          min={field.type === "number" ? field.minimum : undefined}
           onChange={(event) => onChange(event.target.value)}
           placeholder={field.placeholder}
+          type={field.type === "number" ? "number" : "text"}
           value={value}
         />
       )}

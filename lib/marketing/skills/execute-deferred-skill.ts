@@ -44,6 +44,7 @@ export async function executeDeferredMarketingSkill(input: {
   context: SkillExecutionContext;
 }): Promise<{ status: "started"; toolCallId: string }> {
   const { definition, context } = input;
+  const executorKey = definition.executorKey ?? definition.key;
   requireCapability(context.role, definition.capability);
   if (!definition.operation || !definition.rateLimitOperation)
     throw new Error("MARKETING_DEFERRED_SKILL_NOT_BILLABLE");
@@ -94,7 +95,14 @@ export async function executeDeferredMarketingSkill(input: {
     messageId: context.messageId,
     toolCallId: input.toolCallId,
     skillKey: definition.key,
-    toolInput: input.values,
+    toolInput: definition.userSkillId
+      ? {
+          ...input.values,
+          __userSkillId: definition.userSkillId,
+          __executorKey: executorKey,
+          __skillLabel: definition.label,
+        }
+      : input.values,
     estimatedCostCents,
     status: "pending",
   });

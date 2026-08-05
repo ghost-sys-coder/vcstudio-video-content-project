@@ -395,6 +395,7 @@ export const auditActionEnum = pgEnum("audit_action", [
   "invitation_revoked",
   "member_joined",
   "member_removed",
+  "marketing_skill_deleted",
 ]);
 
 export const userThemePreferenceEnum = pgEnum("user_theme_preference", [
@@ -4973,6 +4974,75 @@ export const marketingScheduleRuleRuns = pgTable(
   ],
 );
 
+export type MarketingSkillInputFieldData = {
+  key: string;
+  label: string;
+  type: "text" | "longtext" | "select" | "number" | "platform";
+  required: boolean;
+  placeholder?: string;
+  defaultValue?: string;
+  options?: string[];
+  minimum?: number;
+  maximum?: number;
+};
+
+export const marketingSkills = pgTable(
+  "marketing_skills",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    name: text("name").notNull(),
+    description: text("description").notNull(),
+    instructions: text("instructions").notNull(),
+    baseSkillKey: text("base_skill_key").notNull(),
+    inputFields: jsonb("input_fields")
+      .$type<MarketingSkillInputFieldData[]>()
+      .notNull()
+      .default([]),
+    defaultPlatform: contentPlatformEnum("default_platform"),
+    defaultContentKind: marketingContentKindEnum(
+      "default_content_kind",
+    ).notNull(),
+    isEnabled: boolean("is_enabled").notNull().default(true),
+    version: integer("version").notNull().default(1),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("marketing_skills_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    uniqueIndex("marketing_skills_workspace_slug_active_unique")
+      .on(table.workspaceId, table.slug)
+      .where(sql`${table.deletedAt} is null`),
+    index("marketing_skills_workspace_enabled_index").on(
+      table.workspaceId,
+      table.isEnabled,
+    ),
+    check(
+      "marketing_skills_instructions_length",
+      sql`char_length(${table.instructions}) <= 8000`,
+    ),
+    check(
+      "marketing_skills_input_fields_length",
+      sql`jsonb_array_length(${table.inputFields}) <= 10`,
+    ),
+    check("marketing_skills_version_positive", sql`${table.version} > 0`),
+  ],
+);
+
 export const auditLogEvents = pgTable(
   "audit_log_events",
   {
@@ -5246,6 +5316,7 @@ export type MarketingUsageReservation =
   typeof marketingUsageReservations.$inferSelect;
 export type MarketingUsageEvent = typeof marketingUsageEvents.$inferSelect;
 export type MarketingScheduleRule = typeof marketingScheduleRules.$inferSelect;
+export type MarketingSkill = typeof marketingSkills.$inferSelect;
 export type MarketingScheduleRuleRun =
   typeof marketingScheduleRuleRuns.$inferSelect;
 export type MarketingScheduleFrequency =

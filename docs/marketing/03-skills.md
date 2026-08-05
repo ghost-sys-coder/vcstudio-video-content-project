@@ -257,7 +257,9 @@ skill is prompt text that will be executed later, possibly on a schedule.
 The slug collision rule stops a user skill shadowing `create_social_post` in the
 picker. The `baseSkillKey` allow-list means a user skill **cannot** delegate to
 `create_social_graphic` (image spend) or `analyse_competitors` (provider spend)
-in v1 — user-authored prompt text may not reach a paid executor.
+in v1 — user-authored prompt text may not reach an executor with separate
+image, research, campaign, knowledge, or video side effects. It can only refine
+the normal budget-reserved text-writing path.
 
 Field types are a closed set: `text | longtext | select | number | platform`.
 

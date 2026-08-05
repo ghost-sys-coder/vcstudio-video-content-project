@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { SettingsIcon } from "lucide-react";
+import { SettingsIcon, WandSparklesIcon } from "lucide-react";
 import { MarketingSetupStep } from "@/components/marketing/MarketingSetupStep";
 import { Button } from "@/components/ui/button";
 import type { MarketingSetupStep as SetupStep } from "@/lib/marketing/marketing-setup-steps";
@@ -13,9 +13,11 @@ import type { MarketingSetupStep as SetupStep } from "@/lib/marketing/marketing-
  */
 export function MarketingHome({
   autonomyLabel,
+  canManageSkills,
   steps,
 }: {
   autonomyLabel: string;
+  canManageSkills: boolean;
   steps: SetupStep[];
 }) {
   return (
@@ -29,14 +31,26 @@ export function MarketingHome({
             content on a schedule.
           </p>
         </div>
-        <Button
-          nativeButton={false}
-          render={<Link href="/app/marketing/settings" />}
-          variant="outline"
-        >
-          <SettingsIcon />
-          Settings
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {canManageSkills ? (
+            <Button
+              nativeButton={false}
+              render={<Link href="/app/marketing/skills" />}
+              variant="outline"
+            >
+              <WandSparklesIcon />
+              Custom skills
+            </Button>
+          ) : null}
+          <Button
+            nativeButton={false}
+            render={<Link href="/app/marketing/settings" />}
+            variant="outline"
+          >
+            <SettingsIcon />
+            Settings
+          </Button>
+        </div>
       </header>
 
       <section className="rounded-xl border bg-muted/30 p-4">

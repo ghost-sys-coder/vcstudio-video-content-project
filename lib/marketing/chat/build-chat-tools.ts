@@ -17,14 +17,15 @@ export function buildChatTools(input: {
     input.definitions.map((definition) => [
       definition.key,
       tool({
-        description: definition.description,
+        description: definition.toolDescription ?? definition.description,
         inputSchema: definition.inputSchema,
         execute: async (values, options) => {
           const parsed = definition.inputSchema.parse(values) as Record<
             string,
             string | number
           >;
-          if (definition.key === "create_video_draft")
+          const executorKey = definition.executorKey ?? definition.key;
+          if (executorKey === "create_video_draft")
             return executeVideoDraftSkill({
               definition,
               values: parsed,
@@ -32,7 +33,7 @@ export function buildChatTools(input: {
               context: input.context,
             });
           if (definition.billing.kind === "free") {
-            if (definition.key !== "search_brand_knowledge")
+            if (executorKey !== "search_brand_knowledge")
               throw new Error("MARKETING_FREE_SKILL_NOT_IMPLEMENTED");
             return searchBrandKnowledge({
               workspaceId: input.context.workspaceId,

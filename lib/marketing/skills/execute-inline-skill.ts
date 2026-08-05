@@ -64,6 +64,7 @@ export async function executeInlineMarketingSkill(input: {
   campaignId?: string;
 }> {
   const { definition, context } = input;
+  const executorKey = definition.executorKey ?? definition.key;
   requireCapability(context.role, definition.capability);
   if (
     definition.billing.kind !== "text" ||
@@ -86,7 +87,7 @@ export async function executeInlineMarketingSkill(input: {
     brandContext: context.brandContext,
   };
   const prompt =
-    definition.key === "create_campaign"
+    executorKey === "create_campaign"
       ? input.values.trafficType === "organic"
         ? renderOrganicCampaignPrompt(campaignPromptInput)
         : renderPaidCampaignPrompt(campaignPromptInput)
@@ -199,12 +200,10 @@ export async function executeInlineMarketingSkill(input: {
     );
     knownProviderCostCents = actualCostCents;
     const contentKind =
-      CONTENT_KIND_BY_SKILL[
-        definition.key as keyof typeof CONTENT_KIND_BY_SKILL
-      ];
+      CONTENT_KIND_BY_SKILL[executorKey as keyof typeof CONTENT_KIND_BY_SKILL];
     let contentItemId: string | undefined;
     let campaignId: string | undefined;
-    if (definition.key === "create_campaign") {
+    if (executorKey === "create_campaign") {
       const campaignInput = marketingCampaignMutationSchema.parse({
         name: input.values.name,
         objective: input.values.objective,

@@ -53,7 +53,7 @@ import {
   sumChatUsageCostCents,
 } from "@/lib/marketing/chat/chat-turn-cost";
 import { classifyMarketingProviderError } from "@/lib/marketing/marketing-provider-error";
-import { MARKETING_SKILL_REGISTRY } from "@/lib/marketing/skills/skill-registry";
+import { loadMarketingSkillDefinitions } from "@/lib/marketing/skills/load-skill-definitions";
 import { can } from "@/lib/policies/workspace-policy";
 import { reserveMarketingUsage } from "@/lib/marketing/usage/reserve-marketing-usage";
 import {
@@ -186,7 +186,8 @@ export async function startChatTurn(input: {
     }),
   ]);
 
-  const availableDefinitions = Object.values(MARKETING_SKILL_REGISTRY).filter(
+  const allDefinitions = await loadMarketingSkillDefinitions({ workspaceId });
+  const availableDefinitions = allDefinitions.filter(
     (definition) =>
       can(input.context.role, definition.capability) &&
       (!definition.requiresBrandProfile || context.text.trim() !== ""),
@@ -206,7 +207,8 @@ export async function startChatTurn(input: {
     brandContext: context.text,
     workspaceName,
     availableTools: availableDefinitions.map(
-      (definition) => `${definition.key} — ${definition.description}`,
+      (definition) =>
+        `${definition.key} — ${definition.toolDescription ?? definition.description}`,
     ),
     hasKnowledgeDocuments: documentCount > 0,
   });

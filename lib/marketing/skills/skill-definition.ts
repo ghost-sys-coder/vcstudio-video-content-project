@@ -2,22 +2,26 @@ import type { z } from "zod";
 import type { MarketingOperation, WorkspaceRole } from "@/db/schema";
 import type { WorkspaceCapability } from "@/lib/policies/workspace-policy";
 import type { RateLimitedOperation } from "@/lib/rate-limit/enforce-rate-limit";
-import type { MarketingSkillKey } from "@/lib/marketing/skills/skill-key";
 
 export type SkillInputField = {
   key: string;
   label: string;
-  type: "text" | "longtext" | "select" | "platform";
+  type: "text" | "longtext" | "select" | "number" | "platform";
   required: boolean;
   placeholder?: string;
   defaultValue?: string;
   options?: readonly string[];
+  minimum?: number;
+  maximum?: number;
 };
 
 export type MarketingSkillDefinition = {
-  key: MarketingSkillKey;
+  key: string;
+  executorKey?: string;
+  userSkillId?: string;
   label: string;
   description: string;
+  toolDescription?: string;
   group: "Content" | "Knowledge";
   capability: WorkspaceCapability;
   inputSchema: z.ZodObject;

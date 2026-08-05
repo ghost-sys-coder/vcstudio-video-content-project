@@ -2,7 +2,7 @@ import "server-only";
 import type { WorkspaceRole } from "@/db/schema";
 import { loadEffectiveWorkspaceBudget } from "@/lib/budgets/workspace-budget";
 import { can } from "@/lib/policies/workspace-policy";
-import { MARKETING_SKILL_REGISTRY } from "@/lib/marketing/skills/skill-registry";
+import { loadMarketingSkillDefinitions } from "@/lib/marketing/skills/load-skill-definitions";
 import type { MarketingSkillCatalogueItem } from "@/lib/marketing/skills/skill-definition";
 
 export async function loadMarketingSkillCatalogue(input: {
@@ -13,7 +13,10 @@ export async function loadMarketingSkillCatalogue(input: {
   const budget = await loadEffectiveWorkspaceBudget({
     workspaceId: input.workspaceId,
   });
-  return Object.values(MARKETING_SKILL_REGISTRY)
+  const definitions = await loadMarketingSkillDefinitions({
+    workspaceId: input.workspaceId,
+  });
+  return definitions
     .filter((skill) => can(input.role, skill.capability))
     .filter((skill) => !skill.requiresBrandProfile || input.hasBrandProfile)
     .map((skill) => ({

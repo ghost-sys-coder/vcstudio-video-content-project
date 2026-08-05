@@ -54,4 +54,35 @@ describe("prepareMarketingChatRequest", () => {
       true,
     );
   });
+
+  it("preserves a workspace-authored slash-command slug", () => {
+    const prepared = prepareMarketingChatRequest({
+      threadId: THREAD_ID,
+      body: {
+        requestNonce: NONCE,
+        skillInvocation: {
+          type: "data-skillInvocation",
+          skillKey: "weekly-founder-note",
+          inputs: { topic: "A useful lesson" },
+        },
+      },
+      messages: [
+        {
+          id: "message-1",
+          role: "user",
+          parts: [
+            { type: "text", text: "/weekly-founder-note: A useful lesson" },
+          ],
+        },
+      ],
+    });
+    expect(prepared.body.message?.parts).toContainEqual({
+      type: "data-skillInvocation",
+      skillKey: "weekly-founder-note",
+      inputs: { topic: "A useful lesson" },
+    });
+    expect(marketingChatRequestSchema.safeParse(prepared.body).success).toBe(
+      true,
+    );
+  });
 });

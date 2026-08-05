@@ -264,6 +264,8 @@ weekend of unattended generation.
 
 ## Slice 12 — User-authored skills
 
+**Status:** implemented on 2026-08-05.
+
 **Ships:** `marketing_skills`, the owner-only editor, `compile-user-skill`,
 validation.
 

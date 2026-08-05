@@ -7,6 +7,7 @@ import { loadBrandWorkspaceView } from "@/lib/marketing/brand/brand-view";
 import { loadMarketingSettings } from "@/lib/marketing/marketing-settings-view";
 import { selectMarketingSetupSteps } from "@/lib/marketing/marketing-setup-steps";
 import { listMarketingScheduleRules } from "@/db/repositories/marketing-schedules.repository";
+import { can } from "@/lib/policies/workspace-policy";
 
 export default async function MarketingHomePage() {
   const context = await getAuthenticatedWorkspaceContext();
@@ -25,6 +26,10 @@ export default async function MarketingHomePage() {
   return (
     <MarketingHome
       autonomyLabel={AUTONOMY_LEVEL_LABELS[settings.autonomyLevel]}
+      canManageSkills={can(
+        context.activeMembership.role,
+        "manageMarketingSkills",
+      )}
       steps={selectMarketingSetupSteps({
         hasSavedSettings: stored !== null,
         brandComplete: brand.profile.onboardingStatus === "complete",
