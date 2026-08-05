@@ -7,6 +7,7 @@ const FRESH = {
   brandComplete: false,
   brandRequiredRemaining: 9,
   documentCount: 0,
+  scheduleRuleCount: 0,
 };
 
 describe("selectMarketingSetupSteps", () => {
@@ -51,15 +52,21 @@ describe("selectMarketingSetupSteps", () => {
     ).toBe("done");
   });
 
-  it("shows unbuilt stages as locked rather than hiding them", () => {
-    // A step that simply is not there reads as a missing feature; a visible
-    // locked one reads as a roadmap.
+  it("makes chat and recurring schedules available", () => {
     const steps = selectMarketingSetupSteps(FRESH);
-    expect(steps.filter((step) => step.state === "locked").length).toBe(2);
+    expect(steps[3]).toMatchObject({
+      state: "available",
+      href: "/app/marketing/chat",
+    });
+    expect(steps[4]).toMatchObject({
+      state: "available",
+      href: "/app/marketing/schedules",
+    });
   });
 
-  it("only offers a link on a step that can actually be started", () => {
-    for (const step of selectMarketingSetupSteps(FRESH))
-      if (step.state === "locked") expect(step.href).toBeUndefined();
+  it("marks recurring schedules done once a rule exists", () => {
+    expect(
+      selectMarketingSetupSteps({ ...FRESH, scheduleRuleCount: 1 })[4]?.state,
+    ).toBe("done");
   });
 });

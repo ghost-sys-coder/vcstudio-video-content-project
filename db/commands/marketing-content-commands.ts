@@ -24,6 +24,7 @@ export async function createMarketingContentItem(input: {
   sourceRunId?: string | null;
   createdByUserId?: string | null;
   trafficType?: "organic" | "paid" | "both";
+  isBranded?: boolean;
   structuredPayload?: Record<string, unknown> | null;
   scheduledFor?: Date | null;
 }) {
@@ -37,6 +38,7 @@ export async function createMarketingContentItem(input: {
       sourceRunId: input.sourceRunId ?? null,
       createdByUserId: input.createdByUserId ?? null,
       trafficType: input.trafficType ?? "organic",
+      isBranded: input.isBranded ?? true,
       structuredPayload: input.structuredPayload ?? null,
       scheduledFor: input.scheduledFor ?? null,
       status: "needs_review",
@@ -103,6 +105,28 @@ export async function failMarketingContentItem(input: {
         eq(marketingContentItems.workspaceId, input.workspaceId),
         eq(marketingContentItems.id, input.contentItemId),
         eq(marketingContentItems.status, "needs_review"),
+      ),
+    );
+}
+
+export async function recordMarketingContentAutomationWarning(input: {
+  workspaceId: string;
+  contentItemId: string;
+  category: string;
+  message: string;
+}) {
+  await getDatabase()
+    .update(marketingContentItems)
+    .set({
+      errorCategory: input.category,
+      safeErrorMessage: input.message,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(marketingContentItems.workspaceId, input.workspaceId),
+        eq(marketingContentItems.id, input.contentItemId),
+        eq(marketingContentItems.status, "approved"),
       ),
     );
 }

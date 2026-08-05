@@ -59,6 +59,10 @@ export {
   renderCampaignAutomationPrompt,
 } from "./marketing-campaign-automation";
 export {
+  MARKETING_SCHEDULE_PROMPT_VERSION,
+  renderMarketingSchedulePrompt,
+} from "./marketing-schedule";
+export {
   MARKETING_DOCUMENT_SUMMARY_EXCERPT_CHARACTERS,
   MARKETING_DOCUMENT_SUMMARY_PROMPT_VERSION,
   renderMarketingDocumentSummaryPrompt,

@@ -71,6 +71,11 @@ export default async function MarketingContentDetailPage({
         <section className="rounded-xl border p-4">
           <h2 className="mb-3 font-medium">Review</h2>
           <MarketingContentReviewActions item={item} />
+          {item.safeErrorMessage ? (
+            <p className="mt-3 rounded-lg border border-notice-warning-edge bg-notice-warning p-2 text-xs text-notice-warning-foreground">
+              {item.safeErrorMessage}
+            </p>
+          ) : null}
           {item.socialPostId ? (
             <Link
               className="text-sm underline"

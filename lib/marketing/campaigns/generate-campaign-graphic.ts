@@ -33,23 +33,15 @@ function sizeForPlatform(platform: ContentPlatform) {
   return "1024x1024" as const;
 }
 
-export async function generateCampaignGraphic(input: {
-  workspaceId: string;
-  campaignId: string;
-  contentItemId: string;
+export function estimateMarketingGraphicCostCents(input: {
   platform: ContentPlatform;
-  title: string;
   prompt: string;
-  requestedByUserId: string;
 }) {
   const environment = getSceneImageEnvironment();
-  if (!environment.ENABLE_SCENE_IMAGE_GENERATION)
-    throw new Error("Campaign image generation is disabled.");
-  const size = sizeForPlatform(input.platform);
-  const estimate = estimateSceneImageCost({
+  return estimateSceneImageCost({
     prompt: input.prompt,
     quality: "medium",
-    size,
+    size: sizeForPlatform(input.platform),
     referenceAssetCount: 0,
     outputCostMatrix: createSceneImageOutputCostMatrix(environment),
     textInputCostPerMillionCents:
@@ -57,12 +49,29 @@ export async function generateCampaignGraphic(input: {
     referenceInputReserveCents:
       environment.OPENAI_IMAGE_REFERENCE_RESERVE_CENTS_PER_ASSET,
     safetyMarginBasisPoints: 0,
-  });
+  }).estimatedCostCents;
+}
+
+export async function generateCampaignGraphic(input: {
+  workspaceId: string;
+  campaignId: string | null;
+  contentItemId: string;
+  platform: ContentPlatform;
+  title: string;
+  prompt: string;
+  requestedByUserId: string;
+  usageSubject?: { kind: string; id: string };
+}) {
+  const environment = getSceneImageEnvironment();
+  if (!environment.ENABLE_SCENE_IMAGE_GENERATION)
+    throw new Error("Campaign image generation is disabled.");
+  const size = sizeForPlatform(input.platform);
+  const estimatedCostCents = estimateMarketingGraphicCostCents(input);
   const hashes = getSceneAnalysisEnvironment();
   const reservation = await reserveMarketingUsage({
     workspaceId: input.workspaceId,
     operation: "image_generation",
-    estimatedCostCents: estimate.estimatedCostCents,
+    estimatedCostCents,
     idempotencyKey: createMarketingOperationIdempotencyKey({
       secret: hashes.IDEMPOTENCY_HASH_SECRET,
       workspaceId: input.workspaceId,
@@ -83,8 +92,8 @@ export async function generateCampaignGraphic(input: {
       hashes.REQUEST_FINGERPRINT_SECRET,
       input.prompt,
     ),
-    subjectKind: "campaign_content_item",
-    subjectId: input.contentItemId,
+    subjectKind: input.usageSubject?.kind ?? "campaign_content_item",
+    subjectId: input.usageSubject?.id ?? input.contentItemId,
   });
   await markMarketingRunRunning({
     workspaceId: input.workspaceId,
@@ -121,7 +130,7 @@ export async function generateCampaignGraphic(input: {
         })
       : null;
     const cost = reconcileSceneImageCost({
-      reservedCostCents: estimate.estimatedCostCents,
+      reservedCostCents: estimatedCostCents,
       actualCostCents: actual,
     }).chargedCostCents;
     const mediaAssetId = randomUUID();
@@ -144,7 +153,7 @@ export async function generateCampaignGraphic(input: {
       width: result.width,
       height: result.height,
       title: input.title,
-      altText: `Campaign graphic for ${input.title}`,
+      altText: `Marketing graphic for ${input.title}`,
       createdByUserId: input.requestedByUserId,
     });
     await attachMediaToMarketingContent({
@@ -160,7 +169,7 @@ export async function generateCampaignGraphic(input: {
       actualCostCents: cost,
       providerRequestId: result.requestId,
       safeMetadata: {
-        campaignId: input.campaignId,
+        ...(input.campaignId ? { campaignId: input.campaignId } : {}),
         contentItemId: input.contentItemId,
       },
     });
@@ -173,7 +182,7 @@ export async function generateCampaignGraphic(input: {
       operation: "image_generation",
       category: "campaign_image_failed",
       message: "A campaign graphic could not be generated.",
-      chargedCostCents: estimate.estimatedCostCents,
+      chargedCostCents: estimatedCostCents,
     });
     throw error;
   }

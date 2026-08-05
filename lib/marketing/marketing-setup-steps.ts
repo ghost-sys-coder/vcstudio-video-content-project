@@ -24,6 +24,7 @@ export function selectMarketingSetupSteps(input: {
   brandRequiredRemaining: number;
   brandComplete: boolean;
   documentCount: number;
+  scheduleRuleCount: number;
 }): MarketingSetupStep[] {
   return [
     {
@@ -59,14 +60,18 @@ export function selectMarketingSetupSteps(input: {
       key: "chat",
       label: "Ask the studio for work",
       description: "A conversation with skills — type / to see what it can do.",
-      state: "locked",
+      href: "/app/marketing/chat",
+      state: "available",
     },
     {
       key: "schedule",
       label: "Put content on a schedule",
       description:
-        "Recurring rules that draft content without being asked each time.",
-      state: "locked",
+        input.scheduleRuleCount > 0
+          ? `${input.scheduleRuleCount} recurring rule${input.scheduleRuleCount === 1 ? "" : "s"} prepared. Rules run only while autonomy is Assisted.`
+          : "Recurring rules that draft content without being asked each time.",
+      href: "/app/marketing/schedules",
+      state: input.scheduleRuleCount > 0 ? "done" : "available",
     },
   ];
 }

@@ -4814,6 +4814,165 @@ export const marketingContentRevisions = pgTable(
   ],
 );
 
+export const marketingScheduleFrequencyEnum = pgEnum(
+  "marketing_schedule_frequency",
+  ["daily", "weekly", "monthly"],
+);
+
+export const marketingScheduleRunStatusEnum = pgEnum(
+  "marketing_schedule_run_status",
+  ["claimed", "running", "succeeded", "failed", "skipped"],
+);
+
+export const marketingScheduleRules = pgTable(
+  "marketing_schedule_rules",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    isEnabled: boolean("is_enabled").notNull().default(true),
+    campaignId: uuid("campaign_id"),
+    skillKey: text("skill_key").notNull(),
+    contentKind: marketingContentKindEnum("content_kind").notNull(),
+    platforms: jsonb("platforms")
+      .$type<ContentPlatform[]>()
+      .notNull()
+      .default([]),
+    trafficType: marketingTrafficTypeEnum("traffic_type")
+      .notNull()
+      .default("organic"),
+    isBranded: boolean("is_branded").notNull().default(true),
+    promptBrief: text("prompt_brief").notNull(),
+    frequency: marketingScheduleFrequencyEnum("frequency").notNull(),
+    byWeekday: jsonb("by_weekday").$type<number[]>().notNull().default([]),
+    byMonthDay: integer("by_month_day"),
+    timeOfDayMinutes: integer("time_of_day_minutes").notNull(),
+    timezone: text("timezone").notNull(),
+    leadTimeMinutes: integer("lead_time_minutes").notNull().default(1440),
+    maxItemsPerRun: integer("max_items_per_run").notNull().default(1),
+    autoApprove: boolean("auto_approve").notNull().default(false),
+    autoSchedule: boolean("auto_schedule").notNull().default(true),
+    monthlyBudgetCents: integer("monthly_budget_cents"),
+    nextRunAt: timestamp("next_run_at", { withTimezone: true }),
+    lastRunAt: timestamp("last_run_at", { withTimezone: true }),
+    consecutiveFailureCount: integer("consecutive_failure_count")
+      .notNull()
+      .default(0),
+    pausedReason: text("paused_reason"),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("marketing_schedule_rules_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    index("marketing_schedule_rules_due_index").on(
+      table.isEnabled,
+      table.nextRunAt,
+    ),
+    index("marketing_schedule_rules_workspace_enabled_index").on(
+      table.workspaceId,
+      table.isEnabled,
+    ),
+    foreignKey({
+      columns: [table.campaignId, table.workspaceId],
+      foreignColumns: [marketingCampaigns.id, marketingCampaigns.workspaceId],
+      name: "marketing_schedule_rules_tenant_campaign_fkey",
+    }).onDelete("restrict"),
+    check(
+      "marketing_schedule_rules_time_valid",
+      sql`${table.timeOfDayMinutes} between 0 and 1439`,
+    ),
+    check(
+      "marketing_schedule_rules_items_valid",
+      sql`${table.maxItemsPerRun} between 1 and 10`,
+    ),
+    check(
+      "marketing_schedule_rules_month_day_valid",
+      sql`${table.frequency} <> 'monthly' or ${table.byMonthDay} between 1 and 28`,
+    ),
+    check(
+      "marketing_schedule_rules_lead_time_valid",
+      sql`${table.leadTimeMinutes} between 0 and 43200`,
+    ),
+    check(
+      "marketing_schedule_rules_budget_valid",
+      sql`${table.monthlyBudgetCents} is null or ${table.monthlyBudgetCents} >= 0`,
+    ),
+    check(
+      "marketing_schedule_rules_failure_count_valid",
+      sql`${table.consecutiveFailureCount} >= 0`,
+    ),
+  ],
+);
+
+export const marketingScheduleRuleRuns = pgTable(
+  "marketing_schedule_rule_runs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    ruleId: uuid("rule_id").notNull(),
+    scheduledFor: timestamp("scheduled_for", { withTimezone: true }).notNull(),
+    claimedAt: timestamp("claimed_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    status: marketingScheduleRunStatusEnum("status")
+      .notNull()
+      .default("claimed"),
+    skipReason: text("skip_reason"),
+    createdContentItemIds: jsonb("created_content_item_ids")
+      .$type<string[]>()
+      .notNull()
+      .default([]),
+    runId: uuid("run_id").references(() => marketingGenerationRuns.id, {
+      onDelete: "set null",
+    }),
+    triggerRunId: text("trigger_run_id"),
+    errorCategory: text("error_category"),
+    safeErrorMessage: text("safe_error_message"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("marketing_schedule_rule_runs_occurrence_unique").on(
+      table.ruleId,
+      table.scheduledFor,
+    ),
+    uniqueIndex("marketing_schedule_rule_runs_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    index("marketing_schedule_rule_runs_workspace_created_index").on(
+      table.workspaceId,
+      table.createdAt,
+    ),
+    foreignKey({
+      columns: [table.ruleId, table.workspaceId],
+      foreignColumns: [
+        marketingScheduleRules.id,
+        marketingScheduleRules.workspaceId,
+      ],
+      name: "marketing_schedule_rule_runs_tenant_rule_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
 export const auditLogEvents = pgTable(
   "audit_log_events",
   {
@@ -5086,6 +5245,13 @@ export type MarketingGenerationRun =
 export type MarketingUsageReservation =
   typeof marketingUsageReservations.$inferSelect;
 export type MarketingUsageEvent = typeof marketingUsageEvents.$inferSelect;
+export type MarketingScheduleRule = typeof marketingScheduleRules.$inferSelect;
+export type MarketingScheduleRuleRun =
+  typeof marketingScheduleRuleRuns.$inferSelect;
+export type MarketingScheduleFrequency =
+  (typeof marketingScheduleFrequencyEnum.enumValues)[number];
+export type MarketingScheduleRunStatus =
+  (typeof marketingScheduleRunStatusEnum.enumValues)[number];
 export type MarketingChatThread = typeof marketingChatThreads.$inferSelect;
 export type MarketingThreadStatus =
   (typeof marketingThreadStatusEnum.enumValues)[number];

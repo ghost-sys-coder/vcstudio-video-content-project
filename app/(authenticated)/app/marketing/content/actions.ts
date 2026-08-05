@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import {
   transitionMarketingContent,
   updateMarketingContentBody,
+  recordMarketingContentAutomationWarning,
 } from "@/db/commands/marketing-content-commands";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import {
@@ -17,6 +18,7 @@ import {
 } from "@/lib/schemas/marketing-content";
 import { plainTextToPortableDocument } from "@/lib/social/plain-text-to-document";
 import { renderPortableDocumentToPlainText } from "@/lib/social/render-plain-text";
+import { autoScheduleApprovedContent } from "@/lib/marketing/schedules/auto-schedule-approved-content";
 
 export async function reviewMarketingContentAction(formData: FormData) {
   const parsed = reviewMarketingContentSchema.safeParse({
@@ -35,13 +37,29 @@ export async function reviewMarketingContentAction(formData: FormData) {
         : parsed.data.decision === "request_changes"
           ? "changes_requested"
           : "archived";
-    await transitionMarketingContent({
+    const item = await transitionMarketingContent({
       workspaceId: context.activeMembership.workspaceId,
       contentItemId: parsed.data.contentItemId,
       to,
       reviewedByUserId: context.user.id,
       reviewNotes: parsed.data.reviewNotes,
     });
+    if (to === "approved") {
+      const scheduling = await autoScheduleApprovedContent({
+        workspaceId: context.activeMembership.workspaceId,
+        item,
+        approvedByUserId: context.user.id,
+      });
+      if (scheduling.attempted && !scheduling.scheduled)
+        await recordMarketingContentAutomationWarning({
+          workspaceId: context.activeMembership.workspaceId,
+          contentItemId: item.id,
+          category: "auto_schedule_not_completed",
+          message: scheduling.reason,
+        });
+      revalidatePath("/app/social/posts");
+      revalidatePath("/app/social/calendar");
+    }
     revalidatePath("/app/marketing/content");
     revalidatePath(`/app/marketing/content/${parsed.data.contentItemId}`);
     return { ok: true };
