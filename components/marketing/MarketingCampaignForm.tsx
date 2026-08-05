@@ -1,6 +1,7 @@
 import { saveMarketingCampaignAction } from "@/app/(authenticated)/app/marketing/campaigns/actions";
 import { Button } from "@/components/ui/button";
 import type { MarketingCampaign } from "@/db/schema";
+import { NEW_MARKETING_CAMPAIGN_DEFAULTS } from "@/lib/marketing/campaigns/campaign-form-defaults";
 import { SOCIAL_POST_PLATFORMS } from "@/lib/social/platform-post-capabilities";
 
 export function MarketingCampaignForm({
@@ -17,7 +18,7 @@ export function MarketingCampaignForm({
         Campaign name
         <input
           className="h-10 rounded-lg border bg-background px-3"
-          defaultValue={campaign?.name}
+          defaultValue={campaign?.name ?? NEW_MARKETING_CAMPAIGN_DEFAULTS.name}
           name="name"
           required
         />
@@ -27,7 +28,9 @@ export function MarketingCampaignForm({
           Objective
           <select
             className="h-10 rounded-lg border bg-background px-3"
-            defaultValue={campaign?.objective ?? "awareness"}
+            defaultValue={
+              campaign?.objective ?? NEW_MARKETING_CAMPAIGN_DEFAULTS.objective
+            }
             name="objective"
           >
             {(
@@ -50,7 +53,10 @@ export function MarketingCampaignForm({
           Traffic
           <select
             className="h-10 rounded-lg border bg-background px-3"
-            defaultValue={campaign?.trafficType ?? "organic"}
+            defaultValue={
+              campaign?.trafficType ??
+              NEW_MARKETING_CAMPAIGN_DEFAULTS.trafficType
+            }
             name="trafficType"
           >
             {(["organic", "paid", "both"] as const).map((value) => (
@@ -64,7 +70,9 @@ export function MarketingCampaignForm({
           Status
           <select
             className="h-10 rounded-lg border bg-background px-3"
-            defaultValue={campaign?.status ?? "draft"}
+            defaultValue={
+              campaign?.status ?? NEW_MARKETING_CAMPAIGN_DEFAULTS.status
+            }
             name="status"
           >
             {(
@@ -109,7 +117,9 @@ export function MarketingCampaignForm({
                 defaultChecked={
                   campaign
                     ? campaign.platforms.includes(platform)
-                    : platform === "instagram"
+                    : NEW_MARKETING_CAMPAIGN_DEFAULTS.platforms.some(
+                        (sample) => sample === platform,
+                      )
                 }
                 name="platforms"
                 type="checkbox"
@@ -124,7 +134,9 @@ export function MarketingCampaignForm({
         Key message
         <textarea
           className="min-h-24 rounded-lg border bg-background p-3"
-          defaultValue={campaign?.keyMessage}
+          defaultValue={
+            campaign?.keyMessage ?? NEW_MARKETING_CAMPAIGN_DEFAULTS.keyMessage
+          }
           name="keyMessage"
         />
       </label>
@@ -132,7 +144,9 @@ export function MarketingCampaignForm({
         Hypothesis
         <textarea
           className="min-h-24 rounded-lg border bg-background p-3"
-          defaultValue={campaign?.hypothesis}
+          defaultValue={
+            campaign?.hypothesis ?? NEW_MARKETING_CAMPAIGN_DEFAULTS.hypothesis
+          }
           name="hypothesis"
         />
       </label>
@@ -140,7 +154,10 @@ export function MarketingCampaignForm({
         Campaign brief
         <textarea
           className="min-h-40 rounded-lg border bg-background p-3"
-          defaultValue={campaign?.briefPlainText}
+          defaultValue={
+            campaign?.briefPlainText ??
+            NEW_MARKETING_CAMPAIGN_DEFAULTS.briefPlainText
+          }
           name="briefPlainText"
         />
       </label>

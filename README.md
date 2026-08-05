@@ -459,6 +459,8 @@ Phases 1–9 are implemented through authenticated workspaces, project/script ve
 
 ## Recent major changes
 
+- 2026-08-05: Pre-filled the new marketing campaign form with a complete, editable sample campaign (name, lead objective, organic-and-paid traffic, Instagram and LinkedIn platforms, key message, hypothesis, and campaign brief) so a campaign can be created immediately or adapted without starting from blank fields. Existing campaign settings continue to display their persisted values.
+
 - 2026-08-05: Completed Marketing Studio Slice 9. Added workspace-scoped campaigns with brief, content, paid-ads, and settings tabs; campaign-linked content; structured paid creative variants; and an authenticated CSV export for ad handoff. Added separate organic and paid campaign prompts plus the `create_campaign` chat skill. Added the orchestration-only `create_video_draft` skill, which creates a project and reuses the existing script-generation and scene-analysis reservations and workers, then stops at a reviewable storyboard without generating images. No new environment variables; one campaign migration was added.
 
 - 2026-08-05: **Extended media-first previews to the Marketing content queue.** `/app/marketing/content` now loads ready attachments for the whole bounded queue in one workspace-scoped batch, signs each private preview URL, and renders the first image or video as each card's canvas with platform, type, status, title, and supporting text overlaid. Queue videos remain non-interactive thumbnails so the card is one clear review link; full controls remain on the detail page. Text-only items keep the existing compact card. No migration, dependency, environment-variable, or Trigger task change.
