@@ -9,6 +9,10 @@ import { ChatCostFooter } from "@/components/marketing/ChatCostFooter";
 import { ChatEmptyState } from "@/components/marketing/ChatEmptyState";
 import { ChatErrorState } from "@/components/marketing/ChatErrorState";
 import { ChatMessageList } from "@/components/marketing/ChatMessageList";
+import {
+  prepareMarketingChatRequest,
+  type MarketingChatSendBody,
+} from "@/lib/marketing/chat/prepare-chat-request";
 import type { MarketingSkillCatalogueItem } from "@/lib/marketing/skills/skill-definition";
 import { useMarketingThreadEvents } from "@/hooks/useMarketingThreadEvents";
 
@@ -51,9 +55,10 @@ export function ChatThreadView({
 }) {
   const router = useRouter();
   const [transportError, setTransportError] = useState<string | null>(null);
-  const lastSendRef = useRef<{ text: string; requestNonce: string } | null>(
-    null,
-  );
+  const lastSendRef = useRef<{
+    text: string;
+    body: MarketingChatSendBody;
+  } | null>(null);
   const resumeEventsRef = useRef<() => void>(() => undefined);
 
   const transport = useMemo(
@@ -61,24 +66,11 @@ export function ChatThreadView({
       new DefaultChatTransport({
         api: `/api/workspaces/${workspaceId}/marketing/chat`,
         prepareSendMessagesRequest: ({ messages: sendable, body }) => {
-          const newest = sendable.at(-1);
-          return {
-            body: {
-              // `body` carries the per-send options, including the nonce.
-              ...body,
-              threadId,
-              message: newest
-                ? {
-                    id: newest.id,
-                    role: "user",
-                    parts: [
-                      ...newest.parts.filter((part) => part.type === "text"),
-                      ...(body?.skillInvocation ? [body.skillInvocation] : []),
-                    ],
-                  }
-                : undefined,
-            },
-          };
+          return prepareMarketingChatRequest({
+            messages: sendable,
+            body: body as MarketingChatSendBody,
+            threadId,
+          });
         },
       }),
     [workspaceId, threadId],
@@ -123,8 +115,9 @@ export function ChatThreadView({
     (text: string) => {
       setTransportError(null);
       const requestNonce = crypto.randomUUID();
-      lastSendRef.current = { text, requestNonce };
-      void sendMessage({ text }, { body: { requestNonce } });
+      const body = { requestNonce };
+      lastSendRef.current = { text, body };
+      void sendMessage({ text }, { body });
     },
     [sendMessage],
   );
@@ -135,10 +128,7 @@ export function ChatThreadView({
     setTransportError(null);
     // The same nonce, deliberately: a first attempt that landed but never
     // streamed back must not become a second message and a second charge.
-    void sendMessage(
-      { text: previous.text },
-      { body: { requestNonce: previous.requestNonce } },
-    );
+    void sendMessage({ text: previous.text }, { body: previous.body });
   }, [sendMessage]);
 
   const failure = transportError ?? error?.message ?? null;
@@ -166,20 +156,16 @@ export function ChatThreadView({
           setTransportError(null);
           const requestNonce = crypto.randomUUID();
           const text = `/${skill.key}: ${Object.values(inputs).filter(Boolean).join(" · ")}`;
-          lastSendRef.current = { text, requestNonce };
-          void sendMessage(
-            { text },
-            {
-              body: {
-                requestNonce,
-                skillInvocation: {
-                  type: "data-skillInvocation",
-                  skillKey: skill.key,
-                  inputs,
-                },
-              },
+          const body: MarketingChatSendBody = {
+            requestNonce,
+            skillInvocation: {
+              type: "data-skillInvocation",
+              skillKey: skill.key,
+              inputs,
             },
-          );
+          };
+          lastSendRef.current = { text, body };
+          void sendMessage({ text }, { body });
           events.resume();
         }}
         onSend={send}
