@@ -16,7 +16,7 @@ export function DashboardRecentProjects({
   return (
     <section
       aria-labelledby="dashboard-recent-projects-heading"
-      className="rounded-xl bg-card ring-1 ring-foreground/10"
+      className="overflow-hidden rounded-2xl bg-card/96 shadow-lg shadow-foreground/5 ring-1 ring-border/80"
     >
       <div className="flex items-center justify-between border-b border-foreground/10 px-5 py-4">
         <h2
@@ -57,7 +57,7 @@ export function DashboardRecentProjects({
           {projects.map((project) => (
             <li key={project.id}>
               <Link
-                className="flex items-center justify-between gap-4 px-5 py-3.5 transition hover:bg-muted/50"
+                className="flex items-center justify-between gap-4 px-5 py-4 transition-all duration-200 hover:bg-sidebar-accent/70 hover:pl-6"
                 href={`/app/projects/${project.id}/script`}
               >
                 <div className="min-w-0">

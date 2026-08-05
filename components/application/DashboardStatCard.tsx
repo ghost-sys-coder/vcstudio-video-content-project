@@ -49,8 +49,9 @@ export function DashboardStatCard({
   );
 
   const className = cn(
-    "group/stat rounded-xl bg-card p-5 ring-1 ring-foreground/10 transition",
-    href && "hover:-translate-y-0.5 hover:ring-foreground/20 hover:shadow-sm",
+    "group/stat rounded-2xl bg-card/96 p-5 shadow-lg shadow-foreground/5 ring-1 ring-border/80 transition-all duration-200",
+    href &&
+      "hover:-translate-y-1 hover:ring-ring/35 hover:shadow-xl hover:shadow-foreground/10",
   );
 
   if (href) {

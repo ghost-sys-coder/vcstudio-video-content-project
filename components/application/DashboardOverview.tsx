@@ -22,17 +22,21 @@ export function DashboardOverview({
 }) {
   return (
     <section aria-labelledby="dashboard-heading" className="space-y-8">
-      <div>
-        <p className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
+      <div className="relative overflow-hidden rounded-3xl bg-[oklch(0.25_0.06_174)] px-6 py-7 text-[oklch(0.97_0.02_105)] shadow-xl sm:px-8 sm:py-9">
+        <span
+          aria-hidden
+          className="absolute -right-12 -top-16 size-48 rounded-full border-[28px] border-primary/15"
+        />
+        <p className="font-mono text-xs uppercase tracking-[0.18em] text-white/60">
           {membership.role} workspace
         </p>
         <h1
-          className="mt-2 text-3xl font-semibold tracking-tight"
+          className="font-display mt-2 text-4xl leading-none tracking-tight sm:text-5xl"
           id="dashboard-heading"
         >
           {membership.workspaceName}
         </h1>
-        <p className="mt-2 max-w-2xl text-muted-foreground">
+        <p className="mt-3 max-w-2xl text-sm text-white/70 sm:text-base">
           An overview of your production workspace — projects in flight,
           characters, generated scene imagery, and this month&rsquo;s spend.
         </p>
