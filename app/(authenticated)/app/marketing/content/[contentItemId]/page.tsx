@@ -44,19 +44,26 @@ export default async function MarketingContentDetailPage({
         >
           ← Content queue
         </Link>
-        <header className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm text-muted-foreground">
-              {item.kind.replaceAll("_", " ")} ·{" "}
-              {item.platform ?? "No platform"}
-            </p>
-            <h1 className="text-2xl font-semibold">{item.title}</h1>
-          </div>
-          <MarketingContentStatusBadge status={item.status} />
-        </header>
+        {media.length === 0 ? (
+          <header className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm text-muted-foreground">
+                {item.kind.replaceAll("_", " ")} ·{" "}
+                {item.platform ?? "No platform"}
+              </p>
+              <h1 className="text-2xl font-semibold">{item.title}</h1>
+            </div>
+            <MarketingContentStatusBadge status={item.status} />
+          </header>
+        ) : null}
         <MarketingContentMediaReview
           assets={media}
+          body={item.bodyPlainText}
           expectsGraphic={item.kind === "graphic"}
+          kind={item.kind}
+          platform={item.platform}
+          status={item.status}
+          title={item.title}
         />
         <MarketingContentEditor item={item} />
       </main>

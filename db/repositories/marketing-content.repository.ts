@@ -85,6 +85,25 @@ export async function listMarketingContentMedia(input: {
     )
     .orderBy(asc(marketingContentMedia.position));
 }
+export async function listMarketingContentMediaForItems(input: {
+  workspaceId: string;
+  contentItemIds: string[];
+}) {
+  if (input.contentItemIds.length === 0) return [];
+  return getDatabase()
+    .select()
+    .from(marketingContentMedia)
+    .where(
+      and(
+        eq(marketingContentMedia.workspaceId, input.workspaceId),
+        inArray(marketingContentMedia.contentItemId, input.contentItemIds),
+      ),
+    )
+    .orderBy(
+      asc(marketingContentMedia.contentItemId),
+      asc(marketingContentMedia.position),
+    );
+}
 export async function listMarketingContentRevisions(input: {
   workspaceId: string;
   contentItemId: string;

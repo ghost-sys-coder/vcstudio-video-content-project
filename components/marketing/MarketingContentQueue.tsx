@@ -1,9 +1,12 @@
 import type { MarketingContentItem } from "@/db/schema";
 import { MarketingContentCard } from "@/components/marketing/MarketingContentCard";
+import type { MediaAssetView } from "@/lib/media/media-asset-view";
 export function MarketingContentQueue({
   items,
+  mediaByContentItemId,
 }: {
   items: MarketingContentItem[];
+  mediaByContentItemId: Record<string, MediaAssetView[]>;
 }) {
   if (items.length === 0)
     return (
@@ -15,7 +18,11 @@ export function MarketingContentQueue({
   return (
     <div className="grid gap-3 lg:grid-cols-2">
       {items.map((item) => (
-        <MarketingContentCard item={item} key={item.id} />
+        <MarketingContentCard
+          item={item}
+          key={item.id}
+          media={mediaByContentItemId[item.id] ?? []}
+        />
       ))}
     </div>
   );

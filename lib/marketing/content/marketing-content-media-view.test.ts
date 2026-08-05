@@ -3,12 +3,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 const state = vi.hoisted(() => ({
-  attachments: [] as { mediaAssetId: string; position: number }[],
+  attachments: [] as {
+    contentItemId: string;
+    mediaAssetId: string;
+    position: number;
+  }[],
   assets: [] as Record<string, unknown>[],
 }));
 
 vi.mock("@/db/repositories/marketing-content.repository", () => ({
-  listMarketingContentMedia: async () => state.attachments,
+  listMarketingContentMediaForItems: async () => state.attachments,
 }));
 vi.mock("@/db/repositories/media-assets.repository", () => ({
   findReadyMediaAssets: async () => state.assets,
@@ -18,7 +22,10 @@ vi.mock("@/lib/storage/media-asset-storage", () => ({
     `signed:${objectKey}`,
 }));
 
-import { loadMarketingContentMediaView } from "@/lib/marketing/content/marketing-content-media-view";
+import {
+  loadMarketingContentMediaView,
+  loadMarketingContentMediaViews,
+} from "@/lib/marketing/content/marketing-content-media-view";
 
 function asset(id: string, objectKey: string) {
   return {
@@ -52,8 +59,8 @@ describe("loadMarketingContentMediaView", () => {
 
   it("returns signed previews in attachment order", async () => {
     state.attachments = [
-      { mediaAssetId: "asset-b", position: 0 },
-      { mediaAssetId: "asset-a", position: 1 },
+      { contentItemId: "content-1", mediaAssetId: "asset-b", position: 0 },
+      { contentItemId: "content-1", mediaAssetId: "asset-a", position: 1 },
     ];
     state.assets = [asset("asset-a", "a.png"), asset("asset-b", "b.png")];
 
@@ -70,7 +77,9 @@ describe("loadMarketingContentMediaView", () => {
   });
 
   it("omits an attachment whose asset is no longer ready", async () => {
-    state.attachments = [{ mediaAssetId: "missing", position: 0 }];
+    state.attachments = [
+      { contentItemId: "content-1", mediaAssetId: "missing", position: 0 },
+    ];
 
     await expect(
       loadMarketingContentMediaView({
@@ -78,5 +87,22 @@ describe("loadMarketingContentMediaView", () => {
         contentItemId: "content-1",
       }),
     ).resolves.toEqual([]);
+  });
+
+  it("groups a batched result by content item", async () => {
+    state.attachments = [
+      { contentItemId: "content-1", mediaAssetId: "asset-a", position: 0 },
+      { contentItemId: "content-2", mediaAssetId: "asset-b", position: 0 },
+    ];
+    state.assets = [asset("asset-b", "b.png"), asset("asset-a", "a.png")];
+
+    const result = await loadMarketingContentMediaViews({
+      workspaceId: "workspace-1",
+      contentItemIds: ["content-1", "content-2", "content-3"],
+    });
+
+    expect(result["content-1"]?.map((item) => item.id)).toEqual(["asset-a"]);
+    expect(result["content-2"]?.map((item) => item.id)).toEqual(["asset-b"]);
+    expect(result["content-3"]).toEqual([]);
   });
 });

@@ -12,9 +12,11 @@ import type { MediaAssetView } from "@/lib/media/media-asset-view";
 export function MediaAssetPreview({
   asset,
   className,
+  controls = true,
 }: {
   asset: MediaAssetView;
   className?: string;
+  controls?: boolean;
 }) {
   return (
     <div
@@ -38,7 +40,7 @@ export function MediaAssetPreview({
       ) : (
         <video
           className="size-full object-contain"
-          controls
+          controls={controls}
           preload="metadata"
           src={asset.previewUrl}
         >
