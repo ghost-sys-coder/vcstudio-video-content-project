@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
 import { MarketingContentEditor } from "@/components/marketing/MarketingContentEditor";
+import { MarketingContentMediaReview } from "@/components/marketing/MarketingContentMediaReview";
 import { MarketingContentReviewActions } from "@/components/marketing/MarketingContentReviewActions";
 import { MarketingContentRevisionList } from "@/components/marketing/MarketingContentRevisionList";
 import { MarketingContentStatusBadge } from "@/components/marketing/MarketingContentStatusBadge";
@@ -10,6 +11,7 @@ import {
   listMarketingContentRevisions,
 } from "@/db/repositories/marketing-content.repository";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
+import { loadMarketingContentMediaView } from "@/lib/marketing/content/marketing-content-media-view";
 import { can } from "@/lib/policies/workspace-policy";
 const paramsSchema = z.object({ contentItemId: z.uuid() });
 export default async function MarketingContentDetailPage({
@@ -27,9 +29,10 @@ export default async function MarketingContentDetailPage({
     workspaceId: context.activeMembership.workspaceId,
     contentItemId: parsed.data.contentItemId,
   };
-  const [item, revisions] = await Promise.all([
+  const [item, revisions, media] = await Promise.all([
     findMarketingContentItem(input),
     listMarketingContentRevisions(input),
+    loadMarketingContentMediaView(input),
   ]);
   if (!item) notFound();
   return (
@@ -51,6 +54,10 @@ export default async function MarketingContentDetailPage({
           </div>
           <MarketingContentStatusBadge status={item.status} />
         </header>
+        <MarketingContentMediaReview
+          assets={media}
+          expectsGraphic={item.kind === "graphic"}
+        />
         <MarketingContentEditor item={item} />
       </main>
       <aside className="space-y-6">

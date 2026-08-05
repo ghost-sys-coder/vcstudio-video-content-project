@@ -9,6 +9,7 @@ export function MarketingContentEditor({
   const editable = ["draft", "needs_review", "changes_requested"].includes(
     item.status,
   );
+  const isGraphic = item.kind === "graphic";
   if (!editable)
     return (
       <div className="whitespace-pre-wrap rounded-xl border p-4 text-sm">
@@ -37,10 +38,10 @@ export function MarketingContentEditor({
       </div>
       <div>
         <label className="mb-1 block text-sm font-medium" htmlFor="body">
-          Draft
+          {isGraphic ? "Supporting caption or context" : "Draft"}
         </label>
         <textarea
-          className="min-h-80 w-full rounded-lg border bg-background p-3 text-sm"
+          className={`${isGraphic ? "min-h-32" : "min-h-80"} w-full rounded-lg border bg-background p-3 text-sm`}
           defaultValue={item.bodyPlainText}
           id="body"
           name="body"
