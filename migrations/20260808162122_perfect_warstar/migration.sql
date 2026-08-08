@@ -1,0 +1,1 @@
+ALTER TYPE "audit_action" ADD VALUE 'social_post_deleted' BEFORE 'member_invited';

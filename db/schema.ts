@@ -396,6 +396,7 @@ export const auditActionEnum = pgEnum("audit_action", [
   "media_asset_deleted",
   "social_post_published",
   "social_post_scheduled",
+  "social_post_deleted",
   "member_invited",
   "invitation_revoked",
   "member_joined",

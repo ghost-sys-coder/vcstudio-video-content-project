@@ -77,5 +77,8 @@ describe("AUDIT_ACTION_LABELS", () => {
     expect(AUDIT_ACTION_LABELS.video_published).toBe(
       "Video published to platform",
     );
+    expect(AUDIT_ACTION_LABELS.social_post_deleted).toBe(
+      "Social post draft deleted",
+    );
   });
 });

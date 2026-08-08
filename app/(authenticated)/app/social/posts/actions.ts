@@ -385,7 +385,18 @@ export async function deleteSocialPostAction(
         error: "Only a draft can be deleted — a post that went out is history.",
       };
 
+    await recordAuditEvent({
+      workspaceId: context.activeMembership.workspaceId,
+      actorUserId: context.user.id,
+      action: "social_post_deleted",
+      targetType: "social_post",
+      targetId: parsed.data.postId,
+      metadata: { status: "draft" },
+    });
+
     revalidatePath("/app/social/posts");
+    revalidatePath("/app/marketing/publish");
+    revalidatePath("/app/marketing/calendar");
     return { ok: true };
   } catch {
     return { ok: false, error: "That post could not be removed." };

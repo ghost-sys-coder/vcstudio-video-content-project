@@ -32,6 +32,7 @@ export function SocialPostsWorkspace({
         <ul className="space-y-2">
           {posts.map((post) => (
             <SocialPostRow
+              canDeleteDraft={canCompose}
               composerBasePath={composerBasePath}
               key={post.id}
               post={post}

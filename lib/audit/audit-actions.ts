@@ -27,6 +27,7 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   media_asset_deleted: "Media library asset deleted",
   social_post_published: "Social post published",
   social_post_scheduled: "Social post scheduled",
+  social_post_deleted: "Social post draft deleted",
   member_invited: "Member invited",
   invitation_revoked: "Invitation revoked",
   member_joined: "Member joined",
