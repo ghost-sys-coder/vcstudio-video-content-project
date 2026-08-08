@@ -4,6 +4,8 @@ import {
   createSceneAudioRecordingUploadSchema,
   startBulkSceneAudioGenerationSchema,
   voicePresetInputSchema,
+  customVoiceEnrollmentSchema,
+  customVoiceAudioTypeFromMimeType,
 } from "@/lib/schemas/scene-audio";
 
 describe("voicePresetInputSchema", () => {
@@ -51,6 +53,44 @@ describe("voicePresetInputSchema", () => {
         format: "ogg",
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("customVoiceEnrollmentSchema", () => {
+  it("accepts a bounded name and BCP 47 language", () => {
+    expect(
+      customVoiceEnrollmentSchema.safeParse({
+        name: "My voice",
+        language: "en-US",
+      }).success,
+    ).toBe(true);
+  });
+
+  it("rejects malformed language tags", () => {
+    expect(
+      customVoiceEnrollmentSchema.safeParse({
+        name: "My voice",
+        language: "english",
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("customVoiceAudioTypeFromMimeType", () => {
+  it("accepts codec-qualified browser recording types", () => {
+    expect(customVoiceAudioTypeFromMimeType("audio/webm;codecs=opus")).toBe(
+      "audio/webm",
+    );
+    expect(
+      customVoiceAudioTypeFromMimeType("audio/mp4; codecs=mp4a.40.2"),
+    ).toBe("audio/mp4");
+  });
+
+  it("rejects unsupported and missing recording types", () => {
+    expect(
+      customVoiceAudioTypeFromMimeType("video/webm;codecs=opus"),
+    ).toBeNull();
+    expect(customVoiceAudioTypeFromMimeType("")).toBeNull();
   });
 });
 

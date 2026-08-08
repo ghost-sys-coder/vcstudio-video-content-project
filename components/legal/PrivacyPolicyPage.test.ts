@@ -10,7 +10,7 @@ describe("public privacy policy", () => {
   it("renders as a public page without an authentication context", () => {
     const html = renderToStaticMarkup(createElement(PrivacyPage));
     expect(html).toContain("Privacy Policy");
-    expect(html).toContain("Last updated: July 22, 2026");
+    expect(html).toContain("Last updated: August 8, 2026");
   });
 
   it("publishes the required SEO metadata", () => {

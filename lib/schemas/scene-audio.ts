@@ -21,6 +21,39 @@ export const voicePresetInputSchema = z.object({
   isDefault: z.coerce.boolean().default(false),
 });
 
+export const CUSTOM_VOICE_CONSENT_PHRASE =
+  "I am the owner of this voice and I consent to OpenAI using this recording to create a synthetic voice.";
+
+export const CUSTOM_VOICE_AUDIO_TYPES = [
+  "audio/mpeg",
+  "audio/wav",
+  "audio/x-wav",
+  "audio/ogg",
+  "audio/aac",
+  "audio/flac",
+  "audio/webm",
+  "audio/mp4",
+] as const;
+
+export type CustomVoiceAudioType = (typeof CUSTOM_VOICE_AUDIO_TYPES)[number];
+
+export function customVoiceAudioTypeFromMimeType(
+  mimeType: string,
+): CustomVoiceAudioType | null {
+  const baseType = mimeType.split(";", 1)[0]?.trim().toLowerCase();
+  return CUSTOM_VOICE_AUDIO_TYPES.find((type) => type === baseType) ?? null;
+}
+
+export const customVoiceEnrollmentSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  language: z.string().regex(/^[a-z]{2,3}(?:-[A-Z]{2})?$/),
+});
+
+export const revokeCustomVoiceSchema = z.object({
+  projectId: z.uuid(),
+  customVoiceId: z.uuid(),
+});
+
 const uniqueSceneIdsSchema = z
   .array(z.uuid())
   .min(1, "Select at least one scene.")

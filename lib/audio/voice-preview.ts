@@ -67,7 +67,7 @@ export async function getVoicePreviewAudio(input: {
   const result = await provider.generate({
     model: environment.OPENAI_TTS_MODEL,
     text: VOICE_PREVIEW_SAMPLE_TEXT,
-    voice: input.voice,
+    voice: { kind: "built_in", name: input.voice },
     format: PREVIEW_FORMAT,
     speedScaledPercent: 100,
   });

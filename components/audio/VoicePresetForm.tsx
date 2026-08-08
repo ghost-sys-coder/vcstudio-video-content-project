@@ -28,6 +28,9 @@ const OPENAI_VOICES = [
   "nova",
   "sage",
   "shimmer",
+  "verse",
+  "marin",
+  "cedar",
 ];
 
 export function VoicePresetForm({

@@ -6,6 +6,7 @@ import {
   listSceneAudioGenerationsForSceneVersions,
   listVoicePresets,
 } from "@/db/repositories/scene-audio.repository";
+import { listCustomVoices } from "@/db/repositories/custom-voice.repository";
 import {
   getProjectCommittedCostCents,
   getWorkspaceCommittedCostCents,
@@ -59,6 +60,7 @@ export async function loadAudioWorkspace(input: {
     projectCommittedCents,
     workspaceDailyCommittedCents,
     workspaceMonthlyCommittedCents,
+    customVoices,
   ] = await Promise.all([
     listSceneAudioGenerationsForSceneVersions({
       ...scope,
@@ -74,6 +76,7 @@ export async function loadAudioWorkspace(input: {
       workspaceId: input.workspaceId,
       since: monthlyWindowStart,
     }),
+    listCustomVoices({ workspaceId: input.workspaceId }),
   ]);
 
   let voicePresets = initialVoicePresets;
@@ -203,6 +206,14 @@ export async function loadAudioWorkspace(input: {
       speedScaledPercent: preset.speedScaledPercent,
       format: preset.format,
       isDefault: preset.isDefault,
+      isCustom: preset.customVoiceId !== null,
+    })),
+    customVoices: customVoices.map((voice) => ({
+      id: voice.id,
+      name: voice.name,
+      consentLanguage: voice.consentLanguage,
+      status: voice.status,
+      createdAt: voice.createdAt.toISOString(),
     })),
     timeline: {
       scenes: timelineScenes,

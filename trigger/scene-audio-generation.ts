@@ -152,7 +152,9 @@ export const sceneAudioGenerationTask = task({
       result = await provider.generate({
         model: generation.model,
         text: generation.inputText,
-        voice: generation.voice,
+        voice: generation.isCustomVoice
+          ? { kind: "custom", id: generation.voice }
+          : { kind: "built_in", name: generation.voice },
         format: generation.format,
         speedScaledPercent: generation.speedScaledPercent,
         instructions: generation.instructions,

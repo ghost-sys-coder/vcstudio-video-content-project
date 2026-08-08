@@ -21,6 +21,15 @@ export interface VoicePresetView {
   speedScaledPercent: number;
   format: SceneAudioFormat;
   isDefault: boolean;
+  isCustom: boolean;
+}
+
+export interface CustomVoiceView {
+  id: string;
+  name: string;
+  consentLanguage: string;
+  status: "active" | "revoked";
+  createdAt: string;
 }
 
 export interface AudioSceneView {
@@ -88,6 +97,7 @@ export interface AudioProgressCounts {
 export interface AudioWorkspaceView {
   scenes: AudioSceneView[];
   voicePresets: VoicePresetView[];
+  customVoices: CustomVoiceView[];
   timeline: AudioTimelineView;
   configuration: AudioConfigurationView;
   availableBudgetCents: number;

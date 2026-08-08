@@ -18,7 +18,7 @@ export class AudioGenerationProviderResponseError extends Error {
 export interface AudioGenerationProviderInput {
   model: string;
   text: string;
-  voice: string;
+  voice: { kind: "built_in"; name: string } | { kind: "custom"; id: string };
   format: SceneAudioFormat;
   speedScaledPercent: number;
   instructions?: string;
@@ -92,7 +92,10 @@ export class OpenAiSceneAudioProvider {
       .create({
         model: input.model,
         input: trimmed,
-        voice: input.voice,
+        voice:
+          input.voice.kind === "custom"
+            ? { id: input.voice.id }
+            : input.voice.name,
         response_format: input.format,
         // OpenAI only honors `speed` on the classic tts models; only send it
         // when it deviates from the default so newer models do not reject it.
@@ -120,7 +123,8 @@ export class OpenAiSceneAudioProvider {
       format: input.format,
       characterCount: trimmed.length,
       safeMetadata: {
-        voice: input.voice,
+        voice:
+          input.voice.kind === "custom" ? input.voice.id : input.voice.name,
         format: input.format,
         speedScaledPercent: input.speedScaledPercent,
         characterCount: trimmed.length,

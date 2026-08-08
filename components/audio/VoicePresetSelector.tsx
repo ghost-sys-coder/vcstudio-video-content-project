@@ -41,7 +41,7 @@ export function VoicePresetSelector({
         >
           {voicePresets.map((preset) => (
             <option key={preset.id} value={preset.id}>
-              {preset.name} · {preset.voice}
+              {preset.name} · {preset.isCustom ? "custom voice" : preset.voice}
               {preset.isDefault ? " (default)" : ""}
             </option>
           ))}

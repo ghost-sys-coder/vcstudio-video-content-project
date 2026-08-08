@@ -301,6 +301,11 @@ export const audioGenerationSourceEnum = pgEnum("audio_generation_source", [
   "user_recorded",
 ]);
 
+export const customVoiceStatusEnum = pgEnum("custom_voice_status", [
+  "active",
+  "revoked",
+]);
+
 export const subtitleGranularityEnum = pgEnum("subtitle_granularity", [
   "scene",
   "sentence",
@@ -396,6 +401,8 @@ export const auditActionEnum = pgEnum("audit_action", [
   "member_joined",
   "member_removed",
   "marketing_skill_deleted",
+  "custom_voice_created",
+  "custom_voice_revoked",
 ]);
 
 export const userThemePreferenceEnum = pgEnum("user_theme_preference", [
@@ -2583,6 +2590,50 @@ export const providerRequests = pgTable(
   ],
 );
 
+export const customVoices = pgTable(
+  "custom_voices",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    provider: text("provider").notNull().default("openai"),
+    providerVoiceId: text("provider_voice_id").notNull(),
+    providerConsentId: text("provider_consent_id").notNull(),
+    consentLanguage: text("consent_language").notNull(),
+    status: customVoiceStatusEnum("status").notNull().default("active"),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    revokedByUserId: uuid("revoked_by_user_id").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("custom_voices_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    uniqueIndex("custom_voices_provider_voice_unique").on(
+      table.provider,
+      table.providerVoiceId,
+    ),
+    index("custom_voices_workspace_status_index").on(
+      table.workspaceId,
+      table.status,
+      table.createdAt,
+    ),
+  ],
+);
+
 export const voicePresets = pgTable(
   "voice_presets",
   {
@@ -2595,6 +2646,7 @@ export const voicePresets = pgTable(
     provider: text("provider").notNull().default("openai"),
     model: text("model").notNull(),
     voice: text("voice").notNull(),
+    customVoiceId: uuid("custom_voice_id"),
     instructions: text("instructions").notNull().default(""),
     speedScaledPercent: integer("speed_scaled_percent").notNull().default(100),
     format: audioOutputFormatEnum("format").notNull().default("mp3"),
@@ -2628,6 +2680,11 @@ export const voicePresets = pgTable(
       "voice_presets_speed_range",
       sql`${table.speedScaledPercent} between 25 and 400`,
     ),
+    foreignKey({
+      columns: [table.customVoiceId, table.workspaceId],
+      foreignColumns: [customVoices.id, customVoices.workspaceId],
+      name: "voice_presets_tenant_custom_voice_fkey",
+    }).onDelete("restrict"),
   ],
 );
 
@@ -2657,6 +2714,7 @@ export const sceneAudioGenerations = pgTable(
     provider: text("provider"),
     model: text("model"),
     voice: text("voice"),
+    isCustomVoice: boolean("is_custom_voice").notNull().default(false),
     format: sceneAudioAssetFormatEnum("format").notNull(),
     speedScaledPercent: integer("speed_scaled_percent"),
     instructions: text("instructions").notNull().default(""),
@@ -5271,6 +5329,7 @@ export type ImageReviewStatus =
 export type GenerationReferenceAsset =
   typeof generationReferenceAssets.$inferSelect;
 export type ProviderRequest = typeof providerRequests.$inferSelect;
+export type CustomVoice = typeof customVoices.$inferSelect;
 export type UsageReservation = typeof usageReservations.$inferSelect;
 export type UsageEvent = typeof usageEvents.$inferSelect;
 export type ProjectSubtitleSettings =

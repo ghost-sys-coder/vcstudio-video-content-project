@@ -19,6 +19,7 @@ const voicePresetViewSchema = z.object({
   speedScaledPercent: z.number().int(),
   format: audioFormatSchema,
   isDefault: z.boolean(),
+  isCustom: z.boolean(),
 });
 
 const audioSceneSchema = z.object({
@@ -84,6 +85,15 @@ export const audioWorkspaceResponseSchema = z.discriminatedUnion("success", [
     data: z.object({
       scenes: z.array(audioSceneSchema),
       voicePresets: z.array(voicePresetViewSchema),
+      customVoices: z.array(
+        z.object({
+          id: z.uuid(),
+          name: z.string(),
+          consentLanguage: z.string(),
+          status: z.enum(["active", "revoked"]),
+          createdAt: z.string(),
+        }),
+      ),
       timeline: z.object({
         scenes: z.array(timelineSceneSchema),
         framesPerSecond: z.number().int().positive(),

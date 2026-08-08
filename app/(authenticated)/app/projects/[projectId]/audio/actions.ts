@@ -7,10 +7,14 @@ import {
   rejectSceneAudioGeneration,
 } from "@/db/commands/scene-audio-commands";
 import { createVoicePreset } from "@/db/commands/voice-preset-commands";
+import { revokeCustomVoice } from "@/db/commands/custom-voice-commands";
 import { findProject } from "@/db/repositories/projects.repository";
+import { findActiveCustomVoice } from "@/db/repositories/custom-voice.repository";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import { requireCapability } from "@/lib/policies/workspace-policy";
 import { RateLimitExceededError } from "@/lib/domain/errors";
+import { getSceneAudioEnvironment } from "@/lib/env/server";
+import { OpenAiCustomVoiceProvider } from "@/lib/openai/custom-voice-provider";
 import { recordAuditEvent } from "@/lib/audit/record-audit-event";
 import {
   SceneAudioGenerationRequestError,
@@ -21,6 +25,7 @@ import {
   sceneAudioGenerationMutationSchema,
   startBulkSceneAudioGenerationSchema,
   voicePresetInputSchema,
+  revokeCustomVoiceSchema,
 } from "@/lib/schemas/scene-audio";
 
 async function requireProjectAccess(projectId: string) {
@@ -32,6 +37,45 @@ async function requireProjectAccess(projectId: string) {
   });
   if (!project) throw new Error("PROJECT_NOT_FOUND");
   return { context, project };
+}
+
+export async function revokeCustomVoiceAction(
+  formData: FormData,
+): Promise<SceneAudioActionResult> {
+  const parsed = revokeCustomVoiceSchema.safeParse(
+    Object.fromEntries(formData),
+  );
+  if (!parsed.success)
+    return { success: false, error: "The custom voice is invalid." };
+  try {
+    const { context } = await requireProjectAccess(parsed.data.projectId);
+    requireCapability(context.activeMembership.role, "manageCustomVoices");
+    const customVoice = await findActiveCustomVoice({
+      workspaceId: context.activeMembership.workspaceId,
+      customVoiceId: parsed.data.customVoiceId,
+    });
+    if (!customVoice) throw new Error("CUSTOM_VOICE_NOT_ACTIVE");
+    const environment = getSceneAudioEnvironment();
+    await new OpenAiCustomVoiceProvider({
+      apiKey: environment.OPENAI_API_KEY,
+    }).deleteConsent(customVoice.providerConsentId);
+    await revokeCustomVoice({
+      workspaceId: context.activeMembership.workspaceId,
+      customVoiceId: parsed.data.customVoiceId,
+      revokedByUserId: context.user.id,
+    });
+    await recordAuditEvent({
+      workspaceId: context.activeMembership.workspaceId,
+      actorUserId: context.user.id,
+      action: "custom_voice_revoked",
+      targetType: "custom_voice",
+      targetId: parsed.data.customVoiceId,
+    });
+    revalidatePath(`/app/projects/${parsed.data.projectId}/audio`);
+    return { success: true, error: null };
+  } catch {
+    return { success: false, error: "The custom voice could not be revoked." };
+  }
 }
 
 export async function startSceneAudioGenerationAction(

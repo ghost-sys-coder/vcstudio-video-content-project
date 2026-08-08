@@ -37,7 +37,7 @@ export function PrivacyPolicyPage() {
               production assets, and data from connected publishing platforms.
             </p>
             <p className="mt-6 inline-flex rounded-full border bg-muted/40 px-4 py-2 font-mono text-sm font-medium">
-              Last updated: July 22, 2026
+              Last updated: August 8, 2026
             </p>
           </header>
 
@@ -106,6 +106,11 @@ export function PrivacyPolicyPage() {
                     prompts, scripts, images, character references, audio,
                     videos, captions, publishing settings, and other uploaded
                     files;
+                  </li>
+                  <li>
+                    when an owner chooses voice cloning, a spoken consent
+                    declaration and voice sample used to create the requested
+                    synthetic voice with OpenAI;
                   </li>
                   <li>
                     content briefs, generated outputs, approval choices,
@@ -282,10 +287,15 @@ export function PrivacyPolicyPage() {
                 <p>
                   Prompts, scripts, project information, reference assets, and
                   other content may be sent to AI providers such as OpenAI to
-                  produce requested text, images, or audio. Provider processing
-                  and retention depend on the applicable service configuration
-                  and terms. Avoid submitting sensitive personal information
-                  unless it is necessary for your intended output.
+                  produce requested text, images, or audio. Voice-cloning
+                  consent and sample recordings are sent directly to OpenAI and
+                  are not retained in VCStudio object storage or its database;
+                  VCStudio retains the resulting provider identifiers and
+                  consent metadata until revocation or workspace deletion.
+                  Provider processing and retention depend on the applicable
+                  service configuration and terms. Avoid submitting sensitive
+                  personal information unless it is necessary for your intended
+                  output.
                 </p>
                 <p>
                   AI output may be incomplete, inaccurate, similar to other

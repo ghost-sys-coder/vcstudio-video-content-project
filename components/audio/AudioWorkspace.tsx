@@ -15,6 +15,7 @@ import { BulkGenerateAudioButton } from "@/components/audio/BulkGenerateAudioBut
 import { SceneAudioList } from "@/components/audio/SceneAudioList";
 import { VoicePresetSelector } from "@/components/audio/VoicePresetSelector";
 import { VoicePreviewPanel } from "@/components/audio/VoicePreviewPanel";
+import { CustomVoiceManager } from "@/components/audio/CustomVoiceManager";
 import type {
   AudioGenerateInput,
   AudioWorkspaceView,
@@ -30,12 +31,14 @@ export function AudioWorkspace({
   canGenerate,
   canReview,
   canManageVoicePresets,
+  canManageCustomVoices,
 }: {
   projectId: string;
   initialData: AudioWorkspaceView;
   canGenerate: boolean;
   canReview: boolean;
   canManageVoicePresets: boolean;
+  canManageCustomVoices: boolean;
 }) {
   const [data, setData] = useState<AudioWorkspaceView>(initialData);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
@@ -222,6 +225,14 @@ export function AudioWorkspace({
       />
 
       <VoicePreviewPanel />
+
+      {canManageCustomVoices ? (
+        <CustomVoiceManager
+          onChanged={refresh}
+          projectId={projectId}
+          voices={data.customVoices}
+        />
+      ) : null}
 
       <div className="flex flex-wrap items-end justify-between gap-3">
         <VoicePresetSelector

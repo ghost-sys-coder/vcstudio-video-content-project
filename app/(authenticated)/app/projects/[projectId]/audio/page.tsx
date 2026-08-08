@@ -25,6 +25,7 @@ export default async function ProjectAudioPage({
     <AudioWorkspace
       canGenerate={can(role, "generateSceneAudio") && notArchived}
       canManageVoicePresets={can(role, "manageVoicePresets") && notArchived}
+      canManageCustomVoices={can(role, "manageCustomVoices") && notArchived}
       canReview={can(role, "reviewSceneAudio") && notArchived}
       initialData={audio}
       projectId={project.id}

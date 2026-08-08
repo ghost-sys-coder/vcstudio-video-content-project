@@ -23,7 +23,8 @@ export type RateLimitedOperation =
   | "marketing_chat_turn"
   | "marketing_content_generation"
   | "marketing_image_generation"
-  | "marketing_research";
+  | "marketing_research"
+  | "custom_voice_enrollment";
 
 /**
  * Enforces the per-workspace fixed-window rate limit for a billable operation,

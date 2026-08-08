@@ -272,6 +272,7 @@ export async function startSceneAudioGeneration(input: {
           provider: voicePreset.provider,
           model: voicePreset.model,
           voice: voicePreset.voice,
+          isCustomVoice: voicePreset.customVoiceId !== null,
           format: voicePreset.format,
           speedScaledPercent: voicePreset.speedScaledPercent,
           instructions: voicePreset.instructions,

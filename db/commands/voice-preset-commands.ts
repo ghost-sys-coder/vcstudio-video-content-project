@@ -58,6 +58,7 @@ export async function createVoicePreset(input: {
   speedScaledPercent: number;
   format: AudioFormat;
   isDefault: boolean;
+  customVoiceId?: string | null;
 }) {
   const database = getDatabase();
   const baseSlug = slugifyVoicePresetName(input.name);
@@ -76,6 +77,7 @@ export async function createVoicePreset(input: {
       speedScaledPercent: input.speedScaledPercent,
       format: input.format,
       isDefault: input.isDefault,
+      customVoiceId: input.customVoiceId ?? null,
       createdByUserId: input.createdByUserId,
     };
     try {

@@ -98,6 +98,7 @@ export async function createSceneAudioGenerationReservation(input: {
   provider: string;
   model: string;
   voice: string;
+  isCustomVoice?: boolean;
   format: AudioFormat;
   speedScaledPercent: number;
   instructions: string;
@@ -208,7 +209,7 @@ export async function createSceneAudioGenerationReservation(input: {
         insert into scene_audio_generations (
           id, workspace_id, project_id, scene_id, scene_version_id,
           voice_preset_id, generation_version, request_nonce, idempotency_key,
-          request_fingerprint, provider, model, voice, format,
+          request_fingerprint, provider, model, voice, is_custom_voice, format,
           speed_scaled_percent, instructions, sample_rate, input_text,
           input_character_count, estimated_cost_cents, requested_by_user_id
         )
@@ -226,6 +227,7 @@ export async function createSceneAudioGenerationReservation(input: {
           ${input.provider},
           ${input.model},
           ${input.voice},
+          ${input.isCustomVoice ?? false},
           ${input.format}::scene_audio_asset_format,
           ${input.speedScaledPercent},
           ${input.instructions},

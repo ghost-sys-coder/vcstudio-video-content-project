@@ -20,6 +20,10 @@ import {
   createSceneAudioGenerationReservation,
 } from "@/db/commands/scene-audio-commands";
 import {
+  createCustomVoice,
+  revokeCustomVoice,
+} from "@/db/commands/custom-voice-commands";
+import {
   findSceneAudioGeneration,
   findSceneAudioReservation,
 } from "@/db/repositories/scene-audio.repository";
@@ -35,6 +39,7 @@ import {
   usageReservations,
   users,
   voicePresets,
+  customVoices,
   workspaceMembers,
   workspaces,
 } from "@/db/schema";
@@ -366,6 +371,74 @@ describeDatabase("Phase 7 scene audio invariants", () => {
         .values({
           ...reservationInputRow(second),
           voicePresetId: first.voicePresetId,
+        }),
+    ).rejects.toMatchObject({});
+  }, 30_000);
+
+  it("creates and revokes a tenant-scoped custom voice with its preset", async () => {
+    const fixture = await createFixture();
+    const customVoice = await createCustomVoice({
+      workspaceId: fixture.workspaceId,
+      name: "Owner voice",
+      providerVoiceId: `voice_${randomUUID()}`,
+      providerConsentId: `cons_${randomUUID()}`,
+      consentLanguage: "en-US",
+      createdByUserId: fixture.userId,
+    });
+    const [preset] = await getDatabase()
+      .insert(voicePresets)
+      .values({
+        workspaceId: fixture.workspaceId,
+        name: "Owner voice",
+        slug: `owner-voice-${randomUUID()}`,
+        model: "gpt-4o-mini-tts",
+        voice: customVoice.providerVoiceId,
+        customVoiceId: customVoice.id,
+        createdByUserId: fixture.userId,
+      })
+      .returning();
+
+    await revokeCustomVoice({
+      workspaceId: fixture.workspaceId,
+      customVoiceId: customVoice.id,
+      revokedByUserId: fixture.userId,
+    });
+
+    const [revoked] = await getDatabase()
+      .select()
+      .from(customVoices)
+      .where(eq(customVoices.id, customVoice.id));
+    const [archivedPreset] = await getDatabase()
+      .select()
+      .from(voicePresets)
+      .where(eq(voicePresets.id, preset!.id));
+    expect(revoked).toMatchObject({ status: "revoked" });
+    expect(revoked?.revokedAt).toBeInstanceOf(Date);
+    expect(archivedPreset?.archivedAt).toBeInstanceOf(Date);
+  }, 30_000);
+
+  it("rejects linking a preset to another workspace's custom voice", async () => {
+    const first = await createFixture();
+    const second = await createFixture();
+    const customVoice = await createCustomVoice({
+      workspaceId: first.workspaceId,
+      name: "First owner voice",
+      providerVoiceId: `voice_${randomUUID()}`,
+      providerConsentId: `cons_${randomUUID()}`,
+      consentLanguage: "en-US",
+      createdByUserId: first.userId,
+    });
+    await expect(
+      getDatabase()
+        .insert(voicePresets)
+        .values({
+          workspaceId: second.workspaceId,
+          name: "Invalid voice",
+          slug: `invalid-${randomUUID()}`,
+          model: "gpt-4o-mini-tts",
+          voice: customVoice.providerVoiceId,
+          customVoiceId: customVoice.id,
+          createdByUserId: second.userId,
         }),
     ).rejects.toMatchObject({});
   }, 30_000);
