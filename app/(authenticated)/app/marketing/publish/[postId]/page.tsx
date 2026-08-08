@@ -1,12 +1,12 @@
 import { notFound, redirect } from "next/navigation";
 import { PostComposer } from "@/components/social/PostComposer";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
-import { loadMediaLibrary } from "@/lib/media/load-media-library";
 import { getMediaLibraryEnvironment } from "@/lib/env/server";
-import { loadSocialPostComposerView } from "@/lib/social/load-social-posts";
+import { loadMediaLibrary } from "@/lib/media/load-media-library";
 import { can } from "@/lib/policies/workspace-policy";
+import { loadSocialPostComposerView } from "@/lib/social/load-social-posts";
 
-export default async function SocialPostPage({
+export default async function MarketingPublishPostPage({
   params,
 }: {
   params: Promise<{ postId: string }>;
@@ -16,28 +16,27 @@ export default async function SocialPostPage({
   if (!can(context.activeMembership.role, "composePosts"))
     redirect("/app/access-denied");
 
-  const { postId } = await params;
   const workspaceId = context.activeMembership.workspaceId;
+  const { postId } = await params;
   const limits = getMediaLibraryEnvironment();
-
   const [view, library] = await Promise.all([
     loadSocialPostComposerView({ workspaceId, postId }),
     loadMediaLibrary({ workspaceId }),
   ]);
-  // Null covers both "does not exist" and "belongs to another workspace" — the
-  // repository is workspace-scoped, so a foreign id is indistinguishable from a
-  // missing one, which is the point.
   if (!view) notFound();
 
   return (
-    <PostComposer
-      canPublish={can(context.activeMembership.role, "publishPosts")}
-      canUpload={can(context.activeMembership.role, "manageMediaLibrary")}
-      library={library.assets}
-      maxImageBytes={limits.MAX_MEDIA_IMAGE_BYTES}
-      maxVideoBytes={limits.MAX_MEDIA_VIDEO_BYTES}
-      view={view}
-      workspaceId={workspaceId}
-    />
+    <div className="p-6">
+      <PostComposer
+        canPublish={can(context.activeMembership.role, "publishPosts")}
+        canUpload={can(context.activeMembership.role, "manageMediaLibrary")}
+        composerBasePath="/app/marketing/publish"
+        library={library.assets}
+        maxImageBytes={limits.MAX_MEDIA_IMAGE_BYTES}
+        maxVideoBytes={limits.MAX_MEDIA_VIDEO_BYTES}
+        view={view}
+        workspaceId={workspaceId}
+      />
+    </div>
   );
 }

@@ -9,6 +9,7 @@ import {
   MessagesSquare,
   Plug,
   Repeat2,
+  Send,
   Sparkles,
   Target,
 } from "lucide-react";
@@ -43,6 +44,7 @@ import {
 const MARKETING_ROUTES = [
   { href: "/app/marketing/chat", label: "Chat", icon: MessagesSquare },
   { href: "/app/marketing/calendar", label: "Calendar", icon: CalendarClock },
+  { href: "/app/marketing/publish", label: "Publish", icon: Send },
   { href: "/app/marketing/schedules", label: "Schedules", icon: Repeat2 },
   { href: "/app/marketing/content", label: "Content", icon: FileCheck2 },
   { href: "/app/marketing/campaigns", label: "Campaigns", icon: Target },

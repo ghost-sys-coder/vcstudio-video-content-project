@@ -10,7 +10,11 @@ import { Button } from "@/components/ui/button";
  * asking for a name in a dialog first — the name is internal-only and can be
  * filled in while writing.
  */
-export function CreatePostButton() {
+export function CreatePostButton({
+  composerBasePath = "/app/social/posts",
+}: {
+  composerBasePath?: string;
+}) {
   const [pending, startTransition] = useTransition();
 
   return (
@@ -18,7 +22,9 @@ export function CreatePostButton() {
       disabled={pending}
       onClick={() =>
         startTransition(async () => {
-          await createSocialPostAction(new FormData());
+          const formData = new FormData();
+          formData.set("composerBasePath", composerBasePath);
+          await createSocialPostAction(formData);
         })
       }
       type="button"

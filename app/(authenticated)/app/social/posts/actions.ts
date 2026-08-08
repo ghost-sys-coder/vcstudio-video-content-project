@@ -69,7 +69,11 @@ export async function createSocialPostAction(
   // Outside the try: `redirect` signals by throwing, so catching around it would
   // swallow the navigation and report a failure for a post that was created.
   revalidatePath("/app/social/posts");
-  redirect(`/app/social/posts/${postId}`);
+  const composerBasePath =
+    formData.get("composerBasePath") === "/app/marketing/publish"
+      ? "/app/marketing/publish"
+      : "/app/social/posts";
+  redirect(`${composerBasePath}/${postId}`);
 }
 
 /**
@@ -190,6 +194,16 @@ export async function saveSocialPostAction(
 export type PublishSocialPostResult =
   { ok: true; dispatched: number } | { ok: false; error: string };
 
+function parseCaptionOverrides(formData: FormData): unknown {
+  const value = formData.get("captionOverrides");
+  if (typeof value !== "string" || value === "") return [];
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Sends a post to the chosen connected accounts now.
  *
@@ -207,6 +221,7 @@ export async function publishSocialPostAction(
       .map((value) => String(value))
       .filter((value) => value !== ""),
     requestNonce: formData.get("requestNonce"),
+    captionOverrides: parseCaptionOverrides(formData),
   });
   if (!parsed.success)
     return {
@@ -225,6 +240,7 @@ export async function publishSocialPostAction(
       postId: parsed.data.postId,
       connectionIds: parsed.data.connectionIds,
       requestNonce: parsed.data.requestNonce,
+      captionOverrides: parsed.data.captionOverrides,
     });
 
     await recordAuditEvent({
@@ -266,6 +282,7 @@ export async function scheduleSocialPostAction(
       .map((value) => String(value))
       .filter((value) => value !== ""),
     requestNonce: formData.get("requestNonce"),
+    captionOverrides: parseCaptionOverrides(formData),
   });
   if (!parsed.success)
     return {
@@ -286,6 +303,7 @@ export async function scheduleSocialPostAction(
       timezone: parsed.data.timezone,
       connectionIds: parsed.data.connectionIds,
       requestNonce: parsed.data.requestNonce,
+      captionOverrides: parsed.data.captionOverrides,
     });
 
     await recordAuditEvent({

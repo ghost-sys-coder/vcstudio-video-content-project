@@ -5,16 +5,23 @@ import { useRouter } from "next/navigation";
 import { Loader2Icon, SendIcon } from "lucide-react";
 import { publishSocialPostAction } from "@/app/(authenticated)/app/social/posts/actions";
 import { PostTargetRow } from "@/components/social/PostTargetRow";
+import { PlatformCaptionEditor } from "@/components/social/PlatformCaptionEditor";
 import { SchedulePostDialog } from "@/components/social/SchedulePostDialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { toneContainerClassName } from "@/lib/social/eligibility-tone";
-import type { PlatformEligibility } from "@/lib/social/select-eligible-platforms";
+import {
+  checkPlatformEligibility,
+  type PostAttachmentSummary,
+} from "@/lib/social/select-eligible-platforms";
 import type {
   PostConnectionView,
   SocialPostTargetView,
 } from "@/lib/social/social-post-view";
-import { isSocialPostPlatform } from "@/lib/social/platform-post-capabilities";
+import {
+  isSocialPostPlatform,
+  type SocialPostPlatform,
+} from "@/lib/social/platform-post-capabilities";
 
 /** How often to re-read the server while a destination is still in flight. */
 const POLL_INTERVAL_MS = 4000;
@@ -30,16 +37,18 @@ const POLL_INTERVAL_MS = 4000;
  */
 export function PublishPostPanel({
   canPublish,
+  attachmentSummary,
+  basePlainText,
   connections,
-  eligibility,
   hasUnsavedChanges,
   postId,
   scheduledAt,
   targets,
 }: {
   canPublish: boolean;
+  attachmentSummary: PostAttachmentSummary;
+  basePlainText: string;
   connections: PostConnectionView[];
-  eligibility: PlatformEligibility[];
   hasUnsavedChanges: boolean;
   postId: string;
   scheduledAt: string | null;
@@ -47,6 +56,18 @@ export function PublishPostPanel({
 }) {
   const router = useRouter();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [captionOverrides, setCaptionOverrides] = useState<
+    Partial<Record<SocialPostPlatform, string>>
+  >(() => {
+    const initial: Partial<Record<SocialPostPlatform, string>> = {};
+    for (const target of targets)
+      if (
+        isSocialPostPlatform(target.platform) &&
+        target.overrideBodyPlainText !== null
+      )
+        initial[target.platform] = target.overrideBodyPlainText;
+    return initial;
+  });
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -62,9 +83,17 @@ export function PublishPostPanel({
     return () => clearInterval(timer);
   }, [inFlight, router]);
 
-  const eligibilityByPlatform = new Map(
-    eligibility.map((entry) => [entry.platform, entry]),
+  const selectedPlatforms = Array.from(
+    new Set(
+      connections
+        .filter((connection) => selectedIds.includes(connection.id))
+        .map((connection) => connection.platform)
+        .filter(isSocialPostPlatform),
+    ),
   );
+  const requestCaptionOverrides = selectedPlatforms
+    .filter((platform) => captionOverrides[platform] !== undefined)
+    .map((platform) => ({ platform, text: captionOverrides[platform] ?? "" }));
 
   function publish() {
     setError(null);
@@ -73,6 +102,7 @@ export function PublishPostPanel({
       data.set("postId", postId);
       for (const id of selectedIds) data.append("connectionIds", id);
       data.set("requestNonce", crypto.randomUUID());
+      data.set("captionOverrides", JSON.stringify(requestCaptionOverrides));
       const result = await publishSocialPostAction(data);
       if (result.ok) {
         setSelectedIds([]);
@@ -93,7 +123,13 @@ export function PublishPostPanel({
         <ul className="space-y-1.5">
           {connections.map((connection) => {
             const entry = isSocialPostPlatform(connection.platform)
-              ? eligibilityByPlatform.get(connection.platform)
+              ? checkPlatformEligibility({
+                  platform: connection.platform,
+                  attachments: attachmentSummary,
+                  plainTextLength: (
+                    captionOverrides[connection.platform] ?? basePlainText
+                  ).length,
+                })
               : undefined;
             const eligible = entry?.eligible ?? false;
             const alreadySent = targets.some(
@@ -153,6 +189,47 @@ export function PublishPostPanel({
         </ul>
       )}
 
+      {selectedPlatforms.length > 0 ? (
+        <div className="space-y-2 border-t pt-3">
+          <div>
+            <h3 className="text-sm font-medium">Platform captions</h3>
+            <p className="text-xs text-muted-foreground">
+              Keep the shared text or tailor it for each selected platform.
+            </p>
+          </div>
+          {selectedPlatforms.map((platform) => {
+            const connection = connections.find(
+              (entry) => entry.platform === platform,
+            );
+            const customized = captionOverrides[platform] !== undefined;
+            return (
+              <PlatformCaptionEditor
+                baseText={basePlainText}
+                customized={customized}
+                key={platform}
+                label={connection?.platformLabel ?? platform}
+                onChange={(text) =>
+                  setCaptionOverrides((current) => ({
+                    ...current,
+                    [platform]: text,
+                  }))
+                }
+                onCustomizedChange={(next) =>
+                  setCaptionOverrides((current) => {
+                    if (next) return { ...current, [platform]: basePlainText };
+                    const updated = { ...current };
+                    delete updated[platform];
+                    return updated;
+                  })
+                }
+                platform={platform}
+                value={captionOverrides[platform] ?? basePlainText}
+              />
+            );
+          })}
+        </div>
+      ) : null}
+
       {hasUnsavedChanges ? (
         <p className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-2 text-xs text-amber-700 dark:text-amber-500">
           Publishing sends the last saved version. Save the draft first to
@@ -169,14 +246,15 @@ export function PublishPostPanel({
       {canPublish ? (
         <div className="flex flex-wrap gap-2">
           <SchedulePostDialog
-            disabled={selectedIds.length === 0 || pending}
+            captionOverrides={requestCaptionOverrides}
+            disabled={selectedIds.length === 0 || pending || hasUnsavedChanges}
             postId={postId}
             scheduledAt={scheduledAt}
             selectedConnectionIds={selectedIds}
           />
           <Button
             className="flex-1"
-            disabled={selectedIds.length === 0 || pending}
+            disabled={selectedIds.length === 0 || pending || hasUnsavedChanges}
             onClick={publish}
             type="button"
           >

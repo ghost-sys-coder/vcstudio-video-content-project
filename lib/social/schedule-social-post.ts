@@ -19,7 +19,10 @@ import {
   getSceneAnalysisEnvironment,
 } from "@/lib/env/server";
 import { isSocialPostPlatformConfigured } from "@/lib/publishing/social-post-registry";
-import { isSocialPostPlatform } from "@/lib/social/platform-post-capabilities";
+import {
+  isSocialPostPlatform,
+  type SocialPostPlatform,
+} from "@/lib/social/platform-post-capabilities";
 import { checkScheduleInstant } from "@/lib/social/schedule-window";
 import {
   checkPlatformEligibility,
@@ -50,6 +53,7 @@ export async function scheduleSocialPostPublication(input: {
   timezone: string;
   connectionIds: string[];
   requestNonce: string;
+  captionOverrides?: { platform: SocialPostPlatform; text: string }[];
   now?: Date;
 }): Promise<{ scheduledAt: Date }> {
   const environment = getPublishingEnvironment();
@@ -104,6 +108,9 @@ export async function scheduleSocialPostPublication(input: {
         .join(","),
     )
     .digest("hex");
+  const captionOverrides = new Map(
+    (input.captionOverrides ?? []).map((entry) => [entry.platform, entry.text]),
+  );
 
   const resolved = [];
   for (const connectionId of new Set(input.connectionIds)) {
@@ -124,10 +131,12 @@ export async function scheduleSocialPostPublication(input: {
         "That platform isn't configured on the server yet. Contact an administrator.",
       );
 
+    const override = captionOverrides.get(connection.platform);
+    const platformText = override ?? post.bodyPlainText;
     const eligibility = checkPlatformEligibility({
       platform: connection.platform,
       attachments,
-      plainTextLength: post.bodyPlainText.length,
+      plainTextLength: platformText.length,
     });
     if (!eligibility.eligible)
       throw new SocialPostScheduleError(eligibility.reason);
@@ -135,13 +144,20 @@ export async function scheduleSocialPostPublication(input: {
     resolved.push({
       platform: connection.platform,
       connectionId,
+      overrideBodyPlainText:
+        override !== undefined && override !== post.bodyPlainText
+          ? override
+          : null,
       idempotencyKey: createSocialPostTargetIdempotencyKey({
         secret: getSceneAnalysisEnvironment().IDEMPOTENCY_HASH_SECRET,
         workspaceId: input.workspaceId,
         postId: post.id,
         connectionId,
         platform: connection.platform,
-        bodyFingerprint,
+        bodyFingerprint: createHash("sha256")
+          .update(bodyFingerprint)
+          .update(platformText)
+          .digest("hex"),
         requestNonce: input.requestNonce,
       }),
     });

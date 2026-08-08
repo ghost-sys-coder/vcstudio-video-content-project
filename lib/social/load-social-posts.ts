@@ -91,23 +91,31 @@ export async function loadSocialPostsView(input: {
 
   // Attachment counts come from the per-post media lookup rather than a join,
   // because the list only needs a count and the page size is bounded.
-  const mediaCounts = await Promise.all(
+  const mediaByPost = await Promise.all(
     posts.map(
       async (post) =>
-        (
-          await listSocialPostMedia({
-            workspaceId: input.workspaceId,
-            postId: post.id,
-          })
-        ).length,
+        await listSocialPostMedia({
+          workspaceId: input.workspaceId,
+          postId: post.id,
+        }),
     ),
   );
 
-  return posts.map((post, index) =>
-    toSocialPostSummaryView({
-      post,
-      targets: toTargetViews(targetsByPost.get(post.id) ?? [], byId),
-      mediaCount: mediaCounts[index] ?? 0,
+  return Promise.all(
+    posts.map(async (post, index) => {
+      const media = mediaByPost[index] ?? [];
+      const first = media.find(
+        (attachment) => !attachment.unavailable && attachment.objectKey !== "",
+      );
+      return toSocialPostSummaryView({
+        post,
+        targets: toTargetViews(targetsByPost.get(post.id) ?? [], byId),
+        mediaCount: media.length,
+        mediaPreviewUrl: first
+          ? await createMediaAssetDownloadUrl(first.objectKey)
+          : null,
+        mediaKind: first?.kind ?? null,
+      });
     }),
   );
 }

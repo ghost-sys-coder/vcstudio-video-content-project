@@ -14,6 +14,9 @@ function post(
     createdAt: "2026-07-30T09:00:00.000Z",
     targets: [],
     mediaCount: 0,
+    mediaPreviewUrl: null,
+    mediaKind: null,
+    calendarAt: overrides.scheduledAt ?? "2026-07-30T09:00:00.000Z",
     ...overrides,
   };
 }

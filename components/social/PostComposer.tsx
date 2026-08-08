@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Loader2Icon } from "lucide-react";
 import { saveSocialPostAction } from "@/app/(authenticated)/app/social/posts/actions";
 import { MediaPickerDialog } from "@/components/social/MediaPickerDialog";
+import { MediaUploadDropzone } from "@/components/social/MediaUploadDropzone";
 import { PlatformPreviewCard } from "@/components/social/PlatformPreviewCard";
 import { PostBodyEditor } from "@/components/social/PostBodyEditor";
 import { PostMediaAttachments } from "@/components/social/PostMediaAttachments";
@@ -36,19 +37,37 @@ import { MAX_POST_NAME_LENGTH } from "@/lib/schemas/social-post";
  */
 export function PostComposer({
   canPublish,
+  canUpload,
+  composerBasePath = "/app/social/posts",
   library,
+  maxImageBytes,
+  maxVideoBytes,
   view,
+  workspaceId,
 }: {
   canPublish: boolean;
+  canUpload: boolean;
+  composerBasePath?: string;
   library: MediaAssetView[];
+  maxImageBytes: number;
+  maxVideoBytes: number;
   view: SocialPostComposerView;
+  workspaceId: string;
 }) {
   const [name, setName] = useState(view.name);
   const [document, setDocument] = useState<PortableDocument>(view.bodyDocument);
   const [attachments, setAttachments] = useState<PostAttachmentView[]>(
     view.attachments,
   );
+  const [libraryAssets, setLibraryAssets] = useState(library);
   const [version, setVersion] = useState(view.version);
+  const [savedSnapshot, setSavedSnapshot] = useState(() => ({
+    plainText: view.bodyPlainText,
+    name: view.name,
+    attachmentKey: view.attachments
+      .map((attachment) => `${attachment.source}:${attachment.asset.id}`)
+      .join(":"),
+  }));
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -68,8 +87,22 @@ export function PostComposer({
       }),
     [attachments, plainText.length],
   );
+  const attachmentSummary = useMemo(
+    () =>
+      summarizeAttachments(
+        attachments.map((attachment) => attachment.asset.kind),
+      ),
+    [attachments],
+  );
 
   const eligibleCount = eligibility.filter((entry) => entry.eligible).length;
+  const attachmentKey = attachments
+    .map((attachment) => `${attachment.source}:${attachment.asset.id}`)
+    .join(":");
+  const hasUnsavedChanges =
+    plainText !== savedSnapshot.plainText ||
+    name !== savedSnapshot.name ||
+    attachmentKey !== savedSnapshot.attachmentKey;
 
   function save() {
     setError(null);
@@ -89,6 +122,7 @@ export function PostComposer({
       const result = await saveSocialPostAction(data);
       if (result.ok) {
         setVersion(result.version);
+        setSavedSnapshot({ plainText, name, attachmentKey });
         setSavedAt(new Date().toLocaleTimeString());
       } else setError(result.error);
     });
@@ -115,7 +149,7 @@ export function PostComposer({
           <Button
             className="px-0"
             nativeButton={false}
-            render={<Link href="/app/social/posts" />}
+            render={<Link href={composerBasePath} />}
             size="sm"
             variant="link"
           >
@@ -206,7 +240,7 @@ export function PostComposer({
                   attachedIds={attachments
                     .filter((attachment) => attachment.source === "library")
                     .map((attachment) => attachment.asset.id)}
-                  library={library}
+                  library={libraryAssets}
                   onConfirm={(assets) =>
                     setAttachments((current) => [
                       ...current,
@@ -220,6 +254,24 @@ export function PostComposer({
                 />
               ) : null}
             </div>
+            {view.editable && canUpload ? (
+              <MediaUploadDropzone
+                maxImageBytes={maxImageBytes}
+                maxVideoBytes={maxVideoBytes}
+                onUploaded={(uploaded) => {
+                  setLibraryAssets((current) => [...uploaded, ...current]);
+                  setAttachments((current) => [
+                    ...current,
+                    ...uploaded.map((asset) => ({
+                      asset,
+                      source: "library" as const,
+                      unavailable: false,
+                    })),
+                  ]);
+                }}
+                workspaceId={workspaceId}
+              />
+            ) : null}
             <PostMediaAttachments
               attachments={attachments}
               editable={view.editable && !pending}
@@ -237,10 +289,11 @@ export function PostComposer({
 
         <aside className="space-y-3">
           <PublishPostPanel
+            attachmentSummary={attachmentSummary}
+            basePlainText={plainText}
             canPublish={canPublish}
             connections={view.availableConnections}
-            eligibility={eligibility}
-            hasUnsavedChanges={plainText !== view.bodyPlainText}
+            hasUnsavedChanges={hasUnsavedChanges}
             postId={view.id}
             scheduledAt={view.scheduledAt}
             targets={view.targets}

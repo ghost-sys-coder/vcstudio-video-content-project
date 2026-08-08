@@ -16,6 +16,7 @@ export async function createSocialPostTargets(input: {
     platform: ContentPlatform;
     connectionId: string;
     idempotencyKey: string;
+    overrideBodyPlainText: string | null;
   }[];
 }): Promise<SocialPostTarget[]> {
   if (input.targets.length === 0) return [];
@@ -28,6 +29,7 @@ export async function createSocialPostTargets(input: {
         platform: target.platform,
         connectionId: target.connectionId,
         idempotencyKey: target.idempotencyKey,
+        overrideBodyPlainText: target.overrideBodyPlainText,
         status: "pending" as const,
       })),
     )
@@ -46,6 +48,7 @@ export async function replaceSocialPostTargets(input: {
     platform: ContentPlatform;
     connectionId: string;
     idempotencyKey: string;
+    overrideBodyPlainText: string | null;
   }[];
 }): Promise<SocialPostTarget[]> {
   const database = getDatabase();

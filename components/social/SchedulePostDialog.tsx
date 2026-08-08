@@ -22,6 +22,7 @@ import {
   MINIMUM_SCHEDULE_LEAD_SECONDS,
   toDateTimeLocalValue,
 } from "@/lib/social/schedule-window";
+import type { SocialPostPlatform } from "@/lib/social/platform-post-capabilities";
 
 /**
  * Schedules the post for later.
@@ -41,11 +42,13 @@ export function SchedulePostDialog({
   postId,
   scheduledAt,
   selectedConnectionIds,
+  captionOverrides,
 }: {
   disabled: boolean;
   postId: string;
   scheduledAt: string | null;
   selectedConnectionIds: string[];
+  captionOverrides: { platform: SocialPostPlatform; text: string }[];
 }) {
   const router = useRouter();
   const [value, setValue] = useState(() =>
@@ -80,6 +83,7 @@ export function SchedulePostDialog({
       );
       for (const id of selectedConnectionIds) data.append("connectionIds", id);
       data.set("requestNonce", crypto.randomUUID());
+      data.set("captionOverrides", JSON.stringify(captionOverrides));
 
       const result = await scheduleSocialPostAction(data);
       if (!result.ok) {

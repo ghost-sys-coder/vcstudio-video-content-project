@@ -5,12 +5,18 @@ import { Badge } from "@/components/ui/badge";
 import { formatShortDate } from "@/lib/format/date";
 import type { SocialPostSummaryView } from "@/lib/social/social-post-view";
 
-export function SocialPostRow({ post }: { post: SocialPostSummaryView }) {
+export function SocialPostRow({
+  composerBasePath = "/app/social/posts",
+  post,
+}: {
+  composerBasePath?: string;
+  post: SocialPostSummaryView;
+}) {
   return (
     <li>
       <Link
         className="flex flex-col gap-2 rounded-xl border p-3 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        href={`/app/social/posts/${post.id}`}
+        href={`${composerBasePath}/${post.id}`}
       >
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium">

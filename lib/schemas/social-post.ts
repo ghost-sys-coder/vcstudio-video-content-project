@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { portableDocumentSchema } from "@/lib/social/portable-document";
-import { SOCIAL_POST_PLATFORMS } from "@/lib/social/platform-post-capabilities";
+import {
+  getPlatformPostCapability,
+  SOCIAL_POST_PLATFORMS,
+} from "@/lib/social/platform-post-capabilities";
 
 export const MAX_POST_NAME_LENGTH = 120;
 export const MAX_MEDIA_ASSETS_PER_POST = 20;
@@ -42,6 +45,29 @@ export const saveSocialPostSchema = z.object({
 
 export const MAX_POST_DESTINATIONS = 10;
 
+export const socialPostCaptionOverridesSchema = z
+  .array(
+    z
+      .object({ platform: socialPostPlatformSchema, text: z.string() })
+      .superRefine((value, context) => {
+        const limit = getPlatformPostCapability(value.platform).maxCharacters;
+        if (value.text.length > limit)
+          context.addIssue({
+            code: "too_big",
+            origin: "string",
+            maximum: limit,
+            inclusive: true,
+            message: `The ${value.platform} caption exceeds ${limit.toLocaleString()} characters.`,
+          });
+      }),
+  )
+  .max(SOCIAL_POST_PLATFORMS.length)
+  .refine(
+    (entries) =>
+      new Set(entries.map((entry) => entry.platform)).size === entries.length,
+    "Provide at most one caption per platform.",
+  );
+
 export const publishSocialPostSchema = z.object({
   postId: z.uuid(),
   connectionIds: z
@@ -50,6 +76,7 @@ export const publishSocialPostSchema = z.object({
     .max(MAX_POST_DESTINATIONS),
   /** Distinct per intentional publish, so a deliberate re-post is allowed. */
   requestNonce: z.string().min(8).max(64),
+  captionOverrides: socialPostCaptionOverridesSchema.default([]),
 });
 
 export const scheduleSocialPostSchema = z.object({
@@ -63,6 +90,7 @@ export const scheduleSocialPostSchema = z.object({
   /** IANA zone, kept only so the UI can redisplay the author's intent. */
   timezone: z.string().trim().min(1).max(64),
   requestNonce: z.string().min(8).max(64),
+  captionOverrides: socialPostCaptionOverridesSchema.default([]),
 });
 
 export const MAX_QUICK_COMMENTARY_LENGTH = 3000;

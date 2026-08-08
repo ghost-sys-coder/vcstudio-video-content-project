@@ -5,9 +5,11 @@ import type { SocialPostSummaryView } from "@/lib/social/social-post-view";
 
 export function SocialPostsWorkspace({
   canCompose,
+  composerBasePath = "/app/social/posts",
   posts,
 }: {
   canCompose: boolean;
+  composerBasePath?: string;
   posts: SocialPostSummaryView[];
 }) {
   return (
@@ -19,7 +21,9 @@ export function SocialPostsWorkspace({
             Write once, send to several connected accounts.
           </p>
         </div>
-        {canCompose ? <CreatePostButton /> : null}
+        {canCompose ? (
+          <CreatePostButton composerBasePath={composerBasePath} />
+        ) : null}
       </header>
 
       {posts.length === 0 ? (
@@ -27,7 +31,11 @@ export function SocialPostsWorkspace({
       ) : (
         <ul className="space-y-2">
           {posts.map((post) => (
-            <SocialPostRow key={post.id} post={post} />
+            <SocialPostRow
+              composerBasePath={composerBasePath}
+              key={post.id}
+              post={post}
+            />
           ))}
         </ul>
       )}

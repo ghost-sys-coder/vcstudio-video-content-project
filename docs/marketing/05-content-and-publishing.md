@@ -8,6 +8,14 @@
 application to a platform. Marketing generates content, gets it approved, and
 hands it off as a `social_posts` row.
 
+The manual publishing surface under `/app/marketing/publish` follows the same
+rule. It is an alias over the existing Social composer and actions, not a second
+provider path. Authors can upload ready media there, write shared copy, tailor
+copy per selected platform, and publish now or schedule. Platform-specific copy
+is validated against that platform's character limit and snapshotted on each
+`social_post_targets.override_body_plain_text` row before a durable worker is
+dispatched.
+
 The reason is already written in `lib/social/create-post-from-render.ts`:
 
 > a second publish path would be a second place for the capability matrix to

@@ -27,6 +27,7 @@ export type SocialPostTargetView = {
   externalPostUrl: string | null;
   safeErrorMessage: string | null;
   publishedAt: string | null;
+  overrideBodyPlainText: string | null;
 };
 
 export type SocialPostSummaryView = {
@@ -39,6 +40,9 @@ export type SocialPostSummaryView = {
   createdAt: string;
   targets: SocialPostTargetView[];
   mediaCount: number;
+  mediaPreviewUrl: string | null;
+  mediaKind: "image" | "video" | null;
+  calendarAt: string;
 };
 
 export type SocialPostComposerView = {
@@ -131,6 +135,7 @@ export function toSocialPostTargetView(input: {
     externalPostUrl: input.target.externalPostUrl,
     safeErrorMessage: input.target.safeErrorMessage,
     publishedAt: input.target.publishedAt?.toISOString() ?? null,
+    overrideBodyPlainText: input.target.overrideBodyPlainText,
   };
 }
 
@@ -138,7 +143,13 @@ export function toSocialPostSummaryView(input: {
   post: SocialPost;
   targets: SocialPostTargetView[];
   mediaCount: number;
+  mediaPreviewUrl: string | null;
+  mediaKind: "image" | "video" | null;
 }): SocialPostSummaryView {
+  const publishedInstants = input.targets
+    .map((target) => target.publishedAt)
+    .filter((value): value is string => value !== null)
+    .sort();
   return {
     id: input.post.id,
     name: input.post.name,
@@ -149,5 +160,11 @@ export function toSocialPostSummaryView(input: {
     createdAt: input.post.createdAt.toISOString(),
     targets: input.targets,
     mediaCount: input.mediaCount,
+    mediaPreviewUrl: input.mediaPreviewUrl,
+    mediaKind: input.mediaKind,
+    calendarAt:
+      input.post.scheduledAt?.toISOString() ??
+      publishedInstants[0] ??
+      input.post.createdAt.toISOString(),
   };
 }
