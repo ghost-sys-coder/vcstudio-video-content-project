@@ -34,6 +34,10 @@ const rules = {
     required: [".env.example", ".env"],
     forbidden: [".env.trigger.dev", ".env.vercel"],
   },
+  SECURITY_CSP_MODE: {
+    required: [".env.example", ".env", ".env.vercel"],
+    forbidden: [".env.trigger.dev"],
+  },
 };
 const failures = [];
 for (const [key, rule] of Object.entries(rules)) {

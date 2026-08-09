@@ -26,3 +26,10 @@ Run `npm run env:check` before deployment. It compares key names only and never
 prints values. Local `trigger dev` reads `.env` and does not update a remote
 dashboard. `npm run trigger:deploy` deploys production and synchronizes
 `.env.trigger.dev`; use `-- --env staging` for staging.
+
+## Browser security policy
+
+`SECURITY_CSP_MODE` is web-runtime-only. It belongs in `.env`, `.env.vercel`,
+and `.env.example`, and must not be copied to Trigger.dev. Start with
+`report-only`; switch to `enforce` only after production violation reports and
+the sign-in, recording, upload, preview, and OAuth journeys have been checked.

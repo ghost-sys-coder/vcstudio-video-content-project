@@ -857,6 +857,10 @@ export const storageReconciliationEnvironmentSchema = z.object({
     .default(24),
 });
 
+export const securityEnvironmentSchema = z.object({
+  SECURITY_CSP_MODE: z.enum(["report-only", "enforce"]).default("report-only"),
+});
+
 export type ServerEnvironment = z.infer<typeof serverEnvironmentSchema>;
 export type DatabaseEnvironment = z.infer<typeof databaseEnvironmentSchema>;
 export type ClerkWebhookEnvironment = z.infer<

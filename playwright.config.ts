@@ -4,14 +4,15 @@ import { config as loadEnvironment } from "dotenv";
 loadEnvironment({ path: ".env", quiet: true });
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000";
+const isCi = process.env.CI === "true";
 
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false,
-  forbidOnly: Boolean(process.env.CI),
-  retries: process.env.CI ? 2 : 0,
+  forbidOnly: isCi,
+  retries: isCi ? 2 : 0,
   workers: 1,
-  reporter: process.env.CI
+  reporter: isCi
     ? [["github"], ["html", { open: "never" }]]
     : [["list"], ["html", { open: "never" }]],
   timeout: 45_000,
@@ -40,7 +41,7 @@ export default defineConfig({
   webServer: {
     command: "npm run dev",
     url: baseURL,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: !isCi,
     timeout: 120_000,
   },
 });
