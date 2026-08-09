@@ -849,6 +849,12 @@ export const storageReconciliationEnvironmentSchema = z.object({
     .min(1)
     .max(500)
     .default(100),
+  STORAGE_RECONCILIATION_ABANDONED_UPLOAD_HOURS: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(720)
+    .default(24),
 });
 
 export type ServerEnvironment = z.infer<typeof serverEnvironmentSchema>;

@@ -1,1 +1,1 @@
-ALTER TYPE "audit_action" ADD VALUE 'storage_reconciled';
+ALTER TYPE "audit_action" ADD VALUE IF NOT EXISTS 'storage_reconciled';

@@ -19,6 +19,8 @@ export const reconcileStorageTask = schedules.task({
     return runStorageReconciliation({
       batchSize: environment.STORAGE_RECONCILIATION_BATCH_SIZE,
       dryRun: environment.STORAGE_RECONCILIATION_DRY_RUN,
+      abandonedUploadHours:
+        environment.STORAGE_RECONCILIATION_ABANDONED_UPLOAD_HOURS,
     });
   },
 });

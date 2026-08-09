@@ -22,6 +22,7 @@
     "test:e2e:install": "playwright install chromium",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "env:check": "node scripts/check-env-placement.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "trigger:dev": "trigger dev",

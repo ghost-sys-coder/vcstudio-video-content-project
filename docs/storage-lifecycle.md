@@ -63,9 +63,17 @@ as failed with an actionable message. Every material repair records a
 `STORAGE_RECONCILIATION_DRY_RUN` defaults to `true`. Production should first
 deploy and observe candidate counts in dry-run mode, then explicitly set it to
 `false`. Historical successful assets are never selected merely because they
-are not approved. Bucket-led discovery of uploads that reached R2 but never
-completed the second HTTP phase remains a follow-up; the current worker only
-acts on authoritative database rows.
+are not approved. The same sweep walks the `workspaces/` R2 prefix using a
+durable database checkpoint. An object older than
+`STORAGE_RECONCILIATION_ABANDONED_UPLOAD_HOURS` is deleted only when its exact
+key is absent from every authoritative asset table. This catches uploads that
+reached R2 but never completed their second HTTP phase without imposing a
+blanket retention policy on healthy media.
+
+A second durable cursor walks successful generation rows and issues metadata-only
+`HEAD` checks for their exact keys. A confirmed `404` marks the row failed with
+an actionable `stored_asset_missing` error; transient R2 errors leave the row
+unchanged and are counted as sweep errors.
 
 ## Rate limiting
 

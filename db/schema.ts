@@ -5327,6 +5327,17 @@ export const auditLogEvents = pgTable(
   ],
 );
 
+export const storageReconciliationCheckpoints = pgTable(
+  "storage_reconciliation_checkpoints",
+  {
+    sweep: text("sweep").primaryKey(),
+    lastObjectKey: text("last_object_key"),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+);
+
 export const projectSubtitleSettings = pgTable(
   "project_subtitle_settings",
   {
