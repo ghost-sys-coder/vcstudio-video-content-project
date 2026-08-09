@@ -838,6 +838,19 @@ export const usageEnvironmentSchema = z.object({
     .default(20),
 });
 
+export const storageReconciliationEnvironmentSchema = z.object({
+  STORAGE_RECONCILIATION_DRY_RUN: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((value) => value === "true"),
+  STORAGE_RECONCILIATION_BATCH_SIZE: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(500)
+    .default(100),
+});
+
 export type ServerEnvironment = z.infer<typeof serverEnvironmentSchema>;
 export type DatabaseEnvironment = z.infer<typeof databaseEnvironmentSchema>;
 export type ClerkWebhookEnvironment = z.infer<
@@ -865,6 +878,9 @@ export type SceneAudioEnvironment = z.infer<typeof sceneAudioEnvironmentSchema>;
 export type SubtitleEnvironment = z.infer<typeof subtitleEnvironmentSchema>;
 export type RenderEnvironment = z.infer<typeof renderEnvironmentSchema>;
 export type UsageEnvironment = z.infer<typeof usageEnvironmentSchema>;
+export type StorageReconciliationEnvironment = z.infer<
+  typeof storageReconciliationEnvironmentSchema
+>;
 
 export function parseServerEnvironment(
   environment: Record<string, string | undefined>,

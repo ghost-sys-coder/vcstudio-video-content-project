@@ -12,13 +12,24 @@
 
 export type AssetRowSnapshot = {
   id: string;
+  family: ReconciledAssetFamily;
   status: string;
   hasAsset: boolean;
 };
 
+export const RECONCILED_ASSET_FAMILIES = [
+  "scene_image",
+  "scene_outpaint",
+  "scene_audio",
+  "thumbnail",
+  "video_export",
+] as const;
+
+export type ReconciledAssetFamily = (typeof RECONCILED_ASSET_FAMILIES)[number];
+
 export type OrphanAssetSelection = {
-  leakedAssets: string[];
-  missingAssets: string[];
+  leakedAssets: AssetRowSnapshot[];
+  missingAssets: AssetRowSnapshot[];
 };
 
 const TERMINAL_WITHOUT_ASSET: ReadonlySet<string> = new Set([
@@ -29,13 +40,13 @@ const TERMINAL_WITHOUT_ASSET: ReadonlySet<string> = new Set([
 export function selectOrphanAssetCandidates(
   rows: AssetRowSnapshot[],
 ): OrphanAssetSelection {
-  const leakedAssets: string[] = [];
-  const missingAssets: string[] = [];
+  const leakedAssets: AssetRowSnapshot[] = [];
+  const missingAssets: AssetRowSnapshot[] = [];
   for (const row of rows) {
     if (TERMINAL_WITHOUT_ASSET.has(row.status) && row.hasAsset)
-      leakedAssets.push(row.id);
+      leakedAssets.push(row);
     else if (row.status === "succeeded" && !row.hasAsset)
-      missingAssets.push(row.id);
+      missingAssets.push(row);
   }
   return { leakedAssets, missingAssets };
 }

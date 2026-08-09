@@ -407,6 +407,7 @@ export const auditActionEnum = pgEnum("audit_action", [
   "google_business_connected",
   "google_business_synced",
   "google_business_disconnected",
+  "storage_reconciled",
 ]);
 
 export const userThemePreferenceEnum = pgEnum("user_theme_preference", [

@@ -17,6 +17,7 @@ import {
   marketingEnvironmentSchema,
   publishingEnvironmentSchema,
   publishingWebEnvironmentSchema,
+  storageReconciliationEnvironmentSchema,
   type ClerkWebhookEnvironment,
   type DatabaseEnvironment,
   type StorageEnvironment,
@@ -33,6 +34,7 @@ import {
   type MarketingEnvironment,
   type PublishingEnvironment,
   type PublishingWebEnvironment,
+  type StorageReconciliationEnvironment,
 } from "@/lib/env/server-schema";
 
 let databaseEnvironment: DatabaseEnvironment | null = null;
@@ -51,6 +53,14 @@ let usageEnvironment: UsageEnvironment | null = null;
 let marketingEnvironment: MarketingEnvironment | null = null;
 let publishingEnvironment: PublishingEnvironment | null = null;
 let publishingWebEnvironment: PublishingWebEnvironment | null = null;
+let storageReconciliationEnvironment: StorageReconciliationEnvironment | null =
+  null;
+
+export function getStorageReconciliationEnvironment(): StorageReconciliationEnvironment {
+  storageReconciliationEnvironment ??=
+    storageReconciliationEnvironmentSchema.parse(process.env);
+  return storageReconciliationEnvironment;
+}
 
 export function getMarketingEnvironment(): MarketingEnvironment {
   marketingEnvironment ??= marketingEnvironmentSchema.parse(process.env);

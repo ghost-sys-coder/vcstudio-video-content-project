@@ -123,12 +123,11 @@ export default defineConfig({
       }),
       aptGet({ packages: REMOTION_CHROMIUM_PACKAGES }),
       esbuildPlugin(stubServerOnlyBoundary),
-      // Push the worker env file to the deployed environment so a variable can
-      // never exist in the repo but be missing from the running worker. Skipped
-      // for `dev`, which reads the local environment directly.
-      syncEnvVars((ctx) =>
-        ctx.environment === "dev" ? {} : readWorkerEnvFile(),
-      ),
+      // Push the worker env file to every deployed Trigger.dev environment.
+      // `ctx.environment === "dev"` means the remote development environment,
+      // not the local `trigger dev` process; skipping it prevented development
+      // deployments from receiving newly added variables.
+      syncEnvVars(() => readWorkerEnvFile()),
     ],
   },
   maxDuration: 300,

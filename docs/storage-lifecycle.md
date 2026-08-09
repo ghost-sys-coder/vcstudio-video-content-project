@@ -51,9 +51,21 @@ after it is explicitly selected, and nothing is deleted without a selection.
    that still reference a stored object → remove from R2) and `missingAssets`
    (succeeded rows with no stored object → re-reconcile/flag).
 
-The stale-run and orphan-asset **selectors are unit-tested pure functions**;
-wiring them to a scheduled, audited cleanup task is a deploy-time follow-up (the
-worker is only exercised in the deployed Trigger.dev environment).
+The orphan selector covers scene images (including outpaints), scene audio,
+thumbnails, and video exports. `reconcile-storage-assets` runs hourly on the
+concurrency-one `media-processing` queue. It selects at most
+`STORAGE_RECONCILIATION_BATCH_SIZE` inconsistent rows, deletes only the exact
+workspace-scoped key retained by a terminal failed/cancelled row, clears that
+stale pointer conditionally, and marks a `succeeded` row with no asset pointer
+as failed with an actionable message. Every material repair records a
+`storage_reconciled` audit event.
+
+`STORAGE_RECONCILIATION_DRY_RUN` defaults to `true`. Production should first
+deploy and observe candidate counts in dry-run mode, then explicitly set it to
+`false`. Historical successful assets are never selected merely because they
+are not approved. Bucket-led discovery of uploads that reached R2 but never
+completed the second HTTP phase remains a follow-up; the current worker only
+acts on authoritative database rows.
 
 ## Rate limiting
 

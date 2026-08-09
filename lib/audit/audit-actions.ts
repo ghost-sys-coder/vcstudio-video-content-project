@@ -38,6 +38,7 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   google_business_connected: "Google Business Profile connected",
   google_business_synced: "Google Business Profile synchronized",
   google_business_disconnected: "Google Business Profile disconnected",
+  storage_reconciled: "Storage asset reconciled",
 };
 
 // Keys whose values are genuinely sensitive and must never be persisted to the
