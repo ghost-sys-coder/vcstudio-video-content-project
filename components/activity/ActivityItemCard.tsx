@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { ActivityAcknowledgeButton } from "@/components/activity/ActivityAcknowledgeButton";
+import { FailureRecoveryActions } from "@/components/activity/FailureRecoveryActions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { ActivityItem } from "@/db/repositories/activity.repository";
@@ -38,6 +39,9 @@ export function ActivityItemCard({
           </div>
           <h2 className="font-semibold">{item.title}</h2>
           <p className="text-sm text-muted-foreground">{item.detail}</p>
+          {item.recovery ? (
+            <FailureRecoveryActions recovery={item.recovery} />
+          ) : null}
           <time
             className="block text-xs text-muted-foreground"
             dateTime={item.occurredAt.toISOString()}

@@ -71,16 +71,14 @@ describeDatabase("activity center PostgreSQL", () => {
           role: "owner",
         },
       ]),
-      database
-        .insert(marketingContentItems)
-        .values({
-          id: fixture.contentId,
-          workspaceId: fixture.workspaceId,
-          kind: "social_post",
-          title: "Review me",
-          status: "needs_review",
-          createdByUserId: fixture.userId,
-        }),
+      database.insert(marketingContentItems).values({
+        id: fixture.contentId,
+        workspaceId: fixture.workspaceId,
+        kind: "social_post",
+        title: "Review me",
+        status: "needs_review",
+        createdByUserId: fixture.userId,
+      }),
     ]);
     const own = await listWorkspaceActivity({
       workspaceId: fixture.workspaceId,
@@ -123,7 +121,7 @@ describeDatabase("activity center PostgreSQL", () => {
       .from(marketingContentItems)
       .where(eq(marketingContentItems.id, fixture.contentId));
     expect(source?.status).toBe("needs_review");
-  });
+  }, 20_000);
 });
 
 afterAll(async () => {

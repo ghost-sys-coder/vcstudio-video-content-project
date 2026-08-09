@@ -16,6 +16,10 @@ import {
   videoRenders,
 } from "@/db/schema";
 import type { ActivityCategory } from "@/lib/schemas/activity";
+import {
+  createFailurePresentation,
+  type FailurePresentation,
+} from "@/lib/failures/failure-recovery";
 
 const SOURCE_LIMIT = 100;
 export const ACTIVITY_PAGE_SIZE = 20;
@@ -30,6 +34,7 @@ export type ActivityItem = {
   href: string;
   occurredAt: Date;
   acknowledged: boolean;
+  recovery: FailurePresentation | null;
 };
 
 type ActivityCandidate = Omit<ActivityItem, "acknowledged">;
@@ -138,6 +143,7 @@ export async function listWorkspaceActivity(input: {
           postStatus: socialPosts.status,
           postName: socialPosts.name,
           error: socialPostTargets.safeErrorMessage,
+          errorCategory: socialPostTargets.errorCategory,
           updatedAt: socialPostTargets.updatedAt,
         })
         .from(socialPostTargets)
@@ -185,6 +191,7 @@ export async function listWorkspaceActivity(input: {
           status: marketingScheduleRuleRuns.status,
           skipReason: marketingScheduleRuleRuns.skipReason,
           error: marketingScheduleRuleRuns.safeErrorMessage,
+          errorCategory: marketingScheduleRuleRuns.errorCategory,
           updatedAt: marketingScheduleRuleRuns.updatedAt,
           ruleName: marketingScheduleRules.name,
           ruleId: marketingScheduleRules.id,
@@ -236,6 +243,15 @@ export async function listWorkspaceActivity(input: {
       detail: row.error ?? "Review the generated scene image.",
       href: `${projectHref(row.projectId, "storyboard")}?generation=${row.id}`,
       occurredAt: row.updatedAt,
+      recovery:
+        row.status === "failed"
+          ? createFailurePresentation({
+              errorCategory: row.errorCategory,
+              source: "scene_image",
+              sourceHref: `${projectHref(row.projectId, "storyboard")}?generation=${row.id}`,
+              correlationId: `scene-image:${row.id}`,
+            })
+          : null,
     });
   for (const row of audio)
     candidates.push({
@@ -254,6 +270,15 @@ export async function listWorkspaceActivity(input: {
       detail: row.error ?? "Review the generated narration.",
       href: `${projectHref(row.projectId, "audio")}?generation=${row.id}`,
       occurredAt: row.updatedAt,
+      recovery:
+        row.status === "failed"
+          ? createFailurePresentation({
+              errorCategory: row.errorCategory,
+              source: "scene_audio",
+              sourceHref: `${projectHref(row.projectId, "audio")}?generation=${row.id}`,
+              correlationId: `scene-audio:${row.id}`,
+            })
+          : null,
     });
   for (const row of renders)
     candidates.push({
@@ -270,6 +295,15 @@ export async function listWorkspaceActivity(input: {
       detail: row.error ?? "The export is ready.",
       href: `${projectHref(row.projectId, "render")}?render=${row.id}`,
       occurredAt: row.updatedAt,
+      recovery:
+        row.status === "failed"
+          ? createFailurePresentation({
+              errorCategory: row.errorCategory,
+              source: "render",
+              sourceHref: `${projectHref(row.projectId, "render")}?render=${row.id}`,
+              correlationId: `render:${row.id}`,
+            })
+          : null,
     });
   for (const row of targets) {
     const partial =
@@ -287,6 +321,15 @@ export async function listWorkspaceActivity(input: {
         row.error ?? `${row.platform} destination completed successfully.`,
       href: `/app/social/posts/${row.postId}?target=${row.id}`,
       occurredAt: row.updatedAt,
+      recovery:
+        row.status === "failed"
+          ? createFailurePresentation({
+              errorCategory: row.errorCategory,
+              source: "social_destination",
+              sourceHref: `/app/social/posts/${row.postId}?target=${row.id}`,
+              correlationId: `social-target:${row.id}`,
+            })
+          : null,
     });
   }
   for (const row of content)
@@ -308,6 +351,15 @@ export async function listWorkspaceActivity(input: {
       detail: row.error ?? "Open the exact content item for details.",
       href: `/app/marketing/content/${row.id}`,
       occurredAt: row.updatedAt,
+      recovery:
+        row.status === "failed"
+          ? createFailurePresentation({
+              errorCategory: row.errorCategory,
+              source: "marketing_content",
+              sourceHref: `/app/marketing/content/${row.id}`,
+              correlationId: `marketing-content:${row.id}`,
+            })
+          : null,
     });
   for (const row of scheduleRuns)
     candidates.push({
@@ -320,6 +372,15 @@ export async function listWorkspaceActivity(input: {
         row.skipReason ?? row.error ?? "Open the schedule rule for details.",
       href: `/app/marketing/schedules?edit=${row.ruleId}&run=${row.id}`,
       occurredAt: row.updatedAt,
+      recovery: createFailurePresentation({
+        errorCategory:
+          row.status === "skipped"
+            ? (row.skipReason ?? "validation")
+            : row.errorCategory,
+        source: "marketing_schedule",
+        sourceHref: `/app/marketing/schedules?edit=${row.ruleId}&run=${row.id}`,
+        correlationId: `marketing-schedule:${row.id}`,
+      }),
     });
   for (const row of connections)
     if (row.status !== "active" || row.syncStatus === "failed")
@@ -331,6 +392,13 @@ export async function listWorkspaceActivity(input: {
         detail: row.error ?? "Reconnect or synchronize the business profile.",
         href: "/app/marketing/integrations",
         occurredAt: row.updatedAt,
+        recovery: createFailurePresentation({
+          errorCategory:
+            row.status !== "active" ? "authorization" : "configuration",
+          source: "google_business",
+          sourceHref: "/app/marketing/integrations",
+          correlationId: `google-business:${row.id}`,
+        }),
       });
 
   const keys = candidates.map((item) => item.key);
