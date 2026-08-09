@@ -189,7 +189,7 @@ describe("renderBrandContextBlock", () => {
   });
 
   it("has a pinned version so past generations stay explainable", () => {
-    expect(MARKETING_BRAND_CONTEXT_VERSION).toBe("marketing-brand-context-v1");
+    expect(MARKETING_BRAND_CONTEXT_VERSION).toBe("marketing-brand-context-v2");
   });
 });
 

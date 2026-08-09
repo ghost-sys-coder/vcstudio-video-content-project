@@ -3,6 +3,10 @@ import "server-only";
 import type { ContentPlatform } from "@/db/schema";
 import { listPlatformConnections } from "@/db/repositories/publishing.repository";
 import {
+  findGoogleBusinessConnection,
+  listGoogleBusinessLocations,
+} from "@/db/repositories/google-business.repository";
+import {
   getMarketingEnvironment,
   getPublishingEnvironment,
 } from "@/lib/env/server";
@@ -21,6 +25,23 @@ export type MarketingProviderStatus = {
 export type MarketingIntegrationsView = {
   connections: PostConnectionView[];
   providers: MarketingProviderStatus[];
+  googleBusiness: GoogleBusinessIntegrationView;
+};
+
+export type GoogleBusinessIntegrationView = {
+  connected: boolean;
+  status: "active" | "expired" | "revoked" | "not_connected";
+  statusLabel: string;
+  message: string | null;
+  lastError: string | null;
+  locations: {
+    id: string;
+    accountName: string;
+    accountDisplayName: string;
+    title: string;
+    selected: boolean;
+    isPrimary: boolean;
+  }[];
 };
 
 const PLATFORM_ORDER: readonly ContentPlatform[] = [
@@ -95,16 +116,32 @@ function platformProviderStatus(
 export async function loadMarketingIntegrationsView(input: {
   workspaceId: string;
   now?: Date;
+  googleBusinessMessage?: string | null;
 }): Promise<MarketingIntegrationsView> {
   const now = input.now ?? new Date();
-  const [connections, marketingEnvironment] = await Promise.all([
-    listPlatformConnections({ workspaceId: input.workspaceId }),
-    Promise.resolve(getMarketingEnvironment()),
-  ]);
+  const [connections, marketingEnvironment, googleConnection, googleLocations] =
+    await Promise.all([
+      listPlatformConnections({ workspaceId: input.workspaceId }),
+      Promise.resolve(getMarketingEnvironment()),
+      findGoogleBusinessConnection({ workspaceId: input.workspaceId }),
+      listGoogleBusinessLocations({ workspaceId: input.workspaceId }),
+    ]);
   const researchProvider = marketingEnvironment.MARKETING_RESEARCH_PROVIDER;
   const researchReady =
     researchProvider === "tavily" &&
     configured(marketingEnvironment.TAVILY_API_KEY);
+  const publishingEnvironment = getPublishingEnvironment();
+  const googleBusinessScope =
+    publishingEnvironment.GOOGLE_BUSINESS_SCOPE ??
+    publishingEnvironment.GOOGLE_BUSINESS_SCOPES;
+  const googleBusinessReady =
+    configured(publishingEnvironment.GOOGLE_OAUTH_CLIENT_ID) &&
+    configured(publishingEnvironment.GOOGLE_OAUTH_CLIENT_SECRET) &&
+    Boolean(
+      googleBusinessScope
+        ?.split(/\s+/)
+        .includes("https://www.googleapis.com/auth/business.manage"),
+    );
 
   return {
     connections: connections.map((connection) => ({
@@ -116,6 +153,15 @@ export async function loadMarketingIntegrationsView(input: {
     })),
     providers: [
       ...PLATFORM_ORDER.map(platformProviderStatus),
+      {
+        id: "google-business",
+        label: "Google Business Profile",
+        description: "Business location discovery and AI grounding",
+        state: googleBusinessReady ? "ready" : "setup_required",
+        detail: googleBusinessReady
+          ? "OAuth credentials and the business.manage scope are configured."
+          : "Google OAuth credentials or the Business Profile scope are missing.",
+      },
       {
         id: "research",
         label: "Web research",
@@ -134,5 +180,30 @@ export async function loadMarketingIntegrationsView(input: {
               : `${researchProvider} is selected but not configured.`,
       },
     ],
+    googleBusiness: {
+      connected:
+        googleConnection?.status !== "revoked" && Boolean(googleConnection),
+      status: googleConnection?.status ?? "not_connected",
+      statusLabel:
+        googleConnection?.status === "active"
+          ? googleConnection.syncStatus === "failed"
+            ? "Needs attention"
+            : "Connected"
+          : googleConnection?.status === "expired"
+            ? "Reconnect required"
+            : googleConnection?.status === "revoked"
+              ? "Disconnected"
+              : "Not connected",
+      message: input.googleBusinessMessage ?? null,
+      lastError: googleConnection?.lastError ?? null,
+      locations: googleLocations.map((location) => ({
+        id: location.id,
+        accountName: location.accountName,
+        accountDisplayName: location.accountDisplayName,
+        title: location.title,
+        selected: location.selected,
+        isPrimary: location.isPrimary,
+      })),
+    },
   };
 }

@@ -7,6 +7,7 @@ export type FingerprintInput = {
   offers: { id: string; updatedAt: string }[];
   /** Document checksums, not ids: edited text must change the fingerprint. */
   documents: { id: string; checksum: string; priority: number }[];
+  googleBusinessLocations?: { id: string; updatedAt: string }[];
   maxTokens: number;
 };
 
@@ -52,6 +53,9 @@ export function createBrandContextFingerprint(input: FingerprintInput): string {
     audiences: [...input.audiences].sort((a, b) => a.id.localeCompare(b.id)),
     offers: [...input.offers].sort((a, b) => a.id.localeCompare(b.id)),
     documents: [...input.documents].sort((a, b) => a.id.localeCompare(b.id)),
+    googleBusinessLocations: [...(input.googleBusinessLocations ?? [])].sort(
+      (a, b) => a.id.localeCompare(b.id),
+    ),
   };
   return createHash("sha256").update(stableStringify(canonical)).digest("hex");
 }

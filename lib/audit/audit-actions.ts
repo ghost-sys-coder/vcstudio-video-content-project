@@ -35,6 +35,9 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   marketing_skill_deleted: "Marketing skill deleted",
   custom_voice_created: "Custom voice created",
   custom_voice_revoked: "Custom voice revoked",
+  google_business_connected: "Google Business Profile connected",
+  google_business_synced: "Google Business Profile synchronized",
+  google_business_disconnected: "Google Business Profile disconnected",
 };
 
 // Keys whose values are genuinely sensitive and must never be persisted to the

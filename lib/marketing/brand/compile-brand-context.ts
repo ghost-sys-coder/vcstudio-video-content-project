@@ -13,6 +13,7 @@ import {
   listBrandOffers,
 } from "@/db/repositories/marketing-brand.repository";
 import { listKnowledgeDocuments } from "@/db/repositories/marketing-documents.repository";
+import { listGoogleBusinessLocations } from "@/db/repositories/google-business.repository";
 import { getMarketingEnvironment } from "@/lib/env/server";
 import { createBrandContextFingerprint } from "@/lib/marketing/brand/brand-context-fingerprint";
 
@@ -47,21 +48,32 @@ export const compileBrandContext = cache(
       getMarketingEnvironment().MARKETING_BRAND_CONTEXT_MAX_TOKENS;
     const profile = await findBrandProfile({ workspaceId: input.workspaceId });
 
-    const [audiences, offers, documents] = await Promise.all([
-      profile
-        ? listBrandAudiences({
-            workspaceId: input.workspaceId,
-            brandProfileId: profile.id,
-          })
-        : Promise.resolve([]),
-      profile
-        ? listBrandOffers({
-            workspaceId: input.workspaceId,
-            brandProfileId: profile.id,
-          })
-        : Promise.resolve([]),
-      listKnowledgeDocuments({ workspaceId: input.workspaceId }),
-    ]);
+    const [audiences, offers, documents, googleBusinessLocations] =
+      await Promise.all([
+        profile
+          ? listBrandAudiences({
+              workspaceId: input.workspaceId,
+              brandProfileId: profile.id,
+            })
+          : Promise.resolve([]),
+        profile
+          ? listBrandOffers({
+              workspaceId: input.workspaceId,
+              brandProfileId: profile.id,
+            })
+          : Promise.resolve([]),
+        listKnowledgeDocuments({ workspaceId: input.workspaceId }),
+        listGoogleBusinessLocations({
+          workspaceId: input.workspaceId,
+          selectedOnly: true,
+        }),
+      ]);
+    const boundedGoogleLocations = [...googleBusinessLocations]
+      .sort((left, right) => {
+        if (left.isPrimary !== right.isPrimary) return left.isPrimary ? -1 : 1;
+        return left.profileData.title.localeCompare(right.profileData.title);
+      })
+      .slice(0, 10);
 
     const eligibleDocuments = documents
       .filter(
@@ -118,6 +130,26 @@ export const compileBrandContext = cache(
         summary: document.summary,
         keyFacts: document.keyFacts,
       })),
+      googleBusinessLocations: boundedGoogleLocations.map((location) => ({
+        id: location.id,
+        title: location.profileData.title,
+        isPrimary: location.isPrimary,
+        categories: location.profileData.categories.slice(0, 5),
+        description: location.profileData.description.slice(0, 600),
+        websiteUri: location.profileData.websiteUri,
+        phoneNumbers: location.profileData.phoneNumbers.slice(0, 5),
+        address: [
+          ...location.profileData.addressLines,
+          location.profileData.locality,
+          location.profileData.administrativeArea,
+          location.profileData.postalCode,
+          location.profileData.regionCode,
+        ]
+          .filter(Boolean)
+          .join(", "),
+        regularHours: location.profileData.regularHours.slice(0, 14),
+        serviceArea: location.profileData.serviceArea.slice(0, 300),
+      })),
       maxTokens,
     });
 
@@ -151,6 +183,10 @@ export const compileBrandContext = cache(
         id: document.id,
         checksum: document.checksum,
         priority: document.priority,
+      })),
+      googleBusinessLocations: boundedGoogleLocations.map((location) => ({
+        id: location.id,
+        updatedAt: location.updatedAt.toISOString(),
       })),
     });
 

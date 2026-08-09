@@ -513,6 +513,9 @@ export const publishingEnvironmentSchema = z.object({
   // only when that platform is actually used — see `PlatformNotConfiguredError`.
   GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_BUSINESS_SCOPE: z.string().min(1).optional(),
+  /** Temporary compatibility for the plural key present in older local envs. */
+  GOOGLE_BUSINESS_SCOPES: z.string().min(1).optional(),
   /**
    * Meta's app credentials are consumed only by the web OAuth runtime. They are
    * mirrored here as optional values solely so provider-readiness views can use

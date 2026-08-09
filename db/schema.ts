@@ -404,6 +404,9 @@ export const auditActionEnum = pgEnum("audit_action", [
   "marketing_skill_deleted",
   "custom_voice_created",
   "custom_voice_revoked",
+  "google_business_connected",
+  "google_business_synced",
+  "google_business_disconnected",
 ]);
 
 export const userThemePreferenceEnum = pgEnum("user_theme_preference", [
@@ -3766,6 +3769,187 @@ export const marketingBrandChannels = pgTable(
   ],
 );
 
+export const googleBusinessConnectionStatusEnum = pgEnum(
+  "google_business_connection_status",
+  ["active", "expired", "revoked"],
+);
+
+export const googleBusinessSyncStatusEnum = pgEnum(
+  "google_business_sync_status",
+  ["never", "syncing", "succeeded", "failed"],
+);
+
+export type GoogleBusinessLocationData = {
+  title: string;
+  storeCode: string;
+  categories: string[];
+  primaryCategory: string;
+  description: string;
+  websiteUri: string;
+  phoneNumbers: string[];
+  addressLines: string[];
+  locality: string;
+  administrativeArea: string;
+  postalCode: string;
+  regionCode: string;
+  regularHours: string[];
+  serviceArea: string;
+};
+
+/** One encrypted Google Business Profile authorization per workspace. */
+export const googleBusinessConnections = pgTable(
+  "google_business_connections",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    accessTokenSealed: text("access_token_sealed").notNull(),
+    refreshTokenSealed: text("refresh_token_sealed"),
+    accessTokenExpiresAt: timestamp("access_token_expires_at", {
+      withTimezone: true,
+    }),
+    scopes: text("scopes").notNull().default(""),
+    status: googleBusinessConnectionStatusEnum("status")
+      .notNull()
+      .default("active"),
+    syncStatus: googleBusinessSyncStatusEnum("sync_status")
+      .notNull()
+      .default("never"),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    lastSyncAttemptAt: timestamp("last_sync_attempt_at", {
+      withTimezone: true,
+    }),
+    lastError: text("last_error"),
+    connectedByUserId: uuid("connected_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    disconnectedAt: timestamp("disconnected_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("google_business_connections_workspace_unique").on(
+      table.workspaceId,
+    ),
+    uniqueIndex("google_business_connections_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    index("google_business_connections_sync_index").on(
+      table.status,
+      table.lastSyncedAt,
+    ),
+  ],
+);
+
+/** Discovered locations; only selected rows contribute to AI grounding. */
+export const googleBusinessLocations = pgTable(
+  "google_business_locations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id").notNull(),
+    connectionId: uuid("connection_id").notNull(),
+    accountName: text("account_name").notNull(),
+    accountDisplayName: text("account_display_name").notNull().default(""),
+    locationName: text("location_name").notNull(),
+    title: text("title").notNull().default(""),
+    selected: boolean("selected").notNull().default(false),
+    isPrimary: boolean("is_primary").notNull().default(false),
+    profileData: jsonb("profile_data")
+      .$type<GoogleBusinessLocationData>()
+      .notNull(),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("google_business_locations_workspace_name_unique").on(
+      table.workspaceId,
+      table.locationName,
+    ),
+    uniqueIndex("google_business_locations_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    uniqueIndex("google_business_locations_primary_unique")
+      .on(table.workspaceId)
+      .where(sql`${table.selected} and ${table.isPrimary}`),
+    index("google_business_locations_selected_index").on(
+      table.workspaceId,
+      table.selected,
+      table.title,
+    ),
+    check(
+      "google_business_locations_primary_selected",
+      sql`not ${table.isPrimary} or ${table.selected}`,
+    ),
+    foreignKey({
+      columns: [table.connectionId, table.workspaceId],
+      foreignColumns: [
+        googleBusinessConnections.id,
+        googleBusinessConnections.workspaceId,
+      ],
+      name: "google_business_locations_tenant_connection_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
+/** Immutable copies of provider data retained for synchronization provenance. */
+export const googleBusinessLocationSnapshots = pgTable(
+  "google_business_location_snapshots",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id").notNull(),
+    connectionId: uuid("connection_id").notNull(),
+    locationId: uuid("location_id").notNull(),
+    checksum: text("checksum").notNull(),
+    profileData: jsonb("profile_data")
+      .$type<GoogleBusinessLocationData>()
+      .notNull(),
+    providerRequestId: text("provider_request_id"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("google_business_location_snapshots_checksum_unique").on(
+      table.workspaceId,
+      table.locationId,
+      table.checksum,
+    ),
+    index("google_business_location_snapshots_recent_index").on(
+      table.workspaceId,
+      table.locationId,
+      table.createdAt,
+    ),
+    foreignKey({
+      columns: [table.connectionId, table.workspaceId],
+      foreignColumns: [
+        googleBusinessConnections.id,
+        googleBusinessConnections.workspaceId,
+      ],
+      name: "google_business_snapshots_tenant_connection_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.locationId, table.workspaceId],
+      foreignColumns: [
+        googleBusinessLocations.id,
+        googleBusinessLocations.workspaceId,
+      ],
+      name: "google_business_snapshots_tenant_location_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
 /**
  * The raw onboarding answers, kept deliberately separate from the synthesised
  * profile above.
@@ -5407,4 +5591,10 @@ export type MarketingChatMessageStatus =
   (typeof marketingChatMessageStatusEnum.enumValues)[number];
 export type AuditLogEvent = typeof auditLogEvents.$inferSelect;
 export type AuditAction = (typeof auditActionEnum.enumValues)[number];
+export type GoogleBusinessConnection =
+  typeof googleBusinessConnections.$inferSelect;
+export type GoogleBusinessLocation =
+  typeof googleBusinessLocations.$inferSelect;
+export type GoogleBusinessLocationSnapshot =
+  typeof googleBusinessLocationSnapshots.$inferSelect;
 export type RateLimitCounter = typeof rateLimitCounters.$inferSelect;

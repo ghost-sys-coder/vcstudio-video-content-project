@@ -1,4 +1,17 @@
-export const MARKETING_BRAND_CONTEXT_VERSION = "marketing-brand-context-v1";
+export const MARKETING_BRAND_CONTEXT_VERSION = "marketing-brand-context-v2";
+
+export type BrandContextGoogleBusinessLocation = {
+  id: string;
+  title: string;
+  isPrimary: boolean;
+  categories: string[];
+  description: string;
+  websiteUri: string;
+  phoneNumbers: string[];
+  address: string;
+  regularHours: string[];
+  serviceArea: string;
+};
 
 export type BrandContextAudience = {
   name: string;
@@ -40,6 +53,7 @@ export type BrandContextInput = {
   bannedPhrases: string[];
   complianceNotes: string;
   documents: BrandContextDocument[];
+  googleBusinessLocations?: BrandContextGoogleBusinessLocation[];
   /** Token ceiling for the whole block. Documents are dropped to fit. */
   maxTokens: number;
 };
@@ -110,6 +124,28 @@ function documentLines(document: BrandContextDocument): string[] {
   ];
 }
 
+function googleBusinessLocationLines(
+  location: BrandContextGoogleBusinessLocation,
+): string[] {
+  return [
+    `### ${location.title}${location.isPrimary ? " (primary location)" : ""}`,
+    "Source: synchronized Google Business Profile",
+    location.categories.length > 0
+      ? `Categories: ${location.categories.join(", ")}`
+      : "",
+    location.description,
+    location.websiteUri ? `Website: ${location.websiteUri}` : "",
+    location.phoneNumbers.length > 0
+      ? `Phone: ${location.phoneNumbers.join(", ")}`
+      : "",
+    location.address ? `Address: ${location.address}` : "",
+    location.serviceArea ? `Service area: ${location.serviceArea}` : "",
+    ...(location.regularHours.length > 0
+      ? ["Regular hours:", ...bulletList(location.regularHours)]
+      : []),
+  ];
+}
+
 /**
  * Sorts audiences so the primary one is always first.
  *
@@ -164,6 +200,16 @@ export function renderBrandContextBlock(
       input.oneLiner,
       input.longDescription,
     ]),
+    ...section(
+      "Google Business Profile facts",
+      [...(input.googleBusinessLocations ?? [])]
+        .sort((left, right) => {
+          if (left.isPrimary !== right.isPrimary)
+            return left.isPrimary ? -1 : 1;
+          return left.title.localeCompare(right.title);
+        })
+        .flatMap(googleBusinessLocationLines),
+    ),
     ...section("Positioning", [
       ...(input.valueProps.length > 0
         ? ["Value propositions:", ...bulletList(input.valueProps)]

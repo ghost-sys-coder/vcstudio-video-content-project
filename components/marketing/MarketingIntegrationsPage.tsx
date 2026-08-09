@@ -1,5 +1,6 @@
 import { ConnectedAccountsPanel } from "@/components/social/ConnectedAccountsPanel";
 import { MarketingProviderStatusCard } from "@/components/marketing/MarketingProviderStatusCard";
+import { GoogleBusinessIntegrationPanel } from "@/components/marketing/GoogleBusinessIntegrationPanel";
 import type { MarketingIntegrationsView } from "@/lib/marketing/integrations/marketing-integrations-view";
 
 export function MarketingIntegrationsPage({
@@ -40,6 +41,11 @@ export function MarketingIntegrationsPage({
           ))}
         </ul>
       </section>
+
+      <GoogleBusinessIntegrationPanel
+        canManage={canManageConnections}
+        integration={view.googleBusiness}
+      />
 
       <section aria-label="Connected publishing accounts">
         <ConnectedAccountsPanel
