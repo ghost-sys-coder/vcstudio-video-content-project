@@ -38,9 +38,9 @@ export function LandingReviewSection() {
     <section className="border-b py-24">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <LandingSectionHeading
-          description="A finished generation is not the same as an approved one. Review sits between them at every stage."
+          description="A finished generation is not the same as an approved one. Marketing content and production assets both wait for an accountable decision."
           eyebrow="Nothing ships without a look"
-          title="Every generated asset waits for a human decision."
+          title="Drafts remain drafts until somebody says otherwise."
         />
         <LandingReviewMockupCard />
         <div className="mx-auto mt-14 grid max-w-4xl gap-8 sm:grid-cols-3">

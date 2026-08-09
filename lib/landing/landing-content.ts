@@ -7,11 +7,78 @@ import {
   HistoryIcon,
   ImageIcon,
   LayersIcon,
+  MegaphoneIcon,
+  Mic2Icon,
+  RadioTowerIcon,
+  SearchIcon,
   ShieldCheckIcon,
-  UsersIcon,
   WalletIcon,
   type LucideIcon,
 } from "lucide-react";
+
+export type ProductArea = {
+  index: string;
+  title: string;
+  description: string;
+  capabilities: readonly string[];
+  icon: LucideIcon;
+  emphasis: "primary" | "secondary";
+};
+
+export const PRODUCT_AREAS: ProductArea[] = [
+  {
+    index: "01",
+    title: "Marketing Studio",
+    description:
+      "Ground AI in your brand, turn research into campaigns, and move every draft through a visible content queue before it reaches the calendar.",
+    capabilities: [
+      "Brand profiles and knowledge documents",
+      "AI chat with purpose-built marketing skills",
+      "Campaigns, cited research, schedules, and approvals",
+    ],
+    icon: MegaphoneIcon,
+    emphasis: "primary",
+  },
+  {
+    index: "02",
+    title: "Cross-platform publishing",
+    description:
+      "Write once, tailor captions per destination, attach private media, and publish now or schedule through one durable delivery path.",
+    capabilities: [
+      "LinkedIn, X, Facebook, Instagram, TikTok, and YouTube",
+      "Connected-account health and provider readiness",
+      "Independent outcomes for every destination",
+    ],
+    icon: RadioTowerIcon,
+    emphasis: "secondary",
+  },
+  {
+    index: "03",
+    title: "Video production",
+    description:
+      "Take a brief from script to scenes, storyboard, narration, subtitles, reusable aspect ratios, and deterministic Remotion exports.",
+    capabilities: [
+      "Still-image and animated-character projects",
+      "Landscape, vertical, square, and Shorts outputs",
+      "Reviewable, versioned assets at every stage",
+    ],
+    icon: FilmIcon,
+    emphasis: "secondary",
+  },
+  {
+    index: "04",
+    title: "Characters and voices",
+    description:
+      "Keep recurring characters recognizable across scenes and give approved self-voices a secure path into scene-level narration.",
+    capabilities: [
+      "Reference-anchored character continuity",
+      "Talking, blinking character animation",
+      "Verified custom voices and manual recordings",
+    ],
+    icon: Mic2Icon,
+    emphasis: "primary",
+  },
+];
 
 export type WorkflowStep = {
   index: string;
@@ -79,16 +146,16 @@ export const FEATURE_HIGHLIGHTS: FeatureHighlight[] = [
     icon: WalletIcon,
   },
   {
-    title: "Nothing ships without approval",
+    title: "Approval before distribution",
     description:
-      "Scenes, images, audio, and subtitles each carry an explicit human review step. A generation being finished is not the same as it being approved.",
+      "Marketing drafts, scenes, images, audio, and subtitles carry explicit review states. A generation being finished is not the same as it being ready to publish.",
     icon: CheckCircle2Icon,
   },
   {
-    title: "Character continuity",
+    title: "Grounded creation",
     description:
-      "Reference-locked character profiles keep faces, wardrobe, and style consistent across every scene an image is generated for.",
-    icon: UsersIcon,
+      "Brand knowledge grounds marketing output while reference-locked character profiles keep faces, wardrobe, and style consistent across video scenes.",
+    icon: SearchIcon,
   },
   {
     title: "Role-based workspaces",
@@ -103,9 +170,9 @@ export const FEATURE_HIGHLIGHTS: FeatureHighlight[] = [
     icon: HistoryIcon,
   },
   {
-    title: "Deterministic renders",
+    title: "Production through publishing",
     description:
-      "Frame-accurate timelines render through Remotion without cumulative drift, so a preview and a final export always agree.",
-    icon: FilmIcon,
+      "Frame-accurate Remotion exports flow into connected-platform publishing with durable status, scheduling, and destination-level outcomes.",
+    icon: RadioTowerIcon,
   },
 ];

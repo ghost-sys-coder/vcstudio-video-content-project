@@ -13,6 +13,12 @@ export function LandingNav() {
         <div className="hidden items-center gap-6 md:flex">
           <a
             className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+            href="#studio"
+          >
+            Studio
+          </a>
+          <a
+            className="text-sm text-muted-foreground transition-colors hover:text-foreground"
             href="#workflow"
           >
             Workflow

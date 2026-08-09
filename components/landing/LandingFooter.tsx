@@ -15,6 +15,12 @@ export function LandingFooter() {
         >
           <Link
             className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+            href="/#studio"
+          >
+            Studio
+          </Link>
+          <Link
+            className="text-sm text-muted-foreground transition-colors hover:text-foreground"
             href="/#workflow"
           >
             Workflow
@@ -39,7 +45,7 @@ export function LandingFooter() {
           </Link>
         </nav>
         <p className="text-xs text-muted-foreground">
-          © {year} VCStudio. Review-driven AI video production.
+          © {year} VCStudio. Review-driven content production.
         </p>
       </div>
       <p

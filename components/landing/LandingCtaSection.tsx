@@ -15,11 +15,12 @@ export function LandingCtaSection() {
             className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_50%_60%_at_50%_0%,rgba(131,158,177,0.22),transparent)]"
           />
           <h2 className="text-3xl font-semibold tracking-[-0.03em] sm:text-4xl">
-            Bring a script. Leave with a reviewed video.
+            Give your content operation one place to work.
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-muted-foreground">
-            Set a budget, invite your team, and put every generated scene,
-            image, and clip through an approval step before it ships.
+            Ground the brand, plan campaigns, produce video, schedule social
+            posts, and keep every billable or publishable step visible to the
+            team.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Show when="signed-out">

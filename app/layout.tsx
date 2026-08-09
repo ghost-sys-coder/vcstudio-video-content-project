@@ -25,7 +25,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "VCStudio",
-  description: "Review-driven AI video production from narration to render.",
+  description:
+    "Plan campaigns, create social posts and videos, manage characters and voices, and publish across connected channels with review and cost controls.",
 };
 
 export default async function RootLayout({

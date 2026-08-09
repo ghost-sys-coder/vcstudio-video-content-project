@@ -12,16 +12,16 @@ export function LandingHero() {
       <LandingDotGrid />
       <div className="mx-auto max-w-3xl px-6 text-center lg:px-8">
         <p className="font-mono text-xs uppercase tracking-[0.22em] text-muted-foreground">
-          Script to screen
+          Plan · create · publish
         </p>
         <h1 className="mt-6 text-5xl font-semibold leading-[1.02] tracking-[-0.045em] sm:text-6xl">
-          A production system for AI-assisted video, built for review.
+          One studio for the full life of your content.
         </h1>
         <p className="mx-auto mt-7 max-w-2xl text-lg leading-8 text-muted-foreground">
-          VCStudio turns a narration script into structured scenes, consistent
-          characters and imagery, narration audio, subtitles, and a rendered
-          video — with a reserve-before-spend cost ledger and a human approval
-          checkpoint at every step.
+          Ground campaigns in your brand, produce social posts and videos,
+          animate consistent characters, create narration with approved voices,
+          and publish across connected channels&mdash;with cost controls and
+          human review built into the work.
         </p>
         <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
           <Show when="signed-out">
@@ -34,11 +34,11 @@ export function LandingHero() {
             <Button
               className="rounded-full px-6"
               nativeButton={false}
-              render={<a href="#workflow" />}
+              render={<a href="#studio" />}
               size="lg"
               variant="ghost"
             >
-              See how it works
+              Explore the studio
             </Button>
           </Show>
           <Show when="signed-in">

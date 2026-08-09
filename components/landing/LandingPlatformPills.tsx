@@ -1,9 +1,16 @@
-const PLATFORMS = ["TikTok", "YouTube", "Instagram", "Facebook"];
+const PLATFORMS = [
+  "TikTok",
+  "YouTube",
+  "Instagram",
+  "Facebook",
+  "LinkedIn",
+  "X",
+];
 
 export function LandingPlatformPills() {
   return (
     <div className="mt-14 flex flex-col items-center gap-3">
-      <div className="flex w-fit items-center gap-1 rounded-full border bg-muted/30 p-1">
+      <div className="flex max-w-full flex-wrap items-center justify-center gap-1 rounded-2xl border bg-muted/30 p-1 sm:rounded-full">
         {PLATFORMS.map((platform, index) => (
           <span
             className={
@@ -18,8 +25,8 @@ export function LandingPlatformPills() {
         ))}
       </div>
       <p className="text-xs text-muted-foreground">
-        Every brief targets one primary platform, so the hook is written for
-        where it&rsquo;s going.
+        Plan for each destination, then tailor the final caption before it
+        ships.
       </p>
     </div>
   );

@@ -8,7 +8,7 @@ export function LandingWorkflowSection() {
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <LandingSectionHeading
           description="Every step produces something you can inspect and approve before the next one runs — no stage is a black box."
-          eyebrow="How it works"
+          eyebrow="Inside video production"
           title="A script becomes a video in six reviewed steps."
         />
         <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
