@@ -9,6 +9,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -5336,6 +5337,24 @@ export const storageReconciliationCheckpoints = pgTable(
       .defaultNow()
       .notNull(),
   },
+);
+
+export const taskHeartbeats = pgTable(
+  "task_heartbeats",
+  {
+    taskId: text("task_id").notNull(),
+    environment: text("environment").notNull(),
+    lastStartedAt: timestamp("last_started_at", {
+      withTimezone: true,
+    }).notNull(),
+    lastCompletedAt: timestamp("last_completed_at", { withTimezone: true }),
+    outcome: text("outcome").notNull(),
+    safeMessage: text("safe_message"),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.taskId, table.environment] })],
 );
 
 export const projectSubtitleSettings = pgTable(

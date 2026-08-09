@@ -861,6 +861,12 @@ export const securityEnvironmentSchema = z.object({
   SECURITY_CSP_MODE: z.enum(["report-only", "enforce"]).default("report-only"),
 });
 
+export const readinessEnvironmentSchema = z.object({
+  READINESS_ENVIRONMENT: z
+    .enum(["development", "staging", "production"])
+    .default("development"),
+});
+
 export type ServerEnvironment = z.infer<typeof serverEnvironmentSchema>;
 export type DatabaseEnvironment = z.infer<typeof databaseEnvironmentSchema>;
 export type ClerkWebhookEnvironment = z.infer<

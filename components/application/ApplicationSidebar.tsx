@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   Lightbulb,
   ReceiptText,
+  Activity,
   Settings,
   UsersIcon,
 } from "lucide-react";
@@ -39,6 +40,7 @@ export function ApplicationSidebar({
   canComposePosts,
   canManageSettings,
   canManageUsage,
+  canViewOperationalReadiness,
   canUseMarketingStudio,
   initialTheme,
   logoUrl,
@@ -51,6 +53,7 @@ export function ApplicationSidebar({
   canComposePosts: boolean;
   canManageSettings: boolean;
   canManageUsage: boolean;
+  canViewOperationalReadiness: boolean;
   canUseMarketingStudio: boolean;
   initialTheme: UserThemePreference;
   logoUrl: string | null;
@@ -148,6 +151,18 @@ export function ApplicationSidebar({
                   >
                     <ReceiptText />
                     <span>Usage &amp; budgets</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ) : null}
+              {canViewOperationalReadiness ? (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={pathname.startsWith("/app/readiness")}
+                    render={<Link href="/app/readiness" />}
+                    tooltip="Operational readiness"
+                  >
+                    <Activity />
+                    <span>Readiness</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ) : null}

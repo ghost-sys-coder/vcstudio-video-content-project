@@ -33,3 +33,10 @@ dashboard. `npm run trigger:deploy` deploys production and synchronizes
 and `.env.example`, and must not be copied to Trigger.dev. Start with
 `report-only`; switch to `enforce` only after production violation reports and
 the sign-in, recording, upload, preview, and OAuth journeys have been checked.
+
+## Operational readiness
+
+`READINESS_ENVIRONMENT` is shared by Vercel and Trigger.dev because the web
+dashboard must query the heartbeat written by the matching worker deployment.
+Use `development` locally, `staging` in both staging runtimes, and `production`
+in both production runtimes. A mismatch truthfully appears as a missing worker.

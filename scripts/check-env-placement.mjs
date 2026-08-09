@@ -38,6 +38,10 @@ const rules = {
     required: [".env.example", ".env", ".env.vercel"],
     forbidden: [".env.trigger.dev"],
   },
+  READINESS_ENVIRONMENT: {
+    required: [".env.example", ".env", ".env.vercel", ".env.trigger.dev"],
+    forbidden: [],
+  },
 };
 const failures = [];
 for (const [key, rule] of Object.entries(rules)) {

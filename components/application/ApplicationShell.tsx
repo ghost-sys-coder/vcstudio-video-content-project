@@ -14,6 +14,7 @@ export function ApplicationShell({
   canComposePosts,
   canManageSettings,
   canManageUsage,
+  canViewOperationalReadiness,
   canUseMarketingStudio,
   children,
   defaultSidebarOpen,
@@ -28,6 +29,7 @@ export function ApplicationShell({
   canComposePosts: boolean;
   canManageSettings: boolean;
   canManageUsage: boolean;
+  canViewOperationalReadiness: boolean;
   canUseMarketingStudio: boolean;
   children: React.ReactNode;
   defaultSidebarOpen: boolean;
@@ -46,6 +48,7 @@ export function ApplicationShell({
         canComposePosts={canComposePosts}
         canManageSettings={canManageSettings}
         canManageUsage={canManageUsage}
+        canViewOperationalReadiness={canViewOperationalReadiness}
         canUseMarketingStudio={canUseMarketingStudio}
         initialTheme={initialTheme}
         logoUrl={logoUrl}
