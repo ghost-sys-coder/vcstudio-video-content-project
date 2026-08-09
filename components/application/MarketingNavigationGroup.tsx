@@ -6,6 +6,7 @@ import {
   ChartNoAxesCombined,
   ChevronRight,
   FileCheck2,
+  ClipboardList,
   Images,
   MessagesSquare,
   Plug,
@@ -48,6 +49,11 @@ const MARKETING_ROUTES = [
   { href: "/app/marketing/publish", label: "Publish", icon: Send },
   { href: "/app/marketing/schedules", label: "Schedules", icon: Repeat2 },
   { href: "/app/marketing/content", label: "Content", icon: FileCheck2 },
+  {
+    href: "/app/marketing/digests",
+    label: "Weekly digest",
+    icon: ClipboardList,
+  },
   {
     href: "/app/marketing/metrics",
     label: "Quality metrics",

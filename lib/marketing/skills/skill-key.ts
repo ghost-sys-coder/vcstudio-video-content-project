@@ -9,6 +9,7 @@ export const MARKETING_SKILL_KEYS = [
   "create_social_graphic",
   "train_business_knowledge",
   "search_brand_knowledge",
+  "social_media_manager",
 ] as const;
 
 export type MarketingSkillKey = (typeof MARKETING_SKILL_KEYS)[number];

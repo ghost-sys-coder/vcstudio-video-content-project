@@ -14,3 +14,10 @@ export async function findMarketingSettings(input: {
     .limit(1);
   return settings ?? null;
 }
+
+export async function listMarketingEnabledWorkspaceIds() {
+  return getDatabase()
+    .select({ workspaceId: marketingSettings.workspaceId })
+    .from(marketingSettings)
+    .where(eq(marketingSettings.studioEnabled, true));
+}

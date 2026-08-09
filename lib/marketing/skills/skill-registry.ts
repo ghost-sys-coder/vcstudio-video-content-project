@@ -8,6 +8,7 @@ import { searchBrandKnowledgeSkill } from "@/lib/marketing/skills/definitions/se
 import { trainBusinessKnowledgeSkill } from "@/lib/marketing/skills/definitions/train-business-knowledge";
 import { writeBlogPostSkill } from "@/lib/marketing/skills/definitions/write-blog-post";
 import { writeEmailSkill } from "@/lib/marketing/skills/definitions/write-email";
+import { socialMediaManagerSkill } from "@/lib/marketing/skills/definitions/social-media-manager";
 import type { MarketingSkillDefinition } from "@/lib/marketing/skills/skill-definition";
 import type { MarketingSkillKey } from "@/lib/marketing/skills/skill-key";
 
@@ -22,4 +23,5 @@ export const MARKETING_SKILL_REGISTRY = {
   create_media_story: createMediaStorySkill,
   train_business_knowledge: trainBusinessKnowledgeSkill,
   search_brand_knowledge: searchBrandKnowledgeSkill,
+  social_media_manager: socialMediaManagerSkill,
 } satisfies Record<MarketingSkillKey, MarketingSkillDefinition>;

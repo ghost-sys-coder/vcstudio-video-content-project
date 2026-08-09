@@ -22,6 +22,7 @@ import type {
 import type { RenderTimelineSnapshot } from "@/lib/render/render-timeline-snapshot";
 import type { PortableDocument } from "@/lib/social/portable-document";
 import type { MarketingChatMessagePart } from "@/lib/schemas/marketing-chat-message";
+import type { MarketingWeeklyDigestSnapshot } from "@/lib/marketing/digests/weekly-digest";
 
 export const workspaceRoleEnum = pgEnum("workspace_role", [
   "owner",
@@ -5299,6 +5300,90 @@ export const marketingScheduleRuleRuns = pgTable(
   ],
 );
 
+export const marketingWeeklyDigestStatusEnum = pgEnum(
+  "marketing_weekly_digest_status",
+  ["generating", "ready", "failed"],
+);
+
+/** One immutable reporting snapshot per workspace and UTC week. */
+export const marketingWeeklyDigests = pgTable(
+  "marketing_weekly_digests",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    weekStart: date("week_start", { mode: "string" }).notNull(),
+    weekEnd: date("week_end", { mode: "string" }).notNull(),
+    status: marketingWeeklyDigestStatusEnum("status")
+      .notNull()
+      .default("generating"),
+    snapshot: jsonb("snapshot").$type<MarketingWeeklyDigestSnapshot>(),
+    triggerRunId: text("trigger_run_id"),
+    errorCategory: text("error_category"),
+    safeErrorMessage: text("safe_error_message"),
+    generatedAt: timestamp("generated_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("marketing_weekly_digests_workspace_week_unique").on(
+      table.workspaceId,
+      table.weekStart,
+    ),
+    uniqueIndex("marketing_weekly_digests_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    index("marketing_weekly_digests_workspace_created_index").on(
+      table.workspaceId,
+      table.createdAt,
+    ),
+    check(
+      "marketing_weekly_digests_date_order",
+      sql`${table.weekEnd} > ${table.weekStart}`,
+    ),
+  ],
+);
+
+/** Read and explicit acknowledgement are user-specific, not workspace-wide. */
+export const marketingWeeklyDigestAcknowledgements = pgTable(
+  "marketing_weekly_digest_acknowledgements",
+  {
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    digestId: uuid("digest_id").notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    readAt: timestamp("read_at", { withTimezone: true }).defaultNow().notNull(),
+    acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.digestId, table.userId] }),
+    index("marketing_weekly_digest_ack_workspace_user_index").on(
+      table.workspaceId,
+      table.userId,
+    ),
+    foreignKey({
+      columns: [table.digestId, table.workspaceId],
+      foreignColumns: [
+        marketingWeeklyDigests.id,
+        marketingWeeklyDigests.workspaceId,
+      ],
+      name: "marketing_weekly_digest_ack_tenant_digest_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
 export type MarketingSkillInputFieldData = {
   key: string;
   label: string;
@@ -5678,6 +5763,9 @@ export type MarketingScheduleFrequency =
   (typeof marketingScheduleFrequencyEnum.enumValues)[number];
 export type MarketingScheduleRunStatus =
   (typeof marketingScheduleRunStatusEnum.enumValues)[number];
+export type MarketingWeeklyDigest = typeof marketingWeeklyDigests.$inferSelect;
+export type MarketingWeeklyDigestAcknowledgement =
+  typeof marketingWeeklyDigestAcknowledgements.$inferSelect;
 export type MarketingChatThread = typeof marketingChatThreads.$inferSelect;
 export type MarketingThreadStatus =
   (typeof marketingThreadStatusEnum.enumValues)[number];

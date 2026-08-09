@@ -30,6 +30,7 @@ import { requireCapability } from "@/lib/policies/workspace-policy";
 import { enforceRateLimit } from "@/lib/rate-limit/enforce-rate-limit";
 import type { marketingContentGenerationTask } from "@/trigger/marketing-content-generation";
 import type { marketingImageGenerationTask } from "@/trigger/marketing-image-generation";
+import type { marketingSocialMediaManagerTask } from "@/trigger/marketing-social-media-manager";
 
 function imageSize(values: Record<string, string | number>) {
   if (values.aspectRatio === "portrait") return "1024x1536" as const;
@@ -150,15 +151,20 @@ export async function executeDeferredMarketingSkill(input: {
       toolCallId: toolRow.id,
     };
     const handle =
-      definition.billing.kind === "image"
-        ? await tasks.trigger<typeof marketingImageGenerationTask>(
-            "marketing-image-generation",
+      executorKey === "social_media_manager"
+        ? await tasks.trigger<typeof marketingSocialMediaManagerTask>(
+            "marketing-social-media-manager",
             payload,
           )
-        : await tasks.trigger<typeof marketingContentGenerationTask>(
-            "marketing-content-generation",
-            payload,
-          );
+        : definition.billing.kind === "image"
+          ? await tasks.trigger<typeof marketingImageGenerationTask>(
+              "marketing-image-generation",
+              payload,
+            )
+          : await tasks.trigger<typeof marketingContentGenerationTask>(
+              "marketing-content-generation",
+              payload,
+            );
     await Promise.all([
       attachMarketingToolCallTriggerRun({
         workspaceId: context.workspaceId,
