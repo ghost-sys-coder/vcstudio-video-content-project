@@ -19,29 +19,23 @@ describeDatabase("first-value onboarding PostgreSQL", () => {
     ids.userId = randomUUID();
     ids.workspaceId = randomUUID();
     await database.batch([
-      database
-        .insert(users)
-        .values({
-          id: ids.userId,
-          clerkUserId: `onboarding-${ids.userId}`,
-          email: `${ids.userId}@integration.invalid`,
-          displayName: "Onboarding Fixture",
-        }),
-      database
-        .insert(workspaces)
-        .values({
-          id: ids.workspaceId,
-          name: "Onboarding Fixture",
-          slug: `onboarding-${ids.workspaceId}`,
-          createdByUserId: ids.userId,
-        }),
-      database
-        .insert(workspaceMembers)
-        .values({
-          workspaceId: ids.workspaceId,
-          userId: ids.userId,
-          role: "owner",
-        }),
+      database.insert(users).values({
+        id: ids.userId,
+        clerkUserId: `onboarding-${ids.userId}`,
+        email: `${ids.userId}@integration.invalid`,
+        displayName: "Onboarding Fixture",
+      }),
+      database.insert(workspaces).values({
+        id: ids.workspaceId,
+        name: "Onboarding Fixture",
+        slug: `onboarding-${ids.workspaceId}`,
+        createdByUserId: ids.userId,
+      }),
+      database.insert(workspaceMembers).values({
+        workspaceId: ids.workspaceId,
+        userId: ids.userId,
+        role: "owner",
+      }),
     ]);
     expect(
       Object.values(await loadFirstValueFacts(ids.workspaceId)).every(

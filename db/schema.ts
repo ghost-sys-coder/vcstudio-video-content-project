@@ -464,6 +464,34 @@ export const workspaces = pgTable(
   ],
 );
 
+/** Per-user inbox state only; workflow state remains in its authoritative table. */
+export const activityAcknowledgements = pgTable(
+  "activity_acknowledgements",
+  {
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    activityKey: text("activity_key").notNull(),
+    acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.workspaceId, table.userId, table.activityKey],
+      name: "activity_acknowledgements_primary_key",
+    }),
+    index("activity_acknowledgements_user_index").on(
+      table.workspaceId,
+      table.userId,
+      table.acknowledgedAt,
+    ),
+  ],
+);
+
 export const workspaceMembers = pgTable(
   "workspace_members",
   {

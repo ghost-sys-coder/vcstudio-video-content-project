@@ -33,35 +33,29 @@ describeDatabase("storage reconciliation PostgreSQL", () => {
     userIds.add(userId);
     workspaceIds.add(workspaceId);
     await database.batch([
-      database
-        .insert(users)
-        .values({
-          id: userId,
-          clerkUserId: `storage-${userId}`,
-          email: `${userId}@integration.invalid`,
-          displayName: "Storage Fixture",
-        }),
-      database
-        .insert(workspaces)
-        .values({
-          id: workspaceId,
-          name: "Storage Fixture",
-          slug: `storage-${workspaceId}`,
-          createdByUserId: userId,
-        }),
+      database.insert(users).values({
+        id: userId,
+        clerkUserId: `storage-${userId}`,
+        email: `${userId}@integration.invalid`,
+        displayName: "Storage Fixture",
+      }),
+      database.insert(workspaces).values({
+        id: workspaceId,
+        name: "Storage Fixture",
+        slug: `storage-${workspaceId}`,
+        createdByUserId: userId,
+      }),
       database
         .insert(workspaceMembers)
         .values({ workspaceId, userId, role: "owner" }),
-      database
-        .insert(storageObjects)
-        .values({
-          workspaceId,
-          kind: "workspace_logo",
-          objectKey: key,
-          contentType: "image/png",
-          sizeBytes: 10,
-          createdByUserId: userId,
-        }),
+      database.insert(storageObjects).values({
+        workspaceId,
+        kind: "workspace_logo",
+        objectKey: key,
+        contentType: "image/png",
+        sizeBytes: 10,
+        createdByUserId: userId,
+      }),
     ]);
     expect(await isStorageObjectReferenced(key)).toBe(true);
     expect(

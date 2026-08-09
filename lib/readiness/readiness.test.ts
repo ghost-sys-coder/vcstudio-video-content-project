@@ -25,15 +25,13 @@ describe("operational readiness", () => {
       ENABLE_VIDEO_PUBLISHING: "true",
     };
     mocks.send.mockReset().mockResolvedValue({});
-    mocks.loadSnapshot
-      .mockReset()
-      .mockResolvedValue({
-        heartbeat: null,
-        connections: [],
-        googleBusiness: null,
-        stuckCount: 0,
-        schemaCompatible: true,
-      });
+    mocks.loadSnapshot.mockReset().mockResolvedValue({
+      heartbeat: null,
+      connections: [],
+      googleBusiness: null,
+      stuckCount: 0,
+      schemaCompatible: true,
+    });
   });
   afterEach(() => {
     process.env = { ...originalEnvironment };

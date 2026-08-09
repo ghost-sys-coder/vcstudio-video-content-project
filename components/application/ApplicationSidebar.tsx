@@ -6,6 +6,7 @@ import {
   Lightbulb,
   ReceiptText,
   Activity,
+  Bell,
   Settings,
   UsersIcon,
 } from "lucide-react";
@@ -110,6 +111,16 @@ export function ApplicationSidebar({
                 >
                   <LayoutDashboard />
                   <span>Dashboard</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={pathname.startsWith("/app/activity")}
+                  render={<Link href="/app/activity" />}
+                  tooltip="Activity"
+                >
+                  <Bell />
+                  <span>Activity</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
 import { FirstValueTrackCard } from "@/components/onboarding/FirstValueTrackCard";
 import type { FirstValueTrack } from "@/lib/onboarding/first-value-onboarding";
@@ -10,17 +10,27 @@ export function FirstValueOnboardingPanel({
 }: {
   tracks: FirstValueTrack[];
 }) {
-  const [dismissed, setDismissed] = useState(false);
+  const dismissed = useSyncExternalStore(
+    (onStoreChange) => {
+      window.addEventListener("storage", onStoreChange);
+      window.addEventListener("vcstudio:first-value-dismissed", onStoreChange);
+      return () => {
+        window.removeEventListener("storage", onStoreChange);
+        window.removeEventListener(
+          "vcstudio:first-value-dismissed",
+          onStoreChange,
+        );
+      };
+    },
+    () =>
+      window.localStorage.getItem("vcstudio:first-value-dismissed") === "true",
+    () => false,
+  );
   const allRequiredComplete = tracks.every((track) =>
     track.milestones
       .filter((milestone) => !milestone.optional)
       .every((milestone) => milestone.complete),
   );
-  useEffect(() => {
-    setDismissed(
-      window.localStorage.getItem("vcstudio:first-value-dismissed") === "true",
-    );
-  }, []);
   if (dismissed && allRequiredComplete) return null;
   return (
     <section className="space-y-4" aria-labelledby="first-value-heading">
@@ -46,7 +56,7 @@ export function FirstValueOnboardingPanel({
                 "vcstudio:first-value-dismissed",
                 "true",
               );
-              setDismissed(true);
+              window.dispatchEvent(new Event("vcstudio:first-value-dismissed"));
             }}
           >
             Dismiss
