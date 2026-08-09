@@ -138,27 +138,42 @@ export async function transitionMarketingContent(input: {
   reviewedByUserId: string;
   reviewNotes?: string;
 }) {
+  if (
+    input.to !== "approved" &&
+    input.to !== "changes_requested" &&
+    input.to !== "archived"
+  )
+    throw new Error("MARKETING_CONTENT_REVIEW_DECISION_REQUIRED");
   const current = await findMarketingContentItem(input);
   if (!current) throw new Error("MARKETING_CONTENT_NOT_FOUND");
   assertMarketingContentTransition(current.status, input.to);
-  const [updated] = await getDatabase()
-    .update(marketingContentItems)
-    .set({
-      status: input.to,
-      reviewedByUserId: input.reviewedByUserId,
-      reviewNotes: input.reviewNotes ?? "",
-      approvedAt: input.to === "approved" ? new Date() : current.approvedAt,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(marketingContentItems.id, input.contentItemId),
-        eq(marketingContentItems.workspaceId, input.workspaceId),
-        eq(marketingContentItems.status, current.status),
-      ),
+  const now = new Date();
+  const result = await getDatabase().execute(sql`
+    with updated as (
+      update marketing_content_items
+      set status = ${input.to}::marketing_content_status,
+          reviewed_by_user_id = ${input.reviewedByUserId}::uuid,
+          review_notes = ${input.reviewNotes ?? ""},
+          approved_at = ${input.to === "approved" ? now : current.approvedAt},
+          updated_at = ${now}
+      where id = ${input.contentItemId}::uuid
+        and workspace_id = ${input.workspaceId}::uuid
+        and status = ${current.status}::marketing_content_status
+      returning id, workspace_id
     )
-    .returning();
-  if (!updated) throw new Error("MARKETING_CONTENT_CONFLICT");
+    insert into marketing_content_review_events (
+      id, workspace_id, content_item_id, decision, reason,
+      reviewed_by_user_id, created_at
+    )
+    select gen_random_uuid(), workspace_id, id,
+      ${input.to}::marketing_content_review_decision,
+      ${input.reviewNotes ?? ""}, ${input.reviewedByUserId}::uuid, ${now}
+    from updated
+    returning content_item_id
+  `);
+  if (!result.rows[0]) throw new Error("MARKETING_CONTENT_CONFLICT");
+  const updated = await findMarketingContentItem(input);
+  if (!updated) throw new Error("MARKETING_CONTENT_NOT_FOUND");
   return updated;
 }
 

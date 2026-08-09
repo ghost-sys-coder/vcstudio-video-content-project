@@ -247,6 +247,9 @@ export async function startChatTurn(input: {
     requestedByUserId: userId,
     model: environment.MARKETING_CHAT_MODEL,
     promptVersion: MARKETING_CHAT_PROMPT_VERSION,
+    skillKey: forcedDefinition?.key ?? "marketing_chat",
+    skillVersion: forcedDefinition?.skillVersion ?? 1,
+    brandContextFingerprint: context.sourceFingerprint,
     // The system prompt only. The conversation is already stored as rows, and
     // duplicating it into the run record would copy the whole thread on every
     // turn for no gain in explainability.

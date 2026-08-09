@@ -25,6 +25,9 @@ export type ReserveMarketingUsageInput = {
   requestedByUserId?: string | null;
   model?: string;
   promptVersion?: string;
+  skillKey?: string;
+  skillVersion?: number;
+  brandContextFingerprint?: string;
   finalPrompt?: string;
   requestFingerprint?: string;
   subjectKind?: string;
@@ -137,6 +140,9 @@ export async function reserveMarketingUsage(
       requestedByUserId: input.requestedByUserId ?? null,
       model: input.model ?? "",
       promptVersion: input.promptVersion ?? "",
+      skillKey: input.skillKey ?? "",
+      skillVersion: input.skillVersion ?? 1,
+      brandContextFingerprint: input.brandContextFingerprint ?? "",
       finalPrompt: input.finalPrompt ?? "",
       requestFingerprint: input.requestFingerprint ?? "",
       idempotencyKey: input.idempotencyKey,

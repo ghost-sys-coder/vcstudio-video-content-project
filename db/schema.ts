@@ -4276,6 +4276,11 @@ export const marketingReservationStatusEnum = pgEnum(
   ["pending", "reconciled", "released"],
 );
 
+export const marketingContentReviewDecisionEnum = pgEnum(
+  "marketing_content_review_decision",
+  ["approved", "changes_requested", "archived"],
+);
+
 /**
  * One row per billable marketing operation.
  *
@@ -4301,6 +4306,11 @@ export const marketingGenerationRuns = pgTable(
     }),
     model: text("model").notNull().default(""),
     promptVersion: text("prompt_version").notNull().default(""),
+    skillKey: text("skill_key").notNull().default(""),
+    skillVersion: integer("skill_version").notNull().default(1),
+    brandContextFingerprint: text("brand_context_fingerprint")
+      .notNull()
+      .default(""),
     finalPrompt: text("final_prompt").notNull().default(""),
     requestFingerprint: text("request_fingerprint").notNull().default(""),
     idempotencyKey: text("idempotency_key").notNull(),
@@ -4341,6 +4351,10 @@ export const marketingGenerationRuns = pgTable(
     check(
       "marketing_generation_runs_cost_nonnegative",
       sql`${table.estimatedCostCents} >= 0 and (${table.actualCostCents} is null or ${table.actualCostCents} >= 0)`,
+    ),
+    check(
+      "marketing_generation_runs_skill_version_positive",
+      sql`${table.skillVersion} > 0`,
     ),
   ],
 );
@@ -5084,6 +5098,44 @@ export const marketingContentRevisions = pgTable(
     check(
       "marketing_content_revisions_number_positive",
       sql`${table.revisionNumber} > 0`,
+    ),
+  ],
+);
+
+/** Append-only review history used for quality and time-to-review metrics. */
+export const marketingContentReviewEvents = pgTable(
+  "marketing_content_review_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    contentItemId: uuid("content_item_id").notNull(),
+    decision: marketingContentReviewDecisionEnum("decision").notNull(),
+    reason: text("reason").notNull().default(""),
+    reviewedByUserId: uuid("reviewed_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.contentItemId, table.workspaceId],
+      foreignColumns: [
+        marketingContentItems.id,
+        marketingContentItems.workspaceId,
+      ],
+      name: "marketing_content_review_events_tenant_item_fkey",
+    }).onDelete("cascade"),
+    index("marketing_content_review_events_workspace_created_index").on(
+      table.workspaceId,
+      table.createdAt,
+    ),
+    index("marketing_content_review_events_item_created_index").on(
+      table.contentItemId,
+      table.createdAt,
     ),
   ],
 );

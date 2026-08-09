@@ -3,6 +3,7 @@
 import {
   BarChart3,
   CalendarClock,
+  ChartNoAxesCombined,
   ChevronRight,
   FileCheck2,
   Images,
@@ -47,6 +48,11 @@ const MARKETING_ROUTES = [
   { href: "/app/marketing/publish", label: "Publish", icon: Send },
   { href: "/app/marketing/schedules", label: "Schedules", icon: Repeat2 },
   { href: "/app/marketing/content", label: "Content", icon: FileCheck2 },
+  {
+    href: "/app/marketing/metrics",
+    label: "Quality metrics",
+    icon: ChartNoAxesCombined,
+  },
   { href: "/app/marketing/campaigns", label: "Campaigns", icon: Target },
   { href: "/app/marketing/research", label: "Research", icon: BarChart3 },
   { href: "/app/marketing/assets", label: "Assets", icon: Images },

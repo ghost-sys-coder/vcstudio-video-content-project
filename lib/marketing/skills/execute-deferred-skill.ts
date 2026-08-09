@@ -129,6 +129,9 @@ export async function executeDeferredMarketingSkill(input: {
       requestedByUserId: context.userId,
       model,
       promptVersion: definition.promptVersion,
+      skillKey: definition.key,
+      skillVersion: definition.skillVersion ?? 1,
+      brandContextFingerprint: context.brandContextFingerprint,
       finalPrompt: prompt,
       requestFingerprint: createRequestFingerprint(
         hashEnvironment.REQUEST_FINGERPRINT_SECRET,

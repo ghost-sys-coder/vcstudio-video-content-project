@@ -199,6 +199,9 @@ export const marketingScheduleGenerationTask = task({
         requestedByUserId: scheduled.rule.createdByUserId,
         model: environment.MARKETING_CHAT_MODEL,
         promptVersion: MARKETING_SCHEDULE_PROMPT_VERSION,
+        skillKey: scheduled.rule.skillKey,
+        skillVersion: 1,
+        brandContextFingerprint: brand.sourceFingerprint,
         finalPrompt: prompt,
         requestFingerprint: createRequestFingerprint(
           hashes.REQUEST_FINGERPRINT_SECRET,

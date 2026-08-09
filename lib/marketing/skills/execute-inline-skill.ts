@@ -152,6 +152,9 @@ export async function executeInlineMarketingSkill(input: {
       requestedByUserId: context.userId,
       model: environment.MARKETING_CHAT_MODEL,
       promptVersion: definition.promptVersion,
+      skillKey: definition.key,
+      skillVersion: definition.skillVersion ?? 1,
+      brandContextFingerprint: context.brandContextFingerprint,
       finalPrompt: prompt,
       requestFingerprint: createRequestFingerprint(
         hashEnvironment.REQUEST_FINGERPRINT_SECRET,

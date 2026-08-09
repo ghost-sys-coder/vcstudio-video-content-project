@@ -204,6 +204,9 @@ export const marketingCampaignAutomationTask = task({
         requestedByUserId: input.requestedByUserId,
         model: environment.MARKETING_CHAT_MODEL,
         promptVersion: MARKETING_CAMPAIGN_AUTOMATION_PROMPT_VERSION,
+        skillKey: "campaign_automation",
+        skillVersion: 1,
+        brandContextFingerprint: brand.sourceFingerprint,
         finalPrompt: prompt,
         requestFingerprint: createRequestFingerprint(
           hashes.REQUEST_FINGERPRINT_SECRET,

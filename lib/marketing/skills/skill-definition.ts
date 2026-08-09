@@ -35,6 +35,7 @@ export type MarketingSkillDefinition = {
   rateLimitOperation: RateLimitedOperation | null;
   requiresBrandProfile: boolean;
   promptVersion: string;
+  skillVersion?: number;
   instructions: string;
   estimatedCostRangeCents: readonly [number, number];
 };
