@@ -109,6 +109,7 @@ docs/                Bootstrap and phase specifications
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`                 | Browser     | Yes         | Identifies the Clerk application.                                                                                                              |
 | `CLERK_SECRET_KEY`                                  | Server only | Yes         | Authenticates server-side Clerk operations.                                                                                                    |
 | `CLERK_WEBHOOK_SIGNING_SECRET`                      | Server only | Yes         | Verifies Clerk webhook signatures.                                                                                                             |
+| `E2E_CLERK_USER_EMAIL`                              | Test only   | E2E         | Existing owner in the Clerk development instance used by Playwright. Never configure in Vercel or Trigger.dev.                                 |
 | `NEXT_PUBLIC_CLERK_SIGN_IN_URL`                     | Browser     | Yes         | Clerk sign-in route.                                                                                                                           |
 | `NEXT_PUBLIC_CLERK_SIGN_UP_URL`                     | Browser     | Yes         | Clerk sign-up route.                                                                                                                           |
 | `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL`   | Browser     | Yes         | Post-sign-in destination.                                                                                                                      |
@@ -373,11 +374,15 @@ The preview player is buffering-aware to avoid a stuttering first playback. Prev
 - `npm run db:migrate` applies pending Drizzle migrations.
 - `npm run trigger:dev` runs Trigger.dev tasks locally.
 - `npm run trigger:deploy` deploys Trigger.dev tasks.
+- `npm run test:e2e:install` installs Playwright's Chromium browser.
+- `npm run test:e2e` starts/reuses the local app and runs authenticated browser tests headlessly.
+- `npm run test:e2e:headed` runs the same browser tests with a visible browser.
 
 ## Testing commands
 
 - `npm test` runs Vitest once.
 - `npm run test:coverage` runs tests with V8 coverage.
+- `npm run test:e2e` runs the Playwright suite. It requires development Clerk keys and `E2E_CLERK_USER_EMAIL` for an existing workspace owner. The current lifecycle test creates a uniquely named zero-budget project, edits it, and permanently deletes only that test fixture; it does not call OpenAI, R2, Trigger.dev, or a publishing provider.
 - `$env:RUN_DATABASE_INTEGRATION_TESTS="true"; npm test -- --run db/integration/scene-image-postgres.integration.test.ts; Remove-Item Env:RUN_DATABASE_INTEGRATION_TESTS` runs the opt-in Phase 5 PostgreSQL invariant suite from PowerShell.
 - `RUN_DATABASE_INTEGRATION_TESTS=true npm test -- --run db/integration/scene-image-postgres.integration.test.ts` runs the same suite from a POSIX shell.
 - The Phase 9 render invariants live in `db/integration/video-render-postgres.integration.test.ts` and run the same way (idempotent reservation, budget rejection, cancel/complete/fail reconciliation, and cross-workspace isolation).
@@ -434,7 +439,7 @@ The Marketing Studio spends through its **own** ledger (`marketing_generation_ru
 - Billing is intentionally excluded from Phase 1.
 - `CLERK_WEBHOOK_SIGNING_SECRET` must be configured before real webhook delivery can succeed.
 - The Phase 1 migration must still be applied separately to future preview and production databases.
-- Full browser end-to-end coverage will be expanded with the bootstrap Playwright foundation.
+- Browser end-to-end coverage now has a Clerk-supported Playwright foundation and an authenticated, non-billable project lifecycle test. Coverage still needs to expand across generation simulators, workspace roles, uploads, rendering, publishing, Marketing handoff, and Google Business selection.
 - The end-to-end Remotion render runs only in the deployed Trigger.dev worker (headless Chromium via a build extension); it cannot be exercised locally. The Chromium `aptGet` package list and the `additionalFiles` bundled-source paths in `trigger.config.ts` must be validated on first deploy, and the whole task is gated by `ENABLE_VIDEO_RENDERING`.
 - Render output always uses the project's aspect ratio; the other format presets are shown but disabled because scene images are generated at the project ratio. Camera motion and transitions are assigned deterministically per scene rather than authored per scene.
 - Subtitle word-level timing is intentionally never synthesized; captions use scene- or sentence-level timing distributed across the measured audio duration. Per-cue timing is not hand-editable (only cue text), because timing is always recomputed deterministically from approved audio.
@@ -479,6 +484,8 @@ The Marketing Studio spends through its **own** ledger (`marketing_generation_ru
 Phases 1–9 are implemented through authenticated workspaces, project/script versioning, durable AI scene planning, workspace character consistency references, cost-controlled media generation, deterministic subtitles, and Remotion rendering. Phase 10 operational hardening, the publishing-metadata workflow, and the Idea Lab are implemented. The Marketing Studio is gated by deployment and workspace switches and is implemented through Slice 12 plus the integrations surface from Slice 13 in [`docs/marketing/08-slices.md`](docs/marketing/08-slices.md): campaign creation performs cited research before producing review-only copy, ads, graphics, and storyboard drafts; recurring schedules generate capped drafts exactly once per occurrence; owners can add validated writing skills to the existing slash-command catalogue; and connection/provider health is visible inside Marketing Studio. Assisted approval can schedule through the existing Social path. Slice 13 orchestration (`social_media_manager` and the weekly digest) and Slice 14 evidence-gated autonomous approval remain unbuilt.
 
 ## Recent major changes
+
+- 2026-08-09: Added the first **Playwright browser-test foundation** using official Clerk testing tokens and a reusable authenticated owner state. The initial Chromium journey creates a unique zero-budget project through the real UI, verifies the project page, updates its settings, and deletes the test-created project in a `finally` cleanup path. It deliberately does not generate media or scripts, dispatch Trigger.dev, upload to R2, or contact publishing providers. Added `@playwright/test`, `@clerk/testing`, `playwright.config.ts`, ignored auth/report artifacts, `test:e2e*` commands, and the local/CI-only `E2E_CLERK_USER_EMAIL` contract. No database migration or production environment variable was added.
 
 - 2026-08-09: Added the workspace-owned **Google Business Profile integration** to Marketing Studio. Owners authorize through signed OAuth, encrypted tokens remain server-side, and the Account Management and Business Information APIs import accessible locations with pagination. Owners select multiple locations and one primary; editors have read/use access. Immediate, manual, and daily sync share one idempotent service, and immutable checksummed snapshots preserve the last successful facts on failure. Disconnect clears credentials and removes listings from future AI context without deleting history. Selected listings now enter the versioned brand-context prompt as bounded, source-labelled Google facts, so Marketing Studio generation uses them without merging them into the manual profile. Added migration `20260809114832_nervous_proteus`, `GOOGLE_BUSINESS_SCOPE`, unit tests, and an opt-in PostgreSQL isolation/retention suite. The daily task requires Trigger.dev deployment and the OAuth client must register `{APP_BASE_URL}/api/google-business/callback`.
 
