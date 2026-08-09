@@ -513,6 +513,15 @@ export const publishingEnvironmentSchema = z.object({
   // only when that platform is actually used — see `PlatformNotConfiguredError`.
   GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
+  /**
+   * Meta's app credentials are consumed only by the web OAuth runtime. They are
+   * mirrored here as optional values solely so provider-readiness views can use
+   * the validated publishing environment without reading process.env directly.
+   */
+  FACEBOOK_APP_ID: z.string().optional(),
+  FACEBOOK_APP_SECRET: z.string().optional(),
+  INSTAGRAM_APP_ID: z.string().optional(),
+  INSTAGRAM_APP_SECRET: z.string().optional(),
   /** Versioned Graph API path shared by the web OAuth flow and publish worker. */
   FACEBOOK_GRAPH_API_VERSION: z
     .string()

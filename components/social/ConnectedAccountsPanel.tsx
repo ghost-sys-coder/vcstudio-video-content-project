@@ -16,8 +16,10 @@ import type { PostConnectionView } from "@/lib/social/social-post-view";
  * destination list is otherwise the only place a post author sees it.
  */
 export function ConnectedAccountsPanel({
+  canManageConnections = true,
   connections,
 }: {
+  canManageConnections?: boolean;
   connections: PostConnectionView[];
 }) {
   return (
@@ -29,14 +31,16 @@ export function ConnectedAccountsPanel({
             Where this workspace can post, and what each destination accepts.
           </p>
         </div>
-        <Button
-          nativeButton={false}
-          render={<Link href="/app/settings/workspace" />}
-          size="sm"
-          variant="outline"
-        >
-          Manage connections
-        </Button>
+        {canManageConnections ? (
+          <Button
+            nativeButton={false}
+            render={<Link href="/app/settings/workspace" />}
+            size="sm"
+            variant="outline"
+          >
+            Manage connections
+          </Button>
+        ) : null}
       </header>
 
       {connections.length === 0 ? (
