@@ -4,6 +4,7 @@ import {
   countKnowledgeDocuments,
   listBrandAssets,
   listKnowledgeDocuments,
+  listKnowledgeDocumentChunks,
 } from "@/db/repositories/marketing-documents.repository";
 import type {
   MarketingBrandAssetRole,
@@ -27,6 +28,12 @@ export type KnowledgeDocumentView = {
   keyFacts: string[];
   safeErrorMessage: string | null;
   createdAt: string;
+  chunkCount: number;
+  sourceLocations: string[];
+  processedAt: string | null;
+  expiresAt: string | null;
+  freshForDays: number;
+  isExpired: boolean;
 };
 
 export type BrandAssetView = {
@@ -59,10 +66,11 @@ export async function loadMarketingAssetsView(input: {
   workspaceId: string;
 }): Promise<MarketingAssetsView> {
   const environment = getMarketingEnvironment();
-  const [documents, documentCount, brandAssets] = await Promise.all([
+  const [documents, documentCount, brandAssets, chunks] = await Promise.all([
     listKnowledgeDocuments({ workspaceId: input.workspaceId }),
     countKnowledgeDocuments({ workspaceId: input.workspaceId }),
     listBrandAssets({ workspaceId: input.workspaceId }),
+    listKnowledgeDocumentChunks({ workspaceId: input.workspaceId }),
   ]);
 
   const assetViews = await Promise.all(
@@ -78,22 +86,44 @@ export async function loadMarketingAssetsView(input: {
   );
 
   return {
-    documents: documents.map((document) => ({
-      id: document.id,
-      title: document.title,
-      status: document.status,
-      sourceKind: document.sourceKind,
-      originalFileName: document.originalFileName,
-      characterCount: document.extractedCharacterCount,
-      tokenEstimate: document.tokenEstimate,
-      includeInContext: document.includeInContext,
-      priority: document.priority,
-      hasSummary: document.summary !== "",
-      summary: document.summary,
-      keyFacts: document.keyFacts,
-      safeErrorMessage: document.safeErrorMessage,
-      createdAt: document.createdAt.toISOString(),
-    })),
+    documents: documents.map((document) => {
+      const documentChunks = chunks.filter(
+        (chunk) => chunk.documentId === document.id,
+      );
+      return {
+        id: document.id,
+        title: document.title,
+        status: document.status,
+        sourceKind: document.sourceKind,
+        originalFileName: document.originalFileName,
+        characterCount: document.extractedCharacterCount,
+        tokenEstimate: document.tokenEstimate,
+        includeInContext: document.includeInContext,
+        priority: document.priority,
+        hasSummary: document.summary !== "",
+        summary: document.summary,
+        keyFacts: document.keyFacts,
+        safeErrorMessage: document.safeErrorMessage,
+        createdAt: document.createdAt.toISOString(),
+        chunkCount: documentChunks.length,
+        sourceLocations: [
+          ...new Set(documentChunks.map((chunk) => chunk.sourceLocation.label)),
+        ].slice(0, 12),
+        processedAt: document.processedAt?.toISOString() ?? null,
+        expiresAt: document.expiresAt?.toISOString() ?? null,
+        freshForDays: document.expiresAt
+          ? Math.max(
+              1,
+              Math.ceil(
+                (document.expiresAt.getTime() - Date.now()) / 86_400_000,
+              ),
+            )
+          : 0,
+        isExpired:
+          document.expiresAt !== null &&
+          document.expiresAt.getTime() <= Date.now(),
+      };
+    }),
     documentCount,
     maxDocuments: environment.MARKETING_MAX_DOCUMENTS,
     includedTokenEstimate: documents

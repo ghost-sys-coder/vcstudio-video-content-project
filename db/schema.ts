@@ -4161,6 +4161,15 @@ export const marketingKnowledgeDocuments = pgTable(
     summary: text("summary").notNull().default(""),
     keyFacts: jsonb("key_facts").$type<string[]>().notNull().default([]),
     checksum: text("checksum").notNull().default(""),
+    extractionVersion: text("extraction_version")
+      .notNull()
+      .default("knowledge-extraction-v2"),
+    summaryVersion: text("summary_version"),
+    summaryProviderRequestId: text("summary_provider_request_id"),
+    summaryInputTokens: integer("summary_input_tokens").notNull().default(0),
+    summaryOutputTokens: integer("summary_output_tokens").notNull().default(0),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
     includeInContext: boolean("include_in_context").notNull().default(true),
     priority: integer("priority").notNull().default(0),
     errorCategory: text("error_category"),
@@ -4180,6 +4189,10 @@ export const marketingKnowledgeDocuments = pgTable(
     uniqueIndex("marketing_knowledge_documents_object_key_unique")
       .on(table.objectKey)
       .where(sql`${table.objectKey} is not null`),
+    uniqueIndex("marketing_knowledge_documents_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
     index("marketing_knowledge_documents_status_index").on(
       table.workspaceId,
       table.status,
@@ -4213,6 +4226,65 @@ export const marketingKnowledgeDocuments = pgTable(
   ],
 );
 
+export const marketingKnowledgeDocumentChunks = pgTable(
+  "marketing_knowledge_document_chunks",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id").notNull(),
+    documentId: uuid("document_id").notNull(),
+    chunkIndex: integer("chunk_index").notNull(),
+    text: text("text").notNull(),
+    checksum: text("checksum").notNull(),
+    tokenEstimate: integer("token_estimate").notNull(),
+    sourceLocation: jsonb("source_location")
+      .$type<{
+        kind: "text" | "page" | "section";
+        start: number;
+        end: number;
+        label: string;
+      }>()
+      .notNull(),
+    summary: text("summary").notNull().default(""),
+    keyFacts: jsonb("key_facts").$type<string[]>().notNull().default([]),
+    summaryVersion: text("summary_version"),
+    providerRequestId: text("provider_request_id"),
+    inputTokens: integer("input_tokens").notNull().default(0),
+    outputTokens: integer("output_tokens").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.documentId, table.workspaceId],
+      foreignColumns: [
+        marketingKnowledgeDocuments.id,
+        marketingKnowledgeDocuments.workspaceId,
+      ],
+      name: "marketing_knowledge_document_chunks_tenant_document_fkey",
+    }).onDelete("cascade"),
+    uniqueIndex("marketing_knowledge_document_chunks_position_unique").on(
+      table.documentId,
+      table.chunkIndex,
+    ),
+    index("marketing_knowledge_document_chunks_workspace_index").on(
+      table.workspaceId,
+      table.documentId,
+    ),
+    index("marketing_knowledge_document_chunks_fts_index").using(
+      "gin",
+      sql`to_tsvector('english', ${table.text})`,
+    ),
+    check(
+      "marketing_knowledge_document_chunks_values_nonnegative",
+      sql`${table.chunkIndex} >= 0 and ${table.tokenEstimate} >= 0 and ${table.inputTokens} >= 0 and ${table.outputTokens} >= 0`,
+    ),
+  ],
+);
+
 /**
  * A frozen copy of the brand context block, addressed by its fingerprint.
  *
@@ -4242,6 +4314,17 @@ export const marketingBrandContextSnapshots = pgTable(
     tokenEstimate: integer("token_estimate").notNull().default(0),
     includedDocumentIds: jsonb("included_document_ids")
       .$type<string[]>()
+      .notNull()
+      .default([]),
+    includedDocumentClaims: jsonb("included_document_claims")
+      .$type<
+        {
+          documentId: string;
+          title: string;
+          checksum: string;
+          claims: string[];
+        }[]
+      >()
       .notNull()
       .default([]),
     omittedDocumentCount: integer("omitted_document_count")
@@ -5766,6 +5849,8 @@ export type MarketingBrandAssetRole =
   (typeof marketingBrandAssetRoleEnum.enumValues)[number];
 export type MarketingKnowledgeDocument =
   typeof marketingKnowledgeDocuments.$inferSelect;
+export type MarketingKnowledgeDocumentChunk =
+  typeof marketingKnowledgeDocumentChunks.$inferSelect;
 export type MarketingDocumentStatus =
   (typeof marketingDocumentStatusEnum.enumValues)[number];
 export type MarketingDocumentSource =

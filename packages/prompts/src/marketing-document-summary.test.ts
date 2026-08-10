@@ -102,7 +102,7 @@ describe("renderMarketingDocumentSummaryPrompt", () => {
 
   it("has a pinned version so past runs stay explainable", () => {
     expect(MARKETING_DOCUMENT_SUMMARY_PROMPT_VERSION).toBe(
-      "marketing-document-summary-v1",
+      "marketing-document-summary-v2-chunk-synthesis",
     );
   });
 });

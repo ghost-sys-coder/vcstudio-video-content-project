@@ -53,6 +53,26 @@ export function BrandContextPreview({
         </CardContent>
       </Card>
 
+      {context.includedDocumentClaims.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Claims entering this snapshot</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {context.includedDocumentClaims.map((source) => (
+              <div className="space-y-1" key={source.documentId}>
+                <p className="text-sm font-medium">{source.title}</p>
+                <ul className="list-disc space-y-1 pl-5 text-xs text-muted-foreground">
+                  {source.claims.map((claim) => (
+                    <li key={claim}>{claim}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
+
       <Card>
         <CardHeader>
           <CardTitle>Documents</CardTitle>

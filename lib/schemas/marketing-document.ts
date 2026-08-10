@@ -3,15 +3,15 @@ import { z } from "zod";
 /**
  * Formats the studio can read **today**.
  *
- * Plain text and Markdown parse with no dependency at all, which is why they
- * ship first: the whole upload → extract → include-in-context loop can be built
- * and verified before a PDF parser is argued about. PDF and DOCX arrive in a
- * later slice with their own dependency justification, and they run only in the
- * Trigger worker — never in a web request.
+ * Binary formats are accepted by the web tier but parsed only by the Trigger
+ * worker. Keeping this map shared makes the signed object key and parser agree.
  */
 export const MARKETING_DOCUMENT_EXTENSIONS = {
   "text/plain": "txt",
   "text/markdown": "md",
+  "application/pdf": "pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+    "docx",
 } as const;
 
 export type MarketingDocumentContentType =
@@ -50,11 +50,13 @@ export const updateDocumentSchema = z.object({
   title: z.string().trim().min(1).max(MAX_DOCUMENT_TITLE_LENGTH),
   includeInContext: z.boolean(),
   priority: z.number().int().min(0).max(100),
+  freshForDays: z.number().int().min(0).max(3650),
 });
 
 export const deleteDocumentSchema = z.object({ documentId: z.uuid() });
 
 export const summariseDocumentSchema = z.object({ documentId: z.uuid() });
+export const reprocessDocumentSchema = z.object({ documentId: z.uuid() });
 
 export type RequestDocumentUpload = z.infer<typeof requestDocumentUploadSchema>;
 export type UpdateDocumentInput = z.infer<typeof updateDocumentSchema>;
@@ -68,5 +70,6 @@ export function readUpdateDocumentForm(
     title: formData.get("title") ?? "",
     includeInContext: formData.get("includeInContext") === "on",
     priority: Number(formData.get("priority") ?? 0),
+    freshForDays: Number(formData.get("freshForDays") ?? 0),
   };
 }

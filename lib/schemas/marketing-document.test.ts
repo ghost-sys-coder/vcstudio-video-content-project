@@ -17,10 +17,12 @@ const WORKSPACE = "11111111-1111-4111-8111-111111111111";
 const DOCUMENT = "22222222-2222-4222-8222-222222222222";
 
 describe("marketing document schemas", () => {
-  it("accepts only the formats that parse without a dependency", () => {
+  it("accepts the worker-supported document formats", () => {
     expect(Object.keys(MARKETING_DOCUMENT_EXTENSIONS)).toEqual([
       "text/plain",
       "text/markdown",
+      "application/pdf",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ]);
     expect(
       requestDocumentUploadSchema.safeParse({
@@ -29,7 +31,7 @@ describe("marketing document schemas", () => {
         contentType: "application/pdf",
         sizeBytes: 100,
       }).success,
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("rejects a zero-byte upload", () => {

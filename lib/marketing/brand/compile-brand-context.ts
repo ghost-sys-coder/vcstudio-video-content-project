@@ -23,6 +23,12 @@ export type CompiledBrandContext = BrandContextRender & {
   contextVersion: number;
   /** Documents eligible for the block, in the order truncation considers them. */
   candidateDocuments: { id: string; title: string; tokenEstimate: number }[];
+  includedDocumentClaims: {
+    documentId: string;
+    title: string;
+    checksum: string;
+    claims: string[];
+  }[];
   hasProfile: boolean;
 };
 
@@ -80,6 +86,8 @@ export const compileBrandContext = cache(
         (document) =>
           document.includeInContext &&
           document.status === "ready" &&
+          (document.expiresAt === null ||
+            document.expiresAt.getTime() > Date.now()) &&
           // A document with no summary yet contributes nothing but its title;
           // including it would spend budget on an empty section.
           (document.summary.trim() !== "" || document.keyFacts.length > 0),
@@ -190,6 +198,7 @@ export const compileBrandContext = cache(
       })),
     });
 
+    const includedIds = new Set(render.includedDocumentIds);
     return {
       ...render,
       sourceFingerprint,
@@ -200,6 +209,14 @@ export const compileBrandContext = cache(
         title: document.title,
         tokenEstimate: document.tokenEstimate,
       })),
+      includedDocumentClaims: eligibleDocuments
+        .filter((document) => includedIds.has(document.id))
+        .map((document) => ({
+          documentId: document.id,
+          title: document.title,
+          checksum: document.checksum,
+          claims: document.keyFacts,
+        })),
       hasProfile: profile !== null,
     };
   },
@@ -225,6 +242,7 @@ export async function ensureBrandContextSnapshot(input: {
     compiledText: context.text,
     tokenEstimate: context.tokenEstimate,
     includedDocumentIds: context.includedDocumentIds,
+    includedDocumentClaims: context.includedDocumentClaims,
     omittedDocumentCount: context.omittedDocumentCount,
     truncated: context.truncated,
   });

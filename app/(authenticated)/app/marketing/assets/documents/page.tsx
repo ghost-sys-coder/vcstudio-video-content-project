@@ -1,6 +1,7 @@
 import { DocumentUploadPanel } from "@/components/marketing/DocumentUploadPanel";
 import { EmptyBrandListState } from "@/components/marketing/EmptyBrandListState";
 import { KnowledgeDocumentRow } from "@/components/marketing/KnowledgeDocumentRow";
+import { KnowledgeDocumentProcessingPoller } from "@/components/marketing/KnowledgeDocumentProcessingPoller";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import { loadMarketingAssetsView } from "@/lib/marketing/documents/documents-view";
 
@@ -24,6 +25,12 @@ export default async function MarketingDocumentsPage() {
       </div>
 
       <DocumentUploadPanel workspaceId={workspaceId} />
+      {view.documents.some(
+        (document) =>
+          document.status === "pending" || document.status === "extracting",
+      ) ? (
+        <KnowledgeDocumentProcessingPoller />
+      ) : null}
 
       {view.documents.length === 0 ? (
         <EmptyBrandListState

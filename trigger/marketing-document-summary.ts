@@ -1,12 +1,24 @@
 import { logger, task } from "@trigger.dev/sdk";
 import { z } from "zod";
-import { applyDocumentSummary } from "@/db/commands/marketing-document-commands";
+import {
+  applyDocumentChunkSummary,
+  applyDocumentSummary,
+} from "@/db/commands/marketing-document-commands";
 import {
   failMarketingRun,
   markMarketingRunRunning,
   reconcileMarketingUsage,
 } from "@/db/commands/marketing-usage-commands";
-import { findKnowledgeDocument } from "@/db/repositories/marketing-documents.repository";
+import {
+  findKnowledgeDocument,
+  listKnowledgeDocumentChunksForDocument,
+} from "@/db/repositories/marketing-documents.repository";
+import {
+  MARKETING_DOCUMENT_SUMMARY_PROMPT_VERSION,
+  renderMarketingDocumentSummaryPrompt,
+  renderMarketingDocumentSynthesisPrompt,
+} from "@studio/prompts";
+import { MARKETING_DOCUMENT_KEY_FACT_COUNT } from "@/lib/schemas/marketing-document-summary";
 import { findMarketingRun } from "@/db/repositories/marketing-usage.repository";
 import { calculateTextCostCents } from "@/lib/costs/scene-analysis-cost";
 import { reconcileMarketingCost } from "@/lib/costs/marketing-cost";
@@ -129,14 +141,88 @@ export const marketingDocumentSummaryTask = task({
 
     try {
       const provider = new OpenAiTextGenerationProvider();
-      const result = await provider.summariseDocument({
-        model: run.model,
-        prompt: run.finalPrompt,
+      const chunks = await listKnowledgeDocumentChunksForDocument({
+        workspaceId: input.workspaceId,
+        documentId: document.id,
       });
+      if (chunks.length === 0) throw new Error("DOCUMENT_CHUNKS_MISSING");
+      let inputTokens = 0;
+      let outputTokens = 0;
+      const requestIds: string[] = [];
+      const chunkSummaries = [];
+      for (const chunk of chunks) {
+        if (
+          chunk.summaryVersion === MARKETING_DOCUMENT_SUMMARY_PROMPT_VERSION &&
+          chunk.summary !== ""
+        ) {
+          inputTokens += chunk.inputTokens;
+          outputTokens += chunk.outputTokens;
+          if (chunk.providerRequestId) requestIds.push(chunk.providerRequestId);
+          chunkSummaries.push({
+            label: chunk.sourceLocation.label,
+            summary: chunk.summary,
+            keyFacts: chunk.keyFacts,
+          });
+          continue;
+        }
+        const chunkResult = await provider.summariseDocument({
+          model: run.model,
+          prompt: renderMarketingDocumentSummaryPrompt({
+            title: `${document.title} — ${chunk.sourceLocation.label}`,
+            text: chunk.text,
+            keyFactCount: MARKETING_DOCUMENT_KEY_FACT_COUNT,
+          }),
+        });
+        inputTokens += chunkResult.inputTokens;
+        outputTokens += chunkResult.outputTokens;
+        requestIds.push(chunkResult.requestId);
+        await applyDocumentChunkSummary({
+          workspaceId: input.workspaceId,
+          documentId: document.id,
+          chunkId: chunk.id,
+          checksum: chunk.checksum,
+          summary: chunkResult.output.summary,
+          keyFacts: chunkResult.output.keyFacts,
+          summaryVersion: MARKETING_DOCUMENT_SUMMARY_PROMPT_VERSION,
+          providerRequestId: chunkResult.requestId,
+          inputTokens: chunkResult.inputTokens,
+          outputTokens: chunkResult.outputTokens,
+        });
+        chunkSummaries.push({
+          label: chunk.sourceLocation.label,
+          summary: chunkResult.output.summary,
+          keyFacts: chunkResult.output.keyFacts,
+        });
+      }
+      const result =
+        document.summaryVersion === MARKETING_DOCUMENT_SUMMARY_PROMPT_VERSION &&
+        document.summary !== "" &&
+        document.summaryProviderRequestId
+          ? {
+              output: {
+                summary: document.summary,
+                keyFacts: document.keyFacts,
+                documentType: "other" as const,
+              },
+              requestId: document.summaryProviderRequestId,
+              inputTokens: document.summaryInputTokens,
+              outputTokens: document.summaryOutputTokens,
+            }
+          : await provider.summariseDocument({
+              model: run.model,
+              prompt: renderMarketingDocumentSynthesisPrompt({
+                title: document.title,
+                chunkSummaries,
+                keyFactCount: MARKETING_DOCUMENT_KEY_FACT_COUNT,
+              }),
+            });
+      inputTokens += result.inputTokens;
+      outputTokens += result.outputTokens;
+      requestIds.push(result.requestId);
 
       const actualCostCents = calculateTextCostCents({
-        inputTokens: result.inputTokens,
-        outputTokens: result.outputTokens,
+        inputTokens,
+        outputTokens,
         inputCostPerMillionCents:
           environment.OPENAI_TEXT_INPUT_COST_PER_MILLION_CENTS,
         outputCostPerMillionCents:
@@ -155,6 +241,10 @@ export const marketingDocumentSummaryTask = task({
         checksum: document.checksum,
         summary: result.output.summary,
         keyFacts: result.output.keyFacts,
+        summaryVersion: MARKETING_DOCUMENT_SUMMARY_PROMPT_VERSION,
+        providerRequestId: result.requestId,
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens,
       });
       if (!applied)
         logger.warn("Document changed during summarisation; summary dropped.", {
@@ -168,15 +258,18 @@ export const marketingDocumentSummaryTask = task({
         reservationId: reservation.id,
         operation: run.operation,
         actualCostCents: reconciliation.chargedCostCents,
-        inputTokens: result.inputTokens,
-        outputTokens: result.outputTokens,
-        providerRequestId: result.requestId,
+        inputTokens,
+        outputTokens,
+        providerRequestId: requestIds.at(-1) ?? result.requestId,
         safeMetadata: {
           documentId: document.id,
           documentType: result.output.documentType,
           keyFactCount: result.output.keyFacts.length,
           costBasis: reconciliation.costBasis,
           summaryApplied: applied,
+          chunkCount: chunks.length,
+          providerRequestCount: requestIds.length,
+          providerRequestIds: requestIds,
         },
       });
 

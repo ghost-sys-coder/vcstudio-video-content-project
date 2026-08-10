@@ -4,12 +4,16 @@ import { tasks } from "@trigger.dev/sdk";
 import {
   MARKETING_DOCUMENT_SUMMARY_PROMPT_VERSION,
   renderMarketingDocumentSummaryPrompt,
+  renderMarketingDocumentSynthesisPrompt,
 } from "@studio/prompts";
 import {
   attachMarketingTriggerRun,
   failMarketingRun,
 } from "@/db/commands/marketing-usage-commands";
-import { findKnowledgeDocument } from "@/db/repositories/marketing-documents.repository";
+import {
+  findKnowledgeDocument,
+  listKnowledgeDocumentChunksForDocument,
+} from "@/db/repositories/marketing-documents.repository";
 import {
   estimateMarketingTextCost,
   MARKETING_EXPECTED_OUTPUT_TOKENS,
@@ -74,6 +78,14 @@ export async function startDocumentSummary(input: {
     throw new MarketingDocumentSummaryRequestError(
       "This document has no readable text to summarise.",
     );
+  const chunks = await listKnowledgeDocumentChunksForDocument({
+    workspaceId: input.workspaceId,
+    documentId: document.id,
+  });
+  if (chunks.length === 0)
+    throw new MarketingDocumentSummaryRequestError(
+      "This document has no extracted chunks. Reprocess it first.",
+    );
 
   await enforceRateLimit({
     workspaceId: input.workspaceId,
@@ -82,15 +94,30 @@ export async function startDocumentSummary(input: {
 
   const textEnvironment = getSceneAnalysisEnvironment();
   const model = textEnvironment.OPENAI_TEXT_MODEL;
-  const finalPrompt = renderMarketingDocumentSummaryPrompt({
-    title: document.title,
-    text: document.extractedText,
-    keyFactCount: MARKETING_DOCUMENT_KEY_FACT_COUNT,
-  });
+  const chunkPrompts = chunks.map((chunk) =>
+    renderMarketingDocumentSummaryPrompt({
+      title: `${document.title} — ${chunk.sourceLocation.label}`,
+      text: chunk.text,
+      keyFactCount: MARKETING_DOCUMENT_KEY_FACT_COUNT,
+    }),
+  );
+  const finalPrompt = [
+    ...chunkPrompts,
+    renderMarketingDocumentSynthesisPrompt({
+      title: document.title,
+      chunkSummaries: chunks.map((chunk) => ({
+        label: chunk.sourceLocation.label,
+        summary: "[bounded chunk summary produced by worker]",
+        keyFacts: [],
+      })),
+      keyFactCount: MARKETING_DOCUMENT_KEY_FACT_COUNT,
+    }),
+  ].join("\n\n--- PHASE BOUNDARY ---\n\n");
 
   const estimatedCostCents = estimateMarketingTextCost({
     prompt: finalPrompt,
-    expectedOutputTokens: MARKETING_EXPECTED_OUTPUT_TOKENS.document_summary,
+    expectedOutputTokens:
+      MARKETING_EXPECTED_OUTPUT_TOKENS.document_summary * (chunks.length + 1),
     rates: {
       inputCostPerMillionCents:
         textEnvironment.OPENAI_TEXT_INPUT_COST_PER_MILLION_CENTS,

@@ -1,15 +1,40 @@
 import "server-only";
 
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
 import {
   marketingBrandAssets,
   marketingBrandProfiles,
   marketingKnowledgeDocuments,
+  marketingKnowledgeDocumentChunks,
   type MarketingBrandAssetRole,
   type MarketingKnowledgeDocument,
 } from "@/db/schema";
 import type { ExtractedDocument } from "@/lib/marketing/documents/extract-text";
+import type { DocumentChunk } from "@/lib/marketing/documents/chunk-document";
+
+export async function markDocumentExtracting(input: {
+  workspaceId: string;
+  documentId: string;
+}): Promise<boolean> {
+  const [row] = await getDatabase()
+    .update(marketingKnowledgeDocuments)
+    .set({
+      status: "extracting",
+      errorCategory: null,
+      safeErrorMessage: null,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(marketingKnowledgeDocuments.id, input.documentId),
+        eq(marketingKnowledgeDocuments.workspaceId, input.workspaceId),
+        isNull(marketingKnowledgeDocuments.deletedAt),
+      ),
+    )
+    .returning({ id: marketingKnowledgeDocuments.id });
+  return Boolean(row);
+}
 
 /**
  * Any change to what the studio knows bumps the profile's context version, so a
@@ -55,27 +80,59 @@ export async function markDocumentReady(input: {
   documentId: string;
   sizeBytes: number;
   extracted: ExtractedDocument;
+  chunks?: DocumentChunk[];
 }): Promise<MarketingKnowledgeDocument | null> {
-  const [document] = await getDatabase()
-    .update(marketingKnowledgeDocuments)
-    .set({
-      status: "ready",
-      sizeBytes: input.sizeBytes,
-      extractedText: input.extracted.text,
-      extractedCharacterCount: input.extracted.characterCount,
-      tokenEstimate: input.extracted.tokenEstimate,
-      checksum: input.extracted.checksum,
-      errorCategory: null,
-      safeErrorMessage: null,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(marketingKnowledgeDocuments.id, input.documentId),
-        eq(marketingKnowledgeDocuments.workspaceId, input.workspaceId),
-      ),
-    )
-    .returning();
+  const database = getDatabase();
+  const document = await database.transaction(async (transaction) => {
+    await transaction
+      .delete(marketingKnowledgeDocumentChunks)
+      .where(
+        and(
+          eq(marketingKnowledgeDocumentChunks.documentId, input.documentId),
+          eq(marketingKnowledgeDocumentChunks.workspaceId, input.workspaceId),
+        ),
+      );
+    if (input.chunks?.length)
+      await transaction.insert(marketingKnowledgeDocumentChunks).values(
+        input.chunks.map((chunk) => ({
+          workspaceId: input.workspaceId,
+          documentId: input.documentId,
+          chunkIndex: chunk.index,
+          text: chunk.text,
+          checksum: chunk.checksum,
+          tokenEstimate: chunk.tokenEstimate,
+          sourceLocation: chunk.sourceLocation,
+        })),
+      );
+    const [updated] = await transaction
+      .update(marketingKnowledgeDocuments)
+      .set({
+        status: "ready",
+        sizeBytes: input.sizeBytes,
+        extractedText: input.extracted.text,
+        extractedCharacterCount: input.extracted.characterCount,
+        tokenEstimate: input.extracted.tokenEstimate,
+        checksum: input.extracted.checksum,
+        processedAt: new Date(),
+        summary: "",
+        keyFacts: [],
+        summaryVersion: null,
+        summaryProviderRequestId: null,
+        summaryInputTokens: 0,
+        summaryOutputTokens: 0,
+        errorCategory: null,
+        safeErrorMessage: null,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(marketingKnowledgeDocuments.id, input.documentId),
+          eq(marketingKnowledgeDocuments.workspaceId, input.workspaceId),
+        ),
+      )
+      .returning();
+    return updated ?? null;
+  });
 
   if (document) await bumpContextVersion(input.workspaceId);
   return document ?? null;
@@ -108,8 +165,10 @@ export async function createPastedDocument(input: {
   title: string;
   extracted: ExtractedDocument;
   createdByUserId: string;
+  chunks?: DocumentChunk[];
 }): Promise<MarketingKnowledgeDocument> {
-  const [document] = await getDatabase()
+  const database = getDatabase();
+  const [document] = await database
     .insert(marketingKnowledgeDocuments)
     .values({
       workspaceId: input.workspaceId,
@@ -130,6 +189,18 @@ export async function createPastedDocument(input: {
     .returning();
 
   if (!document) throw new Error("MARKETING_DOCUMENT_NOT_CREATED");
+  if (input.chunks?.length)
+    await database.insert(marketingKnowledgeDocumentChunks).values(
+      input.chunks.map((chunk) => ({
+        workspaceId: input.workspaceId,
+        documentId: document.id,
+        chunkIndex: chunk.index,
+        text: chunk.text,
+        checksum: chunk.checksum,
+        tokenEstimate: chunk.tokenEstimate,
+        sourceLocation: chunk.sourceLocation,
+      })),
+    );
   await bumpContextVersion(input.workspaceId);
   return document;
 }
@@ -148,12 +219,20 @@ export async function applyDocumentSummary(input: {
   checksum: string;
   summary: string;
   keyFacts: string[];
+  summaryVersion?: string;
+  providerRequestId?: string;
+  inputTokens?: number;
+  outputTokens?: number;
 }): Promise<boolean> {
   const [document] = await getDatabase()
     .update(marketingKnowledgeDocuments)
     .set({
       summary: input.summary,
       keyFacts: input.keyFacts,
+      summaryVersion: input.summaryVersion ?? null,
+      summaryProviderRequestId: input.providerRequestId ?? null,
+      summaryInputTokens: input.inputTokens ?? 0,
+      summaryOutputTokens: input.outputTokens ?? 0,
       updatedAt: new Date(),
     })
     .where(
@@ -170,12 +249,48 @@ export async function applyDocumentSummary(input: {
   return true;
 }
 
+export async function applyDocumentChunkSummary(input: {
+  workspaceId: string;
+  documentId: string;
+  chunkId: string;
+  checksum: string;
+  summary: string;
+  keyFacts: string[];
+  summaryVersion: string;
+  providerRequestId: string;
+  inputTokens: number;
+  outputTokens: number;
+}): Promise<boolean> {
+  const [row] = await getDatabase()
+    .update(marketingKnowledgeDocumentChunks)
+    .set({
+      summary: input.summary,
+      keyFacts: input.keyFacts,
+      summaryVersion: input.summaryVersion,
+      providerRequestId: input.providerRequestId,
+      inputTokens: input.inputTokens,
+      outputTokens: input.outputTokens,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(marketingKnowledgeDocumentChunks.id, input.chunkId),
+        eq(marketingKnowledgeDocumentChunks.documentId, input.documentId),
+        eq(marketingKnowledgeDocumentChunks.workspaceId, input.workspaceId),
+        eq(marketingKnowledgeDocumentChunks.checksum, input.checksum),
+      ),
+    )
+    .returning({ id: marketingKnowledgeDocumentChunks.id });
+  return Boolean(row);
+}
+
 export async function updateDocumentDetails(input: {
   workspaceId: string;
   documentId: string;
   title: string;
   includeInContext: boolean;
   priority: number;
+  freshForDays: number;
 }): Promise<void> {
   await getDatabase()
     .update(marketingKnowledgeDocuments)
@@ -183,6 +298,10 @@ export async function updateDocumentDetails(input: {
       title: input.title,
       includeInContext: input.includeInContext,
       priority: input.priority,
+      expiresAt:
+        input.freshForDays === 0
+          ? null
+          : new Date(Date.now() + input.freshForDays * 86_400_000),
       updatedAt: new Date(),
     })
     .where(

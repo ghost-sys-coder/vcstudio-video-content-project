@@ -45,6 +45,12 @@ export async function saveBrandContextSnapshot(input: {
   compiledText: string;
   tokenEstimate: number;
   includedDocumentIds: string[];
+  includedDocumentClaims: {
+    documentId: string;
+    title: string;
+    checksum: string;
+    claims: string[];
+  }[];
   omittedDocumentCount: number;
   truncated: boolean;
 }): Promise<MarketingBrandContextSnapshot> {

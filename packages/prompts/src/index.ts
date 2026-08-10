@@ -66,6 +66,7 @@ export {
   MARKETING_DOCUMENT_SUMMARY_EXCERPT_CHARACTERS,
   MARKETING_DOCUMENT_SUMMARY_PROMPT_VERSION,
   renderMarketingDocumentSummaryPrompt,
+  renderMarketingDocumentSynthesisPrompt,
   truncateForSummary,
 } from "./marketing-document-summary";
 export type { MarketingDocumentSummaryPromptInput } from "./marketing-document-summary";

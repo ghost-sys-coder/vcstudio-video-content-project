@@ -5,11 +5,43 @@ import { getDatabase } from "@/db/drizzle";
 import {
   marketingBrandAssets,
   marketingKnowledgeDocuments,
+  marketingKnowledgeDocumentChunks,
   mediaAssets,
   type MarketingBrandAsset,
   type MarketingKnowledgeDocument,
   type MediaAsset,
 } from "@/db/schema";
+
+export async function listKnowledgeDocumentChunks(input: {
+  workspaceId: string;
+}) {
+  return getDatabase()
+    .select()
+    .from(marketingKnowledgeDocumentChunks)
+    .where(eq(marketingKnowledgeDocumentChunks.workspaceId, input.workspaceId))
+    .orderBy(
+      asc(marketingKnowledgeDocumentChunks.documentId),
+      asc(marketingKnowledgeDocumentChunks.chunkIndex),
+    )
+    .limit(2_000);
+}
+
+export async function listKnowledgeDocumentChunksForDocument(input: {
+  workspaceId: string;
+  documentId: string;
+}) {
+  return getDatabase()
+    .select()
+    .from(marketingKnowledgeDocumentChunks)
+    .where(
+      and(
+        eq(marketingKnowledgeDocumentChunks.workspaceId, input.workspaceId),
+        eq(marketingKnowledgeDocumentChunks.documentId, input.documentId),
+      ),
+    )
+    .orderBy(asc(marketingKnowledgeDocumentChunks.chunkIndex))
+    .limit(100);
+}
 
 export const MARKETING_DOCUMENT_PAGE_SIZE = 100;
 

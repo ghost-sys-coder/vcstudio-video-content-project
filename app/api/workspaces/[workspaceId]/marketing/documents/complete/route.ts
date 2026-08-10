@@ -1,20 +1,15 @@
 import { NextResponse } from "next/server";
-import {
-  markDocumentFailed,
-  markDocumentReady,
-} from "@/db/commands/marketing-document-commands";
 import { findKnowledgeDocument } from "@/db/repositories/marketing-documents.repository";
 import { requireAuthenticatedUser } from "@/lib/auth/require-authenticated-user";
 import { requireWorkspaceMembership } from "@/lib/auth/workspace-context";
 import { getMarketingEnvironment } from "@/lib/env/server";
-import { extractDocumentText } from "@/lib/marketing/documents/extract-text";
+import { startDocumentExtraction } from "@/lib/marketing/documents/start-document-extraction";
 import { requireCapability } from "@/lib/policies/workspace-policy";
 import { completeDocumentUploadSchema } from "@/lib/schemas/marketing-document";
-import { readDocumentObject } from "@/lib/storage/marketing-document-storage";
 import { isMarketingDocumentObjectKey } from "@/lib/storage/object-key";
 
 /**
- * Step three: confirm, then extract.
+ * Step three: confirm, then enqueue extraction.
  *
  * Truth is re-derived from storage rather than trusted from the browser — the
  * real byte length comes from a HEAD, and the text comes from the stored bytes.
@@ -81,50 +76,15 @@ export async function POST(
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
 
   try {
-    const stored = await readDocumentObject({
-      objectKey: document.objectKey,
-      maxBytes: environment.MARKETING_MAX_DOCUMENT_BYTES,
-    });
-    const extracted = extractDocumentText({
-      bytes: stored.bytes,
-      contentType: parsed.data.contentType,
-    });
-
-    if (extracted.characterCount === 0) {
-      await markDocumentFailed({
-        workspaceId,
-        documentId: document.id,
-        category: "empty_document",
-        message: "That file contained no readable text.",
-      });
-      return NextResponse.json(
-        { error: "That file contained no readable text." },
-        { status: 400 },
-      );
-    }
-
-    await markDocumentReady({
-      workspaceId,
-      documentId: document.id,
-      sizeBytes: stored.sizeBytes,
-      extracted,
-    });
-
-    return NextResponse.json({
-      documentId: document.id,
-      characterCount: extracted.characterCount,
-      tokenEstimate: extracted.tokenEstimate,
-    });
-  } catch {
-    await markDocumentFailed({
-      workspaceId,
-      documentId: document.id,
-      category: "extraction_failed",
-      message: "That document could not be read. Try uploading it again.",
-    });
+    await startDocumentExtraction({ workspaceId, documentId: document.id });
     return NextResponse.json(
-      { error: "That document could not be read." },
-      { status: 422 },
+      { documentId: document.id, status: "pending" },
+      { status: 202 },
+    );
+  } catch {
+    return NextResponse.json(
+      { error: "That document could not be queued for processing." },
+      { status: 503 },
     );
   }
 }

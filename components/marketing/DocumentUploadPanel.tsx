@@ -38,14 +38,19 @@ export function DocumentUploadPanel({ workspaceId }: { workspaceId: string }) {
     setFailures([]);
 
     for (const file of Array.from(files)) {
-      const contentType = file.name.toLowerCase().endsWith(".md")
+      const lowerName = file.name.toLowerCase();
+      const contentType = lowerName.endsWith(".md")
         ? ("text/markdown" as const)
-        : ("text/plain" as const);
+        : lowerName.endsWith(".pdf")
+          ? ("application/pdf" as const)
+          : lowerName.endsWith(".docx")
+            ? ("application/vnd.openxmlformats-officedocument.wordprocessingml.document" as const)
+            : ("text/plain" as const);
       setUploadingName(file.name);
       try {
         await uploadMarketingDocument({
           workspaceId,
-          title: file.name.replace(/\.(txt|md)$/i, ""),
+          title: file.name.replace(/\.(txt|md|pdf|docx)$/i, ""),
           file,
           contentType,
         });
@@ -104,7 +109,7 @@ export function DocumentUploadPanel({ workspaceId }: { workspaceId: string }) {
           ) : (
             <>
               <UploadIcon />
-              Upload .txt or .md
+              Upload document
             </>
           )}
         </Button>
@@ -119,8 +124,8 @@ export function DocumentUploadPanel({ workspaceId }: { workspaceId: string }) {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Plain text and Markdown for now. PDF and Word arrive with the document
-        parser in a later stage.
+        Supports TXT, Markdown, PDF, and DOCX. Files are extracted in the
+        background and may take a moment to become ready.
       </p>
 
       {pasteOpen ? (

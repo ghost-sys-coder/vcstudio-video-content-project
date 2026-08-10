@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2Icon } from "lucide-react";
 import {
   deleteDocumentAction,
+  reprocessDocumentAction,
   summariseDocumentAction,
   updateDocumentAction,
 } from "@/app/(authenticated)/app/marketing/assets/actions";
@@ -72,6 +73,17 @@ export function KnowledgeDocumentRow({
     });
   }
 
+  function reprocess() {
+    setError(null);
+    startTransition(async () => {
+      const data = new FormData();
+      data.set("documentId", document.id);
+      const result = await reprocessDocumentAction(data);
+      if (!result.ok) setError(result.error);
+      else router.refresh();
+    });
+  }
+
   return (
     <li className="space-y-3 rounded-xl border p-3">
       <form action={save} className="space-y-3">
@@ -97,6 +109,7 @@ export function KnowledgeDocumentRow({
               </span>
               <span>{document.characterCount.toLocaleString()} characters</span>
               <span>~{document.tokenEstimate.toLocaleString()} tokens</span>
+              <span>{document.chunkCount} chunks</span>
               {document.sourceKind === "pasted" ? <span>Pasted</span> : null}
             </p>
           </div>
@@ -134,6 +147,21 @@ export function KnowledgeDocumentRow({
               type="number"
             />
           </div>
+          <div className="space-y-1">
+            <Label className="text-xs" htmlFor={`fresh-${document.id}`}>
+              Fresh for days
+            </Label>
+            <Input
+              className="w-28"
+              defaultValue={document.freshForDays}
+              disabled={pending}
+              id={`fresh-${document.id}`}
+              max={3650}
+              min={0}
+              name="freshForDays"
+              type="number"
+            />
+          </div>
 
           <Button
             className="ml-auto"
@@ -157,6 +185,17 @@ export function KnowledgeDocumentRow({
           >
             {document.hasSummary ? "Re-summarise" : "Summarise"}
           </Button>
+          {document.sourceKind === "upload" ? (
+            <Button
+              disabled={pending}
+              onClick={reprocess}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              Reprocess
+            </Button>
+          ) : null}
           <Button
             disabled={pending}
             onClick={remove}
@@ -190,6 +229,20 @@ export function KnowledgeDocumentRow({
       <p className="text-xs text-muted-foreground">
         Higher priority survives truncation when the context runs out of room.
       </p>
+      {document.sourceLocations.length > 0 ? (
+        <p className="text-xs text-muted-foreground">
+          Extracted from: {document.sourceLocations.join(", ")}
+          {document.processedAt
+            ? ` · Processed ${new Date(document.processedAt).toLocaleDateString()}`
+            : ""}
+        </p>
+      ) : null}
+      {document.isExpired ? (
+        <p className="text-xs text-notice-warning-foreground">
+          This document is stale. Reprocess it or update its freshness window
+          before relying on it.
+        </p>
+      ) : null}
 
       {error ? (
         <p className="text-xs text-destructive" role="alert">

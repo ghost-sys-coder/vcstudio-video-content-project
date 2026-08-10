@@ -9,6 +9,7 @@ import {
   updateDocumentDetails,
 } from "@/db/commands/marketing-document-commands";
 import { findReadyMediaAssets } from "@/db/repositories/media-assets.repository";
+import { findKnowledgeDocument } from "@/db/repositories/marketing-documents.repository";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import { resolveMarketingAccess } from "@/lib/marketing/marketing-access";
 import {
@@ -17,6 +18,8 @@ import {
   WorkspacePermissionDeniedError,
 } from "@/lib/domain/errors";
 import { extractDocumentText } from "@/lib/marketing/documents/extract-text";
+import { chunkDocumentSections } from "@/lib/marketing/documents/chunk-document";
+import { startDocumentExtraction } from "@/lib/marketing/documents/start-document-extraction";
 import {
   MarketingDocumentSummaryRequestError,
   startDocumentSummary,
@@ -30,6 +33,7 @@ import {
   deleteDocumentSchema,
   pasteDocumentSchema,
   readUpdateDocumentForm,
+  reprocessDocumentSchema,
   summariseDocumentSchema,
   updateDocumentSchema,
 } from "@/lib/schemas/marketing-document";
@@ -104,12 +108,55 @@ export async function pasteDocumentAction(
       title: parsed.data.title,
       extracted,
       createdByUserId: context.userId,
+      chunks: chunkDocumentSections([
+        {
+          text: extracted.text,
+          sourceLocation: {
+            kind: "text",
+            start: 1,
+            end: 1,
+            label: "Pasted text",
+          },
+        },
+      ]),
     });
 
     revalidateAssets();
     return { ok: true };
   } catch (error) {
     return toFailure(error, "That text could not be saved.");
+  }
+}
+
+export async function reprocessDocumentAction(
+  formData: FormData,
+): Promise<AssetsActionResult> {
+  const parsed = reprocessDocumentSchema.safeParse(
+    Object.fromEntries(formData),
+  );
+  if (!parsed.success)
+    return { ok: false, error: "That document could not be reprocessed." };
+  try {
+    const context = await resolveContext();
+    if (!context.ok) return context;
+    const document = await findKnowledgeDocument({
+      workspaceId: context.workspaceId,
+      documentId: parsed.data.documentId,
+    });
+    if (!document || document.deletedAt || !document.objectKey)
+      return { ok: false, error: "That uploaded document no longer exists." };
+    await startDocumentExtraction({
+      workspaceId: context.workspaceId,
+      documentId: parsed.data.documentId,
+      force: true,
+    });
+    revalidateAssets();
+    return { ok: true };
+  } catch (error) {
+    return toFailure(
+      error,
+      "That document could not be queued for reprocessing.",
+    );
   }
 }
 
@@ -135,6 +182,7 @@ export async function updateDocumentAction(
       title: parsed.data.title,
       includeInContext: parsed.data.includeInContext,
       priority: parsed.data.priority,
+      freshForDays: parsed.data.freshForDays,
     });
 
     revalidateAssets();
