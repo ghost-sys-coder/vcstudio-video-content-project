@@ -3,7 +3,9 @@ import { MarketingMetricCard } from "@/components/marketing/metrics/MarketingMet
 import { MarketingMetricsBreakdown } from "@/components/marketing/metrics/MarketingMetricsBreakdown";
 import { MarketingMetricsRangeFilter } from "@/components/marketing/metrics/MarketingMetricsRangeFilter";
 import { MarketingPublicationBreakdown } from "@/components/marketing/metrics/MarketingPublicationBreakdown";
+import { PerformanceFeedbackPanel } from "@/components/marketing/metrics/PerformanceFeedbackPanel";
 import type { MarketingQualityPeriod } from "@/db/repositories/marketing-quality-metrics.repository";
+import type { PerformanceDashboard } from "@/db/repositories/publication-performance.repository";
 
 function percent(value: number | null) {
   return value === null ? "—" : `${Math.round(value * 100)}%`;
@@ -24,10 +26,12 @@ export function MarketingMetricsDashboard({
   days,
   current,
   previous,
+  performance,
 }: {
   days: number;
   current: MarketingQualityPeriod;
   previous: MarketingQualityPeriod;
+  performance: PerformanceDashboard;
 }) {
   const metrics = current.metrics;
   const ConfidenceIcon =
@@ -177,6 +181,7 @@ export function MarketingMetricsDashboard({
           emptyMessage="No brand-context attribution recorded."
         />
       </section>
+      <PerformanceFeedbackPanel dashboard={performance} />
     </main>
   );
 }

@@ -7,6 +7,7 @@ import {
   index,
   integer,
   jsonb,
+  numeric,
   pgEnum,
   pgTable,
   primaryKey,
@@ -215,6 +216,31 @@ export const contentPlatformEnum = pgEnum("content_platform", [
   "instagram",
   "linkedin",
   "twitter",
+]);
+
+export const performanceMetricKindEnum = pgEnum("performance_metric_kind", [
+  "impressions",
+  "views",
+  "watch_time",
+  "retention",
+  "engagement",
+  "clicks",
+  "conversions",
+]);
+
+export const performanceMetricUnitEnum = pgEnum("performance_metric_unit", [
+  "count",
+  "milliseconds",
+  "ratio",
+]);
+
+export const performanceSyncStatusEnum = pgEnum("performance_sync_status", [
+  "pending",
+  "ready",
+  "unsupported",
+  "permission_required",
+  "rate_limited",
+  "failed",
 ]);
 
 export const usageReservationStatusEnum = pgEnum("usage_reservation_status", [
@@ -3332,6 +3358,10 @@ export const socialPostTargets = pgTable(
       .notNull(),
   },
   (table) => [
+    uniqueIndex("social_post_targets_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
     uniqueIndex("social_post_targets_idempotency_unique").on(
       table.idempotencyKey,
     ),
@@ -3346,6 +3376,144 @@ export const socialPostTargets = pgTable(
       table.workspaceId,
       table.status,
     ),
+  ],
+);
+
+/**
+ * Token-free analytics identity and cursor for one published destination.
+ * Connection ids are intentionally not foreign keys: disconnecting or deleting
+ * credentials must not erase non-secret historical performance observations.
+ */
+export const publicationPerformanceSources = pgTable(
+  "publication_performance_sources",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    publicationKind: text("publication_kind").notNull(),
+    socialPostTargetId: uuid("social_post_target_id"),
+    videoPublicationId: uuid("video_publication_id"),
+    connectionId: uuid("connection_id"),
+    platform: contentPlatformEnum("platform").notNull(),
+    providerPublicationId: text("provider_publication_id").notNull(),
+    providerDefinitionVersion: text("provider_definition_version").notNull(),
+    cursor: text("cursor"),
+    syncStatus: performanceSyncStatusEnum("sync_status")
+      .notNull()
+      .default("pending"),
+    nextSyncAt: timestamp("next_sync_at", { withTimezone: true }),
+    backoffUntil: timestamp("backoff_until", { withTimezone: true }),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    safeErrorMessage: text("safe_error_message"),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    attribution: jsonb("attribution")
+      .$type<{
+        titleOrCaption: string;
+        thumbnailAssetId: string | null;
+        hook: string | null;
+        format: string;
+        promptVersion: string | null;
+        contextVersion: number | null;
+        publishedAt: string;
+      }>()
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("publication_performance_sources_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    uniqueIndex("publication_performance_sources_social_unique")
+      .on(table.socialPostTargetId)
+      .where(sql`${table.socialPostTargetId} is not null`),
+    uniqueIndex("publication_performance_sources_video_unique")
+      .on(table.videoPublicationId)
+      .where(sql`${table.videoPublicationId} is not null`),
+    index("publication_performance_sources_due_index").on(
+      table.syncStatus,
+      table.nextSyncAt,
+    ),
+    index("publication_performance_sources_workspace_index").on(
+      table.workspaceId,
+      table.platform,
+    ),
+    check(
+      "publication_performance_sources_kind_target_valid",
+      sql`(${table.publicationKind} = 'social_post_target' and ${table.socialPostTargetId} is not null and ${table.videoPublicationId} is null) or (${table.publicationKind} = 'video_publication' and ${table.videoPublicationId} is not null and ${table.socialPostTargetId} is null)`,
+    ),
+    check(
+      "publication_performance_sources_attempt_nonnegative",
+      sql`${table.attemptCount} >= 0`,
+    ),
+    foreignKey({
+      columns: [table.socialPostTargetId, table.workspaceId],
+      foreignColumns: [socialPostTargets.id, socialPostTargets.workspaceId],
+      name: "publication_performance_sources_tenant_social_target_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.videoPublicationId, table.workspaceId],
+      foreignColumns: [videoPublications.id, videoPublications.workspaceId],
+      name: "publication_performance_sources_tenant_video_publication_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
+/** Append-only provider observations; definitions are versioned per row. */
+export const publicationMetricObservations = pgTable(
+  "publication_metric_observations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    sourceId: uuid("source_id").notNull(),
+    metricKind: performanceMetricKindEnum("metric_kind").notNull(),
+    unit: performanceMetricUnitEnum("unit").notNull(),
+    normalizedValue: numeric("normalized_value", {
+      precision: 24,
+      scale: 6,
+    }).notNull(),
+    rawMetricKey: text("raw_metric_key").notNull(),
+    rawValue: text("raw_value").notNull(),
+    providerDefinition: text("provider_definition").notNull(),
+    providerDefinitionVersion: text("provider_definition_version").notNull(),
+    comparableGroup: text("comparable_group"),
+    observedAt: timestamp("observed_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("publication_metric_observations_identity_unique").on(
+      table.sourceId,
+      table.rawMetricKey,
+      table.providerDefinitionVersion,
+      table.observedAt,
+    ),
+    index("publication_metric_observations_workspace_kind_index").on(
+      table.workspaceId,
+      table.metricKind,
+      table.observedAt,
+    ),
+    check(
+      "publication_metric_observations_value_nonnegative",
+      sql`${table.normalizedValue} >= 0`,
+    ),
+    foreignKey({
+      columns: [table.sourceId, table.workspaceId],
+      foreignColumns: [
+        publicationPerformanceSources.id,
+        publicationPerformanceSources.workspaceId,
+      ],
+      name: "publication_metric_observations_tenant_source_fkey",
+    }).onDelete("cascade"),
   ],
 );
 
@@ -5897,6 +6065,14 @@ export type MarketingContentStatus =
   (typeof marketingContentStatusEnum.enumValues)[number];
 export type MarketingContentKind =
   (typeof marketingContentKindEnum.enumValues)[number];
+export type PerformanceMetricKind =
+  (typeof performanceMetricKindEnum.enumValues)[number];
+export type PerformanceMetricUnit =
+  (typeof performanceMetricUnitEnum.enumValues)[number];
+export type PublicationPerformanceSource =
+  typeof publicationPerformanceSources.$inferSelect;
+export type PublicationMetricObservation =
+  typeof publicationMetricObservations.$inferSelect;
 export type MarketingChatRole =
   (typeof marketingChatRoleEnum.enumValues)[number];
 export type MarketingChatMessageStatus =
