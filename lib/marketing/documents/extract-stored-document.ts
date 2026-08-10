@@ -11,6 +11,7 @@ import {
   extractDocumentText,
   type ExtractedDocument,
 } from "@/lib/marketing/documents/extract-text";
+import { extractPdfSections } from "@/lib/marketing/documents/extract-pdf";
 
 export type StoredDocumentExtraction = ExtractedDocument & {
   chunks: DocumentChunk[];
@@ -68,39 +69,5 @@ export async function extractStoredDocument(input: {
       },
     ]);
   }
-  const pdf = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  const loadingTask = pdf.getDocument({
-    data: input.bytes,
-    useWorkerFetch: false,
-    isEvalSupported: false,
-  });
-  const document = await loadingTask.promise;
-  const sections: {
-    text: string;
-    sourceLocation: DocumentChunk["sourceLocation"];
-  }[] = [];
-  try {
-    for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
-      const page = await document.getPage(pageNumber);
-      const content = await page.getTextContent();
-      const text = content.items
-        .map((item) => ("str" in item ? item.str : ""))
-        .join(" ")
-        .replace(/\s+/g, " ")
-        .trim();
-      if (text)
-        sections.push({
-          text,
-          sourceLocation: {
-            kind: "page",
-            start: pageNumber,
-            end: pageNumber,
-            label: `Page ${pageNumber}`,
-          },
-        });
-    }
-  } finally {
-    await document.destroy();
-  }
-  return finish(sections);
+  return finish(await extractPdfSections(input.bytes));
 }

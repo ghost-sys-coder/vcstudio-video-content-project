@@ -67,6 +67,7 @@ export const marketingDocumentExtractionTask = task({
       return { status: "ready" as const, chunkCount: extracted.chunks.length };
     } catch (error) {
       const message = error instanceof Error ? error.message.toLowerCase() : "";
+      const errorName = error instanceof Error ? error.name : "UnknownError";
       const passwordProtected = message.includes("password");
       await markDocumentFailed({
         ...input,
@@ -82,6 +83,10 @@ export const marketingDocumentExtractionTask = task({
         category: passwordProtected
           ? "password_protected"
           : "extraction_failed",
+        errorName,
+        // Trigger logs are operator-only. Keep this bounded and never include
+        // document text, object keys, signed URLs, or stack traces.
+        errorMessage: message.slice(0, 500),
       });
       return { status: "failed" as const };
     }
