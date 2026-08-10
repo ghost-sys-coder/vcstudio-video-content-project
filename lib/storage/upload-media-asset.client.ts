@@ -20,7 +20,7 @@ function isSupportedContentType(value: string): value is MediaContentType {
 export async function uploadMediaAsset(input: {
   workspaceId: string;
   file: File;
-}): Promise<MediaAssetView> {
+}): Promise<MediaAssetView | null> {
   if (!isSupportedContentType(input.file.type))
     throw new Error(
       "That file type is not supported. Use JPEG, PNG, WebP, GIF, MP4, MOV, or WebM.",
@@ -83,5 +83,9 @@ export async function uploadMediaAsset(input: {
     throw new Error(
       (await completion.json()).error ?? "Upload finalization failed.",
     );
-  return ((await completion.json()) as { asset: MediaAssetView }).asset;
+  const completed = (await completion.json()) as {
+    asset?: MediaAssetView;
+    inspectionPending?: boolean;
+  };
+  return completed.inspectionPending ? null : (completed.asset ?? null);
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { tasks } from "@trigger.dev/sdk";
 import { requireAuthenticatedUser } from "@/lib/auth/require-authenticated-user";
 import { requireWorkspaceMembership } from "@/lib/auth/workspace-context";
 import { getMediaLibraryEnvironment } from "@/lib/env/server";
@@ -19,6 +20,11 @@ import {
   inspectMediaAsset,
 } from "@/lib/storage/media-asset-storage";
 import { toMediaAssetView } from "@/lib/media/media-asset-view";
+import {
+  attachMediaAssetInspectionRun,
+  prepareMediaAssetInspection,
+} from "@/db/commands/media-inspection-commands";
+import type { mediaInspectionTask } from "@/trigger/media-inspection";
 
 /**
  * Step two of the library upload: confirm.
@@ -104,6 +110,32 @@ export async function POST(
     if (!check.allowed) {
       await markMediaAssetFailed({ workspaceId, mediaAssetId: asset.id });
       return NextResponse.json({ error: check.reason }, { status: 400 });
+    }
+
+    if (kind === "video") {
+      await prepareMediaAssetInspection({
+        workspaceId,
+        mediaAssetId: asset.id,
+        sizeBytes: inspected.sizeBytes,
+      });
+      const handle = await tasks.trigger<typeof mediaInspectionTask>(
+        "media-inspection",
+        { kind: "media_asset", workspaceId, mediaAssetId: asset.id },
+        { idempotencyKey: `media-inspection:asset:${asset.id}` },
+      );
+      await attachMediaAssetInspectionRun({
+        workspaceId,
+        mediaAssetId: asset.id,
+        triggerRunId: handle.id,
+      });
+      return NextResponse.json(
+        {
+          inspectionPending: true,
+          message:
+            "Upload complete. The video is being verified before it becomes selectable.",
+        },
+        { status: 202 },
+      );
     }
 
     const ready = await markMediaAssetReady({

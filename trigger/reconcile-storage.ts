@@ -1,6 +1,7 @@
 import { schedules } from "@trigger.dev/sdk";
 import { runStorageReconciliation } from "@/lib/reconciliation/run-storage-reconciliation";
 import { getStorageReconciliationEnvironment } from "@/lib/env/server";
+import { dispatchPendingMediaInspections } from "@/lib/media/dispatch-pending-media-inspections";
 
 export const reconcileStorageTask = schedules.task({
   id: "reconcile-storage-assets",
@@ -16,11 +17,15 @@ export const reconcileStorageTask = schedules.task({
   maxDuration: 300,
   run: async () => {
     const environment = getStorageReconciliationEnvironment();
-    return runStorageReconciliation({
-      batchSize: environment.STORAGE_RECONCILIATION_BATCH_SIZE,
-      dryRun: environment.STORAGE_RECONCILIATION_DRY_RUN,
-      abandonedUploadHours:
-        environment.STORAGE_RECONCILIATION_ABANDONED_UPLOAD_HOURS,
-    });
+    const [storage, inspections] = await Promise.all([
+      runStorageReconciliation({
+        batchSize: environment.STORAGE_RECONCILIATION_BATCH_SIZE,
+        dryRun: environment.STORAGE_RECONCILIATION_DRY_RUN,
+        abandonedUploadHours:
+          environment.STORAGE_RECONCILIATION_ABANDONED_UPLOAD_HOURS,
+      }),
+      dispatchPendingMediaInspections(25),
+    ]);
+    return { storage, inspections };
   },
 });

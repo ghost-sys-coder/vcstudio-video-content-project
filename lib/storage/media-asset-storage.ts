@@ -56,6 +56,21 @@ export async function createMediaAssetDownloadUrl(
   );
 }
 
+export async function downloadMediaAssetBytes(
+  objectKey: string,
+): Promise<Buffer> {
+  const environment = getStorageEnvironment();
+  const response = await getR2Client().send(
+    new GetObjectCommand({
+      Bucket: environment.R2_BUCKET_NAME,
+      Key: objectKey,
+    }),
+  );
+  if (!response.Body)
+    throw new MediaAssetStorageError("MEDIA_ASSET_BODY_MISSING");
+  return Buffer.from(await response.Body.transformToByteArray());
+}
+
 /**
  * Confirms an upload actually landed and reports what is really there.
  *

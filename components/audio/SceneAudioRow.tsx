@@ -62,7 +62,8 @@ export function SceneAudioRow({
     scene.eligibility === "hasApprovedAudio";
   const needsReview =
     scene.latestStatus === "succeeded" &&
-    scene.latestReviewStatus === "pending";
+    scene.latestReviewStatus === "pending" &&
+    (scene.inspectionStatus === null || scene.inspectionStatus === "succeeded");
   const isFailed = scene.latestStatus === "failed";
   const inProgress =
     scene.latestStatus === "pending" ||
@@ -133,6 +134,26 @@ export function SceneAudioRow({
 
       {isFailed ? (
         <AudioErrorState safeErrorMessage={scene.safeErrorMessage} />
+      ) : null}
+
+      {scene.inspectionStatus === "pending" ||
+      scene.inspectionStatus === "running" ? (
+        <p className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">
+          Inspecting the recording before review and animated-character
+          lip-sync.
+        </p>
+      ) : null}
+      {scene.inspectionError ? (
+        <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+          {scene.inspectionError}
+        </p>
+      ) : null}
+      {scene.inspectionWarnings.length > 0 ? (
+        <ul className="list-disc space-y-1 rounded-lg border border-amber-300 bg-amber-50 p-3 pl-8 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+          {scene.inspectionWarnings.map((warning) => (
+            <li key={warning}>{warning}</li>
+          ))}
+        </ul>
       ) : null}
 
       <div className="flex flex-wrap items-center gap-2">

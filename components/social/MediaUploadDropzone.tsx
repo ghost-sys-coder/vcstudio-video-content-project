@@ -41,6 +41,7 @@ export function MediaUploadDropzone({
   const [isDragging, setIsDragging] = useState(false);
   const [pendingFileName, setPendingFileName] = useState<string | null>(null);
   const [failures, setFailures] = useState<UploadFailure[]>([]);
+  const [processingCount, setProcessingCount] = useState(0);
 
   const isUploading = pendingFileName !== null;
 
@@ -49,11 +50,14 @@ export function MediaUploadDropzone({
     setFailures([]);
     const uploaded: MediaAssetView[] = [];
     const failed: UploadFailure[] = [];
+    let processing = 0;
 
     for (const file of files) {
       setPendingFileName(file.name);
       try {
-        uploaded.push(await uploadMediaAsset({ workspaceId, file }));
+        const asset = await uploadMediaAsset({ workspaceId, file });
+        if (asset) uploaded.push(asset);
+        else processing += 1;
       } catch (error) {
         failed.push({
           fileName: file.name,
@@ -67,6 +71,7 @@ export function MediaUploadDropzone({
 
     setPendingFileName(null);
     setFailures(failed);
+    setProcessingCount(processing);
     if (uploaded.length > 0) onUploaded(uploaded);
   }
 
@@ -128,6 +133,13 @@ export function MediaUploadDropzone({
       </div>
 
       <div aria-live="polite">
+        {processingCount > 0 ? (
+          <p className="rounded-xl border bg-muted/40 p-3 text-sm text-muted-foreground">
+            {processingCount} video{processingCount === 1 ? " is" : "s are"}{" "}
+            being verified. It will appear in the library after server-side
+            inspection succeeds.
+          </p>
+        ) : null}
         {failures.length > 0 ? (
           <ul className="space-y-1 rounded-xl border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
             {failures.map((failure) => (

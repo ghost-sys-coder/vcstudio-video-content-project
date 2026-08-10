@@ -99,6 +99,44 @@ export function MediaAssetDetailSheet({
             className="flex max-h-64 items-center justify-center overflow-hidden rounded-lg border bg-muted"
           />
 
+          {(asset.inspectionWarnings?.length ?? 0) > 0 ? (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+              <p className="font-medium">Inspection warnings</p>
+              <ul className="mt-1 list-disc space-y-1 pl-5">
+                {asset.inspectionWarnings?.map((warning) => (
+                  <li key={warning}>{warning}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {asset.verifiedMetadata?.kind === "video" ? (
+            <dl className="grid grid-cols-2 gap-2 rounded-lg bg-muted/50 p-3 text-xs">
+              <div>
+                <dt className="text-muted-foreground">Container</dt>
+                <dd>{asset.verifiedMetadata.container}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Codec</dt>
+                <dd>{asset.verifiedMetadata.codec}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Frame rate</dt>
+                <dd>
+                  {asset.verifiedMetadata.averageFrameRate.toFixed(2)} fps
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Audio</dt>
+                <dd>
+                  {asset.verifiedMetadata.hasAudio
+                    ? asset.verifiedMetadata.audioCodec
+                    : "None"}
+                </dd>
+              </div>
+            </dl>
+          ) : null}
+
           <div className="space-y-2">
             <Label htmlFor="media-title">Title</Label>
             <Input

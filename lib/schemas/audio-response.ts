@@ -56,6 +56,11 @@ const audioSceneSchema = z.object({
   estimatedCostCents: z.number().int().nonnegative().nullable(),
   actualCostCents: z.number().int().nonnegative().nullable(),
   safeErrorMessage: z.string().nullable(),
+  inspectionStatus: z
+    .enum(["pending", "running", "succeeded", "failed"])
+    .nullable(),
+  inspectionWarnings: z.array(z.string()),
+  inspectionError: z.string().nullable(),
 });
 
 const timelineSceneSchema = z.object({

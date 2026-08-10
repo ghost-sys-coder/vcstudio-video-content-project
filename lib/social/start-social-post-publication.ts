@@ -32,6 +32,7 @@ import {
   checkPlatformEligibility,
   summarizeAttachments,
 } from "@/lib/social/select-eligible-platforms";
+import { checkVerifiedVideoCompatibility } from "@/lib/social/video-platform-compatibility";
 import type { socialPostPublishTask } from "@/trigger/social-post-publish";
 
 export class SocialPostPublicationError extends Error {
@@ -161,6 +162,14 @@ export async function startSocialPostPublication(input: {
     });
     if (!eligibility.eligible)
       throw new SocialPostPublicationError(eligibility.reason);
+    for (const video of readyAssets.filter((asset) => asset.kind === "video")) {
+      const compatibility = checkVerifiedVideoCompatibility({
+        platform: connection.platform,
+        metadata: video.verifiedMetadata,
+      });
+      if (!compatibility.compatible)
+        throw new SocialPostPublicationError(compatibility.reason);
+    }
 
     resolved.push({
       platform: connection.platform,

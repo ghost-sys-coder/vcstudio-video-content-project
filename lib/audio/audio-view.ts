@@ -52,6 +52,9 @@ export interface AudioSceneView {
   estimatedCostCents: number | null;
   actualCostCents: number | null;
   safeErrorMessage: string | null;
+  inspectionStatus: "pending" | "running" | "succeeded" | "failed" | null;
+  inspectionWarnings: string[];
+  inspectionError: string | null;
 }
 
 export interface AudioTimelineSceneView {

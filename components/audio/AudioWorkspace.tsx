@@ -77,8 +77,14 @@ export function AudioWorkspace({
 
   const hasActiveWork = useMemo(
     () =>
-      data.progress.pending + data.progress.queued + data.progress.running > 0,
-    [data.progress],
+      data.progress.pending + data.progress.queued + data.progress.running >
+        0 ||
+      data.scenes.some(
+        (scene) =>
+          scene.inspectionStatus === "pending" ||
+          scene.inspectionStatus === "running",
+      ),
+    [data.progress, data.scenes],
   );
 
   useEffect(() => {

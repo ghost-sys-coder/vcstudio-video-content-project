@@ -162,6 +162,9 @@ export async function loadAudioWorkspace(input: {
       estimatedCostCents: latest?.estimatedCostCents ?? null,
       actualCostCents: latest?.actualCostCents ?? null,
       safeErrorMessage: latest?.safeErrorMessage ?? null,
+      inspectionStatus: latest?.inspectionStatus ?? null,
+      inspectionWarnings: latest?.inspectionWarnings ?? [],
+      inspectionError: latest?.inspectionError ?? null,
     };
   });
 

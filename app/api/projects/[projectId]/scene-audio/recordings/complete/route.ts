@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { tasks } from "@trigger.dev/sdk";
 import { saveRecordedSceneAudio } from "@/db/commands/scene-audio-commands";
 import { findProject } from "@/db/repositories/projects.repository";
 import { findApprovedCurrentSceneVersion } from "@/db/repositories/scene-images.repository";
@@ -15,6 +16,11 @@ import {
   deleteUploadedSceneAudioObject,
   inspectUploadedSceneAudio,
 } from "@/lib/storage/scene-audio-storage";
+import {
+  attachRecordedAudioInspectionRun,
+  prepareRecordedAudioInspection,
+} from "@/db/commands/media-inspection-commands";
+import type { mediaInspectionTask } from "@/trigger/media-inspection";
 
 const paramsSchema = z.object({ projectId: z.uuid() });
 
@@ -125,7 +131,27 @@ export async function POST(
       requestedByUserId: workspaceContext.user.id,
     });
     uncommittedObjectKey = null;
-
+    await prepareRecordedAudioInspection({
+      workspaceId,
+      projectId: project.id,
+      generationId: created.id,
+    });
+    const handle = await tasks.trigger<typeof mediaInspectionTask>(
+      "media-inspection",
+      {
+        kind: "recorded_audio",
+        workspaceId,
+        projectId: project.id,
+        generationId: created.id,
+      },
+      { idempotencyKey: `media-inspection:recorded-audio:${created.id}` },
+    );
+    await attachRecordedAudioInspectionRun({
+      workspaceId,
+      projectId: project.id,
+      generationId: created.id,
+      triggerRunId: handle.id,
+    });
     revalidatePath(`/app/projects/${project.id}/audio`);
     return NextResponse.json({ generationId: created.id });
   } catch (error) {

@@ -729,6 +729,11 @@ export async function approveSceneAudioGeneration(input: {
   if (!generation) throw new Error("SCENE_AUDIO_GENERATION_NOT_FOUND");
   if (generation.status !== "succeeded")
     throw new Error("SCENE_AUDIO_GENERATION_NOT_SUCCESSFUL");
+  if (
+    generation.source === "user_recorded" &&
+    generation.inspectionStatus !== "succeeded"
+  )
+    throw new Error("SCENE_AUDIO_RECORDING_NOT_INSPECTED");
   if (generation.reviewStatus === "approved") return generation;
 
   const now = new Date();

@@ -28,6 +28,7 @@ import {
   checkPlatformEligibility,
   summarizeAttachments,
 } from "@/lib/social/select-eligible-platforms";
+import { checkVerifiedVideoCompatibility } from "@/lib/social/video-platform-compatibility";
 
 export class SocialPostScheduleError extends Error {
   constructor(message: string) {
@@ -140,6 +141,14 @@ export async function scheduleSocialPostPublication(input: {
     });
     if (!eligibility.eligible)
       throw new SocialPostScheduleError(eligibility.reason);
+    for (const video of readyAssets.filter((asset) => asset.kind === "video")) {
+      const compatibility = checkVerifiedVideoCompatibility({
+        platform: connection.platform,
+        metadata: video.verifiedMetadata,
+      });
+      if (!compatibility.compatible)
+        throw new SocialPostScheduleError(compatibility.reason);
+    }
 
     resolved.push({
       platform: connection.platform,

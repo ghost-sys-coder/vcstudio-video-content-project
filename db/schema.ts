@@ -23,6 +23,7 @@ import type { RenderTimelineSnapshot } from "@/lib/render/render-timeline-snapsh
 import type { PortableDocument } from "@/lib/social/portable-document";
 import type { MarketingChatMessagePart } from "@/lib/schemas/marketing-chat-message";
 import type { MarketingWeeklyDigestSnapshot } from "@/lib/marketing/digests/weekly-digest";
+import type { VerifiedMediaMetadata } from "@/lib/media/media-inspection";
 
 export const workspaceRoleEnum = pgEnum("workspace_role", [
   "owner",
@@ -51,6 +52,13 @@ export const mediaAssetKindEnum = pgEnum("media_asset_kind", [
 export const mediaAssetStatusEnum = pgEnum("media_asset_status", [
   "pending",
   "ready",
+  "failed",
+]);
+
+export const mediaInspectionStatusEnum = pgEnum("media_inspection_status", [
+  "pending",
+  "running",
+  "succeeded",
   "failed",
 ]);
 
@@ -642,6 +650,15 @@ export const mediaAssets = pgTable(
      * enforced at publish time by each provider, as they are for renders.
      */
     durationMilliseconds: integer("duration_milliseconds"),
+    inspectionStatus: mediaInspectionStatusEnum("inspection_status"),
+    verifiedMetadata: jsonb("verified_metadata").$type<VerifiedMediaMetadata>(),
+    inspectionWarnings: jsonb("inspection_warnings")
+      .$type<string[]>()
+      .notNull()
+      .default([]),
+    inspectionTriggerRunId: text("inspection_trigger_run_id"),
+    inspectionError: text("inspection_error"),
+    inspectedAt: timestamp("inspected_at", { withTimezone: true }),
     uploadedByUserId: uuid("uploaded_by_user_id")
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
@@ -2773,6 +2790,15 @@ export const sceneAudioGenerations = pgTable(
     // ffmpeg was unavailable or the audio could not be decoded; the character
     // then idles instead of the render failing.
     amplitudeEnvelope: jsonb("amplitude_envelope").$type<number[]>(),
+    inspectionStatus: mediaInspectionStatusEnum("inspection_status"),
+    verifiedMetadata: jsonb("verified_metadata").$type<VerifiedMediaMetadata>(),
+    inspectionWarnings: jsonb("inspection_warnings")
+      .$type<string[]>()
+      .notNull()
+      .default([]),
+    inspectionTriggerRunId: text("inspection_trigger_run_id"),
+    inspectionError: text("inspection_error"),
+    inspectedAt: timestamp("inspected_at", { withTimezone: true }),
     errorCategory: text("error_category"),
     safeErrorMessage: text("safe_error_message"),
     requestedByUserId: uuid("requested_by_user_id")
@@ -5618,6 +5644,8 @@ export type StorageObject = typeof storageObjects.$inferSelect;
 export type MediaAsset = typeof mediaAssets.$inferSelect;
 export type MediaAssetKind = (typeof mediaAssetKindEnum.enumValues)[number];
 export type MediaAssetStatus = (typeof mediaAssetStatusEnum.enumValues)[number];
+export type MediaInspectionStatus =
+  (typeof mediaInspectionStatusEnum.enumValues)[number];
 export type SocialPost = typeof socialPosts.$inferSelect;
 export type SocialPostStatus = (typeof socialPostStatusEnum.enumValues)[number];
 export type SocialPostMedia = typeof socialPostMedia.$inferSelect;
