@@ -83,17 +83,50 @@ export async function markDocumentReady(input: {
   chunks?: DocumentChunk[];
 }): Promise<MarketingKnowledgeDocument | null> {
   const database = getDatabase();
-  const document = await database.transaction(async (transaction) => {
-    await transaction
-      .delete(marketingKnowledgeDocumentChunks)
-      .where(
-        and(
-          eq(marketingKnowledgeDocumentChunks.documentId, input.documentId),
-          eq(marketingKnowledgeDocumentChunks.workspaceId, input.workspaceId),
-        ),
-      );
-    if (input.chunks?.length)
-      await transaction.insert(marketingKnowledgeDocumentChunks).values(
+  const deleteChunks = database
+    .delete(marketingKnowledgeDocumentChunks)
+    .where(
+      and(
+        eq(marketingKnowledgeDocumentChunks.documentId, input.documentId),
+        eq(marketingKnowledgeDocumentChunks.workspaceId, input.workspaceId),
+      ),
+    );
+  const updateDocument = database
+    .update(marketingKnowledgeDocuments)
+    .set({
+      status: "ready",
+      sizeBytes: input.sizeBytes,
+      extractedText: input.extracted.text,
+      extractedCharacterCount: input.extracted.characterCount,
+      tokenEstimate: input.extracted.tokenEstimate,
+      checksum: input.extracted.checksum,
+      processedAt: new Date(),
+      summary: "",
+      keyFacts: [],
+      summaryVersion: null,
+      summaryProviderRequestId: null,
+      summaryInputTokens: 0,
+      summaryOutputTokens: 0,
+      errorCategory: null,
+      safeErrorMessage: null,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(marketingKnowledgeDocuments.id, input.documentId),
+        eq(marketingKnowledgeDocuments.workspaceId, input.workspaceId),
+      ),
+    )
+    .returning();
+
+  // `neon-http` deliberately rejects callback transactions. Its batch API is
+  // the supported atomic transaction primitive and executes every statement
+  // through `client.transaction`, so chunks and the ready state cannot diverge.
+  let updatedRows: MarketingKnowledgeDocument[];
+  if (input.chunks?.length) {
+    const insertChunks = database
+      .insert(marketingKnowledgeDocumentChunks)
+      .values(
         input.chunks.map((chunk) => ({
           workspaceId: input.workspaceId,
           documentId: input.documentId,
@@ -104,35 +137,17 @@ export async function markDocumentReady(input: {
           sourceLocation: chunk.sourceLocation,
         })),
       );
-    const [updated] = await transaction
-      .update(marketingKnowledgeDocuments)
-      .set({
-        status: "ready",
-        sizeBytes: input.sizeBytes,
-        extractedText: input.extracted.text,
-        extractedCharacterCount: input.extracted.characterCount,
-        tokenEstimate: input.extracted.tokenEstimate,
-        checksum: input.extracted.checksum,
-        processedAt: new Date(),
-        summary: "",
-        keyFacts: [],
-        summaryVersion: null,
-        summaryProviderRequestId: null,
-        summaryInputTokens: 0,
-        summaryOutputTokens: 0,
-        errorCategory: null,
-        safeErrorMessage: null,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(marketingKnowledgeDocuments.id, input.documentId),
-          eq(marketingKnowledgeDocuments.workspaceId, input.workspaceId),
-        ),
-      )
-      .returning();
-    return updated ?? null;
-  });
+    const [, , updated] = await database.batch([
+      deleteChunks,
+      insertChunks,
+      updateDocument,
+    ]);
+    updatedRows = updated;
+  } else {
+    const [, updated] = await database.batch([deleteChunks, updateDocument]);
+    updatedRows = updated;
+  }
+  const document = updatedRows[0] ?? null;
 
   if (document) await bumpContextVersion(input.workspaceId);
   return document ?? null;
