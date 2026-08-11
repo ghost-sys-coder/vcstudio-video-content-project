@@ -25,10 +25,10 @@ export function MarketingContentQueue({
     groups.set(key, [...(groups.get(key) ?? []), item]);
   }
   return (
-    <div className="space-y-5">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
       {[...groups.entries()].map(([conceptKey, variants]) => (
-        <section className="space-y-3 rounded-xl border p-4" key={conceptKey}>
-          <header>
+        <section className="contents" key={conceptKey}>
+          <header className="mt-2 lg:col-span-2">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Content concept
             </p>
@@ -41,7 +41,7 @@ export function MarketingContentQueue({
               caption independently.
             </p>
           </header>
-          <div className="grid gap-3 lg:grid-cols-2">
+          <div className="contents">
             {variants.map((item) => (
               <MarketingContentCard
                 accountName={
