@@ -5159,6 +5159,7 @@ export const marketingCampaigns = pgTable(
     workspaceId: uuid("workspace_id")
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
+    brandProfileId: uuid("brand_profile_id"),
     name: text("name").notNull(),
     objective: marketingCampaignObjectiveEnum("objective").notNull(),
     trafficType: marketingTrafficTypeEnum("traffic_type").notNull(),
@@ -5215,10 +5216,64 @@ export const marketingCampaigns = pgTable(
       table.status,
       table.startDate,
     ),
+    foreignKey({
+      columns: [table.brandProfileId, table.workspaceId],
+      foreignColumns: [
+        marketingBrandProfiles.id,
+        marketingBrandProfiles.workspaceId,
+      ],
+      name: "marketing_campaigns_tenant_brand_profile_fkey",
+    }).onDelete("restrict"),
     check(
       "marketing_campaigns_date_order",
       sql`${table.endDate} is null or ${table.endDate} >= ${table.startDate}`,
     ),
+  ],
+);
+
+/** Exact connected accounts selected for a campaign. Historical selections are
+ * retained when disabled so generated content never silently changes target. */
+export const marketingCampaignDestinations = pgTable(
+  "marketing_campaign_destinations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    campaignId: uuid("campaign_id").notNull(),
+    connectionId: uuid("connection_id").notNull(),
+    platform: contentPlatformEnum("platform").notNull(),
+    isSelected: boolean("is_selected").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex(
+      "marketing_campaign_destinations_campaign_connection_unique",
+    ).on(table.campaignId, table.connectionId),
+    uniqueIndex("marketing_campaign_destinations_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    index("marketing_campaign_destinations_selected_index").on(
+      table.workspaceId,
+      table.campaignId,
+      table.isSelected,
+    ),
+    foreignKey({
+      columns: [table.campaignId, table.workspaceId],
+      foreignColumns: [marketingCampaigns.id, marketingCampaigns.workspaceId],
+      name: "marketing_campaign_destinations_tenant_campaign_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.connectionId, table.workspaceId],
+      foreignColumns: [platformConnections.id, platformConnections.workspaceId],
+      name: "marketing_campaign_destinations_tenant_connection_fkey",
+    }).onDelete("restrict"),
   ],
 );
 
@@ -5230,6 +5285,7 @@ export const marketingContentItems = pgTable(
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
     campaignId: uuid("campaign_id"),
+    campaignDestinationId: uuid("campaign_destination_id"),
     kind: marketingContentKindEnum("kind").notNull(),
     platform: contentPlatformEnum("platform"),
     trafficType: marketingTrafficTypeEnum("traffic_type")
@@ -5275,6 +5331,14 @@ export const marketingContentItems = pgTable(
       columns: [table.campaignId, table.workspaceId],
       foreignColumns: [marketingCampaigns.id, marketingCampaigns.workspaceId],
       name: "marketing_content_items_tenant_campaign_fkey",
+    }).onDelete("restrict"),
+    foreignKey({
+      columns: [table.campaignDestinationId, table.workspaceId],
+      foreignColumns: [
+        marketingCampaignDestinations.id,
+        marketingCampaignDestinations.workspaceId,
+      ],
+      name: "marketing_content_items_tenant_destination_fkey",
     }).onDelete("restrict"),
     uniqueIndex("marketing_content_items_id_workspace_unique").on(
       table.id,
@@ -6054,6 +6118,8 @@ export type MarketingChatMessage = typeof marketingChatMessages.$inferSelect;
 export type MarketingChatToolCall = typeof marketingChatToolCalls.$inferSelect;
 export type MarketingContentItem = typeof marketingContentItems.$inferSelect;
 export type MarketingCampaign = typeof marketingCampaigns.$inferSelect;
+export type MarketingCampaignDestination =
+  typeof marketingCampaignDestinations.$inferSelect;
 export type MarketingCompetitor = typeof marketingCompetitors.$inferSelect;
 export type MarketingResearchSnapshot =
   typeof marketingResearchSnapshots.$inferSelect;

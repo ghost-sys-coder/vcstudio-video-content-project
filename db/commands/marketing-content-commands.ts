@@ -16,6 +16,7 @@ import type { PortableDocument } from "@/lib/social/portable-document";
 export async function createMarketingContentItem(input: {
   workspaceId: string;
   campaignId?: string | null;
+  campaignDestinationId?: string | null;
   kind: MarketingContentKind;
   platform?: ContentPlatform | null;
   title: string;
@@ -34,6 +35,7 @@ export async function createMarketingContentItem(input: {
     .values({
       ...input,
       campaignId: input.campaignId ?? null,
+      campaignDestinationId: input.campaignDestinationId ?? null,
       platform: input.platform ?? null,
       sourceRunId: input.sourceRunId ?? null,
       createdByUserId: input.createdByUserId ?? null,
@@ -175,6 +177,39 @@ export async function transitionMarketingContent(input: {
   const updated = await findMarketingContentItem(input);
   if (!updated) throw new Error("MARKETING_CONTENT_NOT_FOUND");
   return updated;
+}
+
+export async function approveAllCampaignContent(input: {
+  workspaceId: string;
+  campaignId: string;
+  reviewedByUserId: string;
+}) {
+  const now = new Date();
+  const result = await getDatabase().execute(sql`
+    with updated as (
+      update marketing_content_items
+      set status = 'approved'::marketing_content_status,
+          reviewed_by_user_id = ${input.reviewedByUserId}::uuid,
+          approved_at = ${now}, updated_at = ${now}
+      where workspace_id = ${input.workspaceId}::uuid
+        and campaign_id = ${input.campaignId}::uuid
+        and status = 'needs_review'::marketing_content_status
+      returning id, workspace_id
+    ), reviewed as (
+      insert into marketing_content_review_events (
+        id, workspace_id, content_item_id, decision, reason,
+        reviewed_by_user_id, created_at
+      )
+      select gen_random_uuid(), workspace_id, id,
+        'approved'::marketing_content_review_decision,
+        'Approved with campaign batch action',
+        ${input.reviewedByUserId}::uuid, ${now}
+      from updated
+      returning content_item_id
+    )
+    select count(*)::int as count from reviewed
+  `);
+  return Number(result.rows[0]?.count ?? 0);
 }
 
 export async function updateMarketingContentBody(input: {

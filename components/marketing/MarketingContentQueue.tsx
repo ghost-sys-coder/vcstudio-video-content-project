@@ -4,10 +4,12 @@ import type { MediaAssetView } from "@/lib/media/media-asset-view";
 export function MarketingContentQueue({
   items,
   mediaByContentItemId,
+  accountByDestinationId = {},
   emptyMessage = "No marketing content yet. Create a draft from Chat and it will appear here for review.",
 }: {
   items: MarketingContentItem[];
   mediaByContentItemId: Record<string, MediaAssetView[]>;
+  accountByDestinationId?: Record<string, string>;
   emptyMessage?: string;
 }) {
   if (items.length === 0)
@@ -16,14 +18,44 @@ export function MarketingContentQueue({
         {emptyMessage}
       </div>
     );
+  const groups = new Map<string, MarketingContentItem[]>();
+  for (const item of items) {
+    const conceptKey = item.structuredPayload?.conceptKey;
+    const key = typeof conceptKey === "string" ? conceptKey : item.id;
+    groups.set(key, [...(groups.get(key) ?? []), item]);
+  }
   return (
-    <div className="grid gap-3 lg:grid-cols-2">
-      {items.map((item) => (
-        <MarketingContentCard
-          item={item}
-          key={item.id}
-          media={mediaByContentItemId[item.id] ?? []}
-        />
+    <div className="space-y-5">
+      {[...groups.entries()].map(([conceptKey, variants]) => (
+        <section className="space-y-3 rounded-xl border p-4" key={conceptKey}>
+          <header>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Content concept
+            </p>
+            <h2 className="font-semibold">
+              {variants[0]?.title ?? "Campaign content"}
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {variants.length} account-specific{" "}
+              {variants.length === 1 ? "version" : "versions"}. Review each
+              caption independently.
+            </p>
+          </header>
+          <div className="grid gap-3 lg:grid-cols-2">
+            {variants.map((item) => (
+              <MarketingContentCard
+                accountName={
+                  item.campaignDestinationId
+                    ? accountByDestinationId[item.campaignDestinationId]
+                    : undefined
+                }
+                item={item}
+                key={item.id}
+                media={mediaByContentItemId[item.id] ?? []}
+              />
+            ))}
+          </div>
+        </section>
       ))}
     </div>
   );

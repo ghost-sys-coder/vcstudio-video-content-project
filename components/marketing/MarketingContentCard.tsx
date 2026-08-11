@@ -3,13 +3,16 @@ import type { MarketingContentItem } from "@/db/schema";
 import { MarketingContentStatusBadge } from "@/components/marketing/MarketingContentStatusBadge";
 import { MediaAssetPreview } from "@/components/social/MediaAssetPreview";
 import type { MediaAssetView } from "@/lib/media/media-asset-view";
+import { PlatformMarkIcon } from "@/components/brand/PlatformMarkIcon";
 
 export function MarketingContentCard({
   item,
   media,
+  accountName,
 }: {
   item: MarketingContentItem;
   media: MediaAssetView[];
+  accountName?: string;
 }) {
   const asset = media[0];
   if (asset)
@@ -28,8 +31,15 @@ export function MarketingContentCard({
           className={`pointer-events-none absolute inset-x-0 z-10 p-5 text-white ${asset.kind === "video" ? "top-0 bg-gradient-to-b from-black/85 via-black/55 to-transparent pb-16" : "bottom-0 bg-gradient-to-t from-black/90 via-black/65 to-transparent pt-20"}`}
         >
           <p className="mb-2 text-xs font-medium text-white/80">
-            {item.platform ?? "No platform"} · {item.kind.replaceAll("_", " ")}{" "}
-            · {item.status.replaceAll("_", " ")}
+            {item.platform ? (
+              <PlatformMarkIcon
+                className="mr-1 inline size-3.5"
+                platform={item.platform}
+              />
+            ) : null}
+            {accountName ?? item.platform ?? "No platform"} ·{" "}
+            {item.kind.replaceAll("_", " ")} ·{" "}
+            {item.status.replaceAll("_", " ")}
           </p>
           <h2 className="text-lg font-semibold leading-tight text-balance">
             {item.title || item.kind.replaceAll("_", " ")}
@@ -60,8 +70,21 @@ export function MarketingContentCard({
         <MarketingContentStatusBadge status={item.status} />
       </div>
       <p className="mt-3 text-xs text-muted-foreground">
-        {item.platform ?? "No platform"} · {item.kind.replaceAll("_", " ")}
+        {item.platform ? (
+          <PlatformMarkIcon
+            className="mr-1 inline size-3.5"
+            platform={item.platform}
+          />
+        ) : null}
+        {accountName ?? item.platform ?? "No platform"} ·{" "}
+        {item.kind.replaceAll("_", " ")}
       </p>
+      {item.scheduledFor ? (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Planned for {item.scheduledFor.toLocaleString()} · confirm the exact
+          time in Social
+        </p>
+      ) : null}
     </Link>
   );
 }

@@ -43,6 +43,8 @@ import { plainTextToPortableDocument } from "@/lib/social/plain-text-to-document
 import type { ContentPlatform, MarketingContentKind } from "@/db/schema";
 import { marketingCampaignMutationSchema } from "@/lib/schemas/marketing-campaign";
 import { dispatchCampaignAutomation } from "@/lib/marketing/campaigns/dispatch-campaign-automation";
+import { findBrandProfile } from "@/db/repositories/marketing-brand.repository";
+import { listPlatformConnections } from "@/db/repositories/publishing.repository";
 
 const CONTENT_KIND_BY_SKILL = {
   create_social_post: "social_post",
@@ -207,13 +209,28 @@ export async function executeInlineMarketingSkill(input: {
     let contentItemId: string | undefined;
     let campaignId: string | undefined;
     if (executorKey === "create_campaign") {
+      const platform = input.values.platform as ContentPlatform;
+      const [brandProfile, connections] = await Promise.all([
+        findBrandProfile({ workspaceId: context.workspaceId }),
+        listPlatformConnections({ workspaceId: context.workspaceId }),
+      ]);
+      const destinations = connections.filter(
+        (connection) =>
+          connection.status === "active" && connection.platform === platform,
+      );
+      if (!brandProfile || destinations.length === 0)
+        throw new Error(
+          "Complete the brand profile and connect an active account for the selected platform before creating a campaign.",
+        );
       const campaignInput = marketingCampaignMutationSchema.parse({
         name: input.values.name,
         objective: input.values.objective,
         trafficType: input.values.trafficType,
         status: "draft",
         startDate: new Date().toISOString().slice(0, 10),
-        platforms: [input.values.platform],
+        platforms: [platform],
+        brandProfileId: brandProfile.id,
+        connectionIds: destinations.map((destination) => destination.id),
         keyMessage: input.values.keyMessage,
         hypothesis: `If we communicate ${String(input.values.keyMessage)}, the campaign will improve ${String(input.values.objective)} among ${String(input.values.audience)}.`,
         briefPlainText: result.text,
@@ -223,6 +240,12 @@ export async function executeInlineMarketingSkill(input: {
         ...campaignInput,
         workspaceId: context.workspaceId,
         createdByUserId: context.userId,
+        connectionPlatforms: Object.fromEntries(
+          destinations.map((destination) => [
+            destination.id,
+            destination.platform,
+          ]),
+        ),
       });
       campaignId = campaign.id;
       try {
@@ -238,33 +261,6 @@ export async function executeInlineMarketingSkill(input: {
           status: "failed",
           error: "Campaign automation could not be queued. Try again.",
         });
-      }
-      if (campaign.trafficType !== "organic") {
-        for (const [index, variantLabel] of ["A", "B", "C"].entries()) {
-          const headline = String(input.values.keyMessage).slice(0, 80);
-          const primaryText = `${String(input.values.audience)}: ${String(input.values.keyMessage)} ${index === 0 ? "Learn what changes next." : index === 1 ? "See the practical difference." : "Explore a clearer path forward."}`;
-          await createMarketingContentItem({
-            workspaceId: context.workspaceId,
-            campaignId: campaign.id,
-            kind: "ad_creative",
-            platform: campaign.platforms[0] ?? null,
-            trafficType: "paid",
-            title: `${campaign.name} · Variant ${variantLabel}`,
-            bodyDocument: plainTextToPortableDocument(primaryText),
-            bodyPlainText: primaryText,
-            structuredPayload: {
-              headline,
-              primaryText,
-              description: "Campaign creative for review and export.",
-              cta: campaign.objective === "sales" ? "Shop now" : "Learn more",
-              platform: campaign.platforms[0],
-              placement: "feed",
-              variantLabel,
-            },
-            sourceRunId: reservation.runId,
-            createdByUserId: context.userId,
-          });
-        }
       }
     }
     if (contentKind) {

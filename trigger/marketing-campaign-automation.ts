@@ -21,6 +21,7 @@ import {
 } from "@/db/commands/marketing-usage-commands";
 import {
   findMarketingCampaign,
+  listMarketingCampaignDestinations,
   listMarketingCampaignContent,
 } from "@/db/repositories/marketing-campaigns.repository";
 import { listActiveMarketingCompetitors } from "@/db/repositories/marketing-research.repository";
@@ -131,22 +132,33 @@ export const marketingCampaignAutomationTask = task({
         ...input,
         status: "generating",
       });
-      const [brand, media] = await Promise.all([
+      const [brand, media, destinations] = await Promise.all([
         compileBrandContext({ workspaceId: input.workspaceId }),
         listMediaAssets({ workspaceId: input.workspaceId, limit: 60 }),
+        listMarketingCampaignDestinations({ ...input, selectedOnly: true }),
       ]);
+      if (
+        destinations.length === 0 ||
+        destinations.some(({ accountStatus }) => accountStatus !== "active")
+      )
+        throw new Error("Every campaign destination must still be connected.");
       const days = durationDays(campaign.startDate, campaign.endDate);
       const maxItems = Math.min(
         30,
         Math.max(
-          campaign.platforms.length,
-          Math.ceil(days / 7) * campaign.platforms.length,
+          destinations.length,
+          Math.ceil(days / 7) * destinations.length,
         ),
       );
       const prompt = renderCampaignAutomationPrompt({
         campaign: `${campaignContext}\nObjective: ${campaign.objective}\nTraffic: ${campaign.trafficType}`,
         durationDays: days,
         platforms: campaign.platforms,
+        destinations: destinations.map(({ destination, accountName }) => ({
+          connectionId: destination.connectionId,
+          platform: destination.platform,
+          accountName,
+        })),
         maxItems,
         brandContext: brand.text,
         researchContext: research
@@ -252,6 +264,12 @@ export const marketingCampaignAutomationTask = task({
       });
       const researchIds = new Set(research.map((item) => item.snapshotId));
       const mediaIds = new Set(media.map((asset) => asset.id));
+      const destinationByConnectionId = new Map(
+        destinations.map(({ destination }) => [
+          destination.connectionId,
+          destination,
+        ]),
+      );
       const plan = campaignContentPlanSchema.parse(generated.object);
       const validItems = selectCampaignPlanItems({
         items: plan.items,
@@ -260,8 +278,22 @@ export const marketingCampaignAutomationTask = task({
       });
       if (validItems.length === 0)
         throw new Error("The campaign plan contained no eligible content.");
+      if (
+        destinations.some(
+          ({ destination }) =>
+            !validItems.some(
+              (item) => item.connectionId === destination.connectionId,
+            ),
+        )
+      )
+        throw new Error(
+          "The campaign plan did not cover every selected account.",
+        );
       for (const planned of validItems) {
+        const destination = destinationByConnectionId.get(planned.connectionId);
         if (
+          !destination ||
+          destination.platform !== planned.platform ||
           planned.researchSnapshotIds.some((id) => !researchIds.has(id)) ||
           (planned.mediaAssetId && !mediaIds.has(planned.mediaAssetId))
         )
@@ -269,6 +301,7 @@ export const marketingCampaignAutomationTask = task({
         const item = await createMarketingContentItem({
           workspaceId: input.workspaceId,
           campaignId: campaign.id,
+          campaignDestinationId: destination.id,
           kind: planned.kind,
           platform: planned.platform,
           title: planned.title,
@@ -276,7 +309,7 @@ export const marketingCampaignAutomationTask = task({
           bodyPlainText: planned.body,
           sourceRunId: reservation.runId,
           createdByUserId: input.requestedByUserId,
-          trafficType: planned.trafficType,
+          trafficType: "organic",
           scheduledFor: new Date(
             new Date(`${campaign.startDate}T12:00:00Z`).getTime() +
               Math.min(planned.scheduledDayOffset, days - 1) * 86_400_000,
@@ -287,17 +320,8 @@ export const marketingCampaignAutomationTask = task({
             researchSnapshotIds: planned.researchSnapshotIds,
             researchRationale: planned.researchRationale,
             strategySummary: plan.strategySummary,
-            ...(planned.adPayload
-              ? {
-                  headline: planned.adPayload.headline,
-                  primaryText: planned.body,
-                  description: planned.adPayload.description,
-                  cta: planned.adPayload.cta,
-                  platform: planned.platform,
-                  placement: planned.adPayload.placement,
-                  variantLabel: planned.adPayload.variantLabel,
-                }
-              : {}),
+            conceptKey: planned.conceptKey,
+            connectionId: planned.connectionId,
           },
         });
         try {

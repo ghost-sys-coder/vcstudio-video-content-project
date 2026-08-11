@@ -2,7 +2,12 @@ import "server-only";
 
 import { and, asc, desc, eq } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
-import { marketingCampaigns, marketingContentItems } from "@/db/schema";
+import {
+  marketingCampaignDestinations,
+  marketingCampaigns,
+  marketingContentItems,
+  platformConnections,
+} from "@/db/schema";
 
 export async function listMarketingCampaigns(input: { workspaceId: string }) {
   return getDatabase()
@@ -47,4 +52,41 @@ export async function listMarketingCampaignContent(input: {
       ),
     )
     .orderBy(asc(marketingContentItems.createdAt));
+}
+
+export async function listMarketingCampaignDestinations(input: {
+  workspaceId: string;
+  campaignId: string;
+  selectedOnly?: boolean;
+}) {
+  return getDatabase()
+    .select({
+      destination: marketingCampaignDestinations,
+      accountName: platformConnections.externalAccountName,
+      accountStatus: platformConnections.status,
+    })
+    .from(marketingCampaignDestinations)
+    .innerJoin(
+      platformConnections,
+      and(
+        eq(platformConnections.id, marketingCampaignDestinations.connectionId),
+        eq(
+          platformConnections.workspaceId,
+          marketingCampaignDestinations.workspaceId,
+        ),
+      ),
+    )
+    .where(
+      and(
+        eq(marketingCampaignDestinations.workspaceId, input.workspaceId),
+        eq(marketingCampaignDestinations.campaignId, input.campaignId),
+        ...(input.selectedOnly === false
+          ? []
+          : [eq(marketingCampaignDestinations.isSelected, true)]),
+      ),
+    )
+    .orderBy(
+      asc(marketingCampaignDestinations.platform),
+      asc(platformConnections.externalAccountName),
+    );
 }

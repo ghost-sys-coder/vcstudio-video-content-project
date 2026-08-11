@@ -6,17 +6,20 @@ const item = (
   platform: "instagram" | "linkedin",
   mediaAssetId: string | null = null,
 ) => ({
+  conceptKey: `${kind}-concept`,
+  connectionId:
+    platform === "instagram"
+      ? "11111111-1111-4111-8111-111111111112"
+      : "11111111-1111-4111-8111-111111111113",
   platform,
   kind,
   title: `${kind}-${platform}`,
   body: "Usable campaign copy",
-  trafficType: "organic" as const,
   scheduledDayOffset: 0,
   mediaAssetId,
   visualDirection: "Clean editorial composition",
   researchSnapshotIds: ["11111111-1111-4111-8111-111111111111"],
   researchRationale: "Grounded in cited research",
-  adPayload: null,
 });
 
 describe("selectCampaignPlanItems", () => {

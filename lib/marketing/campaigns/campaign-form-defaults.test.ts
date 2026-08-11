@@ -9,6 +9,8 @@ describe("NEW_MARKETING_CAMPAIGN_DEFAULTS", () => {
         ...NEW_MARKETING_CAMPAIGN_DEFAULTS,
         startDate: "2026-08-05",
         endDate: "",
+        brandProfileId: "11111111-1111-4111-8111-111111111111",
+        connectionIds: ["11111111-1111-4111-8111-111111111112"],
         isBranded: true,
       }).success,
     ).toBe(true);

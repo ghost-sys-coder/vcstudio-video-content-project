@@ -13,7 +13,9 @@ export const marketingCampaignInputSchema = z
   .object({
     name: z.string().trim().min(2).max(120),
     objective: z.enum(marketingCampaignObjectiveEnum.enumValues),
-    trafficType: z.enum(marketingTrafficTypeEnum.enumValues),
+    trafficType: z.enum(marketingTrafficTypeEnum.enumValues).default("organic"),
+    brandProfileId: z.uuid(),
+    connectionIds: z.array(z.uuid()).min(1).max(30),
     status: z.enum(marketingCampaignStatusEnum.enumValues).default("draft"),
     startDate: isoDateSchema,
     endDate: z
@@ -51,19 +53,8 @@ export const marketingCampaignMutationSchema = marketingCampaignInputSchema
 
 export const marketingCampaignIdSchema = z.object({ campaignId: z.uuid() });
 
-export const adCreativePayloadSchema = z.object({
-  headline: z.string().trim().min(1).max(255),
-  primaryText: z.string().trim().min(1).max(2_000),
-  description: z.string().trim().max(500),
-  cta: z.string().trim().min(1).max(80),
-  platform: z.enum(contentPlatformEnum.enumValues),
-  placement: z.string().trim().min(1).max(120),
-  variantLabel: z.string().trim().min(1).max(80),
-});
-
 export const marketingCampaignBriefDocumentSchema = portableDocumentSchema;
 
 export type MarketingCampaignInput = z.infer<
   typeof marketingCampaignMutationSchema
 >;
-export type AdCreativePayload = z.infer<typeof adCreativePayloadSchema>;

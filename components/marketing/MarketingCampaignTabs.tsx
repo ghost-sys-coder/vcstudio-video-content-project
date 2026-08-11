@@ -15,12 +15,7 @@ export function MarketingCampaignTabs({
     {
       href: `/app/marketing/campaigns/${campaign.id}/content`,
       label: "Content",
-      show: campaign.trafficType !== "paid",
-    },
-    {
-      href: `/app/marketing/campaigns/${campaign.id}/ads`,
-      label: "Ads",
-      show: campaign.trafficType !== "organic",
+      show: true,
     },
     {
       href: `/app/marketing/campaigns/${campaign.id}/settings`,

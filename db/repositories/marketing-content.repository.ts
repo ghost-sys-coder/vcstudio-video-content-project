@@ -5,6 +5,7 @@ import {
   marketingContentItems,
   marketingContentMedia,
   marketingContentRevisions,
+  marketingCampaignDestinations,
   socialPosts,
   type MarketingContentItem,
   type MarketingContentStatus,
@@ -69,6 +70,36 @@ export async function findMarketingContentItem(input: {
     )
     .limit(1);
   return row ?? null;
+}
+
+export async function findCampaignConnectionForSocialPost(input: {
+  workspaceId: string;
+  socialPostId: string;
+}) {
+  const [row] = await getDatabase()
+    .select({ connectionId: marketingCampaignDestinations.connectionId })
+    .from(marketingContentItems)
+    .innerJoin(
+      marketingCampaignDestinations,
+      and(
+        eq(
+          marketingCampaignDestinations.id,
+          marketingContentItems.campaignDestinationId,
+        ),
+        eq(
+          marketingCampaignDestinations.workspaceId,
+          marketingContentItems.workspaceId,
+        ),
+      ),
+    )
+    .where(
+      and(
+        eq(marketingContentItems.workspaceId, input.workspaceId),
+        eq(marketingContentItems.socialPostId, input.socialPostId),
+      ),
+    )
+    .limit(1);
+  return row?.connectionId ?? null;
 }
 export async function listMarketingContentMedia(input: {
   workspaceId: string;

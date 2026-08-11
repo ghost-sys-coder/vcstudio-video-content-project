@@ -22,7 +22,13 @@ export function MarketingContentReviewActions({
         }}
       >
         <input name="contentItemId" type="hidden" value={item.id} />
-        <Button type="submit">Open as Social draft</Button>
+        <div className="space-y-2">
+          <Button type="submit">Schedule or publish in Social</Button>
+          <p className="text-xs text-muted-foreground">
+            The campaign&apos;s exact account is locked in Social; confirm the final
+            time and timezone there.
+          </p>
+        </div>
       </form>
     );
   if (item.status !== "needs_review") return null;

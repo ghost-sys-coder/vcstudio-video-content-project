@@ -1,7 +1,12 @@
 import { notFound } from "next/navigation";
 import { MarketingCampaignForm } from "@/components/marketing/MarketingCampaignForm";
-import { findMarketingCampaign } from "@/db/repositories/marketing-campaigns.repository";
+import {
+  findMarketingCampaign,
+  listMarketingCampaignDestinations,
+} from "@/db/repositories/marketing-campaigns.repository";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
+import { findBrandProfile } from "@/db/repositories/marketing-brand.repository";
+import { listPlatformConnections } from "@/db/repositories/publishing.repository";
 
 export default async function CampaignSettingsPage({
   params,
@@ -10,10 +15,25 @@ export default async function CampaignSettingsPage({
 }) {
   const context = await getAuthenticatedWorkspaceContext();
   if (!context) return null;
-  const campaign = await findMarketingCampaign({
-    workspaceId: context.activeMembership.workspaceId,
-    campaignId: (await params).campaignId,
-  });
+  const workspaceId = context.activeMembership.workspaceId;
+  const campaignId = (await params).campaignId;
+  const [campaign, brandProfile, connections, destinations] = await Promise.all(
+    [
+      findMarketingCampaign({ workspaceId, campaignId }),
+      findBrandProfile({ workspaceId }),
+      listPlatformConnections({ workspaceId }),
+      listMarketingCampaignDestinations({ workspaceId, campaignId }),
+    ],
+  );
   if (!campaign) notFound();
-  return <MarketingCampaignForm campaign={campaign} />;
+  return (
+    <MarketingCampaignForm
+      brandProfile={brandProfile}
+      campaign={campaign}
+      connections={connections}
+      selectedConnectionIds={destinations.map(
+        ({ destination }) => destination.connectionId,
+      )}
+    />
+  );
 }
