@@ -13,6 +13,7 @@ import {
 import { resolveMarketingConnectionHealth } from "@/lib/marketing/integrations/connection-health";
 import { CONTENT_PLATFORM_LABELS } from "@/lib/platforms/platform-labels";
 import type { PostConnectionView } from "@/lib/social/social-post-view";
+import type { PlatformConnectionSummary } from "@/db/repositories/publishing.repository";
 
 export type MarketingProviderStatus = {
   id: string;
@@ -113,6 +114,21 @@ function platformProviderStatus(
   };
 }
 
+export function buildMarketingPublishingConnectionsView(
+  connections: PlatformConnectionSummary[],
+  now: Date,
+): PostConnectionView[] {
+  return connections
+    .filter((connection) => connection.status !== "revoked")
+    .map((connection) => ({
+      id: connection.id,
+      platform: connection.platform,
+      platformLabel: CONTENT_PLATFORM_LABELS[connection.platform],
+      accountName: connection.externalAccountName,
+      status: resolveMarketingConnectionHealth(connection, now),
+    }));
+}
+
 export async function loadMarketingIntegrationsView(input: {
   workspaceId: string;
   now?: Date;
@@ -144,13 +160,7 @@ export async function loadMarketingIntegrationsView(input: {
     );
 
   return {
-    connections: connections.map((connection) => ({
-      id: connection.id,
-      platform: connection.platform,
-      platformLabel: CONTENT_PLATFORM_LABELS[connection.platform],
-      accountName: connection.externalAccountName,
-      status: resolveMarketingConnectionHealth(connection, now),
-    })),
+    connections: buildMarketingPublishingConnectionsView(connections, now),
     providers: [
       ...PLATFORM_ORDER.map(platformProviderStatus),
       {

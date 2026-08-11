@@ -55,16 +55,18 @@ export function buildWorkspaceChannelsView(input: {
   return {
     enabled: input.enabled,
     socialPostingEnabled: input.socialPostingEnabled,
-    channels: input.connections.map((connection) => ({
-      id: connection.id,
-      platform: connection.platform,
-      platformLabel: CONTENT_PLATFORM_LABELS[connection.platform],
-      accountName: connection.externalAccountName,
-      accountUrl: connection.externalAccountUrl,
-      status: connection.status,
-      lastError: connection.lastError,
-      updatedAtLabel: formatUtc(connection.updatedAt),
-    })),
+    channels: input.connections
+      .filter((connection) => connection.status !== "revoked")
+      .map((connection) => ({
+        id: connection.id,
+        platform: connection.platform,
+        platformLabel: CONTENT_PLATFORM_LABELS[connection.platform],
+        accountName: connection.externalAccountName,
+        accountUrl: connection.externalAccountUrl,
+        status: connection.status,
+        lastError: connection.lastError,
+        updatedAtLabel: formatUtc(connection.updatedAt),
+      })),
     platforms: PLATFORM_ORDER.map((platform) => ({
       platform,
       label: CONTENT_PLATFORM_LABELS[platform],

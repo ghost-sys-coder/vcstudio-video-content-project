@@ -1,4 +1,6 @@
+import { randomUUID } from "node:crypto";
 import { DashboardOverview } from "@/components/application/DashboardOverview";
+import { DashboardUnavailableState } from "@/components/application/DashboardUnavailableState";
 import { FirstValueOnboardingPanel } from "@/components/onboarding/FirstValueOnboardingPanel";
 import { loadFirstValueFacts } from "@/db/repositories/first-value-onboarding.repository";
 import { getWorkspaceDashboardStatistics } from "@/db/repositories/dashboard.repository";
@@ -14,11 +16,19 @@ export default async function DashboardPage() {
   }
 
   const workspaceId = context.activeMembership.workspaceId;
-  const [statistics, recentProjects, firstValueFacts] = await Promise.all([
-    getWorkspaceDashboardStatistics({ workspaceId }),
-    listProjects({ workspaceId, page: 1, pageSize: 5 }),
-    loadFirstValueFacts(workspaceId),
-  ]);
+  let dashboardData: Awaited<ReturnType<typeof loadWorkspaceDashboardData>>;
+  try {
+    dashboardData = await loadWorkspaceDashboardData(workspaceId);
+  } catch (error) {
+    const supportReference = `dashboard-${randomUUID().slice(0, 8)}`;
+    console.error("Workspace dashboard data load failed.", {
+      supportReference,
+      error,
+    });
+    return <DashboardUnavailableState supportReference={supportReference} />;
+  }
+
+  const { statistics, recentProjects, firstValueFacts } = dashboardData;
 
   const tracks = buildFirstValueTracks({
     facts: firstValueFacts,
@@ -37,4 +47,13 @@ export default async function DashboardPage() {
       />
     </div>
   );
+}
+
+async function loadWorkspaceDashboardData(workspaceId: string) {
+  const [statistics, recentProjects, firstValueFacts] = await Promise.all([
+    getWorkspaceDashboardStatistics({ workspaceId }),
+    listProjects({ workspaceId, page: 1, pageSize: 5 }),
+    loadFirstValueFacts(workspaceId),
+  ]);
+  return { statistics, recentProjects, firstValueFacts };
 }

@@ -57,4 +57,29 @@ describe("workspace channels view", () => {
       { platform: "twitter", label: "X", available: true },
     ]);
   });
+
+  it("omits disconnected channels while retaining expired connections", () => {
+    const connection = {
+      id: "connection-active",
+      workspaceId: "workspace-1",
+      platform: "youtube" as const,
+      externalAccountId: "channel-1",
+      externalAccountName: "VCStudio",
+      externalAccountUrl: null,
+      lastError: null,
+      accessTokenExpiresAt: null,
+      createdAt: new Date("2026-08-01T00:00:00.000Z"),
+      updatedAt: new Date("2026-08-11T00:00:00.000Z"),
+    };
+    const view = buildWorkspaceChannelsView({
+      enabled: true,
+      socialPostingEnabled: true,
+      connections: [
+        { ...connection, id: "expired", status: "expired" },
+        { ...connection, id: "revoked", status: "revoked" },
+      ],
+    });
+
+    expect(view.channels.map(({ id }) => id)).toEqual(["expired"]);
+  });
 });
