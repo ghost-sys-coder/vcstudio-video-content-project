@@ -256,13 +256,15 @@ export function isEditableStatus(status: SocialPostStatus): boolean {
  * gaps.
  */
 export function isRepublishableStatus(status: SocialPostStatus): boolean {
-  return (
-    status === "draft" ||
-    status === "scheduled" ||
-    status === "failed" ||
-    status === "partially_failed"
-  );
+  return REPUBLISHABLE_SOCIAL_POST_STATUSES.includes(status);
 }
+
+export const REPUBLISHABLE_SOCIAL_POST_STATUSES: readonly SocialPostStatus[] = [
+  "draft",
+  "scheduled",
+  "failed",
+  "partially_failed",
+];
 
 export async function renameSocialPost(input: {
   workspaceId: string;

@@ -6,10 +6,12 @@ import { afterAll, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 import { createSocialPost } from "@/db/commands/social-post-commands";
+import { scheduleSocialPost } from "@/db/commands/social-post-schedule-commands";
 import { createSocialPostTargets } from "@/db/commands/social-post-target-commands";
 import { getDatabase } from "@/db/drizzle";
 import {
   platformConnections,
+  socialPosts,
   socialPostTargets,
   users,
   workspaces,
@@ -101,5 +103,109 @@ describeDatabase("social post captions (postgres)", () => {
       .from(socialPostTargets)
       .where(eq(socialPostTargets.id, target?.id ?? randomUUID()));
     expect(stored?.overrideBodyPlainText).toBe("LinkedIn-specific launch copy");
+  }, 30_000);
+
+  it("atomically reschedules a failed post and replaces its failed target", async () => {
+    const fixture = await createFixture();
+    const [oldTarget] = await createSocialPostTargets({
+      workspaceId: fixture.workspaceId,
+      postId: fixture.post.id,
+      targets: [
+        {
+          platform: "linkedin",
+          connectionId: fixture.connection.id,
+          idempotencyKey: `failed-${randomUUID()}`,
+          overrideBodyPlainText: null,
+        },
+      ],
+    });
+    await getDatabase()
+      .update(socialPostTargets)
+      .set({ status: "failed" })
+      .where(eq(socialPostTargets.id, oldTarget?.id ?? randomUUID()));
+    await getDatabase()
+      .update(socialPosts)
+      .set({ status: "failed" })
+      .where(eq(socialPosts.id, fixture.post.id));
+
+    const scheduledAt = new Date("2030-01-02T03:04:05.000Z");
+    const scheduled = await scheduleSocialPost({
+      workspaceId: fixture.workspaceId,
+      postId: fixture.post.id,
+      scheduledAt,
+      timezone: "Africa/Kampala",
+      targets: [
+        {
+          platform: "linkedin",
+          connectionId: fixture.connection.id,
+          idempotencyKey: `retry-${randomUUID()}`,
+          overrideBodyPlainText: "Retry copy",
+        },
+      ],
+    });
+
+    const targets = await getDatabase()
+      .select()
+      .from(socialPostTargets)
+      .where(eq(socialPostTargets.postId, fixture.post.id));
+    expect(scheduled).toMatchObject({
+      status: "scheduled",
+      scheduledAt,
+      scheduledTimezone: "Africa/Kampala",
+    });
+    expect(targets).toHaveLength(1);
+    expect(targets[0]).toMatchObject({
+      status: "pending",
+      overrideBodyPlainText: "Retry copy",
+    });
+    expect(targets[0]?.id).not.toBe(oldTarget?.id);
+  }, 30_000);
+
+  it("leaves targets untouched when the post is no longer republishable", async () => {
+    const fixture = await createFixture();
+    const [oldTarget] = await createSocialPostTargets({
+      workspaceId: fixture.workspaceId,
+      postId: fixture.post.id,
+      targets: [
+        {
+          platform: "linkedin",
+          connectionId: fixture.connection.id,
+          idempotencyKey: `published-${randomUUID()}`,
+          overrideBodyPlainText: null,
+        },
+      ],
+    });
+    await getDatabase()
+      .update(socialPostTargets)
+      .set({ status: "failed" })
+      .where(eq(socialPostTargets.id, oldTarget?.id ?? randomUUID()));
+    await getDatabase()
+      .update(socialPosts)
+      .set({ status: "published" })
+      .where(eq(socialPosts.id, fixture.post.id));
+
+    const scheduled = await scheduleSocialPost({
+      workspaceId: fixture.workspaceId,
+      postId: fixture.post.id,
+      scheduledAt: new Date("2030-01-02T03:04:05.000Z"),
+      timezone: "Africa/Kampala",
+      targets: [
+        {
+          platform: "linkedin",
+          connectionId: fixture.connection.id,
+          idempotencyKey: `should-not-land-${randomUUID()}`,
+          overrideBodyPlainText: null,
+        },
+      ],
+    });
+
+    const targets = await getDatabase()
+      .select()
+      .from(socialPostTargets)
+      .where(eq(socialPostTargets.postId, fixture.post.id));
+    expect(scheduled).toBeNull();
+    expect(targets).toHaveLength(1);
+    expect(targets[0]?.id).toBe(oldTarget?.id);
+    expect(targets[0]?.status).toBe("failed");
   }, 30_000);
 });

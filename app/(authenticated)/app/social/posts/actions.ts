@@ -325,6 +325,12 @@ export async function scheduleSocialPostAction(
   } catch (error) {
     if (error instanceof SocialPostScheduleError)
       return { ok: false, error: error.message };
+    console.error("[social-post:schedule] unexpected failure", {
+      postId: parsed.data.postId,
+      errorName: error instanceof Error ? error.name : "UnknownError",
+      errorMessage:
+        error instanceof Error ? error.message : "Non-error value thrown",
+    });
     return { ok: false, error: "That post could not be scheduled." };
   }
 }

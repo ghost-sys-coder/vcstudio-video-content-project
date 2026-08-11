@@ -1,34 +1,123 @@
 import "server-only";
 
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, exists, inArray, sql } from "drizzle-orm";
+import { REPUBLISHABLE_SOCIAL_POST_STATUSES } from "@/db/commands/social-post-commands";
 import { getDatabase } from "@/db/drizzle";
-import { socialPosts, type SocialPost } from "@/db/schema";
+import {
+  socialPostTargets,
+  socialPosts,
+  type ContentPlatform,
+  type SocialPost,
+} from "@/db/schema";
 
 export async function scheduleSocialPost(input: {
   workspaceId: string;
   postId: string;
   scheduledAt: Date;
   timezone: string;
+  targets: {
+    platform: ContentPlatform;
+    connectionId: string;
+    idempotencyKey: string;
+    overrideBodyPlainText: string | null;
+  }[];
 }): Promise<SocialPost | null> {
-  const [post] = await getDatabase()
+  const database = getDatabase();
+  const updateMarker = new Date();
+  const updatedPost = database
     .update(socialPosts)
     .set({
       status: "scheduled",
       scheduledAt: input.scheduledAt,
       scheduledTimezone: input.timezone,
-      updatedAt: new Date(),
+      updatedAt: updateMarker,
     })
     .where(
       and(
         eq(socialPosts.id, input.postId),
         eq(socialPosts.workspaceId, input.workspaceId),
-        // Only a draft or an already-scheduled post can be (re)scheduled. A post
-        // that is mid-publish must not be pulled back into the queue.
-        inArray(socialPosts.status, ["draft", "scheduled"]),
+        inArray(socialPosts.status, [...REPUBLISHABLE_SOCIAL_POST_STATUSES]),
       ),
     )
     .returning();
-  return post ?? null;
+
+  // Every later statement is guarded by the exact timestamp written above. If
+  // the post was claimed or published concurrently, the update affects no row
+  // and neither its old targets nor new targets are touched. Neon HTTP's batch
+  // transaction is the supported atomic primitive; callback transactions are
+  // deliberately unavailable in this driver.
+  const updateLanded = exists(
+    database
+      .select({ id: socialPosts.id })
+      .from(socialPosts)
+      .where(
+        and(
+          eq(socialPosts.id, input.postId),
+          eq(socialPosts.workspaceId, input.workspaceId),
+          eq(socialPosts.status, "scheduled"),
+          eq(socialPosts.updatedAt, updateMarker),
+        ),
+      ),
+  );
+  const deleteReplaceableTargets = database
+    .delete(socialPostTargets)
+    .where(
+      and(
+        eq(socialPostTargets.postId, input.postId),
+        eq(socialPostTargets.workspaceId, input.workspaceId),
+        inArray(socialPostTargets.status, ["pending", "cancelled", "failed"]),
+        updateLanded,
+      ),
+    );
+
+  const statements = [updatedPost, deleteReplaceableTargets] as const;
+  let updatedRows: SocialPost[];
+  if (input.targets.length > 0) {
+    const targetPayload = input.targets.map((target) => ({
+      platform: target.platform,
+      connection_id: target.connectionId,
+      override_body_plain_text: target.overrideBodyPlainText,
+      idempotency_key: target.idempotencyKey,
+    }));
+    const insertTargets = database.insert(socialPostTargets).select(
+      database
+        .select({
+          postId: socialPosts.id,
+          workspaceId: socialPosts.workspaceId,
+          platform: sql<ContentPlatform>`target.platform::content_platform`.as(
+            "platform",
+          ),
+          connectionId: sql<string>`target.connection_id::uuid`.as(
+            "connection_id",
+          ),
+          overrideBodyPlainText: sql<
+            string | null
+          >`target.override_body_plain_text`.as("override_body_plain_text"),
+          idempotencyKey: sql<string>`target.idempotency_key`.as(
+            "idempotency_key",
+          ),
+        })
+        .from(socialPosts)
+        .innerJoin(
+          sql`jsonb_to_recordset(${JSON.stringify(targetPayload)}::jsonb) as target(platform text, connection_id text, override_body_plain_text text, idempotency_key text)`,
+          sql`true`,
+        )
+        .where(
+          and(
+            eq(socialPosts.id, input.postId),
+            eq(socialPosts.workspaceId, input.workspaceId),
+            eq(socialPosts.status, "scheduled"),
+            eq(socialPosts.updatedAt, updateMarker),
+          ),
+        ),
+    );
+    const [updated] = await database.batch([...statements, insertTargets]);
+    updatedRows = updated;
+  } else {
+    const [updated] = await database.batch([...statements]);
+    updatedRows = updated;
+  }
+  return updatedRows[0] ?? null;
 }
 
 /**

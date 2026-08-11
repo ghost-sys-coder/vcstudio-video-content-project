@@ -6,12 +6,12 @@ import {
   scheduleSocialPost,
 } from "@/db/commands/social-post-schedule-commands";
 import { isRepublishableStatus } from "@/db/commands/social-post-commands";
-import { replaceSocialPostTargets } from "@/db/commands/social-post-target-commands";
 import { findReadyMediaAssets } from "@/db/repositories/media-assets.repository";
 import { findPlatformConnectionSummary } from "@/db/repositories/publishing.repository";
 import {
   findSocialPost,
   listSocialPostMedia,
+  listSocialPostTargets,
 } from "@/db/repositories/social-posts.repository";
 import { createSocialPostTargetIdempotencyKey } from "@/lib/domain/idempotency";
 import {
@@ -172,17 +172,29 @@ export async function scheduleSocialPostPublication(input: {
     });
   }
 
-  await replaceSocialPostTargets({
+  const existing = await listSocialPostTargets({
     workspaceId: input.workspaceId,
     postId: post.id,
-    targets: resolved,
   });
+  const alreadyPublished = new Set(
+    existing
+      .filter((target) => target.status === "published")
+      .map((target) => target.connectionId),
+  );
+  const targets = resolved.filter(
+    (target) => !alreadyPublished.has(target.connectionId),
+  );
+  if (targets.length === 0)
+    throw new SocialPostScheduleError(
+      "Every chosen destination has already received this post.",
+    );
 
   const scheduled = await scheduleSocialPost({
     workspaceId: input.workspaceId,
     postId: post.id,
     scheduledAt: instant.scheduledAt,
     timezone: input.timezone,
+    targets,
   });
   if (!scheduled)
     throw new SocialPostScheduleError("That post could not be scheduled.");
