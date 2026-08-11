@@ -17,6 +17,15 @@ import {
 
 const idSchema = z.object({ id: z.string().min(1) });
 const permalinkSchema = z.object({ permalink: z.string().min(1).optional() });
+const graphErrorSchema = z.object({
+  error: z
+    .object({
+      code: z.number().int().optional(),
+      error_subcode: z.number().int().optional(),
+      is_transient: z.boolean().optional(),
+    })
+    .optional(),
+});
 
 function fail(failure: PublishFailure): never {
   throw new PublishProviderError(failure);
@@ -24,9 +33,12 @@ function fail(failure: PublishFailure): never {
 
 function failureForResponse(
   response: Response,
+  payload: unknown,
   mayHavePublished = false,
 ): PublishFailure {
-  if (response.status === 401)
+  const parsed = graphErrorSchema.safeParse(payload);
+  const error = parsed.success ? parsed.data.error : undefined;
+  if (response.status === 401 || error?.code === 190)
     return {
       category: "authorization_expired",
       safeMessage:
@@ -34,7 +46,7 @@ function failureForResponse(
       retriable: false,
       mayHavePublished,
     };
-  if (response.status === 403)
+  if (response.status === 403 || error?.code === 10 || error?.code === 200)
     return {
       category: "insufficient_permissions",
       safeMessage:
@@ -42,7 +54,7 @@ function failureForResponse(
       retriable: false,
       mayHavePublished,
     };
-  if (response.status === 429)
+  if (response.status === 429 || [4, 17, 32, 613].includes(error?.code ?? -1))
     return {
       category: "rate_limited",
       safeMessage:
@@ -50,7 +62,7 @@ function failureForResponse(
       retriable: !mayHavePublished,
       mayHavePublished,
     };
-  if (response.status >= 500)
+  if (response.status >= 500 || error?.is_transient)
     return {
       category: mayHavePublished
         ? "transport_ambiguous"
@@ -94,7 +106,7 @@ export class InstagramSocialPostProvider implements SocialPostProvider {
 
   private graphUrl(path: string): URL {
     return new URL(
-      `https://graph.facebook.com/${this.input.apiVersion}/${path}`,
+      `https://graph.instagram.com/${this.input.apiVersion}/${path}`,
     );
   }
 
@@ -103,13 +115,28 @@ export class InstagramSocialPostProvider implements SocialPostProvider {
     accessToken: string,
     body: URLSearchParams,
   ): Promise<string> {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${accessToken}` },
-      body,
-    });
-    const parsed = idSchema.safeParse(await response.json().catch(() => ({})));
-    if (!response.ok || !parsed.success) fail(failureForResponse(response));
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body,
+      });
+    } catch {
+      // Creating a container cannot make content public. It is therefore safe
+      // to retry even if Instagram received the request before the socket died.
+      fail({
+        category: "network_unreachable",
+        safeMessage:
+          "Could not reach Instagram. The post was not published; it will be retried.",
+        retriable: true,
+        mayHavePublished: false,
+      });
+    }
+    const payload = await response.json().catch(() => ({}));
+    const parsed = idSchema.safeParse(payload);
+    if (!response.ok || !parsed.success)
+      fail(failureForResponse(response, payload));
     return parsed.data.id;
   }
 
@@ -211,11 +238,10 @@ export class InstagramSocialPostProvider implements SocialPostProvider {
         mayHavePublished: true,
       });
     }
-    const published = idSchema.safeParse(
-      await publishResponse.json().catch(() => ({})),
-    );
+    const publishPayload = await publishResponse.json().catch(() => ({}));
+    const published = idSchema.safeParse(publishPayload);
     if (!publishResponse.ok || !published.success)
-      fail(failureForResponse(publishResponse, true));
+      fail(failureForResponse(publishResponse, publishPayload, true));
 
     const permalinkUrl = this.graphUrl(encodeURIComponent(published.data.id));
     permalinkUrl.searchParams.set("fields", "permalink");
