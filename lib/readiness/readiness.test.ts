@@ -59,4 +59,34 @@ describe("operational readiness", () => {
     expect(serialized).not.toContain("secret-id");
     expect(serialized).not.toContain("secret-key");
   });
+
+  it("allows for the thirty-minute maintenance heartbeat cadence", async () => {
+    mocks.loadSnapshot.mockResolvedValue({
+      heartbeat: { lastCompletedAt: new Date(Date.now() - 40 * 60_000) },
+      connections: [],
+      googleBusiness: null,
+      stuckCount: 0,
+      schemaCompatible: true,
+    });
+    const view = await loadOperationalReadiness(
+      "11111111-1111-4111-8111-111111111111",
+    );
+    expect(view.deployment.find((item) => item.id === "worker")?.status).toBe(
+      "ready",
+    );
+
+    mocks.loadSnapshot.mockResolvedValue({
+      heartbeat: { lastCompletedAt: new Date(Date.now() - 46 * 60_000) },
+      connections: [],
+      googleBusiness: null,
+      stuckCount: 0,
+      schemaCompatible: true,
+    });
+    const stale = await loadOperationalReadiness(
+      "11111111-1111-4111-8111-111111111111",
+    );
+    expect(stale.deployment.find((item) => item.id === "worker")?.status).toBe(
+      "blocked",
+    );
+  });
 });

@@ -5,8 +5,10 @@ import { dispatchPendingMediaInspections } from "@/lib/media/dispatch-pending-me
 
 export const reconcileStorageTask = schedules.task({
   id: "reconcile-storage-assets",
-  cron: "17 * * * *",
-  queue: { name: "media-processing", concurrencyLimit: 1 },
+  // Recovery and garbage collection can lag without affecting active work.
+  // A six-hour cadence leaves the internal deployment quiet for long periods.
+  cron: "17 */6 * * *",
+  queue: { name: "media-processing", concurrencyLimit: 2 },
   retry: {
     maxAttempts: 2,
     minTimeoutInMs: 5_000,

@@ -83,7 +83,7 @@ export async function loadOperationalReadiness(
   const workerStatus: ReadinessStatus =
     heartbeatAge === null
       ? "unknown"
-      : heartbeatAge > 15 * 60_000
+      : heartbeatAge > 45 * 60_000
         ? "blocked"
         : "ready";
   const publishingEnabled = process.env.ENABLE_VIDEO_PUBLISHING !== "false";
@@ -135,7 +135,7 @@ export async function loadOperationalReadiness(
         action:
           workerStatus === "ready"
             ? null
-            : "Deploy Trigger.dev and verify the operational-readiness-heartbeat schedule.",
+            : "Deploy Trigger.dev and verify the reconcile-marketing-usage schedule.",
       },
       {
         id: "publishing",

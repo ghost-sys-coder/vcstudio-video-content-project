@@ -111,7 +111,7 @@ function getFailureCost(input: {
 
 export const sceneImageGenerationTask = task({
   id: "scene-image-generation",
-  queue: { name: "image-generation", concurrencyLimit: 1 },
+  queue: { name: "image-generation", concurrencyLimit: 2 },
   retry: {
     maxAttempts: 3,
     minTimeoutInMs: 2_000,

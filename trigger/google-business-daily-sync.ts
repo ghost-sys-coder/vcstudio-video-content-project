@@ -2,6 +2,7 @@ import { schedules } from "@trigger.dev/sdk";
 import { listActiveGoogleBusinessConnections } from "@/db/repositories/google-business.repository";
 import { syncGoogleBusiness } from "@/lib/marketing/integrations/sync-google-business";
 import { recordAuditEvent } from "@/lib/audit/record-audit-event";
+import { getMarketingEnvironment } from "@/lib/env/server";
 
 export const googleBusinessDailySyncTask = schedules.task({
   id: "google-business-daily-sync",
@@ -9,6 +10,8 @@ export const googleBusinessDailySyncTask = schedules.task({
   queue: { name: "google-business-sync", concurrencyLimit: 1 },
   maxDuration: 300,
   run: async () => {
+    if (!getMarketingEnvironment().ENABLE_MARKETING_STUDIO)
+      return { checked: 0, succeeded: 0, failed: 0 };
     const connections = await listActiveGoogleBusinessConnections();
     let succeeded = 0;
     let failed = 0;

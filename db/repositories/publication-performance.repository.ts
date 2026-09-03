@@ -17,6 +17,7 @@ import {
   marketingBrandContextSnapshots,
   marketingContentItems,
   marketingGenerationRuns,
+  marketingSettings,
   platformConnections,
   publicationMetricObservations,
   publicationPerformanceSources,
@@ -58,6 +59,10 @@ export async function discoverPerformanceSources(): Promise<number> {
       })
       .from(socialPostTargets)
       .innerJoin(socialPosts, eq(socialPosts.id, socialPostTargets.postId))
+      .innerJoin(
+        marketingSettings,
+        eq(marketingSettings.workspaceId, socialPostTargets.workspaceId),
+      )
       .leftJoin(
         marketingContentItems,
         eq(marketingContentItems.socialPostId, socialPosts.id),
@@ -84,6 +89,7 @@ export async function discoverPerformanceSources(): Promise<number> {
           eq(socialPostTargets.status, "published"),
           isNotNull(socialPostTargets.externalPostId),
           isNotNull(socialPostTargets.publishedAt),
+          eq(marketingSettings.studioEnabled, true),
           sql`not exists (select 1 from publication_performance_sources existing where existing.social_post_target_id = ${socialPostTargets.id})`,
         ),
       )
@@ -100,11 +106,16 @@ export async function discoverPerformanceSources(): Promise<number> {
         caption: videoPublications.caption,
       })
       .from(videoPublications)
+      .innerJoin(
+        marketingSettings,
+        eq(marketingSettings.workspaceId, videoPublications.workspaceId),
+      )
       .where(
         and(
           eq(videoPublications.status, "succeeded"),
           isNotNull(videoPublications.externalVideoId),
           isNotNull(videoPublications.completedAt),
+          eq(marketingSettings.studioEnabled, true),
           sql`not exists (select 1 from publication_performance_sources existing where existing.video_publication_id = ${videoPublications.id})`,
         ),
       )
@@ -195,6 +206,13 @@ export async function listDuePerformanceSources(
       accessTokenSealed: platformConnections.accessTokenSealed,
     })
     .from(publicationPerformanceSources)
+    .innerJoin(
+      marketingSettings,
+      eq(
+        marketingSettings.workspaceId,
+        publicationPerformanceSources.workspaceId,
+      ),
+    )
     .leftJoin(
       platformConnections,
       and(
@@ -207,6 +225,7 @@ export async function listDuePerformanceSources(
     )
     .where(
       and(
+        eq(marketingSettings.studioEnabled, true),
         inArray(publicationPerformanceSources.syncStatus, [
           "pending",
           "ready",

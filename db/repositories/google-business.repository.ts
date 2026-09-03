@@ -5,6 +5,7 @@ import { getDatabase } from "@/db/drizzle";
 import {
   googleBusinessConnections,
   googleBusinessLocations,
+  marketingSettings,
 } from "@/db/schema";
 
 export async function findGoogleBusinessConnection(input: {
@@ -43,5 +44,14 @@ export async function listActiveGoogleBusinessConnections() {
       workspaceId: googleBusinessConnections.workspaceId,
     })
     .from(googleBusinessConnections)
-    .where(eq(googleBusinessConnections.status, "active"));
+    .innerJoin(
+      marketingSettings,
+      eq(marketingSettings.workspaceId, googleBusinessConnections.workspaceId),
+    )
+    .where(
+      and(
+        eq(googleBusinessConnections.status, "active"),
+        eq(marketingSettings.studioEnabled, true),
+      ),
+    );
 }

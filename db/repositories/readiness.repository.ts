@@ -51,7 +51,7 @@ export async function loadReadinessDatabaseSnapshot(input: {
         .from(taskHeartbeats)
         .where(
           and(
-            eq(taskHeartbeats.taskId, "operational-readiness-heartbeat"),
+            eq(taskHeartbeats.taskId, "reconcile-marketing-usage"),
             eq(taskHeartbeats.environment, input.environment),
           ),
         )

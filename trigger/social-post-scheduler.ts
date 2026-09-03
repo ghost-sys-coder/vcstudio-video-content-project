@@ -26,7 +26,9 @@ import type { socialPostPublishTask } from "@/trigger/social-post-publish";
  */
 export const socialPostSchedulerTask = schedules.task({
   id: "social-post-scheduler",
-  cron: "* * * * *",
+  // Internal deployment: a small delivery delay is preferable to keeping the
+  // database compute awake with a query every minute.
+  cron: "*/10 * * * *",
   maxDuration: 120,
   run: async () => {
     const environment = getPublishingEnvironment();
