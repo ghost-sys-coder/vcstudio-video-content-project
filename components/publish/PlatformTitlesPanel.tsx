@@ -226,6 +226,7 @@ export function PlatformTitlesPanel({
 
         {canGenerate ? (
           <Button
+            className="h-10"
             disabled={busy || generating || !data.hasContext}
             onClick={generate}
             type="button"
@@ -240,6 +241,7 @@ export function PlatformTitlesPanel({
 
         {generating && cancellable && canGenerate ? (
           <Button
+            className="h-10"
             disabled={busy}
             onClick={cancel}
             type="button"

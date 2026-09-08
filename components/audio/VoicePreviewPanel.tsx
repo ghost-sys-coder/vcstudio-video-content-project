@@ -99,6 +99,7 @@ export function VoicePreviewPanel() {
         </div>
 
         <Button
+          className="h-10"
           disabled={status === "loading"}
           onClick={() => (isBusy ? stop() : play())}
           type="button"
@@ -121,13 +122,13 @@ export function VoicePreviewPanel() {
             </>
           )}
         </Button>
-
-        {selected ? (
-          <p className="text-xs text-muted-foreground">
-            {selected.label}: {selected.description}
-          </p>
-        ) : null}
       </div>
+
+      {selected ? (
+        <p className="text-xs text-muted-foreground">
+          {selected.label}: {selected.description}
+        </p>
+      ) : null}
 
       {status === "error" ? (
         <p className="text-xs text-destructive" role="alert">

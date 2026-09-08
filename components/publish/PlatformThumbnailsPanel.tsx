@@ -373,15 +373,12 @@ export function PlatformThumbnailsPanel({
               placeholder="Say as much as you need"
               value={headline}
             />
-            <p className="text-xs text-muted-foreground">
-              {headline.length}/{MAX_THUMBNAIL_HEADLINE_LENGTH} characters.
-              Longer headlines wrap onto more lines, so they render smaller.
-            </p>
           </div>
         ) : null}
 
         {canGenerate ? (
           <Button
+            className="h-10"
             disabled={
               busy ||
               generating ||
@@ -402,6 +399,7 @@ export function PlatformThumbnailsPanel({
 
         {generating && cancellable && canGenerate ? (
           <Button
+            className="h-10"
             disabled={busy}
             onClick={cancel}
             type="button"
@@ -411,6 +409,13 @@ export function PlatformThumbnailsPanel({
           </Button>
         ) : null}
       </div>
+
+      {headlineRequired ? (
+        <p className="text-xs text-muted-foreground">
+          {headline.length}/{MAX_THUMBNAIL_HEADLINE_LENGTH} characters. Longer
+          headlines wrap onto more lines, so they render smaller.
+        </p>
+      ) : null}
 
       {!data.generationEnabled ? (
         <p className="text-xs text-muted-foreground">

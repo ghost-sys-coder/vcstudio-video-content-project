@@ -50,8 +50,9 @@ export function VoicePresetSelector({
       {canManage ? (
         <>
           <Button
+            className="shrink-0"
             onClick={() => setFormOpen(true)}
-            size="icon"
+            size="icon-lg"
             title="New voice preset"
             type="button"
             variant="outline"
