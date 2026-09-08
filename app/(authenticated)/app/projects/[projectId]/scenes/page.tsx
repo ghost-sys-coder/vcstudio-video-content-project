@@ -18,6 +18,7 @@ import {
 import { listProjectCast } from "@/db/repositories/project-characters.repository";
 import { listSceneImageGenerationsForSceneVersions } from "@/db/repositories/scene-images.repository";
 import { buildSceneImageIndicatorMap } from "@/lib/scenes/scene-image-indicator";
+import { buildScriptCoverageView } from "@/lib/scenes/script-coverage-view";
 import { matchCharacterNamesToCast } from "@/lib/scenes/character-name-matching";
 import type { ProjectCastEntry } from "@/components/scenes/ProjectCastPanel";
 
@@ -119,6 +120,11 @@ export default async function ProjectScenesPage({
           environment.OPENAI_TEXT_OUTPUT_COST_PER_MILLION_CENTS,
       }).estimatedCostCents
     : 0;
+  const scriptCoverage = buildScriptCoverageView({
+    approvedScript: approvedVersion?.content ?? null,
+    scriptVersionNumber: approvedVersion?.versionNumber ?? null,
+    sceneNarrations: rows.map((row) => row.version.narrationText),
+  });
   return (
     <ScenePlanner
       approvedVersion={approvedVersion}
@@ -131,6 +137,7 @@ export default async function ProjectScenesPage({
       initialSceneNumber={initialSceneNumber}
       projectId={project.id}
       rows={rowsWithCharacters}
+      scriptCoverage={scriptCoverage}
       videoKind={project.videoKind}
       availableCharacters={availableCharacters}
       cast={castEntries}

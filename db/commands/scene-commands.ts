@@ -400,6 +400,59 @@ export async function failSceneAnalysis(input: {
   ]);
 }
 
+/**
+ * Fails an analysis run whose provider output was produced and paid for, but
+ * rejected by validation.
+ *
+ * Separate from {@link failSceneAnalysis} because the money is real. The plain
+ * failure path releases the reservation at zero, which is correct when nothing
+ * was generated (a preflight refusal, a queue error, a provider outage). Here
+ * the provider answered and billed, so the reservation is reconciled at the
+ * actual cost and the token counts and provider request id are recorded, the
+ * same as a successful run. No scenes are inserted, so the previously active
+ * scene plan survives untouched.
+ */
+export async function failSceneAnalysisWithUsage(input: {
+  analysisRunId: string;
+  category: string;
+  message: string;
+  providerRequestId: string | null;
+  inputTokens: number;
+  outputTokens: number;
+  actualCostCents: number;
+}) {
+  const now = new Date();
+  await getDatabase().batch([
+    getDatabase()
+      .update(sceneAnalysisRuns)
+      .set({
+        status: "failed",
+        errorCategory: input.category,
+        safeErrorMessage: input.message,
+        providerRequestId: input.providerRequestId,
+        inputTokens: input.inputTokens,
+        outputTokens: input.outputTokens,
+        actualCostCents: input.actualCostCents,
+        completedAt: now,
+        updatedAt: now,
+      })
+      .where(eq(sceneAnalysisRuns.id, input.analysisRunId)),
+    getDatabase()
+      .update(usageReservations)
+      .set({
+        status: "reconciled",
+        actualCostCents: input.actualCostCents,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(usageReservations.analysisRunId, input.analysisRunId),
+          eq(usageReservations.status, "pending"),
+        ),
+      ),
+  ]);
+}
+
 export async function updateScene(
   input: SceneContent & {
     workspaceId: string;

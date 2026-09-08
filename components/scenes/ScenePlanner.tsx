@@ -8,9 +8,11 @@ import type {
 } from "@/db/schema";
 import type { SceneImageIndicator } from "@/lib/scenes/scene-image-indicator";
 import type { SceneCharacterStaging } from "@/lib/scenes/scene-character-staging";
+import type { ScriptCoverageView } from "@/lib/scenes/script-coverage-view";
 import { ScenePlannerHeader } from "@/components/scenes/ScenePlannerHeader";
 import { AnalysisProgressPanel } from "@/components/scenes/AnalysisProgressPanel";
 import { SceneAnalysisErrorState } from "@/components/scenes/SceneAnalysisErrorState";
+import { ScriptCoveragePanel } from "@/components/scenes/ScriptCoveragePanel";
 import { SceneList } from "@/components/scenes/SceneList";
 import {
   ProjectCastPanel,
@@ -31,6 +33,7 @@ export function ScenePlanner({
   canGenerateImages,
   canReviewImages,
   videoKind,
+  scriptCoverage,
 }: {
   projectId: string;
   approvedVersion: ProjectScriptVersion | null;
@@ -51,6 +54,7 @@ export function ScenePlanner({
   castAvailableCharacters: Character[];
   canGenerateImages: boolean;
   canReviewImages: boolean;
+  scriptCoverage: ScriptCoverageView;
 }) {
   const active = latestRun
     ? ["pending", "queued", "running"].includes(latestRun.status)
@@ -70,6 +74,7 @@ export function ScenePlanner({
       {latestRun?.status === "failed" ? (
         <SceneAnalysisErrorState run={latestRun} />
       ) : null}
+      <ScriptCoveragePanel view={scriptCoverage} />
       {rows.length > 0 ? (
         <ProjectCastPanel
           availableCharacters={castAvailableCharacters}
