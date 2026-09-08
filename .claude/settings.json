@@ -92,8 +92,19 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code} -> %{redirect_url}\\\\n\" \"http://localhost:3000/app/projects/11111111-1111-1111-1111-111111111111/publish\")",
       "Bash(RUN_DATABASE_INTEGRATION_TESTS=true npx vitest run db/integration/thumbnail-generation-postgres.integration.test.ts)",
       "Bash(xargs -I{} dirname {})",
-      "Bash(npx drizzle-kit *)"
+      "Bash(npx drizzle-kit *)",
+      "Bash(node probe.mjs)",
+      "Bash(cd d:/TIKTOK-YOUTUBE-CONTENT/content-creation-tool && rm -rf \"app/api/projects/[projectId]/custom-voices\" && echo removed && ls \"app/api/projects/[projectId]/\")",
+      "Bash(python -c \"import json,sys; print\\(json.load\\(sys.stdin\\)['scripts']\\)\")",
+      "Bash(python -)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(node consent-probe.mjs)"
     ],
-    "additionalDirectories": ["\\tmp"]
+    "additionalDirectories": [
+      "\\tmp",
+      "D:\\TIKTOK-YOUTUBE-CONTENT\\content-creation-tool\\app\\api\\projects\\[projectId]\\custom-voices"
+    ]
   }
 }

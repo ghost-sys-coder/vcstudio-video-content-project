@@ -198,7 +198,7 @@ export function PlatformTitlesPanel({
         </p>
       </div>
 
-      <div className="flex flex-wrap items-end gap-3">
+      <div className="flex flex-wrap gap-3">
         <div className="min-w-40 max-w-xs flex-1 space-y-1.5">
           <Label className="text-xs" htmlFor="title-platform-select">
             Platform
@@ -223,10 +223,11 @@ export function PlatformTitlesPanel({
             </SelectContent>
           </Select>
         </div>
+      </div>
 
+      <div className="flex flex-wrap gap-3">
         {canGenerate ? (
           <Button
-            className="h-10 shrink-0"
             disabled={busy || generating || !data.hasContext}
             onClick={generate}
             type="button"
@@ -241,7 +242,6 @@ export function PlatformTitlesPanel({
 
         {generating && cancellable && canGenerate ? (
           <Button
-            className="h-10 shrink-0"
             disabled={busy}
             onClick={cancel}
             type="button"

@@ -71,7 +71,7 @@ export function VoicePreviewPanel() {
         “{VOICE_PREVIEW_SAMPLE_TEXT}”
       </blockquote>
 
-      <div className="flex flex-wrap items-end gap-3">
+      <div className="space-y-3">
         <div className="min-w-48 max-w-xs flex-1 space-y-1.5">
           <Label className="text-xs" htmlFor="voice-preview-select">
             Voice
@@ -99,7 +99,6 @@ export function VoicePreviewPanel() {
         </div>
 
         <Button
-          className="h-10 shrink-0"
           disabled={status === "loading"}
           onClick={() => (isBusy ? stop() : play())}
           type="button"

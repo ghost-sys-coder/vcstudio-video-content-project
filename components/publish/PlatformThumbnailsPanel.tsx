@@ -279,7 +279,7 @@ export function PlatformThumbnailsPanel({
       {/* The fields flex down instead of holding a fixed minimum, so the
           action button stays on the same line as them rather than wrapping
           below at the content widths this app actually renders at. */}
-      <div className="flex flex-wrap items-end gap-3">
+      <div className="flex flex-wrap gap-3">
         <div className="min-w-36 flex-1 space-y-1.5">
           <Label className="text-xs" htmlFor="thumbnail-platform-select">
             Platform
@@ -378,10 +378,11 @@ export function PlatformThumbnailsPanel({
             />
           </div>
         ) : null}
+      </div>
 
+      <div className="flex flex-wrap gap-3">
         {canGenerate ? (
           <Button
-            className="h-10 shrink-0"
             disabled={
               busy ||
               generating ||
@@ -402,7 +403,6 @@ export function PlatformThumbnailsPanel({
 
         {generating && cancellable && canGenerate ? (
           <Button
-            className="h-10 shrink-0"
             disabled={busy}
             onClick={cancel}
             type="button"
