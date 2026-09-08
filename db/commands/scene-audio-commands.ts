@@ -1,4 +1,5 @@
 import "server-only";
+import { assertCurrentMediaReview } from "@/lib/scenes/assert-current-media-review";
 
 import { createHash } from "node:crypto";
 import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
@@ -735,6 +736,7 @@ export async function approveSceneAudioGeneration(input: {
   )
     throw new Error("SCENE_AUDIO_RECORDING_NOT_INSPECTED");
   if (generation.reviewStatus === "approved") return generation;
+  await assertCurrentMediaReview(generation);
 
   const now = new Date();
   const [, approvedRows] = await getDatabase().batch([
@@ -790,6 +792,7 @@ export async function rejectSceneAudioGeneration(input: {
   if (generation.status !== "succeeded")
     throw new Error("SCENE_AUDIO_GENERATION_NOT_SUCCESSFUL");
   if (generation.reviewStatus === "rejected") return generation;
+  await assertCurrentMediaReview(generation);
   const [rejected] = await getDatabase()
     .update(sceneAudioGenerations)
     .set({

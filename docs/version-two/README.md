@@ -1,6 +1,6 @@
 # Version two: YouTube production
 
-Created: 2026-09-08. Status: V2-00 baseline and V2-01 revision safety in progress. The first revision-safety increment is implemented; edited-scene media compatibility remains pending.
+Created: 2026-09-08. Status: V2-00 baseline and V2-01 revision safety in progress. Local revisions and compatible media reuse are implemented; remaining V2-01 acceptance is tracked below.
 
 ## Objective
 

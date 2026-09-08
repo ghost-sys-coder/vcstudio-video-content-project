@@ -1,0 +1,2 @@
+ALTER TABLE "scene_revision_media" DROP CONSTRAINT "scene_revision_media_image_fk", ADD CONSTRAINT "scene_revision_media_image_fk" FOREIGN KEY ("image_generation_id","project_id","workspace_id") REFERENCES "scene_image_generations"("id","project_id","workspace_id");--> statement-breakpoint
+ALTER TABLE "scene_revision_media" DROP CONSTRAINT "scene_revision_media_audio_fk", ADD CONSTRAINT "scene_revision_media_audio_fk" FOREIGN KEY ("audio_generation_id","project_id","workspace_id") REFERENCES "scene_audio_generations"("id","project_id","workspace_id");

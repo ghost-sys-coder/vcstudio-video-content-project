@@ -89,6 +89,7 @@ export interface SceneImageActionResult {
 }
 
 export interface SceneImageGenerationView {
+  reused?: boolean;
   id: string;
   generationVersion: number;
   status: SceneImageGenerationStatus;

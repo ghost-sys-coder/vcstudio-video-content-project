@@ -23,6 +23,7 @@ import { matchCharacterNamesToCast } from "@/lib/scenes/character-name-matching"
 import {
   hasSceneContentChanged,
   SceneRevisionConflictError,
+  sceneMediaCompatibility,
 } from "@/lib/domain/scene-revision";
 import { saveSceneRevision } from "@/db/commands/save-scene-revision";
 import { BudgetExceededError } from "@/lib/domain/errors";
@@ -418,6 +419,7 @@ export async function updateScene(
   if (!hasSceneContentChanged(target.version, input)) return { changed: false };
   return saveSceneRevision({
     ...input,
+    compatibility: sceneMediaCompatibility(target.version, input),
     previousVersionId: target.version.id,
     analysisRunId: target.scene.analysisRunId,
     startTimeMilliseconds: target.version.startTimeMilliseconds,

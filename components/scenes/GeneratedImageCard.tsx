@@ -92,9 +92,11 @@ export function GeneratedImageCard({
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="text-xs text-muted-foreground">
             <p>
-              {generation.stylePresetName
-                ? `${generation.stylePresetName} v${generation.stylePresetVersion}`
-                : "Uploaded image"}
+              {generation.reused
+                ? "Reused approved image from an earlier revision"
+                : generation.stylePresetName
+                  ? `${generation.stylePresetName} v${generation.stylePresetVersion}`
+                  : "Uploaded image"}
             </p>
             <p className="mt-1 tabular-nums">
               {generation.actualCostCents === null
@@ -104,7 +106,7 @@ export function GeneratedImageCard({
           </div>
           {succeeded && generation.imageUrl ? (
             <ImageReviewDialog
-              canReview={canReview}
+              canReview={canReview && !generation.reused}
               generation={generation}
               onApprove={onApprove}
               onReject={onReject}

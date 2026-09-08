@@ -2,12 +2,48 @@ import { describe, expect, it } from "vitest";
 import {
   hasSceneContentChanged,
   projectCurrentSceneTimings,
+  sceneMediaCompatibility,
 } from "./scene-revision";
 import { createProductionBaselineFixture } from "@/lib/test-utils/version-two-production-fixture";
 import { sceneContentSchema } from "@/lib/schemas/scene";
 import { parseSceneEditorInput } from "@/lib/scenes/scene-editor-input";
 
 describe("scene revision content and timing", () => {
+  it("keeps images for narration edits and narration for every visual-only edit", () => {
+    const version = createProductionBaselineFixture().rows[0]!.version;
+    expect(
+      sceneMediaCompatibility(version, {
+        ...version,
+        narrationText: "A different sentence.",
+      }),
+    ).toEqual({ image: true, audio: false });
+    for (const field of [
+      "visualDescription",
+      "locationDescription",
+      "actionDescription",
+      "cameraShot",
+      "cameraAngle",
+      "cameraMotion",
+      "emotionalTone",
+      "continuityNotes",
+    ] as const) {
+      expect(
+        sceneMediaCompatibility(version, { ...version, [field]: "Changed" }),
+        field,
+      ).toEqual({ image: false, audio: true });
+    }
+    for (const field of ["characterNames", "propNames"] as const)
+      expect(
+        sceneMediaCompatibility(version, { ...version, [field]: ["Changed"] }),
+        field,
+      ).toEqual({ image: false, audio: true });
+    expect(
+      sceneMediaCompatibility(version, {
+        ...version,
+        estimatedDurationMilliseconds: 14000,
+      }),
+    ).toEqual({ image: true, audio: true });
+  });
   it("ignores identity, timestamp and derived timing differences", () => {
     const version = createProductionBaselineFixture().rows[0]!.version;
     expect(

@@ -43,3 +43,28 @@ export class SceneRevisionConflictError extends Error {
     this.name = "SceneRevisionConflictError";
   }
 }
+
+/** Speech generation consumes narration; images consume the visual brief. */
+export function sceneMediaCompatibility(
+  before: SceneContent,
+  after: SceneContent,
+) {
+  const visualFields = [
+    "visualDescription",
+    "locationDescription",
+    "actionDescription",
+    "cameraShot",
+    "cameraAngle",
+    "cameraMotion",
+    "emotionalTone",
+    "characterNames",
+    "propNames",
+    "continuityNotes",
+  ] as const;
+  return {
+    audio: before.narrationText === after.narrationText,
+    image: visualFields.every(
+      (field) => JSON.stringify(before[field]) === JSON.stringify(after[field]),
+    ),
+  };
+}

@@ -156,6 +156,11 @@ export function SceneAudioRow({
         </ul>
       ) : null}
 
+      {scene.approvedAudioReused ? (
+        <p className="text-sm text-muted-foreground">
+          Approved narration reused from an earlier revision.
+        </p>
+      ) : null}
       <div className="flex flex-wrap items-center gap-2">
         {needsReview && canReview && scene.latestGenerationId ? (
           <ApproveSceneAudioButton

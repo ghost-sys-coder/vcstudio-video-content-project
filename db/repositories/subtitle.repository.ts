@@ -3,6 +3,10 @@ import "server-only";
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
 import {
+  listReusedImages,
+  listReusedAudio,
+} from "@/db/repositories/scene-revision-media.repository";
+import {
   projectSubtitleSettings,
   sceneAudioGenerations,
   sceneImageGenerations,
@@ -47,7 +51,7 @@ export async function listApprovedSceneImageAssets(input: {
 }) {
   const sceneVersionIds = scopedSceneVersionIds(input.sceneVersionIds);
   if (!sceneVersionIds.length) return [];
-  return getDatabase()
+  const native = await getDatabase()
     .select({
       generationId: sceneImageGenerations.id,
       sceneVersionId: sceneImageGenerations.sceneVersionId,
@@ -69,6 +73,22 @@ export async function listApprovedSceneImageAssets(input: {
       ),
     )
     .limit(MAX_SCENE_VERSIONS);
+  const present = new Set(native.map((row) => row.sceneVersionId));
+  const reused = await listReusedImages({ ...input, sceneVersionIds });
+  return [
+    ...native,
+    ...reused
+      .filter(
+        (row) => row.size === input.size && !present.has(row.sceneVersionId),
+      )
+      .map((row) => ({
+        generationId: row.id,
+        sceneVersionId: row.sceneVersionId,
+        assetObjectKey: row.assetObjectKey,
+        assetWidth: row.assetWidth,
+        assetHeight: row.assetHeight,
+      })),
+  ];
 }
 
 /**
@@ -81,7 +101,7 @@ export async function listApprovedSceneAudioAssets(input: {
 }) {
   const sceneVersionIds = scopedSceneVersionIds(input.sceneVersionIds);
   if (!sceneVersionIds.length) return [];
-  return getDatabase()
+  const native = await getDatabase()
     .select({
       generationId: sceneAudioGenerations.id,
       sceneVersionId: sceneAudioGenerations.sceneVersionId,
@@ -102,4 +122,19 @@ export async function listApprovedSceneAudioAssets(input: {
       ),
     )
     .limit(MAX_SCENE_VERSIONS);
+  const present = new Set(native.map((row) => row.sceneVersionId));
+  const reused = await listReusedAudio({ ...input, sceneVersionIds });
+  return [
+    ...native,
+    ...reused
+      .filter((row) => !present.has(row.sceneVersionId))
+      .map((row) => ({
+        generationId: row.id,
+        sceneVersionId: row.sceneVersionId,
+        assetObjectKey: row.assetObjectKey,
+        durationMilliseconds: row.durationMilliseconds,
+        format: row.format,
+        amplitudeEnvelope: row.amplitudeEnvelope,
+      })),
+  ];
 }

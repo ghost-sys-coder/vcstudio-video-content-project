@@ -9,6 +9,7 @@ const nativeImage = {
 };
 
 const variantImage = {
+  sourceImageGenerationId: "approved-gen",
   generationId: "variant-gen",
   assetObjectKey: "variant.webp",
   assetWidth: 1080,
@@ -32,6 +33,25 @@ const storedFraming = {
 };
 
 describe("resolveSceneImage", () => {
+  it("uses a replacement image when saved cover framing points at the prior generation", () => {
+    const resolved = resolveSceneImage({
+      native: null,
+      variantImage,
+      approvedImage,
+      storedFraming: { ...storedFraming, mode: "cover" },
+    });
+    expect(resolved?.image.generationId).toBe("approved-gen");
+    expect(resolved?.framing.scaleBps).toBe(10000);
+  });
+  it("does not reuse an outpaint made from a replaced source", () => {
+    const resolved = resolveSceneImage({
+      native: null,
+      variantImage,
+      approvedImage: { ...approvedImage, generationId: "replacement" },
+      storedFraming,
+    });
+    expect(resolved?.image.generationId).toBe("replacement");
+  });
   it("prefers a native image at the exact size, with identity framing", () => {
     const resolved = resolveSceneImage({
       native: nativeImage,

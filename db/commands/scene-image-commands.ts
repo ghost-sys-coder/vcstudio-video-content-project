@@ -1,4 +1,5 @@
 import "server-only";
+import { assertCurrentMediaReview } from "@/lib/scenes/assert-current-media-review";
 
 import { createHash } from "node:crypto";
 import { and, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
@@ -1531,6 +1532,7 @@ export async function rejectSceneImageGeneration(input: {
   if (generation.status !== "succeeded")
     throw new Error("SCENE_IMAGE_GENERATION_NOT_SUCCESSFUL");
   if (generation.reviewStatus === "rejected") return generation;
+  await assertCurrentMediaReview(generation);
 
   const [rejected] = await getDatabase()
     .update(sceneImageGenerations)

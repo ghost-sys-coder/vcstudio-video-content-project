@@ -12,7 +12,10 @@ import { SceneVisualDescriptionField } from "@/components/scenes/SceneVisualDesc
 import { SceneCameraControls } from "@/components/scenes/SceneCameraControls";
 import { SceneCharacterSelector } from "@/components/scenes/SceneCharacterSelector";
 import { SceneDurationField } from "@/components/scenes/SceneDurationField";
-import { hasSceneContentChanged } from "@/lib/domain/scene-revision";
+import {
+  hasSceneContentChanged,
+  sceneMediaCompatibility,
+} from "@/lib/domain/scene-revision";
 import { parseSceneEditorInput } from "@/lib/scenes/scene-editor-input";
 
 export function SceneEditor({
@@ -30,6 +33,10 @@ export function SceneEditor({
   const [message, setMessage] = useState<string | null>(null);
   const [changed, setChanged] = useState(false);
   const [succeeded, setSucceeded] = useState(false);
+  const [compatibility, setCompatibility] = useState({
+    image: true,
+    audio: true,
+  });
   return (
     <form
       action={(data) =>
@@ -51,6 +58,11 @@ export function SceneEditor({
         const dirty =
           !parsed.success || hasSceneContentChanged(version, parsed.data);
         setChanged(dirty);
+        setCompatibility(
+          parsed.success
+            ? sceneMediaCompatibility(version, parsed.data)
+            : { image: false, audio: false },
+        );
         setMessage(null);
         onDirtyChange?.(dirty);
       }}
@@ -132,7 +144,7 @@ export function SceneEditor({
         <div className="space-y-2">
           <p className="text-sm text-muted-foreground" role="status">
             {changed
-              ? "Saving returns this scene to review. Its images, audio, captions and framing will need to be prepared for the new version. Other scenes keep their approvals and media. Shorts after an edited scene may need their ranges reviewed. Saving is free; generation costs are confirmed separately."
+              ? `Saving returns this scene to review. ${compatibility.image ? "Approved images and framing are kept." : "Images and framing need preparation again."} ${compatibility.audio ? "Approved narration and caption edits are kept." : "Narration and captions need preparation again."} Other scenes keep their media. Shorts may need range review. Saving is free; generation costs are confirmed separately.`
               : "No changes to save. Existing approvals and media will be kept."}
           </p>
           <Button

@@ -1,5 +1,14 @@
 import { randomUUID } from "node:crypto";
-import { inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
+import { updateScene, approveScene } from "@/db/commands/scene-commands";
+import { listCurrentScenes } from "@/db/repositories/scenes.repository";
+import {
+  listApprovedSceneImageAssets,
+  listApprovedSceneAudioAssets,
+  getProjectSubtitleSettings,
+} from "@/db/repositories/subtitle.repository";
+import { listReusedImages } from "@/db/repositories/scene-revision-media.repository";
+import { DEFAULT_CAPTION_STYLE } from "@/lib/subtitles/caption-style";
 import { config as loadEnvironment } from "dotenv";
 import {
   afterAll,
@@ -15,10 +24,12 @@ vi.mock("server-only", () => ({}));
 
 import {
   approveSceneImageGeneration,
+  rejectSceneImageGeneration,
   saveUploadedSceneImage,
 } from "@/db/commands/scene-image-commands";
 import {
   approveSceneAudioGeneration,
+  rejectSceneAudioGeneration,
   saveRecordedSceneAudio,
 } from "@/db/commands/scene-audio-commands";
 import { findSceneImageGeneration } from "@/db/repositories/scene-images.repository";
@@ -33,6 +44,10 @@ import {
   users,
   workspaceMembers,
   workspaces,
+  sceneAudioGenerations,
+  projectSubtitleSettings,
+  projectOutputVariants,
+  sceneVariantFramings,
 } from "@/db/schema";
 
 const enabled = process.env.RUN_DATABASE_INTEGRATION_TESTS === "true";
@@ -186,6 +201,241 @@ describeDatabase("scene media upload invariants", () => {
   });
   afterEach(cleanup);
   afterAll(cleanup);
+
+  it.each(["narration", "visual", "duration", "both"] as const)(
+    "reuses only compatible approved media after a %s revision",
+    async (change) => {
+      const fixture = await createFixture();
+      const scope = {
+        workspaceId: fixture.workspaceId,
+        projectId: fixture.projectId,
+      };
+      const [original] = await listCurrentScenes(scope);
+      if (!original) throw new Error("Missing fixture scene");
+      const image = await saveUploadedSceneImage({
+        ...fixture,
+        generationId: randomUUID(),
+        size: "1536x1024",
+        objectKey: `integration/${randomUUID()}.png`,
+        contentType: "image/png",
+        sizeBytes: 2048,
+        width: 1536,
+        height: 1024,
+        etag: "fixture",
+        requestedByUserId: fixture.userId,
+      });
+      await approveSceneImageGeneration({
+        ...scope,
+        generationId: image.id,
+        userId: fixture.userId,
+      });
+      const audio = await saveRecordedSceneAudio({
+        ...fixture,
+        generationId: randomUUID(),
+        objectKey: `integration/${randomUUID()}.webm`,
+        contentType: "audio/webm",
+        sizeBytes: 4096,
+        etag: "fixture",
+        durationMilliseconds: 5000,
+        narrationText: original.version.narrationText,
+        requestedByUserId: fixture.userId,
+      });
+      await getDatabase()
+        .update(sceneAudioGenerations)
+        .set({ inspectionStatus: "succeeded" })
+        .where(
+          and(
+            eq(sceneAudioGenerations.workspaceId, scope.workspaceId),
+            eq(sceneAudioGenerations.id, audio.id),
+          ),
+        );
+      await approveSceneAudioGeneration({
+        ...scope,
+        generationId: audio.id,
+        userId: fixture.userId,
+      });
+      await getDatabase()
+        .insert(projectSubtitleSettings)
+        .values({
+          ...scope,
+          captionStyle: DEFAULT_CAPTION_STYLE,
+          segmentTextOverrides: {
+            [`${original.version.id}:0`]: "Edited caption",
+          },
+          updatedByUserId: fixture.userId,
+        });
+      const beforeImage = await findSceneImageGeneration({
+        ...scope,
+        generationId: image.id,
+      });
+      const variantId = randomUUID();
+      await getDatabase()
+        .insert(projectOutputVariants)
+        .values({
+          ...scope,
+          id: variantId,
+          name: "Vertical fixture",
+          aspectRatio: "9:16",
+          width: 1080,
+          height: 1920,
+          createdByUserId: fixture.userId,
+        });
+      await getDatabase()
+        .insert(sceneVariantFramings)
+        .values({
+          ...scope,
+          outputVariantId: variantId,
+          sceneId: original.scene.id,
+          sceneVersionId: original.version.id,
+          sourceImageGenerationId: image.id,
+          focalPointXBps: 6500,
+          scaleBps: 12000,
+          updatedByUserId: fixture.userId,
+        });
+      const beforeAudio = await findSceneAudioGeneration({
+        ...scope,
+        generationId: audio.id,
+      });
+      const input = {
+        ...original.version,
+        ...scope,
+        userId: fixture.userId,
+        sceneId: original.scene.id,
+        expectedVersion: 1,
+        narrationText:
+          change === "narration" || change === "both"
+            ? "Changed narration."
+            : original.version.narrationText,
+        visualDescription:
+          change === "visual" || change === "both"
+            ? "A new composition."
+            : original.version.visualDescription,
+        estimatedDurationMilliseconds: change === "duration" ? 6000 : 5000,
+      };
+      await updateScene(input);
+      const [current] = await listCurrentScenes(scope);
+      if (!current) throw new Error("Missing revision");
+      if (change === "duration") {
+        await expect(
+          rejectSceneImageGeneration({
+            ...scope,
+            generationId: image.id,
+            userId: fixture.userId,
+          }),
+        ).rejects.toThrow("MEDIA_REVIEW_REQUIRES_CURRENT_SCENE_VERSION");
+        await expect(
+          rejectSceneAudioGeneration({
+            ...scope,
+            generationId: audio.id,
+            userId: fixture.userId,
+          }),
+        ).rejects.toThrow("MEDIA_REVIEW_REQUIRES_CURRENT_SCENE_VERSION");
+      }
+      const readScope = { ...scope, sceneVersionIds: [current.version.id] };
+      const framings = await getDatabase()
+        .select()
+        .from(sceneVariantFramings)
+        .where(
+          and(
+            eq(sceneVariantFramings.workspaceId, scope.workspaceId),
+            eq(sceneVariantFramings.sceneVersionId, current.version.id),
+          ),
+        );
+      expect(framings.length).toBe(
+        change === "narration" || change === "duration" ? 1 : 0,
+      );
+      if (framings[0])
+        expect(framings[0]).toMatchObject({
+          sourceImageGenerationId: image.id,
+          focalPointXBps: 6500,
+          scaleBps: 12000,
+        });
+      const images = await listApprovedSceneImageAssets({
+        ...readScope,
+        size: "1536x1024",
+      });
+      const audios = await listApprovedSceneAudioAssets(readScope);
+      expect(images.map((row) => row.generationId)).toEqual(
+        change === "narration" || change === "duration" ? [image.id] : [],
+      );
+      expect(audios.map((row) => row.generationId)).toEqual(
+        change === "visual" || change === "duration" ? [audio.id] : [],
+      );
+      const captions = await getProjectSubtitleSettings(scope);
+      expect(captions?.segmentTextOverrides[`${current.version.id}:0`]).toBe(
+        change === "visual" || change === "duration"
+          ? "Edited caption"
+          : undefined,
+      );
+      expect(
+        await findSceneImageGeneration({ ...scope, generationId: image.id }),
+      ).toEqual(beforeImage);
+      expect(
+        await findSceneAudioGeneration({ ...scope, generationId: audio.id }),
+      ).toEqual(beforeAudio);
+      expect(
+        await listReusedImages({ ...readScope, workspaceId: randomUUID() }),
+      ).toEqual([]);
+      // A duration-only revision carries explicit bindings forward again.
+      await updateScene({
+        ...input,
+        expectedVersion: 2,
+        estimatedDurationMilliseconds: 7000,
+      });
+      const [next] = await listCurrentScenes(scope);
+      if (!next) throw new Error("Missing second revision");
+      expect(
+        (
+          await listApprovedSceneImageAssets({
+            ...scope,
+            sceneVersionIds: [next.version.id],
+            size: "1536x1024",
+          })
+        ).map((row) => row.generationId),
+      ).toEqual(images.map((row) => row.generationId));
+      expect(
+        (
+          await listApprovedSceneAudioAssets({
+            ...scope,
+            sceneVersionIds: [next.version.id],
+          })
+        ).map((row) => row.generationId),
+      ).toEqual(audios.map((row) => row.generationId));
+      await approveScene({
+        ...scope,
+        sceneId: next.scene.id,
+        expectedVersion: 3,
+      });
+      const replacement = await saveUploadedSceneImage({
+        ...fixture,
+        sceneVersionId: next.version.id,
+        generationId: randomUUID(),
+        size: "1536x1024",
+        objectKey: `integration/${randomUUID()}.png`,
+        contentType: "image/png",
+        sizeBytes: 2048,
+        width: 1536,
+        height: 1024,
+        etag: "replacement",
+        requestedByUserId: fixture.userId,
+      });
+      await approveSceneImageGeneration({
+        ...scope,
+        generationId: replacement.id,
+        userId: fixture.userId,
+      });
+      expect(
+        (
+          await listApprovedSceneImageAssets({
+            ...scope,
+            sceneVersionIds: [next.version.id],
+            size: "1536x1024",
+          })
+        ).map((row) => row.generationId),
+      ).toEqual([replacement.id]);
+    },
+    60_000,
+  );
 
   it("saves an uploaded scene image with nulled AI-only fields and no reservation", async () => {
     const fixture = await createFixture();

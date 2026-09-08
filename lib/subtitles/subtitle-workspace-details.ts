@@ -242,6 +242,7 @@ export async function buildSubtitleContext(input: {
         variantImage: variantImage?.assetObjectKey
           ? {
               generationId: variantImage.id,
+              sourceImageGenerationId: variantImage.sourceImageGenerationId,
               assetObjectKey: variantImage.assetObjectKey,
               assetWidth: variantImage.assetWidth,
               assetHeight: variantImage.assetHeight,

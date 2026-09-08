@@ -170,10 +170,11 @@ export async function loadSceneImageDetails(input: {
   }
 
   const generations: SceneImageGenerationView[] = generationRows.map(
-    ({ generation, stylePresetVersion, reservationStatus }) => {
+    ({ generation, stylePresetVersion, reservationStatus, reused }) => {
       const parsedSize = sceneImageApiSizeSchema.parse(generation.size);
       return {
         id: generation.id,
+        reused,
         generationVersion: generation.generationVersion,
         status: generation.status,
         reviewStatus: generation.reviewStatus,

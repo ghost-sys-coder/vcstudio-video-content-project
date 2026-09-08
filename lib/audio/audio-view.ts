@@ -33,6 +33,7 @@ export interface CustomVoiceView {
 }
 
 export interface AudioSceneView {
+  approvedAudioReused?: boolean;
   sceneId: string;
   sceneNumber: number;
   sceneStatus: SceneStatus;

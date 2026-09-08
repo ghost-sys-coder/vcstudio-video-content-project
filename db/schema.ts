@@ -5903,6 +5903,75 @@ export const projectSubtitleSettings = pgTable(
   ],
 );
 
+// Explicit reuse only: historical generations keep their original identity and ledger.
+export const sceneRevisionMedia = pgTable(
+  "scene_revision_media",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    sceneId: uuid("scene_id").notNull(),
+    sceneVersionId: uuid("scene_version_id").notNull(),
+    slot: text("slot").notNull(),
+    imageGenerationId: uuid("image_generation_id"),
+    audioGenerationId: uuid("audio_generation_id"),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("scene_revision_media_version_slot_unique").on(
+      table.sceneVersionId,
+      table.slot,
+    ),
+    index("scene_revision_media_scope_index").on(
+      table.workspaceId,
+      table.projectId,
+      table.sceneVersionId,
+    ),
+    check(
+      "scene_revision_media_slot_valid",
+      sql`(${table.slot} = 'audio' and ${table.audioGenerationId} is not null and ${table.imageGenerationId} is null) or (${table.slot} in ('1024x1024', '1536x1024', '1024x1536') and ${table.imageGenerationId} is not null and ${table.audioGenerationId} is null)`,
+    ),
+    foreignKey({
+      columns: [
+        table.sceneVersionId,
+        table.sceneId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        sceneVersions.id,
+        sceneVersions.sceneId,
+        sceneVersions.projectId,
+        sceneVersions.workspaceId,
+      ],
+      name: "scene_revision_media_version_fk",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.imageGenerationId, table.projectId, table.workspaceId],
+      foreignColumns: [
+        sceneImageGenerations.id,
+        sceneImageGenerations.projectId,
+        sceneImageGenerations.workspaceId,
+      ],
+      name: "scene_revision_media_image_fk",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.audioGenerationId, table.projectId, table.workspaceId],
+      foreignColumns: [
+        sceneAudioGenerations.id,
+        sceneAudioGenerations.projectId,
+        sceneAudioGenerations.workspaceId,
+      ],
+      name: "scene_revision_media_audio_fk",
+    }).onDelete("cascade"),
+  ],
+);
+
 export const rateLimitCounters = pgTable(
   "rate_limit_counters",
   {

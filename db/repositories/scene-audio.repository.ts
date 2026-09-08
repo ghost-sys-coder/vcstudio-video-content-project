@@ -1,4 +1,8 @@
 import "server-only";
+import {
+  appendReusedMedia,
+  listReusedAudio,
+} from "@/db/repositories/scene-revision-media.repository";
 
 import { and, asc, desc, eq, inArray, isNull, lte, max } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
@@ -174,7 +178,7 @@ export async function listSceneAudioGenerationsForSceneVersions(input: {
     MAX_LIST_LIMIT * 2,
   );
   if (!sceneVersionIds.length) return [];
-  return getDatabase()
+  const native = await getDatabase()
     .select()
     .from(sceneAudioGenerations)
     .where(
@@ -189,6 +193,10 @@ export async function listSceneAudioGenerationsForSceneVersions(input: {
       desc(sceneAudioGenerations.generationVersion),
     )
     .limit(MAX_AUDIO_GENERATION_RESULTS);
+  return appendReusedMedia(
+    native,
+    await listReusedAudio({ ...input, sceneVersionIds }),
+  );
 }
 
 export async function listSceneAudioGenerationSummaries(input: {

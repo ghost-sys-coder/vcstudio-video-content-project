@@ -96,6 +96,11 @@ export async function loadAudioWorkspace(input: {
   );
   const latestByScene = new Map<string, SceneAudioGeneration>();
   const approvedByScene = new Map<string, SceneAudioGeneration>();
+  const reusedGenerationIds = new Set(
+    generations
+      .filter((generation) => "sourceSceneVersionId" in generation)
+      .map((generation) => generation.id),
+  );
   const progress = { ...EMPTY_PROGRESS };
   for (const generation of generations) {
     if (sceneVersionById.get(generation.sceneId) !== generation.sceneVersionId)
@@ -154,6 +159,9 @@ export async function loadAudioWorkspace(input: {
           ? assetUrl(latest.id)
           : null,
       approvedAudioUrl: approved ? assetUrl(approved.id) : null,
+      approvedAudioReused: approved
+        ? reusedGenerationIds.has(approved.id)
+        : false,
       durationMilliseconds:
         approved?.durationMilliseconds ??
         (latest?.status === "succeeded"

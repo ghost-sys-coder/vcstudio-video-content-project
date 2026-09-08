@@ -1,4 +1,8 @@
 import "server-only";
+import {
+  appendReusedMedia,
+  listReusedImages,
+} from "@/db/repositories/scene-revision-media.repository";
 
 import { and, asc, desc, eq, inArray, isNull, lte, max } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
@@ -419,49 +423,74 @@ export async function listSceneImageGenerationSummaries(input: {
       eq(sceneImageGenerations.sceneVersionId, input.sceneVersionId),
     );
 
-  return (
-    getDatabase()
-      .select({
-        generation: sceneImageGenerations,
-        stylePreset: stylePresets,
-        stylePresetVersion: stylePresetVersions,
-        reservationStatus: usageReservations.status,
-      })
-      .from(sceneImageGenerations)
-      // A user-uploaded image has no stylePresetVersionId, so these must be
-      // left joins (not inner) or uploaded rows would silently disappear from
-      // this list entirely. The workspace scoping moves onto the join
-      // condition itself so it still constrains the match without turning the
-      // join back into an inner join via the WHERE clause.
-      .leftJoin(
-        stylePresetVersions,
-        and(
-          eq(
-            stylePresetVersions.id,
-            sceneImageGenerations.stylePresetVersionId,
-          ),
-          eq(stylePresetVersions.workspaceId, input.workspaceId),
-        ),
+  const native = await getDatabase()
+    .select({
+      generation: sceneImageGenerations,
+      stylePreset: stylePresets,
+      stylePresetVersion: stylePresetVersions,
+      reservationStatus: usageReservations.status,
+    })
+    .from(sceneImageGenerations)
+    // A user-uploaded image has no stylePresetVersionId, so these must be
+    // left joins (not inner) or uploaded rows would silently disappear from
+    // this list entirely. The workspace scoping moves onto the join
+    // condition itself so it still constrains the match without turning the
+    // join back into an inner join via the WHERE clause.
+    .leftJoin(
+      stylePresetVersions,
+      and(
+        eq(stylePresetVersions.id, sceneImageGenerations.stylePresetVersionId),
+        eq(stylePresetVersions.workspaceId, input.workspaceId),
+      ),
+    )
+    .leftJoin(
+      stylePresets,
+      and(
+        eq(stylePresets.id, stylePresetVersions.stylePresetId),
+        eq(stylePresets.workspaceId, input.workspaceId),
+      ),
+    )
+    .leftJoin(
+      usageReservations,
+      and(
+        eq(usageReservations.workspaceId, input.workspaceId),
+        eq(usageReservations.projectId, input.projectId),
+        eq(usageReservations.imageGenerationId, sceneImageGenerations.id),
+      ),
+    )
+    .where(and(...conditions))
+    .orderBy(desc(sceneImageGenerations.generationVersion))
+    .limit(boundedLimit(input.limit));
+  if (!input.sceneVersionId)
+    return native.map((row) => ({ ...row, reused: false }));
+  const reused = await listReusedImages({
+    ...input,
+    sceneVersionIds: [input.sceneVersionId],
+  });
+  const approvedSizes = new Set(
+    native
+      .filter(
+        (row) =>
+          row.generation.reviewStatus === "approved" &&
+          row.generation.status === "succeeded" &&
+          row.generation.assetObjectKey !== null,
       )
-      .leftJoin(
-        stylePresets,
-        and(
-          eq(stylePresets.id, stylePresetVersions.stylePresetId),
-          eq(stylePresets.workspaceId, input.workspaceId),
-        ),
-      )
-      .leftJoin(
-        usageReservations,
-        and(
-          eq(usageReservations.workspaceId, input.workspaceId),
-          eq(usageReservations.projectId, input.projectId),
-          eq(usageReservations.imageGenerationId, sceneImageGenerations.id),
-        ),
-      )
-      .where(and(...conditions))
-      .orderBy(desc(sceneImageGenerations.generationVersion))
-      .limit(boundedLimit(input.limit))
+      .map((row) => row.generation.size),
   );
+  return [
+    ...native.map((row) => ({ ...row, reused: false })),
+    ...reused
+      .filter(
+        (row) => row.sceneId === input.sceneId && !approvedSizes.has(row.size),
+      )
+      .map((generation) => ({
+        generation,
+        stylePreset: null,
+        stylePresetVersion: null,
+        reservationStatus: null,
+        reused: true,
+      })),
+  ];
 }
 
 export async function listGenerationReferenceAssets(input: {
@@ -640,7 +669,7 @@ export async function listSceneImageGenerationsForSceneVersions(input: {
   );
   if (!sceneVersionIds.length) return [];
 
-  return getDatabase()
+  const native = await getDatabase()
     .select({
       id: sceneImageGenerations.id,
       sceneId: sceneImageGenerations.sceneId,
@@ -671,6 +700,10 @@ export async function listSceneImageGenerationsForSceneVersions(input: {
       desc(sceneImageGenerations.generationVersion),
     )
     .limit(MAX_STORYBOARD_GENERATION_RESULTS);
+  return appendReusedMedia(
+    native,
+    await listReusedImages({ ...input, sceneVersionIds }),
+  );
 }
 
 export async function listExpiredActiveSceneImageGenerations(input: {

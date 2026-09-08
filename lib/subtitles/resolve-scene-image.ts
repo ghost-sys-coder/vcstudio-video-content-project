@@ -3,6 +3,7 @@ export type ResolvableSceneImage = {
   assetObjectKey: string | null;
   assetWidth: number | null;
   assetHeight: number | null;
+  sourceImageGenerationId?: string | null;
 };
 
 export type SceneImageFraming = {
@@ -70,9 +71,13 @@ export function resolveSceneImage(input: {
       usedNative: true,
     };
 
-  const source = input.variantImage?.assetObjectKey
-    ? input.variantImage
-    : input.approvedImage;
+  const source =
+    input.storedFraming?.mode === "outpaint" &&
+    input.variantImage?.assetObjectKey &&
+    input.approvedImage?.generationId ===
+      input.variantImage.sourceImageGenerationId
+      ? input.variantImage
+      : input.approvedImage;
   if (!source?.assetObjectKey) return null;
   const image = {
     generationId: source.generationId,

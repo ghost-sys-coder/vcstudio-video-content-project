@@ -321,11 +321,25 @@ export async function startSceneOutpaintAction(formData: FormData) {
         generationId: parsed.data.sourceImageGenerationId,
       }),
     ]);
+    const currentScenes = await listCurrentScenes(scope);
+    const current = currentScenes.find(
+      (row) =>
+        row.scene.id === parsed.data.sceneId &&
+        row.version.id === parsed.data.sceneVersionId,
+    );
+    const approvedSources = source
+      ? await listApprovedSceneImageAssets({
+          ...scope,
+          sceneVersionIds: [parsed.data.sceneVersionId],
+          size: source.size,
+        })
+      : [];
     if (
       !variant ||
       !source ||
+      !current ||
       source.sceneId !== parsed.data.sceneId ||
-      source.sceneVersionId !== parsed.data.sceneVersionId ||
+      !approvedSources.some((image) => image.generationId === source.id) ||
       source.status !== "succeeded" ||
       source.reviewStatus !== "approved" ||
       source.purpose !== "scene"
@@ -350,7 +364,7 @@ export async function startSceneOutpaintAction(formData: FormData) {
       requestedByUserId: context.user.id,
       project,
       outputVariant: variant,
-      sourceGeneration: source,
+      sourceGeneration: { ...source, sceneVersionId: current.version.id },
       requestNonce: parsed.data.requestNonce,
     });
     revalidatePath(`/app/projects/${project.id}/render`);
