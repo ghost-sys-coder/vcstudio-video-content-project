@@ -1,7 +1,10 @@
 "use client";
 
 import { AlertTriangleIcon, InfoIcon } from "lucide-react";
-import type { CustomVoiceAvailability } from "@/lib/audio/custom-voice-availability";
+import {
+  isEnrollmentBlocked,
+  type CustomVoiceAvailability,
+} from "@/lib/audio/custom-voice-availability";
 
 export function CustomVoiceAvailabilityNotice({
   availability,
@@ -9,9 +12,7 @@ export function CustomVoiceAvailabilityNotice({
   availability: CustomVoiceAvailability;
 }) {
   if (availability.status === "available") return null;
-  const blocking =
-    availability.status === "unsupported" ||
-    availability.status === "unauthorized";
+  const blocking = isEnrollmentBlocked(availability);
   const Icon = blocking ? AlertTriangleIcon : InfoIcon;
   return (
     <div
@@ -28,9 +29,11 @@ export function CustomVoiceAvailabilityNotice({
       />
       <div>
         <p className="text-sm font-medium">
-          {blocking
-            ? "Voice cloning is unavailable"
-            : "Voice cloning status unconfirmed"}
+          {availability.status === "not_enabled"
+            ? "This OpenAI organization is not approved for custom voices"
+            : blocking
+              ? "Voice cloning is unavailable"
+              : "Voice cloning status unconfirmed"}
         </p>
         <p className="text-sm text-muted-foreground">{availability.detail}</p>
       </div>

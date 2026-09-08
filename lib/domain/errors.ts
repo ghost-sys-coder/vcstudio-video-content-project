@@ -109,11 +109,14 @@ export class WorkspaceInvitationEmailMismatchError extends Error {
 
 /**
  * Why a custom-voice provider call failed, at the granularity the user can act
- * on. The distinction that matters most is `provider_unavailable`: the account
- * or the API itself has no custom-voice endpoints, so no amount of re-recording
- * will help and the UI must stop blaming the recording.
+ * on. Two failures are deliberately kept apart even though OpenAI answers both
+ * with a 404: `provider_not_enabled` means the endpoint exists but this
+ * organization is not allowlisted for it (fixable by requesting access), while
+ * `provider_unavailable` means the route itself is unknown. Neither is caused
+ * by the recording, so neither may be reported as one.
  */
 export type CustomVoiceProviderFailure =
+  | "provider_not_enabled"
   | "provider_unavailable"
   | "unauthorized"
   | "recording_rejected"
