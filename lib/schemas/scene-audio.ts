@@ -49,11 +49,6 @@ export const customVoiceEnrollmentSchema = z.object({
   language: z.string().regex(/^[a-z]{2,3}(?:-[A-Z]{2})?$/),
 });
 
-export const revokeCustomVoiceSchema = z.object({
-  projectId: z.uuid(),
-  customVoiceId: z.uuid(),
-});
-
 const uniqueSceneIdsSchema = z
   .array(z.uuid())
   .min(1, "Select at least one scene.")

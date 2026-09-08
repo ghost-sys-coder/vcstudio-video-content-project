@@ -233,11 +233,7 @@ export function AudioWorkspace({
       <VoicePreviewPanel />
 
       {canManageCustomVoices ? (
-        <CustomVoiceManager
-          onChanged={refresh}
-          projectId={projectId}
-          voices={data.customVoices}
-        />
+        <CustomVoiceManager onChanged={refresh} voices={data.customVoices} />
       ) : null}
 
       <div className="flex flex-wrap items-end justify-between gap-3">

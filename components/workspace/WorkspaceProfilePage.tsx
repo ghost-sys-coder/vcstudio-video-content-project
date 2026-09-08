@@ -1,4 +1,5 @@
 import { MarketingStudioSection } from "@/components/workspace/MarketingStudioSection";
+import { WorkspaceCustomVoicesSection } from "@/components/workspace/WorkspaceCustomVoicesSection";
 import { WorkspaceProfileForm } from "@/components/workspace/WorkspaceProfileForm";
 import { WorkspaceChannelsSection } from "@/components/workspace/WorkspaceChannelsSection";
 import { WorkspaceMembersSection } from "@/components/workspace/WorkspaceMembersSection";
@@ -6,11 +7,14 @@ import type {
   WorkspaceInvitationView,
   WorkspaceMemberView,
 } from "@/db/repositories/workspaces.repository";
+import type { CustomVoiceSummary } from "@/lib/audio/custom-voice-client";
 import type { WorkspaceChannelsView } from "@/lib/publishing/workspace-connections-view";
 
 export function WorkspaceProfilePage({
+  canManageCustomVoices,
   channelsView,
   currentUserId,
+  customVoices,
   logoUrl,
   marketingDeploymentEnabled,
   marketingStudioEnabled,
@@ -20,8 +24,10 @@ export function WorkspaceProfilePage({
   workspaceId,
   workspaceName,
 }: {
+  canManageCustomVoices: boolean;
   channelsView: WorkspaceChannelsView;
   currentUserId: string;
+  customVoices: CustomVoiceSummary[];
   logoUrl: string | null;
   marketingDeploymentEnabled: boolean;
   marketingStudioEnabled: boolean;
@@ -68,6 +74,12 @@ export function WorkspaceProfilePage({
         <WorkspaceChannelsSection
           initialData={channelsView}
           oauthStatus={oauthStatus}
+        />
+      </div>
+      <div className="mt-6">
+        <WorkspaceCustomVoicesSection
+          canManage={canManageCustomVoices}
+          initialVoices={customVoices}
         />
       </div>
       <div className="mt-6">

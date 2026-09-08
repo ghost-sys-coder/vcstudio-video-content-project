@@ -1,22 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { Mic2Icon, Trash2Icon } from "lucide-react";
-import { revokeCustomVoiceAction } from "@/app/(authenticated)/app/projects/[projectId]/audio/actions";
+import Link from "next/link";
+import { Trash2Icon } from "lucide-react";
+import { CustomVoiceEnrollmentLauncher } from "@/components/audio/CustomVoiceEnrollmentLauncher";
 import { Button } from "@/components/ui/button";
-import { CustomVoiceEnrollmentDialog } from "@/components/audio/CustomVoiceEnrollmentDialog";
+import { revokeCustomVoiceRequest } from "@/lib/audio/custom-voice-client";
 import type { CustomVoiceView } from "@/lib/audio/audio-view";
 
 export function CustomVoiceManager({
-  projectId,
   voices,
   onChanged,
 }: {
-  projectId: string;
   voices: CustomVoiceView[];
   onChanged: () => Promise<void>;
 }) {
-  const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function revoke(customVoiceId: string) {
@@ -26,12 +24,12 @@ export function CustomVoiceManager({
       )
     )
       return;
-    const formData = new FormData();
-    formData.set("projectId", projectId);
-    formData.set("customVoiceId", customVoiceId);
-    const result = await revokeCustomVoiceAction(formData);
+    const result = await revokeCustomVoiceRequest(customVoiceId);
     if (!result.success) setError(result.error);
-    else await onChanged();
+    else {
+      setError(null);
+      await onChanged();
+    }
   }
 
   const active = voices.filter((voice) => voice.status === "active");
@@ -41,12 +39,15 @@ export function CustomVoiceManager({
         <div>
           <h2 className="font-semibold">Custom voices</h2>
           <p className="text-sm text-muted-foreground">
-            Verified self-voice clones for this workspace.
+            Verified self-voice clones, shared across every project in this
+            workspace. Manage them in{" "}
+            <Link className="underline" href="/app/settings/workspace">
+              workspace settings
+            </Link>
+            .
           </p>
         </div>
-        <Button type="button" size="sm" onClick={() => setOpen(true)}>
-          <Mic2Icon aria-hidden /> Clone my voice
-        </Button>
+        <CustomVoiceEnrollmentLauncher onCreated={onChanged} />
       </div>
       {active.length ? (
         <ul className="mt-4 divide-y">
@@ -62,11 +63,11 @@ export function CustomVoiceManager({
                 </p>
               </div>
               <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                title="Revoke custom voice"
                 onClick={() => revoke(voice.id)}
+                size="icon"
+                title="Revoke custom voice"
+                type="button"
+                variant="ghost"
               >
                 <Trash2Icon aria-hidden />
                 <span className="sr-only">Revoke {voice.name}</span>
@@ -84,12 +85,6 @@ export function CustomVoiceManager({
           {error}
         </p>
       ) : null}
-      <CustomVoiceEnrollmentDialog
-        open={open}
-        onOpenChange={setOpen}
-        projectId={projectId}
-        onCreated={onChanged}
-      />
     </section>
   );
 }
