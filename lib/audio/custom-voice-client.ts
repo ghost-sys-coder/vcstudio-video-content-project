@@ -3,7 +3,13 @@ import type { CustomVoiceAvailability } from "@/lib/audio/custom-voice-availabil
 
 const overviewSchema = z.object({
   availability: z.object({
-    status: z.enum(["available", "unsupported", "unauthorized", "unknown"]),
+    status: z.enum([
+      "available",
+      "not_enabled",
+      "unsupported",
+      "unauthorized",
+      "unknown",
+    ]),
     detail: z.string(),
   }),
   canManage: z.boolean(),

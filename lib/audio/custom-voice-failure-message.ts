@@ -13,6 +13,8 @@ export function customVoiceFailureMessage(error: unknown): string {
     return "The custom voice could not be created. The request failed before it reached the voice provider.";
 
   switch (error.failure) {
+    case "provider_not_enabled":
+      return "This OpenAI organization is not approved for custom voices, so the recordings were never evaluated. Request custom voice access for the organization that owns this deployment's API key, then try again.";
     case "provider_unavailable":
       return "Voice cloning is not available on the connected provider account, so this recording was never evaluated. Ask a workspace owner to configure a voice cloning provider.";
     case "unauthorized":
@@ -35,6 +37,7 @@ export function customVoiceFailureStatus(error: unknown): number {
       return 422;
     case "rate_limited":
       return 429;
+    case "provider_not_enabled":
     case "provider_unavailable":
     case "unauthorized":
       return 503;

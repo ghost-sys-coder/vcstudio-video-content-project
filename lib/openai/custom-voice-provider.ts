@@ -22,9 +22,23 @@ const providerErrorSchema = z.object({
   error: z.object({ message: z.string().min(1) }).partial(),
 });
 
-function failureFromStatus(status: number): CustomVoiceProviderFailure {
-  if (status === 404 || status === 403 || status === 405)
-    return "provider_unavailable";
+/**
+ * OpenAI returns 404 both for a route it does not recognize and for a real
+ * route this organization is not allowlisted for, and only the body text
+ * separates them — "Your organization does not have access to this endpoint."
+ * versus "Endpoint not found." The difference decides whether the operator
+ * should request access or change providers, so it is classified, not flattened.
+ */
+function failureFromResponse(
+  status: number,
+  message: string | null,
+): CustomVoiceProviderFailure {
+  const deniedForOrganization = message
+    ? /does not have access|must be verified|not approved/i.test(message)
+    : false;
+  if (status === 403 || (status === 404 && deniedForOrganization))
+    return "provider_not_enabled";
+  if (status === 404 || status === 405) return "provider_unavailable";
   if (status === 401) return "unauthorized";
   if (status === 429) return "rate_limited";
   if (status >= 400 && status < 500) return "recording_rejected";
@@ -83,11 +97,11 @@ export class OpenAiCustomVoiceProvider {
   private async request(path: string, formData: FormData): Promise<unknown> {
     const response = await this.send(path, { method: "POST", body: formData });
     if (!response.ok) {
-      const body = await response.text().catch(() => "");
+      const message = providerMessage(await response.text().catch(() => ""));
       throw new CustomVoiceProviderError(
-        failureFromStatus(response.status),
+        failureFromResponse(response.status, message),
         response.status,
-        providerMessage(body),
+        message,
         response.headers.get("x-request-id"),
       );
     }
@@ -97,15 +111,26 @@ export class OpenAiCustomVoiceProvider {
   /**
    * Probes whether this account can enroll custom voices, so the UI can refuse
    * to collect recordings it cannot use.
+   *
+   * The probe is an empty POST to the consent endpoint rather than a GET: these
+   * routes are POST-only, so a GET answers "Endpoint not found." even for an
+   * organization that does have access, which would falsely block enrollment.
+   * An empty body creates nothing — an allowlisted organization gets a 400 for
+   * the missing parameters, which is itself the proof that access exists.
    */
   async checkAvailability(): Promise<CustomVoiceAvailability> {
-    const response = await this.send("/audio/voices", { method: "GET" }).catch(
-      (error: unknown) => error,
-    );
+    const response = await this.send("/audio/voice_consents", {
+      method: "POST",
+      body: new FormData(),
+    }).catch((error: unknown) => error);
     if (!(response instanceof Response))
       return availabilityFromFailure("provider_error");
-    if (response.ok) return { status: "available", detail: "" };
-    return availabilityFromFailure(failureFromStatus(response.status));
+    if (response.ok || response.status === 400)
+      return { status: "available", detail: "" };
+    const message = providerMessage(await response.text().catch(() => ""));
+    return availabilityFromFailure(
+      failureFromResponse(response.status, message),
+    );
   }
 
   async createConsent(input: {
@@ -143,12 +168,14 @@ export class OpenAiCustomVoiceProvider {
       `/audio/voice_consents/${encodeURIComponent(consentId)}`,
       { method: "DELETE" },
     );
-    if (!response.ok && response.status !== 404)
+    if (!response.ok && response.status !== 404) {
+      const message = providerMessage(await response.text().catch(() => ""));
       throw new CustomVoiceProviderError(
-        failureFromStatus(response.status),
+        failureFromResponse(response.status, message),
         response.status,
-        null,
+        message,
         response.headers.get("x-request-id"),
       );
+    }
   }
 }

@@ -6,6 +6,16 @@ import {
 import { CustomVoiceProviderError } from "@/lib/domain/errors";
 
 describe("customVoiceFailureMessage", () => {
+  it("tells the operator to request access when the organization is not approved", () => {
+    const message = customVoiceFailureMessage(
+      new CustomVoiceProviderError("provider_not_enabled", 404, null, null),
+    );
+    expect(message).toContain("not approved for custom voices");
+    expect(message).toContain("Request custom voice access");
+    expect(message.toLowerCase()).not.toContain("consent phrase");
+    expect(message.toLowerCase()).not.toContain("recording quality");
+  });
+
   it("does not blame the recording when the provider has no voice endpoints", () => {
     const message = customVoiceFailureMessage(
       new CustomVoiceProviderError("provider_unavailable", 404, null, null),
@@ -55,6 +65,11 @@ describe("customVoiceFailureStatus", () => {
     expect(
       customVoiceFailureStatus(
         new CustomVoiceProviderError("provider_unavailable", 404, null, null),
+      ),
+    ).toBe(503);
+    expect(
+      customVoiceFailureStatus(
+        new CustomVoiceProviderError("provider_not_enabled", 404, null, null),
       ),
     ).toBe(503);
     expect(

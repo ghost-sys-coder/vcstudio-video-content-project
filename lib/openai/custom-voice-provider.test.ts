@@ -51,15 +51,70 @@ describe("OpenAiCustomVoiceProvider", () => {
     );
   });
 
-  it("reports a missing endpoint as unsupported rather than a bad recording", async () => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
-      new Response(
-        JSON.stringify({ error: { message: "Endpoint not found." } }),
-        {
-          status: 404,
-        },
-      ),
+  it("separates an organization without access from an unknown route", async () => {
+    // Both are 404; only the body text distinguishes them, and they call for
+    // different operator action.
+    // A fresh Response per call: a body may only be read once, and this test
+    // makes two requests.
+    const deniedFetcher = vi.fn<typeof fetch>().mockImplementation(
+      async () =>
+        new Response(
+          JSON.stringify({
+            error: {
+              message:
+                "Your organization does not have access to this endpoint.",
+            },
+          }),
+          { status: 404 },
+        ),
     );
+    const denied = new OpenAiCustomVoiceProvider({
+      apiKey: "test",
+      fetcher: deniedFetcher,
+    });
+    await expect(denied.checkAvailability()).resolves.toMatchObject({
+      status: "not_enabled",
+    });
+    await expect(
+      denied.createConsent({
+        name: "Owner consent",
+        language: "en-US",
+        recording: new File(["audio"], "r.webm", { type: "audio/webm" }),
+      }),
+    ).rejects.toMatchObject({ failure: "provider_not_enabled" });
+  });
+
+  it("treats a 400 from the availability probe as proof of access", async () => {
+    // An allowlisted organization answers the empty probe with a validation
+    // error, which is the only positive signal available without enrolling.
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify({ error: { message: "Missing required parameter." } }),
+          { status: 400 },
+        ),
+      );
+    const provider = new OpenAiCustomVoiceProvider({ apiKey: "test", fetcher });
+    await expect(provider.checkAvailability()).resolves.toMatchObject({
+      status: "available",
+    });
+    expect(fetcher.mock.calls[0]?.[0]).toBe(
+      "https://api.openai.com/v1/audio/voice_consents",
+    );
+    expect(fetcher.mock.calls[0]?.[1]?.method).toBe("POST");
+  });
+
+  it("reports a missing endpoint as unsupported rather than a bad recording", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockImplementation(
+        async () =>
+          new Response(
+            JSON.stringify({ error: { message: "Endpoint not found." } }),
+            { status: 404 },
+          ),
+      );
     const provider = new OpenAiCustomVoiceProvider({ apiKey: "test", fetcher });
 
     await expect(provider.checkAvailability()).resolves.toMatchObject({

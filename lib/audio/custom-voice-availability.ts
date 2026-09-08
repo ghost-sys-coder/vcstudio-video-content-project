@@ -5,11 +5,11 @@ import type { CustomVoiceProviderFailure } from "@/lib/domain/errors";
  *
  * This is checked before the enrollment UI asks anyone to record, because the
  * failure mode it guards against is indistinguishable from a bad recording once
- * enrollment has already been attempted: the provider answers "endpoint not
- * found" and the user is told to re-read the consent phrase.
+ * enrollment has already been attempted: the provider answers 404 and the user
+ * is told to re-read the consent phrase.
  */
 export type CustomVoiceAvailabilityStatus =
-  "available" | "unsupported" | "unauthorized" | "unknown";
+  "available" | "not_enabled" | "unsupported" | "unauthorized" | "unknown";
 
 export interface CustomVoiceAvailability {
   status: CustomVoiceAvailabilityStatus;
@@ -17,13 +17,18 @@ export interface CustomVoiceAvailability {
   detail: string;
 }
 
+export const CUSTOM_VOICE_NOT_ENABLED_DETAIL =
+  "The custom voice endpoints exist, but this OpenAI organization is not approved to use them. Request access for the organization that owns this deployment's API key; no change to your recordings will help until then.";
+
 export const CUSTOM_VOICE_UNSUPPORTED_DETAIL =
-  "The connected OpenAI project does not expose custom voice endpoints. Voice cloning cannot run until a provider that supports it is configured.";
+  "The connected provider does not expose custom voice endpoints. Voice cloning cannot run until a provider that supports it is configured.";
 
 export function availabilityFromFailure(
   failure: CustomVoiceProviderFailure,
 ): CustomVoiceAvailability {
   switch (failure) {
+    case "provider_not_enabled":
+      return { status: "not_enabled", detail: CUSTOM_VOICE_NOT_ENABLED_DETAIL };
     case "provider_unavailable":
       return { status: "unsupported", detail: CUSTOM_VOICE_UNSUPPORTED_DETAIL };
     case "unauthorized":
@@ -52,6 +57,7 @@ export function isEnrollmentBlocked(
   availability: CustomVoiceAvailability,
 ): boolean {
   return (
+    availability.status === "not_enabled" ||
     availability.status === "unsupported" ||
     availability.status === "unauthorized"
   );

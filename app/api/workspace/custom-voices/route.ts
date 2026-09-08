@@ -166,10 +166,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         availability,
-        error:
-          availability.status === "unsupported"
-            ? "Voice cloning is not available on the connected provider account. Your recordings were fine — nothing was sent."
-            : "The voice provider rejected this deployment's credentials. Your recordings were fine — nothing was sent.",
+        error: `${availability.detail} Your recordings were fine — nothing was sent to the provider.`,
       },
       { status: 503 },
     );
