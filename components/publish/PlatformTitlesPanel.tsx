@@ -199,7 +199,7 @@ export function PlatformTitlesPanel({
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
-        <div className="space-y-1.5">
+        <div className="min-w-40 max-w-xs flex-1 space-y-1.5">
           <Label className="text-xs" htmlFor="title-platform-select">
             Platform
           </Label>
@@ -211,7 +211,7 @@ export function PlatformTitlesPanel({
             }}
             value={platform}
           >
-            <SelectTrigger className="min-w-48" id="title-platform-select">
+            <SelectTrigger className="w-full" id="title-platform-select">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -226,7 +226,7 @@ export function PlatformTitlesPanel({
 
         {canGenerate ? (
           <Button
-            className="h-10"
+            className="h-10 shrink-0"
             disabled={busy || generating || !data.hasContext}
             onClick={generate}
             type="button"
@@ -241,7 +241,7 @@ export function PlatformTitlesPanel({
 
         {generating && cancellable && canGenerate ? (
           <Button
-            className="h-10"
+            className="h-10 shrink-0"
             disabled={busy}
             onClick={cancel}
             type="button"

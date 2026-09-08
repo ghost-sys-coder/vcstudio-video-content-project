@@ -72,7 +72,7 @@ export function VoicePreviewPanel() {
       </blockquote>
 
       <div className="flex flex-wrap items-end gap-3">
-        <div className="space-y-1.5">
+        <div className="min-w-48 max-w-xs flex-1 space-y-1.5">
           <Label className="text-xs" htmlFor="voice-preview-select">
             Voice
           </Label>
@@ -81,7 +81,7 @@ export function VoicePreviewPanel() {
             onValueChange={(value) => handleVoiceChange(String(value))}
             value={voice}
           >
-            <SelectTrigger className="min-w-56" id="voice-preview-select">
+            <SelectTrigger className="w-full" id="voice-preview-select">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -99,7 +99,7 @@ export function VoicePreviewPanel() {
         </div>
 
         <Button
-          className="h-10"
+          className="h-10 shrink-0"
           disabled={status === "loading"}
           onClick={() => (isBusy ? stop() : play())}
           type="button"

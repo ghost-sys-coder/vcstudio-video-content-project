@@ -276,8 +276,11 @@ export function PlatformThumbnailsPanel({
         </p>
       </div>
 
+      {/* The fields flex down instead of holding a fixed minimum, so the
+          action button stays on the same line as them rather than wrapping
+          below at the content widths this app actually renders at. */}
       <div className="flex flex-wrap items-end gap-3">
-        <div className="space-y-1.5">
+        <div className="min-w-36 flex-1 space-y-1.5">
           <Label className="text-xs" htmlFor="thumbnail-platform-select">
             Platform
           </Label>
@@ -289,7 +292,7 @@ export function PlatformThumbnailsPanel({
             }}
             value={platform}
           >
-            <SelectTrigger className="min-w-44" id="thumbnail-platform-select">
+            <SelectTrigger className="w-full" id="thumbnail-platform-select">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -302,7 +305,7 @@ export function PlatformThumbnailsPanel({
           </Select>
         </div>
 
-        <div className="space-y-1.5">
+        <div className="min-w-36 flex-1 space-y-1.5">
           <Label className="text-xs" htmlFor="thumbnail-text-mode-select">
             Text
           </Label>
@@ -314,7 +317,7 @@ export function PlatformThumbnailsPanel({
             }}
             value={textMode}
           >
-            <SelectTrigger className="min-w-52" id="thumbnail-text-mode-select">
+            <SelectTrigger className="w-full" id="thumbnail-text-mode-select">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -325,7 +328,7 @@ export function PlatformThumbnailsPanel({
         </div>
 
         {headlineRequired && headlineOptions.length > 0 ? (
-          <div className="space-y-1.5">
+          <div className="min-w-36 flex-1 space-y-1.5">
             <Label className="text-xs" htmlFor="thumbnail-headline-suggestion">
               Suggested headline
             </Label>
@@ -341,7 +344,7 @@ export function PlatformThumbnailsPanel({
               value={selectedHeadlineOption}
             >
               <SelectTrigger
-                className="min-w-56"
+                className="w-full"
                 id="thumbnail-headline-suggestion"
               >
                 <SelectValue />
@@ -361,12 +364,12 @@ export function PlatformThumbnailsPanel({
         ) : null}
 
         {headlineRequired ? (
-          <div className="space-y-1.5">
+          <div className="min-w-44 flex-[2] space-y-1.5">
             <Label className="text-xs" htmlFor="thumbnail-headline">
               Headline
             </Label>
             <Input
-              className="min-w-72"
+              className="w-full"
               id="thumbnail-headline"
               maxLength={MAX_THUMBNAIL_HEADLINE_LENGTH}
               onChange={(event) => setHeadline(event.target.value)}
@@ -378,7 +381,7 @@ export function PlatformThumbnailsPanel({
 
         {canGenerate ? (
           <Button
-            className="h-10"
+            className="h-10 shrink-0"
             disabled={
               busy ||
               generating ||
@@ -399,7 +402,7 @@ export function PlatformThumbnailsPanel({
 
         {generating && cancellable && canGenerate ? (
           <Button
-            className="h-10"
+            className="h-10 shrink-0"
             disabled={busy}
             onClick={cancel}
             type="button"
