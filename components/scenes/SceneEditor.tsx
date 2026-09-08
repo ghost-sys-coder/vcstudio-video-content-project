@@ -12,6 +12,8 @@ import { SceneVisualDescriptionField } from "@/components/scenes/SceneVisualDesc
 import { SceneCameraControls } from "@/components/scenes/SceneCameraControls";
 import { SceneCharacterSelector } from "@/components/scenes/SceneCharacterSelector";
 import { SceneDurationField } from "@/components/scenes/SceneDurationField";
+import { hasSceneContentChanged } from "@/lib/domain/scene-revision";
+import { parseSceneEditorInput } from "@/lib/scenes/scene-editor-input";
 
 export function SceneEditor({
   scene,
@@ -26,17 +28,32 @@ export function SceneEditor({
 }) {
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
+  const [changed, setChanged] = useState(false);
+  const [succeeded, setSucceeded] = useState(false);
   return (
     <form
       action={(data) =>
         startTransition(async () => {
           const result = await updateSceneAction(data);
-          setMessage(result.error ?? "Scene saved as a new version.");
+          setSucceeded(result.success);
+          setMessage(
+            result.error ??
+              (result.changed
+                ? "Scene saved as a new version."
+                : "No changes to save."),
+          );
           if (result.success) onDirtyChange?.(false);
         })
       }
       className="space-y-4"
-      onChange={() => onDirtyChange?.(true)}
+      onChange={(event) => {
+        const parsed = parseSceneEditorInput(new FormData(event.currentTarget));
+        const dirty =
+          !parsed.success || hasSceneContentChanged(version, parsed.data);
+        setChanged(dirty);
+        setMessage(null);
+        onDirtyChange?.(dirty);
+      }}
     >
       <input name="projectId" type="hidden" value={scene.projectId} />
       <input name="sceneId" type="hidden" value={scene.id} />
@@ -112,16 +129,25 @@ export function SceneEditor({
         />
       </div>
       {canEdit ? (
-        <Button disabled={pending} type="submit" variant="outline">
-          {pending ? "Saving…" : "Save new version"}
-        </Button>
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground" role="status">
+            {changed
+              ? "Saving returns this scene to review. Its images, audio, captions and framing will need to be prepared for the new version. Other scenes keep their approvals and media. Shorts after an edited scene may need their ranges reviewed. Saving is free; generation costs are confirmed separately."
+              : "No changes to save. Existing approvals and media will be kept."}
+          </p>
+          <Button
+            disabled={pending || !changed}
+            type="submit"
+            variant="outline"
+          >
+            {pending ? "Saving…" : "Save scene"}
+          </Button>
+        </div>
       ) : null}
       {message ? (
         <p
           className={
-            message.includes("saved")
-              ? "text-sm text-emerald-700"
-              : "text-sm text-destructive"
+            succeeded ? "text-sm text-emerald-700" : "text-sm text-destructive"
           }
           role="status"
         >

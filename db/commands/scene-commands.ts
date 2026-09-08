@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
 import {
   projectScriptVersions,
@@ -20,6 +20,11 @@ import {
 import { findProjectScriptVersion } from "@/db/repositories/projects.repository";
 import { listProjectCast } from "@/db/repositories/project-characters.repository";
 import { matchCharacterNamesToCast } from "@/lib/scenes/character-name-matching";
+import {
+  hasSceneContentChanged,
+  SceneRevisionConflictError,
+} from "@/lib/domain/scene-revision";
+import { saveSceneRevision } from "@/db/commands/save-scene-revision";
 import { BudgetExceededError } from "@/lib/domain/errors";
 
 export async function approveScriptVersion(input: {
@@ -409,88 +414,14 @@ export async function updateScene(
   );
   const target = currentRows[targetIndex];
   if (!target || target.scene.currentVersion !== input.expectedVersion)
-    throw new Error("SCENE_REVISION_CONFLICT");
-  let cursor = target.version.startTimeMilliseconds;
-  const affected = currentRows.slice(targetIndex).map((row, index) => {
-    const content = index === 0 ? input : row.version;
-    const startTimeMilliseconds = cursor;
-    const endTimeMilliseconds = cursor + content.estimatedDurationMilliseconds;
-    cursor = endTimeMilliseconds;
-    return {
-      id: crypto.randomUUID(),
-      workspaceId: input.workspaceId,
-      projectId: input.projectId,
-      sceneId: row.scene.id,
-      versionNumber: row.scene.currentVersion + 1,
-      narrationText: content.narrationText,
-      visualDescription: content.visualDescription,
-      locationDescription: content.locationDescription,
-      actionDescription: content.actionDescription,
-      cameraShot: content.cameraShot,
-      cameraAngle: content.cameraAngle,
-      cameraMotion: content.cameraMotion,
-      emotionalTone: content.emotionalTone,
-      characterNames: content.characterNames,
-      propNames: content.propNames,
-      continuityNotes: content.continuityNotes,
-      estimatedDurationMilliseconds: content.estimatedDurationMilliseconds,
-      startTimeMilliseconds,
-      endTimeMilliseconds,
-      createdByUserId: input.userId,
-    };
+    throw new SceneRevisionConflictError();
+  if (!hasSceneContentChanged(target.version, input)) return { changed: false };
+  return saveSceneRevision({
+    ...input,
+    previousVersionId: target.version.id,
+    analysisRunId: target.scene.analysisRunId,
+    startTimeMilliseconds: target.version.startTimeMilliseconds,
   });
-  const updates = affected.map((version) =>
-    getDatabase()
-      .update(scenes)
-      .set({
-        currentVersion: version.versionNumber,
-        status: "review",
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(scenes.workspaceId, input.workspaceId),
-          eq(scenes.projectId, input.projectId),
-          eq(scenes.id, version.sceneId),
-          eq(scenes.currentVersion, version.versionNumber - 1),
-        ),
-      ),
-  );
-  const previousAssignments = await getDatabase()
-    .select()
-    .from(sceneVersionCharacters)
-    .where(
-      and(
-        eq(sceneVersionCharacters.workspaceId, input.workspaceId),
-        eq(sceneVersionCharacters.projectId, input.projectId),
-        inArray(
-          sceneVersionCharacters.sceneVersionId,
-          currentRows.slice(targetIndex).map((row) => row.version.id),
-        ),
-      ),
-    );
-  const copiedAssignments = affected.flatMap((version, index) =>
-    previousAssignments
-      .filter(
-        (assignment) =>
-          assignment.sceneVersionId ===
-          currentRows[targetIndex + index]?.version.id,
-      )
-      .map((assignment) => ({
-        workspaceId: input.workspaceId,
-        projectId: input.projectId,
-        sceneVersionId: version.id,
-        characterId: assignment.characterId,
-        assignedByUserId: input.userId,
-      })),
-  );
-  await getDatabase().batch([
-    getDatabase().insert(sceneVersions).values(affected),
-    ...(copiedAssignments.length
-      ? [getDatabase().insert(sceneVersionCharacters).values(copiedAssignments)]
-      : []),
-    ...updates,
-  ]);
 }
 
 export async function approveScene(input: {

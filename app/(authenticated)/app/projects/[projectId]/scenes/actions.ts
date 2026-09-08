@@ -1,5 +1,6 @@
 "use server";
 
+import { parseSceneEditorInput } from "@/lib/scenes/scene-editor-input";
 import { revalidatePath } from "next/cache";
 import { tasks } from "@trigger.dev/sdk";
 import {
@@ -41,7 +42,6 @@ import {
   approveScriptVersionSchema,
   reconcileSceneAnalysisSchema,
   startSceneAnalysisSchema,
-  updateSceneSchema,
 } from "@/lib/schemas/scene";
 import { getSceneAnalysisEnvironment } from "@/lib/env/server";
 import { loadEffectiveWorkspaceBudget } from "@/lib/budgets/workspace-budget";
@@ -63,7 +63,11 @@ import {
 import { enforceRateLimit } from "@/lib/rate-limit/enforce-rate-limit";
 import { recordAuditEvent } from "@/lib/audit/record-audit-event";
 
-export type SceneActionState = { success: boolean; error: string | null };
+export type SceneActionState = {
+  success: boolean;
+  error: string | null;
+  changed?: boolean;
+};
 
 async function requireProjectMutation(
   projectId: string,
@@ -472,19 +476,7 @@ export async function reconcileSceneAnalysisRunAction(
 export async function updateSceneAction(
   formData: FormData,
 ): Promise<SceneActionState> {
-  const raw = Object.fromEntries(formData);
-  const parsed = updateSceneSchema.safeParse({
-    ...raw,
-    characterNames: String(raw.characterNames ?? "")
-      .split(",")
-      .map((value) => value.trim())
-      .filter(Boolean),
-    propNames: String(raw.propNames ?? "")
-      .split(",")
-      .map((value) => value.trim())
-      .filter(Boolean),
-    estimatedDurationMilliseconds: Number(raw.estimatedDurationMilliseconds),
-  });
+  const parsed = parseSceneEditorInput(formData);
   if (!parsed.success)
     return {
       success: false,
@@ -495,13 +487,13 @@ export async function updateSceneAction(
       parsed.data.projectId,
       "editScenes",
     );
-    await updateScene({
+    const result = await updateScene({
       ...parsed.data,
       workspaceId: context.activeMembership.workspaceId,
       userId: context.user.id,
     });
     revalidatePath(`/app/projects/${parsed.data.projectId}/scenes`);
-    return { success: true, error: null };
+    return { success: true, error: null, changed: result.changed };
   } catch (error) {
     return {
       success: false,

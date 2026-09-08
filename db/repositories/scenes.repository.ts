@@ -1,6 +1,7 @@
 import "server-only";
 
 import { and, asc, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
+import { projectCurrentSceneTimings } from "@/lib/domain/scene-revision";
 import { getDatabase } from "@/db/drizzle";
 import {
   projectScriptVersions,
@@ -154,7 +155,7 @@ export async function listCurrentScenes(input: {
 }) {
   const latestCompletedRun = await findLatestCompletedSceneAnalysisRun(input);
   if (!latestCompletedRun) return [];
-  return getDatabase()
+  const rows = await getDatabase()
     .select({ scene: scenes, version: sceneVersions })
     .from(scenes)
     .innerJoin(
@@ -172,6 +173,7 @@ export async function listCurrentScenes(input: {
       ),
     )
     .orderBy(asc(scenes.sceneNumber));
+  return projectCurrentSceneTimings(rows);
 }
 
 export async function findCurrentScene(input: {

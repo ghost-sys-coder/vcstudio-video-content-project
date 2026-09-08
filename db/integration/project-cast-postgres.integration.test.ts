@@ -10,6 +10,8 @@ import {
   applyCastToScenes,
   removeCharacterFromProjectCast,
 } from "@/db/commands/project-characters.command";
+import { updateScene } from "@/db/commands/scene-commands";
+import { listCurrentScenes } from "@/db/repositories/scenes.repository";
 import { listProjectCast } from "@/db/repositories/project-characters.repository";
 import { getDatabase } from "@/db/drizzle";
 import {
@@ -383,6 +385,97 @@ describeDatabase("project cast (postgres)", () => {
       });
       expect(second.assignmentsCreated).toBe(0);
       expect((await listAssignments(fixture)).length).toBe(4);
+    },
+  );
+
+  it(
+    "revises one scene atomically, preserves staging and history, and rejects competing saves",
+    { timeout: 60_000 },
+    async () => {
+      const fixture = await createFixture();
+      const scope = {
+        workspaceId: fixture.workspaceId,
+        projectId: fixture.projectId,
+      };
+      const original = await listCurrentScenes(scope);
+      const target = original[0]!;
+      await getDatabase()
+        .insert(sceneVersionCharacters)
+        .values({
+          ...scope,
+          sceneVersionId: target.version.id,
+          characterId: fixture.kaneId,
+          assignedByUserId: fixture.userId,
+          stageSlot: "left",
+          isSpeaker: true,
+        });
+      const input = {
+        ...target.version,
+        ...scope,
+        sceneId: target.scene.id,
+        expectedVersion: 1,
+        userId: fixture.userId,
+      };
+      expect(await updateScene(input)).toEqual({ changed: false });
+      const results = await Promise.allSettled([
+        updateScene({ ...input, narrationText: "First competing edit." }),
+        updateScene({ ...input, narrationText: "Second competing edit." }),
+      ]);
+      expect(
+        results.filter((result) => result.status === "fulfilled"),
+      ).toHaveLength(1);
+      expect(
+        results.filter((result) => result.status === "rejected"),
+      ).toHaveLength(1);
+      const current = await listCurrentScenes(scope);
+      expect(current[0]!.scene.currentVersion).toBe(2);
+      expect(current[0]!.scene.status).toBe("review");
+      expect(current[1]).toEqual(original[1]);
+      const versions = await getDatabase()
+        .select()
+        .from(sceneVersions)
+        .where(
+          and(
+            eq(sceneVersions.workspaceId, scope.workspaceId),
+            eq(sceneVersions.projectId, scope.projectId),
+          ),
+        );
+      expect(versions).toHaveLength(3);
+      expect(
+        versions.find((version) => version.id === target.version.id),
+      ).toEqual(target.version);
+      const assignments = await listAssignments(fixture);
+      const copied = assignments.find(
+        (row) => row.sceneVersionId === current[0]!.version.id,
+      );
+      expect(copied).toMatchObject({
+        characterId: fixture.kaneId,
+        stageSlot: "left",
+        isSpeaker: true,
+      });
+      await expect(
+        updateScene({ ...input, workspaceId: randomUUID() }),
+      ).rejects.toThrow("SCENE_REVISION_CONFLICT");
+      await expect(
+        updateScene({
+          ...input,
+          expectedVersion: 2,
+          userId: randomUUID(),
+          narrationText: "This insert must fail its creator foreign key.",
+        }),
+      ).rejects.toThrow();
+      expect(await listCurrentScenes(scope)).toEqual(current);
+      await updateScene({
+        ...input,
+        ...current[0]!.version,
+        expectedVersion: 2,
+        estimatedDurationMilliseconds: 6000,
+      });
+      const retimed = await listCurrentScenes(scope);
+      expect(retimed[1]!.scene).toEqual(original[1]!.scene);
+      expect(retimed[1]!.version.id).toBe(original[1]!.version.id);
+      expect(retimed[1]!.version.startTimeMilliseconds).toBe(6000);
+      expect(retimed[1]!.version.endTimeMilliseconds).toBe(11000);
     },
   );
 });

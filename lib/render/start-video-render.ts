@@ -12,6 +12,7 @@ import { countTerminalVideoRendersForTimeline } from "@/db/repositories/video-re
 import {
   getProjectCommittedCostCents,
   getWorkspaceCommittedCostCents,
+  listCurrentScenes,
 } from "@/db/repositories/scenes.repository";
 import {
   createRequestFingerprint,
@@ -39,6 +40,7 @@ import {
 } from "@/lib/output-variants/output-variant-context";
 import { findShortCompositionWithClips } from "@/db/repositories/shorts.repository";
 import { buildShortTimeline } from "@/lib/shorts/short-timeline";
+import { shortNeedsRangeReview } from "@/lib/shorts/short-revision-safety";
 
 export class VideoRenderRequestError extends Error {
   constructor(message: string) {
@@ -132,6 +134,14 @@ export async function startVideoRender(input: {
     });
     if (!short || short.composition.outputVariantId !== outputVariant.id)
       throw new VideoRenderRequestError("The selected short was not found.");
+    const currentScenes = await listCurrentScenes({
+      workspaceId: input.workspaceId,
+      projectId: input.project.id,
+    });
+    if (shortNeedsRangeReview(short.clips, currentScenes))
+      throw new VideoRenderRequestError(
+        "A source or earlier scene changed. Review and save this Short's clip ranges before rendering.",
+      );
     renderTimeline = buildShortTimeline({
       source: renderTimeline,
       clips: short.clips.map((clip) => ({
