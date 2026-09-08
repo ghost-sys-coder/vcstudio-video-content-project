@@ -1,0 +1,4 @@
+ALTER TABLE "short_clips" ADD COLUMN "source_audio_generation_id_snapshot" uuid;--> statement-breakpoint
+ALTER TABLE "short_clips" ADD COLUMN "source_start_offset_milliseconds" integer;--> statement-breakpoint
+ALTER TABLE "short_clips" ADD COLUMN "source_end_offset_milliseconds" integer;--> statement-breakpoint
+ALTER TABLE "short_clips" ADD CONSTRAINT "short_clips_anchor_valid" CHECK (("source_audio_generation_id_snapshot" is null and "source_start_offset_milliseconds" is null and "source_end_offset_milliseconds" is null) or ("source_audio_generation_id_snapshot" is not null and "source_start_offset_milliseconds" is not null and "source_end_offset_milliseconds" is not null and "source_start_offset_milliseconds" >= 0 and "source_end_offset_milliseconds" > "source_start_offset_milliseconds"));

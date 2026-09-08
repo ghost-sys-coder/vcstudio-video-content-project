@@ -40,7 +40,7 @@ import {
 } from "@/lib/output-variants/output-variant-context";
 import { findShortCompositionWithClips } from "@/db/repositories/shorts.repository";
 import { buildShortTimeline } from "@/lib/shorts/short-timeline";
-import { shortNeedsRangeReview } from "@/lib/shorts/short-revision-safety";
+import { resolveShortClips } from "@/lib/shorts/short-anchors";
 
 export class VideoRenderRequestError extends Error {
   constructor(message: string) {
@@ -138,13 +138,18 @@ export async function startVideoRender(input: {
       workspaceId: input.workspaceId,
       projectId: input.project.id,
     });
-    if (shortNeedsRangeReview(short.clips, currentScenes))
+    const resolved = resolveShortClips(
+      short.clips,
+      renderTimeline,
+      currentScenes,
+    );
+    if (resolved.needsReview)
       throw new VideoRenderRequestError(
         "A source or earlier scene changed. Review and save this Short's clip ranges before rendering.",
       );
     renderTimeline = buildShortTimeline({
       source: renderTimeline,
-      clips: short.clips.map((clip) => ({
+      clips: resolved.clips.map((clip) => ({
         id: clip.id,
         sourceSceneId: clip.sourceSceneId,
         sourceSceneVersionId: clip.sourceSceneVersionId,

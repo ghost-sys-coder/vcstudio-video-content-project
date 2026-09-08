@@ -280,6 +280,9 @@ describeDatabase("updateShortComposition", () => {
           position: 1,
           sourceStartMilliseconds: 5_000,
           sourceEndMilliseconds: 9_000,
+          sourceAudioGenerationIdSnapshot: fixture.sceneBVersionId,
+          sourceStartOffsetMilliseconds: 0,
+          sourceEndOffsetMilliseconds: 4_000,
           transition: "fade",
         },
       ],
@@ -294,6 +297,22 @@ describeDatabase("updateShortComposition", () => {
     expect(clips).toHaveLength(1);
     expect(clips[0]?.sourceSceneId).toBe(fixture.sceneBId);
     expect(clips[0]?.transition).toBe("fade");
+    expect(clips[0]).toMatchObject({
+      sourceAudioGenerationIdSnapshot: fixture.sceneBVersionId,
+      sourceStartOffsetMilliseconds: 0,
+      sourceEndOffsetMilliseconds: 4000,
+    });
+    await expect(
+      getDatabase()
+        .update(shortClips)
+        .set({ sourceEndOffsetMilliseconds: null })
+        .where(eq(shortClips.id, clips[0]!.id)),
+    ).rejects.toThrow();
+    const [retained] = await getDatabase()
+      .select()
+      .from(shortClips)
+      .where(eq(shortClips.id, clips[0]!.id));
+    expect(retained?.sourceEndOffsetMilliseconds).toBe(4000);
 
     const [composition] = await getDatabase()
       .select()

@@ -1,4 +1,5 @@
 import "server-only";
+import { resolveShortClips } from "@/lib/shorts/short-anchors";
 
 import type { Project, VideoRender } from "@/db/schema";
 import {
@@ -360,9 +361,13 @@ export async function loadRenderWorkspace(input: {
     clipsByShort.set(clip.shortCompositionId, clips);
   }
   const shorts = shortRows.map((short) => {
-    const clips = (clipsByShort.get(short.id) ?? []).sort(
+    const savedClips = (clipsByShort.get(short.id) ?? []).sort(
       (left, right) => left.position - right.position,
     );
+    const resolved = readyTimeline
+      ? resolveShortClips(savedClips, readyTimeline, currentScenes)
+      : { clips: savedClips, needsReview: true };
+    const clips = resolved.clips;
     const durationMilliseconds = sumDurationMilliseconds(
       clips.map((clip) => ({
         startMilliseconds: clip.sourceStartMilliseconds,
@@ -372,6 +377,7 @@ export async function loadRenderWorkspace(input: {
     return {
       id: short.id,
       name: short.name,
+      needsRangeReview: resolved.needsReview,
       status: short.status,
       outputVariantId: short.outputVariantId,
       clipCount: clips.length,

@@ -2,7 +2,12 @@
 
 import { useState, useTransition } from "react";
 import type { Scene, SceneVersion } from "@/db/schema";
-import { updateSceneAction } from "@/app/(authenticated)/app/projects/[projectId]/scenes/actions";
+import {
+  updateSceneAction,
+  previewSceneRevisionAction,
+} from "@/app/(authenticated)/app/projects/[projectId]/scenes/actions";
+import { SceneRevisionEstimate } from "@/components/scenes/SceneRevisionEstimate";
+import type { SceneRevisionEstimateView } from "@/lib/scenes/scene-revision-view";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,27 +38,57 @@ export function SceneEditor({
   const [message, setMessage] = useState<string | null>(null);
   const [changed, setChanged] = useState(false);
   const [succeeded, setSucceeded] = useState(false);
+  const [estimate, setEstimate] = useState<SceneRevisionEstimateView | null>(
+    null,
+  );
   const [compatibility, setCompatibility] = useState({
     image: true,
     audio: true,
   });
   return (
     <form
-      action={(data) =>
+      onSubmit={(event) => {
+        // React form actions reset uncontrolled fields after returning. A preview
+        // must preserve the draft, including after a recoverable request failure.
+        event.preventDefault();
+        const data = new FormData(event.currentTarget);
         startTransition(async () => {
-          const result = await updateSceneAction(data);
-          setSucceeded(result.success);
-          setMessage(
-            result.error ??
-              (result.changed
-                ? "Scene saved as a new version."
-                : "No changes to save."),
-          );
-          if (result.success) onDirtyChange?.(false);
-        })
-      }
+          try {
+            if (!estimate) {
+              const preview = await previewSceneRevisionAction(data);
+              if (preview.success) {
+                setEstimate(preview.estimate);
+                setMessage(null);
+              } else {
+                setSucceeded(false);
+                setMessage(preview.error);
+              }
+              return;
+            }
+            const result = await updateSceneAction(data);
+            setSucceeded(result.success);
+            setMessage(
+              result.error ??
+                (result.changed
+                  ? "Scene saved as a new version."
+                  : "No changes to save."),
+            );
+            if (result.success) {
+              setChanged(false);
+              setEstimate(null);
+              onDirtyChange?.(false);
+            }
+          } catch {
+            setSucceeded(false);
+            setMessage(
+              "The request could not complete. Your changes are still here; try again.",
+            );
+          }
+        });
+      }}
       className="space-y-4"
       onChange={(event) => {
+        setEstimate(null);
         const parsed = parseSceneEditorInput(new FormData(event.currentTarget));
         const dirty =
           !parsed.success || hasSceneContentChanged(version, parsed.data);
@@ -152,8 +187,13 @@ export function SceneEditor({
             type="submit"
             variant="outline"
           >
-            {pending ? "Saving…" : "Save scene"}
+            {pending
+              ? "Working…"
+              : estimate
+                ? "Confirm and save scene"
+                : "Review edit impact"}
           </Button>
+          {estimate ? <SceneRevisionEstimate estimate={estimate} /> : null}
         </div>
       ) : null}
       {message ? (

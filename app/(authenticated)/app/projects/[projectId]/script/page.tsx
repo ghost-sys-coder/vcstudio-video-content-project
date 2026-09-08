@@ -55,6 +55,8 @@ export default async function ProjectScriptPage({
         }
       />
       <ScriptEditor
+        key={`${context.user.id}:${scope.workspaceId}:${project.id}:${canEdit}`}
+        userId={context.user.id}
         canEdit={canEdit}
         draft={draft}
         maximumCharacters={getProjectEnvironment().MAX_SCRIPT_CHARACTERS}

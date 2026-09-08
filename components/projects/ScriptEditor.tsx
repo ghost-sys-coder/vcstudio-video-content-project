@@ -1,144 +1,126 @@
 "use client";
-
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo } from "react";
 import type { ProjectScriptDraft, ProjectScriptVersion } from "@/db/schema";
-import {
-  createScriptVersionAction,
-  saveScriptDraftAction,
-} from "@/app/(authenticated)/app/projects/actions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScriptStatistics } from "@/components/projects/ScriptStatistics";
 import { ScriptVersionHistory } from "@/components/projects/ScriptVersionHistory";
+import { ScriptDraftNotices } from "@/components/projects/ScriptDraftNotices";
 import { calculateScriptStatistics } from "@/lib/domain/script-statistics";
+import { useScriptDraft } from "@/hooks/use-script-draft";
 
 export function ScriptEditor({
   draft,
   versions,
   maximumCharacters,
   canEdit,
+  userId,
 }: {
   draft: ProjectScriptDraft;
   versions: ProjectScriptVersion[];
   maximumCharacters: number;
   canEdit: boolean;
+  userId: string;
 }) {
-  const [content, setContent] = useState(draft.content);
-  const [revision, setRevision] = useState(draft.revision);
-  const [savedContent, setSavedContent] = useState(draft.content);
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const { state, controller } = useScriptDraft({
+    initial: draft,
+    maximumCharacters,
+    canEdit,
+    userId,
+    workspaceId: draft.workspaceId,
+    projectId: draft.projectId,
+  });
   const statistics = useMemo(
-    () => calculateScriptStatistics(content),
-    [content],
+    () => calculateScriptStatistics(state.content),
+    [state.content],
   );
-  // Bridge for the generate-script panel: replacing the textarea leaves the
-  // saved draft untouched until the user explicitly saves (non-destructive).
-  useEffect(() => {
-    if (!canEdit) return;
-    function handleInsert(event: Event) {
-      const detail = (event as CustomEvent<string>).detail;
-      if (typeof detail === "string") {
-        setContent(detail);
-        setMessage("Generated script inserted — review and save the draft.");
-        setError(null);
-      }
-    }
-    window.addEventListener("vcstudio:insert-script", handleInsert);
-    return () =>
-      window.removeEventListener("vcstudio:insert-script", handleInsert);
-  }, [canEdit]);
-  function formData() {
-    const data = new FormData();
-    data.set("projectId", draft.projectId);
-    data.set("content", content);
-    data.set("revision", String(revision));
-    return data;
-  }
-  function save() {
-    startTransition(async () => {
-      setError(null);
-      const result = await saveScriptDraftAction(formData());
-      if (result.success && result.revision !== undefined) {
-        setRevision(result.revision);
-        setSavedContent(content);
-        setMessage("Draft saved.");
-      } else setError(result.error);
-    });
-  }
-  function version() {
-    startTransition(async () => {
-      setError(null);
-      const data = new FormData();
-      data.set("projectId", draft.projectId);
-      data.set("revision", String(revision));
-      const result = await createScriptVersionAction(data);
-      if (result.success) setMessage("Version created.");
-      else setError(result.error);
-    });
-  }
+  const busy = state.saving || state.approving;
+  const unresolved = Boolean(state.remote || state.recovery || state.generated);
   return (
     <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_24rem]">
       <section className="space-y-4">
+        <p className="text-sm text-muted-foreground" role="status">
+          {state.approving
+            ? "Saving and approving this script…"
+            : state.approved
+              ? "Script saved and approved for production."
+              : state.status === "saved"
+                ? "All changes saved."
+                : state.status === "saving"
+                  ? "Saving… You can keep writing."
+                  : state.status === "unsaved"
+                    ? "Unsaved changes — autosave pending."
+                    : "Draft needs attention below."}
+        </p>
         <Textarea
           aria-label="Narration script"
           className="h-[clamp(28rem,65svh,48rem)] min-h-0 resize-none overflow-y-auto font-mono leading-7 field-sizing-fixed"
-          disabled={!canEdit || pending}
+          disabled={!canEdit || state.approving || Boolean(state.recovery)}
           maxLength={maximumCharacters}
-          onChange={(event) => setContent(event.target.value)}
-          value={content}
+          onChange={(event) => controller.edit(event.target.value)}
+          value={state.content}
         />
         <ScriptStatistics
           maximumCharacters={maximumCharacters}
           statistics={statistics}
         />
-        <div className="flex flex-wrap gap-2">
-          {canEdit ? (
-            <>
-              <Button
-                disabled={
-                  pending ||
-                  content === savedContent ||
-                  statistics.characterCount > maximumCharacters
-                }
-                onClick={save}
-                type="button"
-              >
-                Save draft
-              </Button>
-              <Button
-                disabled={pending || content !== savedContent}
-                onClick={version}
-                type="button"
-                variant="outline"
-              >
-                Create version
-              </Button>
-            </>
-          ) : null}
-        </div>
-        {content !== savedContent ? (
-          <p className="text-xs text-amber-700">Unsaved draft changes</p>
+        <ScriptDraftNotices state={state} controller={controller} />
+        {canEdit ? (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              disabled={
+                busy ||
+                unresolved ||
+                (state.content === state.savedContent &&
+                  state.status !== "error") ||
+                state.content.length > maximumCharacters
+              }
+              onClick={() => void controller.save()}
+              type="button"
+              variant="outline"
+            >
+              Save now
+            </Button>
+            <Button
+              disabled={
+                state.approving ||
+                unresolved ||
+                !state.content.trim() ||
+                state.content.length > maximumCharacters ||
+                state.approved
+              }
+              onClick={() => void controller.save(true)}
+              type="button"
+            >
+              Save and approve for production
+            </Button>
+            <Button
+              disabled={
+                busy || state.content === state.savedContent || unresolved
+              }
+              onClick={() => controller.discard()}
+              type="button"
+              variant="outline"
+            >
+              Discard unsaved changes
+            </Button>
+          </div>
         ) : null}
-        {error ? (
-          <p className="text-sm text-destructive" role="alert">
-            {error}
-          </p>
-        ) : null}
-        {message ? (
-          <p className="text-sm text-emerald-700" role="status">
-            {message}
-          </p>
-        ) : null}
+        <p className="text-xs text-muted-foreground">
+          Autosave stores the draft. Approval freezes a version for scene
+          production and starts no paid generation. Local recovery lasts up to
+          seven days in this tab and is cleared on sign-out.
+        </p>
       </section>
       <ScriptVersionHistory
-        canEdit={canEdit}
-        onRestored={(next) => {
-          setRevision(next);
-          window.location.reload();
-        }}
-        revision={revision}
+        canEdit={
+          canEdit &&
+          !busy &&
+          !unresolved &&
+          state.content === state.savedContent
+        }
+        onRestored={() => window.location.reload()}
+        revision={state.revision}
         versions={versions}
       />
     </div>

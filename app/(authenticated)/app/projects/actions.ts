@@ -383,13 +383,17 @@ export async function createScriptVersionAction(
     return { error: "Invalid version request.", success: false };
   try {
     const { context } = await requireProjectMutation(parsed.data.projectId);
-    await createScriptVersion({
+    const version = await createScriptVersion({
       ...parsed.data,
       workspaceId: context.activeMembership.workspaceId,
       userId: context.user.id,
     });
     revalidatePath(`/app/projects/${parsed.data.projectId}/script`);
-    return { error: null, success: true, revision: parsed.data.revision };
+    return {
+      error: null,
+      success: true,
+      revision: version.sourceDraftRevision ?? parsed.data.revision,
+    };
   } catch {
     return {
       error: "Save the latest draft before creating a version.",

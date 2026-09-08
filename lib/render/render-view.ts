@@ -107,6 +107,7 @@ export interface ShortCompositionClipView {
 }
 
 export interface ShortCompositionView {
+  needsRangeReview?: boolean;
   id: string;
   name: string;
   status: "draft" | "ready" | "archived";

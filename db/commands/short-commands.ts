@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
 import { shortClips, shortCompositions } from "@/db/schema";
 import type { ShortClipDefinition } from "@/lib/shorts/short-timeline";
+import type { ShortClipAnchor } from "@/lib/shorts/short-anchors";
 
 export async function createShortComposition(input: {
   workspaceId: string;
@@ -11,7 +12,7 @@ export async function createShortComposition(input: {
   outputVariantId: string;
   name: string;
   createdByUserId: string;
-  clips: ShortClipDefinition[];
+  clips: (ShortClipDefinition & ShortClipAnchor)[];
 }) {
   const shortCompositionId = crypto.randomUUID();
   const [created] = await getDatabase().batch([
@@ -39,6 +40,9 @@ export async function createShortComposition(input: {
           position: clip.position,
           sourceStartMilliseconds: clip.sourceStartMilliseconds,
           sourceEndMilliseconds: clip.sourceEndMilliseconds,
+          sourceAudioGenerationIdSnapshot: clip.sourceAudioGenerationIdSnapshot,
+          sourceStartOffsetMilliseconds: clip.sourceStartOffsetMilliseconds,
+          sourceEndOffsetMilliseconds: clip.sourceEndOffsetMilliseconds,
           transition: clip.transition,
         })),
       ),
@@ -63,7 +67,7 @@ export async function updateShortComposition(input: {
   projectId: string;
   shortCompositionId: string;
   name: string;
-  clips: ShortClipDefinition[];
+  clips: (ShortClipDefinition & ShortClipAnchor)[];
 }) {
   const [existing] = await getDatabase()
     .select({ id: shortCompositions.id })
@@ -82,11 +86,23 @@ export async function updateShortComposition(input: {
     getDatabase()
       .update(shortCompositions)
       .set({ name: input.name, updatedAt: new Date() })
-      .where(eq(shortCompositions.id, input.shortCompositionId))
+      .where(
+        and(
+          eq(shortCompositions.id, input.shortCompositionId),
+          eq(shortCompositions.workspaceId, input.workspaceId),
+          eq(shortCompositions.projectId, input.projectId),
+        ),
+      )
       .returning(),
     getDatabase()
       .delete(shortClips)
-      .where(eq(shortClips.shortCompositionId, input.shortCompositionId)),
+      .where(
+        and(
+          eq(shortClips.shortCompositionId, input.shortCompositionId),
+          eq(shortClips.workspaceId, input.workspaceId),
+          eq(shortClips.projectId, input.projectId),
+        ),
+      ),
     getDatabase()
       .insert(shortClips)
       .values(
@@ -100,6 +116,9 @@ export async function updateShortComposition(input: {
           position: clip.position,
           sourceStartMilliseconds: clip.sourceStartMilliseconds,
           sourceEndMilliseconds: clip.sourceEndMilliseconds,
+          sourceAudioGenerationIdSnapshot: clip.sourceAudioGenerationIdSnapshot,
+          sourceStartOffsetMilliseconds: clip.sourceStartOffsetMilliseconds,
+          sourceEndOffsetMilliseconds: clip.sourceEndOffsetMilliseconds,
           transition: clip.transition,
         })),
       ),

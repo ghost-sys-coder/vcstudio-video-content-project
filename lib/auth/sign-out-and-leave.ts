@@ -1,3 +1,5 @@
+import { clearScriptRecovery } from "@/lib/scripts/script-recovery";
+
 /**
  * Signs the user out, then leaves the application with a **full document load**
  * instead of a client-side navigation.
@@ -22,6 +24,14 @@ export async function signOutAndLeave({
   signOut: (callback: () => void) => Promise<unknown>;
 }): Promise<void> {
   await signOut(() => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("vcstudio:clear-script-recovery"));
+      try {
+        clearScriptRecovery(window.localStorage);
+      } catch {
+        /* Storage can be unavailable during sign-out. */
+      }
+    }
     navigate(destination);
   });
 }

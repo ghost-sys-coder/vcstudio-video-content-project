@@ -16,6 +16,8 @@ import {
 } from "@/lib/output-variants/output-variant-context";
 import { findShortCompositionWithClips } from "@/db/repositories/shorts.repository";
 import { buildShortTimeline } from "@/lib/shorts/short-timeline";
+import { resolveShortClips } from "@/lib/shorts/short-anchors";
+import { listCurrentScenes } from "@/db/repositories/scenes.repository";
 
 export type RenderPreviewResult =
   | { status: "ready"; input: ValidatedVideoCompositionInput }
@@ -51,9 +53,19 @@ export async function loadRenderPreview(input: {
     });
     if (!short || short.composition.outputVariantId !== outputVariant.id)
       return { status: "invalid" };
+    const currentScenes = await listCurrentScenes({
+      workspaceId: input.workspaceId,
+      projectId: input.project.id,
+    });
+    const resolved = resolveShortClips(
+      short.clips,
+      renderTimeline,
+      currentScenes,
+    );
+    if (resolved.needsReview) return { status: "invalid" };
     renderTimeline = buildShortTimeline({
       source: renderTimeline,
-      clips: short.clips.map((clip) => ({
+      clips: resolved.clips.map((clip) => ({
         id: clip.id,
         sourceSceneId: clip.sourceSceneId,
         sourceSceneVersionId: clip.sourceSceneVersionId,

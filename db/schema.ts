@@ -1099,6 +1099,7 @@ export const projectScriptVersions = pgTable(
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
     versionNumber: integer("version_number").notNull(),
+    sourceDraftRevision: integer("source_draft_revision"),
     content: text("content").notNull(),
     characterCount: integer("character_count").notNull(),
     estimatedNarrationDurationSeconds: integer(
@@ -1125,6 +1126,14 @@ export const projectScriptVersions = pgTable(
     uniqueIndex("project_script_versions_project_number_unique").on(
       table.projectId,
       table.versionNumber,
+    ),
+    uniqueIndex("project_script_versions_draft_revision_unique").on(
+      table.projectId,
+      table.sourceDraftRevision,
+    ),
+    check(
+      "project_script_versions_draft_revision_positive",
+      sql`${table.sourceDraftRevision} is null or ${table.sourceDraftRevision} > 0`,
     ),
     index("project_script_versions_workspace_project_index").on(
       table.workspaceId,
@@ -2473,6 +2482,13 @@ export const shortClips = pgTable(
     position: integer("position").notNull(),
     sourceStartMilliseconds: integer("source_start_milliseconds").notNull(),
     sourceEndMilliseconds: integer("source_end_milliseconds").notNull(),
+    // Historical identity, not an asset-access reference; retained if the
+    // original audio is deleted so the clip can still require review.
+    sourceAudioGenerationIdSnapshot: uuid(
+      "source_audio_generation_id_snapshot",
+    ),
+    sourceStartOffsetMilliseconds: integer("source_start_offset_milliseconds"),
+    sourceEndOffsetMilliseconds: integer("source_end_offset_milliseconds"),
     transition: text("transition").notNull().default("cut"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -2492,6 +2508,10 @@ export const shortClips = pgTable(
       table.shortCompositionId,
     ),
     check("short_clips_position_positive", sql`${table.position} > 0`),
+    check(
+      "short_clips_anchor_valid",
+      sql`(${table.sourceAudioGenerationIdSnapshot} is null and ${table.sourceStartOffsetMilliseconds} is null and ${table.sourceEndOffsetMilliseconds} is null) or (${table.sourceAudioGenerationIdSnapshot} is not null and ${table.sourceStartOffsetMilliseconds} is not null and ${table.sourceEndOffsetMilliseconds} is not null and ${table.sourceStartOffsetMilliseconds} >= 0 and ${table.sourceEndOffsetMilliseconds} > ${table.sourceStartOffsetMilliseconds})`,
+    ),
     check(
       "short_clips_range_valid",
       sql`${table.sourceStartMilliseconds} >= 0 and ${table.sourceEndMilliseconds} > ${table.sourceStartMilliseconds}`,

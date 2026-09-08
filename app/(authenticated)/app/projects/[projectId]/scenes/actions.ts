@@ -1,6 +1,7 @@
 "use server";
 
 import { parseSceneEditorInput } from "@/lib/scenes/scene-editor-input";
+import { estimateSceneRevision } from "@/lib/scenes/scene-revision-estimate";
 import { revalidatePath } from "next/cache";
 import { tasks } from "@trigger.dev/sdk";
 import {
@@ -469,6 +470,35 @@ export async function reconcileSceneAnalysisRunAction(
     return {
       success: false,
       error: "The analysis status could not be refreshed.",
+    };
+  }
+}
+
+export async function previewSceneRevisionAction(formData: FormData) {
+  const parsed = parseSceneEditorInput(formData);
+  if (!parsed.success)
+    return {
+      success: false as const,
+      error: "Complete the scene fields before reviewing the edit.",
+    };
+  try {
+    const { context, project } = await requireProjectMutation(
+      parsed.data.projectId,
+      "editScenes",
+    );
+    const estimate = await estimateSceneRevision({
+      workspaceId: context.activeMembership.workspaceId,
+      project,
+      revision: parsed.data,
+    });
+    return { success: true as const, estimate };
+  } catch (error) {
+    return {
+      success: false as const,
+      error:
+        error instanceof Error && error.message === "SCENE_REVISION_CONFLICT"
+          ? "This scene changed. Refresh before reviewing your edit."
+          : "The edit estimate could not be loaded. Your changes are still here; try again.",
     };
   }
 }

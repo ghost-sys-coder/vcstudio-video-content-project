@@ -31,7 +31,8 @@ export function ScriptVersionHistory({
         </ol>
       ) : (
         <p className="mt-3 text-sm text-muted-foreground">
-          No versions yet. Save the draft, then create the first version.
+          No versions yet. Approve the script to freeze its first production
+          version.
         </p>
       )}
     </section>

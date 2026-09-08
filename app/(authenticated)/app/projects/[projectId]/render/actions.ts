@@ -41,6 +41,7 @@ import {
 } from "@/lib/schemas/short";
 import { buildOutputVariantTimelineContext } from "@/lib/output-variants/output-variant-context";
 import { buildShortTimeline } from "@/lib/shorts/short-timeline";
+import { anchorShortClips } from "@/lib/shorts/short-anchors";
 
 async function requireRenderAccess(projectId: string) {
   const context = await getAuthenticatedWorkspaceContext();
@@ -441,7 +442,10 @@ export async function createShortCompositionAction(formData: FormData) {
       outputVariantId: variant.id,
       name: parsed.data.name,
       createdByUserId: context.user.id,
-      clips: clipDefinitions,
+      clips: anchorShortClips(
+        clipDefinitions,
+        timelineContext.timeline.timeline,
+      ),
     });
     revalidatePath(`/app/projects/${project.id}/render`);
     return {
@@ -522,7 +526,10 @@ export async function updateShortCompositionAction(formData: FormData) {
       ...scope,
       shortCompositionId: parsed.data.shortCompositionId,
       name: parsed.data.name,
-      clips: clipDefinitions,
+      clips: anchorShortClips(
+        clipDefinitions,
+        timelineContext.timeline.timeline,
+      ),
     });
     revalidatePath(`/app/projects/${project.id}/render`);
     return {

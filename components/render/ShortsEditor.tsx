@@ -98,7 +98,16 @@ export function ShortsEditor({
   ) {
     setClips((current) =>
       current.map((clip) =>
-        clip.clientId === clientId ? { ...clip, ...patch } : clip,
+        clip.clientId === clientId
+          ? {
+              ...clip,
+              ...patch,
+              sourceSceneVersionId:
+                sourceScenes.find(
+                  (scene) => scene.sceneId === clip.sourceSceneId,
+                )?.sceneVersionId ?? clip.sourceSceneVersionId,
+            }
+          : clip,
       ),
     );
   }
@@ -294,13 +303,19 @@ export function ShortsEditor({
             {savedShorts.map((short) => (
               <li className="min-w-0 rounded-lg border p-3" key={short.id}>
                 <p className="truncate text-sm font-medium">{short.name}</p>
+                {short.needsRangeReview ? (
+                  <p className="text-xs text-destructive">
+                    Source changed. Review and save the clip ranges before
+                    previewing or rendering.
+                  </p>
+                ) : null}
                 <p className="text-xs text-muted-foreground">
                   {short.clipCount} clips ·{" "}
                   {(short.durationMilliseconds / 1000).toFixed(1)}s
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Button
-                    disabled={renderPending}
+                    disabled={renderPending || short.needsRangeReview}
                     nativeButton
                     onClick={() => onPreview(short.id)}
                     type="button"
@@ -318,7 +333,11 @@ export function ShortsEditor({
                     Edit
                   </Button>
                   <StartRenderButton
-                    disabled={!canEdit || renderPending}
+                    disabled={
+                      !canEdit ||
+                      renderPending ||
+                      Boolean(short.needsRangeReview)
+                    }
                     estimatedCostCents={short.estimatedRenderCostCents}
                     onStart={() => onRender(short.id)}
                     pending={renderPending}

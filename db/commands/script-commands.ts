@@ -9,10 +9,10 @@ import {
 } from "@/db/schema";
 import { calculateScriptStatistics } from "@/lib/domain/script-statistics";
 import { assertScriptVersionDeletable } from "@/lib/domain/script-version-deletion";
+import { commitScriptVersion } from "./commit-script-version";
 import {
   findProjectScriptDraft,
   findProjectScriptVersion,
-  getLatestProjectScriptVersionNumber,
 } from "@/db/repositories/projects.repository";
 
 export async function saveScriptDraft(input: {
@@ -42,7 +42,11 @@ export async function saveScriptDraft(input: {
       ),
     )
     .returning();
-  if (!draft) throw new Error("SCRIPT_REVISION_CONFLICT");
+  if (!draft) {
+    const current = await findProjectScriptDraft(input);
+    if (current?.content === input.content) return current;
+    throw new Error("SCRIPT_REVISION_CONFLICT");
+  }
   return draft;
 }
 
@@ -55,20 +59,15 @@ export async function createScriptVersion(input: {
   const draft = await findProjectScriptDraft(input);
   if (!draft || draft.revision !== input.revision)
     throw new Error("SCRIPT_REVISION_CONFLICT");
-  const versionNumber = (await getLatestProjectScriptVersionNumber(input)) + 1;
-  const [version] = await getDatabase()
-    .insert(projectScriptVersions)
-    .values({
-      workspaceId: input.workspaceId,
-      projectId: input.projectId,
-      versionNumber,
-      content: draft.content,
-      characterCount: draft.characterCount,
-      estimatedNarrationDurationSeconds:
-        draft.estimatedNarrationDurationSeconds,
-      createdByUserId: input.userId,
-    })
-    .returning();
+  const committed = await commitScriptVersion({
+    ...input,
+    content: draft.content,
+    approve: false,
+  });
+  const version = await findProjectScriptVersion({
+    ...input,
+    versionId: committed.id,
+  });
   if (!version) throw new Error("Script version creation failed.");
   return version;
 }
@@ -80,50 +79,20 @@ export async function restoreScriptVersion(input: {
   revision: number;
   userId: string;
 }) {
-  const [draft, source, latest] = await Promise.all([
+  const [draft, source] = await Promise.all([
     findProjectScriptDraft(input),
     findProjectScriptVersion(input),
-    getLatestProjectScriptVersionNumber(input),
   ]);
   if (!draft || draft.revision !== input.revision)
     throw new Error("SCRIPT_REVISION_CONFLICT");
   if (!source) throw new Error("Script version not found.");
-  const versionId = crypto.randomUUID();
-  await getDatabase().batch([
-    getDatabase()
-      .update(projectScriptDrafts)
-      .set({
-        content: source.content,
-        revision: input.revision + 1,
-        characterCount: source.characterCount,
-        estimatedNarrationDurationSeconds:
-          source.estimatedNarrationDurationSeconds,
-        updatedByUserId: input.userId,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(projectScriptDrafts.workspaceId, input.workspaceId),
-          eq(projectScriptDrafts.projectId, input.projectId),
-          eq(projectScriptDrafts.revision, input.revision),
-        ),
-      ),
-    getDatabase()
-      .insert(projectScriptVersions)
-      .values({
-        id: versionId,
-        workspaceId: input.workspaceId,
-        projectId: input.projectId,
-        versionNumber: latest + 1,
-        content: source.content,
-        characterCount: source.characterCount,
-        estimatedNarrationDurationSeconds:
-          source.estimatedNarrationDurationSeconds,
-        createdByUserId: input.userId,
-        restoredFromVersionId: source.id,
-      }),
-  ]);
-  return { versionId, revision: input.revision + 1 };
+  const committed = await commitScriptVersion({
+    ...input,
+    content: source.content,
+    approve: false,
+    restoredFromVersionId: source.id,
+  });
+  return { versionId: committed.id, revision: committed.revision };
 }
 
 export async function deleteScriptVersion(input: {

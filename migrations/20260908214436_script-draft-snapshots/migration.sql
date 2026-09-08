@@ -1,0 +1,3 @@
+ALTER TABLE "project_script_versions" ADD COLUMN "source_draft_revision" integer;--> statement-breakpoint
+CREATE UNIQUE INDEX "project_script_versions_draft_revision_unique" ON "project_script_versions" ("project_id","source_draft_revision");--> statement-breakpoint
+ALTER TABLE "project_script_versions" ADD CONSTRAINT "project_script_versions_draft_revision_positive" CHECK ("source_draft_revision" is null or "source_draft_revision" > 0);
