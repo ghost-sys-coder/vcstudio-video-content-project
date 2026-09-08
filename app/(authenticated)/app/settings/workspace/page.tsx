@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { WorkspaceProfilePage } from "@/components/workspace/WorkspaceProfilePage";
+import { listCustomVoices } from "@/db/repositories/custom-voice.repository";
 import { findWorkspaceLogo } from "@/db/repositories/storage-objects.repository";
 import {
   listPendingWorkspaceInvitations,
@@ -8,7 +9,7 @@ import {
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import { getMarketingEnvironment } from "@/lib/env/server";
 import { isMarketingStudioEnabledForWorkspace } from "@/lib/marketing/marketing-access";
-import { canManageWorkspace } from "@/lib/policies/workspace-policy";
+import { can, canManageWorkspace } from "@/lib/policies/workspace-policy";
 import { loadWorkspaceChannelsView } from "@/lib/publishing/workspace-connections-view";
 import { createWorkspaceLogoDownloadUrl } from "@/lib/storage/workspace-logo-storage";
 
@@ -37,6 +38,7 @@ export default async function WorkspaceSettingsPage({
     members,
     pendingInvitations,
     marketingStudioEnabled,
+    customVoices,
   ] = await Promise.all([
     searchParams,
     findWorkspaceLogo(context.activeMembership.workspaceId),
@@ -48,6 +50,7 @@ export default async function WorkspaceSettingsPage({
     isMarketingStudioEnabledForWorkspace({
       workspaceId: context.activeMembership.workspaceId,
     }),
+    listCustomVoices({ workspaceId: context.activeMembership.workspaceId }),
   ]);
   const logoUrl = logo
     ? await createWorkspaceLogoDownloadUrl(logo.objectKey)
@@ -55,8 +58,19 @@ export default async function WorkspaceSettingsPage({
 
   return (
     <WorkspaceProfilePage
+      canManageCustomVoices={can(
+        context.activeMembership.role,
+        "manageCustomVoices",
+      )}
       channelsView={channelsView}
       currentUserId={context.user.id}
+      customVoices={customVoices.map((voice) => ({
+        id: voice.id,
+        name: voice.name,
+        consentLanguage: voice.consentLanguage,
+        status: voice.status,
+        createdAt: voice.createdAt.toISOString(),
+      }))}
       logoUrl={logoUrl}
       marketingDeploymentEnabled={
         getMarketingEnvironment().ENABLE_MARKETING_STUDIO

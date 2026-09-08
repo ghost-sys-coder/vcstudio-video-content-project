@@ -106,3 +106,30 @@ export class WorkspaceInvitationEmailMismatchError extends Error {
     this.name = "WorkspaceInvitationEmailMismatchError";
   }
 }
+
+/**
+ * Why a custom-voice provider call failed, at the granularity the user can act
+ * on. The distinction that matters most is `provider_unavailable`: the account
+ * or the API itself has no custom-voice endpoints, so no amount of re-recording
+ * will help and the UI must stop blaming the recording.
+ */
+export type CustomVoiceProviderFailure =
+  | "provider_unavailable"
+  | "unauthorized"
+  | "recording_rejected"
+  | "rate_limited"
+  | "provider_error";
+
+export class CustomVoiceProviderError extends Error {
+  readonly code = "CUSTOM_VOICE_PROVIDER_ERROR";
+
+  constructor(
+    readonly failure: CustomVoiceProviderFailure,
+    readonly status: number | null,
+    readonly providerMessage: string | null,
+    readonly requestId: string | null,
+  ) {
+    super(`CUSTOM_VOICE_${failure.toUpperCase()}`);
+    this.name = "CustomVoiceProviderError";
+  }
+}

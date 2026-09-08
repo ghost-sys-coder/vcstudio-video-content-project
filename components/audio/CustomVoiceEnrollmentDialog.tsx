@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { CustomVoiceAvailabilityNotice } from "@/components/audio/CustomVoiceAvailabilityNotice";
+import { VoiceRecordingStepPanel } from "@/components/audio/VoiceRecordingStepPanel";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,32 +14,57 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useSceneAudioRecorder } from "@/lib/audio/use-scene-audio-recorder";
+import {
+  isEnrollmentBlocked,
+  type CustomVoiceAvailability,
+} from "@/lib/audio/custom-voice-availability";
+import { useVoiceEnrollmentRecorder } from "@/lib/audio/use-voice-enrollment-recorder";
+import {
+  CONSENT_RECORDING_SPEC,
+  SAMPLE_RECORDING_SPEC,
+  evaluateVoiceRecording,
+  isVoiceRecordingAcceptable,
+  voiceRecordingFileName,
+} from "@/lib/audio/voice-enrollment-requirements";
 import { CUSTOM_VOICE_CONSENT_PHRASE } from "@/lib/schemas/scene-audio";
 
-function recordingFileName(prefix: string, mimeType: string): string {
-  return `${prefix}.${mimeType.toLowerCase().startsWith("audio/mp4") ? "m4a" : "webm"}`;
-}
-
 export function CustomVoiceEnrollmentDialog({
+  availability,
   open,
   onOpenChange,
-  projectId,
   onCreated,
 }: {
+  availability: CustomVoiceAvailability;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  projectId: string;
   onCreated: () => Promise<void>;
 }) {
-  const consent = useSceneAudioRecorder();
-  const sample = useSceneAudioRecorder();
+  const consent = useVoiceEnrollmentRecorder();
+  const sample = useVoiceEnrollmentRecorder();
   const [name, setName] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const blocked = isEnrollmentBlocked(availability);
+  const consentReady =
+    consent.recording !== null &&
+    isVoiceRecordingAcceptable(
+      evaluateVoiceRecording(CONSENT_RECORDING_SPEC, consent.recording.capture),
+    );
+  const sampleReady =
+    sample.recording !== null &&
+    isVoiceRecordingAcceptable(
+      evaluateVoiceRecording(SAMPLE_RECORDING_SPEC, sample.recording.capture),
+    );
+  const canSubmit =
+    !blocked &&
+    !pending &&
+    name.trim().length > 0 &&
+    consentReady &&
+    sampleReady;
+
   async function submit() {
-    if (!consent.blob || !sample.blob || !name.trim()) return;
+    if (!consent.recording || !sample.recording || !canSubmit) return;
     setPending(true);
     setError(null);
     try {
@@ -46,19 +73,25 @@ export function CustomVoiceEnrollmentDialog({
       formData.set("language", "en-US");
       formData.set(
         "consentRecording",
-        consent.blob,
-        recordingFileName("consent", consent.blob.type),
+        consent.recording.blob,
+        voiceRecordingFileName(
+          CONSENT_RECORDING_SPEC,
+          consent.recording.capture.mimeType,
+        ),
       );
       formData.set(
         "voiceSample",
-        sample.blob,
-        recordingFileName("sample", sample.blob.type),
+        sample.recording.blob,
+        voiceRecordingFileName(
+          SAMPLE_RECORDING_SPEC,
+          sample.recording.capture.mimeType,
+        ),
       );
-      const response = await fetch(`/api/projects/${projectId}/custom-voices`, {
+      const response = await fetch("/api/workspace/custom-voices", {
         method: "POST",
         body: formData,
       });
-      const payload: unknown = await response.json();
+      const payload: unknown = await response.json().catch(() => null);
       if (!response.ok) {
         const message =
           typeof payload === "object" &&
@@ -81,96 +114,61 @@ export function CustomVoiceEnrollmentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Clone your voice</DialogTitle>
           <DialogDescription>
-            Only clone your own voice. Recordings are sent directly to OpenAI
-            and are not stored in VCStudio.
+            Only clone your own voice. Recordings are sent directly to the voice
+            provider and are not stored in VCStudio.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-5">
+          <CustomVoiceAvailabilityNotice availability={availability} />
           <div className="space-y-1.5">
             <Label htmlFor="custom-voice-name">Voice name</Label>
             <Input
               id="custom-voice-name"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
               maxLength={80}
+              onChange={(event) => setName(event.target.value)}
+              value={name}
             />
           </div>
-          <div className="space-y-2 rounded-lg border p-4">
-            <p className="text-sm font-medium">1. Consent recording</p>
-            <p className="text-sm text-muted-foreground">Read this exactly:</p>
-            <blockquote className="rounded-md bg-muted p-3 text-sm">
-              {CUSTOM_VOICE_CONSENT_PHRASE}
-            </blockquote>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={
-                consent.state === "recording" ? consent.stop : consent.start
-              }
-            >
-              {consent.state === "recording"
-                ? "Stop consent recording"
-                : consent.blob
-                  ? "Record consent again"
-                  : "Record consent"}
-            </Button>
-            {consent.blob ? (
-              <p className="text-xs text-emerald-600">
-                Consent recording ready.
-              </p>
-            ) : null}
-            {consent.error ? (
-              <p className="text-sm text-destructive">{consent.error}</p>
-            ) : null}
-          </div>
-          <div className="space-y-2 rounded-lg border p-4">
-            <p className="text-sm font-medium">2. Voice sample</p>
-            <p className="text-sm text-muted-foreground">
-              Record 30–60 seconds of clean, natural speech in a quiet room.
-            </p>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={
-                sample.state === "recording" ? sample.stop : sample.start
-              }
-            >
-              {sample.state === "recording"
-                ? "Stop voice sample"
-                : sample.blob
-                  ? "Record sample again"
-                  : "Record sample"}
-            </Button>
-            {sample.blob ? (
-              <p className="text-xs text-emerald-600">Voice sample ready.</p>
-            ) : null}
-            {sample.error ? (
-              <p className="text-sm text-destructive">{sample.error}</p>
-            ) : null}
-          </div>
+          <VoiceRecordingStepPanel
+            disabled={blocked || pending}
+            instructions={
+              <>
+                <span>Read this sentence aloud, exactly as written:</span>
+                <blockquote className="mt-2 rounded-md bg-muted p-3 text-sm text-foreground">
+                  {CUSTOM_VOICE_CONSENT_PHRASE}
+                </blockquote>
+              </>
+            }
+            recorder={consent}
+            spec={CONSENT_RECORDING_SPEC}
+            stepNumber={1}
+          />
+          <VoiceRecordingStepPanel
+            disabled={blocked || pending}
+            instructions="Speak naturally for at least 30 seconds in a quiet room — read anything you like, at your normal pace and volume."
+            recorder={sample}
+            spec={SAMPLE_RECORDING_SPEC}
+            stepNumber={2}
+          />
           {error ? (
-            <p role="alert" className="text-sm text-destructive">
+            <p className="text-sm text-destructive" role="alert">
               {error}
             </p>
           ) : null}
         </div>
         <DialogFooter>
           <Button
+            onClick={() => onOpenChange(false)}
             type="button"
             variant="outline"
-            onClick={() => onOpenChange(false)}
           >
             Cancel
           </Button>
-          <Button
-            type="button"
-            disabled={pending || !name.trim() || !consent.blob || !sample.blob}
-            onClick={submit}
-          >
+          <Button disabled={!canSubmit} onClick={submit} type="button">
             {pending ? "Creating voice…" : "Create custom voice"}
           </Button>
         </DialogFooter>
