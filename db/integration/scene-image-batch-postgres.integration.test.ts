@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { config as loadEnvironment } from "dotenv";
 import {
   afterAll,
@@ -472,5 +472,65 @@ describeDatabase("Phase 6 scene image batch invariants", () => {
     expect(first.created).toBe(true);
     expect(second.created).toBe(false);
     expect(second.batch.id).toBe(first.batch.id);
+  }, 30_000);
+  it("deletes a batch without deleting or detenanting its generations", async () => {
+    // A bare composite ON DELETE SET NULL nulls every column in the key,
+    // including the NOT NULL workspace_id, which makes this delete fail
+    // outright. The live key therefore carries an explicit column list. Both
+    // halves are asserted: the shape, so a drizzle-kit push that rewrites the
+    // key to the bare form is caught, and the behaviour it is there to protect.
+    const database = getDatabase();
+    const columns = await database.execute<{ column_name: string }>(sql`
+      select a.attname as column_name
+      from pg_constraint c
+      join pg_attribute a
+        on a.attrelid = c.conrelid and a.attnum = any (c.confdelsetcols)
+      where c.conname = 'scene_image_generations_tenant_batch_fkey'
+    `);
+    expect(columns.rows.map((row) => row.column_name)).toEqual(["batch_id"]);
+
+    const fixture = await createFixture();
+    const batchId = randomUUID();
+    const generationId = randomUUID();
+    await insertBatch({ fixture, batchId, requestNonce: randomUUID() });
+    await database.insert(sceneImageGenerations).values(
+      generationValues({
+        fixture,
+        batchId,
+        generationId,
+        generationVersion: 1,
+        status: "succeeded",
+      }),
+    );
+
+    await database
+      .delete(sceneImageBatches)
+      .where(
+        and(
+          eq(sceneImageBatches.id, batchId),
+          eq(sceneImageBatches.workspaceId, fixture.workspaceId),
+        ),
+      );
+
+    const [survivor] = await database
+      .select()
+      .from(sceneImageGenerations)
+      .where(eq(sceneImageGenerations.id, generationId));
+    expect(survivor).toBeDefined();
+    expect(survivor?.batchId).toBeNull();
+    // The tenant column must be untouched, or the row escapes its workspace.
+    expect(survivor?.workspaceId).toBe(fixture.workspaceId);
+
+    // And it stays reachable through a workspace-scoped query.
+    const orphans = await database
+      .select({ id: sceneImageGenerations.id })
+      .from(sceneImageGenerations)
+      .where(
+        and(
+          eq(sceneImageGenerations.workspaceId, fixture.workspaceId),
+          isNull(sceneImageGenerations.batchId),
+        ),
+      );
+    expect(orphans.map((row) => row.id)).toEqual([generationId]);
   }, 30_000);
 });

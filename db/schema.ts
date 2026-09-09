@@ -2615,6 +2615,16 @@ export const sceneImageGenerations = pgTable(
       table.workspaceId,
       table.batchId,
     ),
+    /**
+     * The live constraint is `ON DELETE SET NULL (batch_id)`, which this call
+     * cannot express: Drizzle's `onDelete` takes a bare action, and a bare
+     * `SET NULL` on a composite key nulls every column in it, including the
+     * NOT NULL `workspaceId`. That form makes deleting a batch fail instead of
+     * releasing its generations. The column list is applied by migration
+     * `20260909053000_batch_delete_keeps_generations` and asserted by a guard
+     * test, so a `drizzle-kit push` that rewrites this key to the bare form
+     * fails loudly rather than silently restoring the broken behaviour.
+     */
     foreignKey({
       columns: [table.batchId, table.workspaceId],
       foreignColumns: [sceneImageBatches.id, sceneImageBatches.workspaceId],
