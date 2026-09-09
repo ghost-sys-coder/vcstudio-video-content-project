@@ -31,7 +31,10 @@ export function CreateProjectDialog({
         <Plus />
         New project
       </DialogTrigger>
-      <DialogContent>
+      {/* Wider than the default `sm:max-w-sm`: this form has a two-column
+          field group, and at the default width each column is too narrow to
+          read comfortably. */}
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Create project</DialogTitle>
           <DialogDescription>
