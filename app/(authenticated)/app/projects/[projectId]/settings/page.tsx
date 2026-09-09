@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { ProjectDangerZone } from "@/components/projects/ProjectDangerZone";
 import { ProjectChannelSection } from "@/components/projects/ProjectChannelSection";
+import { ProjectPlannedReleaseSection } from "@/components/projects/ProjectPlannedReleaseSection";
 import { ProjectSettingsForm } from "@/components/projects/ProjectSettingsForm";
 import { listChannelProfiles } from "@/db/repositories/channel-profiles.repository";
 import { findProject } from "@/db/repositories/projects.repository";
@@ -56,6 +57,14 @@ export default async function ProjectSettingsPage({
         })}
         projectId={project.id}
         selectedChannelId={project.channelProfileId}
+      />
+      <ProjectPlannedReleaseSection
+        canEdit={
+          canEditProject(context.activeMembership.role) &&
+          project.status !== "archived"
+        }
+        plannedReleaseAt={project.plannedReleaseAt}
+        projectId={project.id}
       />
       {/* Deliberately not gated on `project.status !== "archived"` like the
           settings form: an archived project is exactly the one most likely to

@@ -4,6 +4,7 @@ import {
   FolderKanban,
   LayoutDashboard,
   Lightbulb,
+  ListChecks,
   ReceiptText,
   Activity,
   Bell,
@@ -121,6 +122,16 @@ export function ApplicationSidebar({
                 >
                   <Bell />
                   <span>Activity</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={pathname.startsWith("/app/queue")}
+                  render={<Link href="/app/queue" />}
+                  tooltip="Production queue"
+                >
+                  <ListChecks />
+                  <span>Queue</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>

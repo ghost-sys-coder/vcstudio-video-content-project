@@ -38,7 +38,8 @@ export function DashboardOverview({
         </h1>
         <p className="mt-3 max-w-2xl text-sm text-white/70 sm:text-base">
           An overview of your production workspace — projects in flight,
-          characters, generated scene imagery, and this month&rsquo;s spend.
+          characters, generated scene imagery, and this month&rsquo;s production
+          spend across every billable operation.
         </p>
       </div>
 
@@ -77,9 +78,9 @@ export function DashboardOverview({
           value={statistics.sceneImages.succeeded.toLocaleString()}
         />
         <DashboardStatCard
-          detail="Image generation this month"
+          detail="All billable operations, month to date"
           icon={WalletIcon}
-          label="Spend to date"
+          label="Production spend"
           value={formatUsdCents(statistics.spend.monthToDateCents)}
         />
       </div>

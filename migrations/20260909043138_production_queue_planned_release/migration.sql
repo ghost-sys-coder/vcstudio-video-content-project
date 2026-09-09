@@ -1,0 +1,2 @@
+ALTER TABLE "projects" ADD COLUMN "planned_release_at" timestamp with time zone;--> statement-breakpoint
+CREATE INDEX "projects_workspace_planned_release_index" ON "projects" ("workspace_id","planned_release_at");

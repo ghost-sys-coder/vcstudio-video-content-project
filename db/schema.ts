@@ -995,6 +995,12 @@ export const projects = pgTable(
     createdByUserId: uuid("created_by_user_id")
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
+    /**
+     * Editorial intent: when a creator means to release this video. It is a
+     * plan, never evidence of progress, so nothing derives production
+     * readiness from it. Nullable because a project need not be scheduled.
+     */
+    plannedReleaseAt: timestamp("planned_release_at", { withTimezone: true }),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -1005,6 +1011,11 @@ export const projects = pgTable(
   },
   (table) => [
     uniqueIndex("projects_id_workspace_unique").on(table.id, table.workspaceId),
+    // Orders the production queue by intended release inside one workspace.
+    index("projects_workspace_planned_release_index").on(
+      table.workspaceId,
+      table.plannedReleaseAt,
+    ),
     index("projects_workspace_status_updated_index").on(
       table.workspaceId,
       table.status,
