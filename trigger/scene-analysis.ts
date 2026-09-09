@@ -1,6 +1,5 @@
 import { task } from "@trigger.dev/sdk";
 import { z } from "zod";
-import { renderSceneAnalysisRepairPrompt } from "@studio/prompts";
 import {
   completeSceneAnalysis,
   failSceneAnalysis,
@@ -16,14 +15,9 @@ import {
 import { calculateTextCostCents } from "@/lib/costs/scene-analysis-cost";
 import { getSceneAnalysisEnvironment } from "@/lib/env/server";
 import { createRequestFingerprint } from "@/lib/domain/idempotency";
-import {
-  checkNarrationCoverage,
-  MAX_SCENE_ANALYSIS_REPAIR_ATTEMPTS,
-  type NarrationCoverageResult,
-} from "@/lib/domain/narration-coverage";
 import { validateSceneAnalysisPreflight } from "@/lib/domain/scene-analysis-preflight";
+import { generateValidatedScenePlan } from "@/lib/scenes/generate-validated-scene-plan";
 import { NARRATION_FIDELITY_ERROR_CATEGORY } from "@/lib/scenes/scene-analysis-failure";
-import type { SceneAnalysisOutput } from "@/lib/schemas/scene";
 import { OpenAiTextGenerationProvider } from "@/lib/openai/openai-text-generation-provider";
 import { classifyOpenAiError } from "@/lib/openai/openai-error";
 
@@ -88,15 +82,17 @@ export const sceneAnalysisTask = task({
     }
     await markSceneAnalysisRunning(run.id, ctx.attempt.number);
 
-    // Billing accumulates across the first attempt and any repair, so a plan
-    // that is ultimately rejected still reconciles the full amount spent.
-    let inputTokens = 0;
-    let outputTokens = 0;
-    let providerRequestId: string | null = null;
+    // Usage is tracked here as well as inside the generator so a throw
+    // mid-flight still reconciles whatever the provider already billed.
+    let usage = {
+      inputTokens: 0,
+      outputTokens: 0,
+      providerRequestId: null as string | null,
+    };
     const costOf = () =>
       calculateTextCostCents({
-        inputTokens,
-        outputTokens,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
         inputCostPerMillionCents:
           environment.OPENAI_TEXT_INPUT_COST_PER_MILLION_CENTS,
         outputCostPerMillionCents:
@@ -104,56 +100,27 @@ export const sceneAnalysisTask = task({
       });
 
     try {
-      const provider = new OpenAiTextGenerationProvider();
-      let prompt = run.finalPrompt;
-      let output: SceneAnalysisOutput | null = null;
-      let coverage: NarrationCoverageResult | null = null;
+      const plan = await generateValidatedScenePlan({
+        provider: new OpenAiTextGenerationProvider(),
+        model: run.model,
+        initialPrompt: run.finalPrompt,
+        approvedScript: scriptVersion.content,
+        maximumScenes: environment.MAX_SCENES_PER_PROJECT,
+        aspectRatio: project?.aspectRatio ?? "16:9",
+        language: project?.language ?? "en",
+      });
+      usage = plan.usage;
 
-      for (
-        let attempt = 0;
-        attempt <= MAX_SCENE_ANALYSIS_REPAIR_ATTEMPTS;
-        attempt += 1
-      ) {
-        const result = await provider.analyzeScenes({
-          model: run.model,
-          prompt,
-        });
-        inputTokens += result.inputTokens;
-        outputTokens += result.outputTokens;
-        providerRequestId = result.requestId;
-        if (result.output.scenes.length > environment.MAX_SCENES_PER_PROJECT)
-          throw new Error("OPENAI_INVALID_RESPONSE");
-
-        output = result.output;
-        coverage = checkNarrationCoverage({
-          approvedScript: scriptVersion.content,
-          sceneNarrations: result.output.scenes.map(
-            (scene) => scene.narrationText,
-          ),
-        });
-        if (coverage.ok) break;
-        if (attempt === MAX_SCENE_ANALYSIS_REPAIR_ATTEMPTS) break;
-        prompt = renderSceneAnalysisRepairPrompt({
-          script: scriptVersion.content,
-          maximumScenes: environment.MAX_SCENES_PER_PROJECT,
-          aspectRatio: project?.aspectRatio ?? "16:9",
-          language: project?.language ?? "en",
-          discrepancy: coverage.summary,
-        });
-      }
-
-      if (!output || !coverage) throw new Error("OPENAI_INVALID_RESPONSE");
-
-      if (!coverage.ok) {
+      if (!plan.ok) {
         // Paid output that cannot become the active scene plan. The previous
         // plan is left in place precisely because nothing is inserted here.
         await failSceneAnalysisWithUsage({
           analysisRunId: run.id,
           category: NARRATION_FIDELITY_ERROR_CATEGORY,
-          message: coverage.summary,
-          providerRequestId,
-          inputTokens,
-          outputTokens,
+          message: plan.coverage.summary,
+          providerRequestId: usage.providerRequestId,
+          inputTokens: usage.inputTokens,
+          outputTokens: usage.outputTokens,
           actualCostCents: costOf(),
         });
         return { analysisRunId: run.id, status: "failed" as const };
@@ -161,11 +128,11 @@ export const sceneAnalysisTask = task({
 
       await completeSceneAnalysis({
         ...input,
-        output,
-        inputTokens,
-        outputTokens,
+        output: plan.output,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
         actualCostCents: costOf(),
-        providerRequestId: providerRequestId ?? "",
+        providerRequestId: usage.providerRequestId ?? "",
         durationLimits: {
           minimum: environment.MIN_SCENE_DURATION_MILLISECONDS,
           maximum: environment.MAX_SCENE_DURATION_MILLISECONDS,
@@ -180,14 +147,14 @@ export const sceneAnalysisTask = task({
       ) {
         // Tokens may already have been billed before the throw, so record what
         // was spent rather than releasing the reservation to zero.
-        if (inputTokens > 0 || outputTokens > 0)
+        if (usage.inputTokens > 0 || usage.outputTokens > 0)
           await failSceneAnalysisWithUsage({
             analysisRunId: run.id,
             category: failure.category,
             message: failure.message,
-            providerRequestId,
-            inputTokens,
-            outputTokens,
+            providerRequestId: usage.providerRequestId,
+            inputTokens: usage.inputTokens,
+            outputTokens: usage.outputTokens,
             actualCostCents: costOf(),
           });
         else
