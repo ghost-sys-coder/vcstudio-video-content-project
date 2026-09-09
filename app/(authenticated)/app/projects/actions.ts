@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createProject } from "@/db/commands/create-project.command";
+import { findChannelProfile } from "@/db/repositories/channel-profiles.repository";
 import { findContentIdea } from "@/db/repositories/content-ideas.repository";
 import {
   createScriptVersion,
@@ -141,6 +142,15 @@ export async function createProjectAction(
           ideaId: ideaIdCheck.data,
         })
       : null;
+
+    if (parsed.data.channelProfileId) {
+      const channel = await findChannelProfile({
+        workspaceId: context.activeMembership.workspaceId,
+        channelProfileId: parsed.data.channelProfileId,
+      });
+      if (!channel || channel.profile.status !== "active")
+        return { error: "That channel is unavailable.", success: false };
+    }
 
     const project = await createProject({
       ...parsed.data,

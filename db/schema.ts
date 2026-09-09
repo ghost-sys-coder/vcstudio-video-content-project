@@ -373,6 +373,18 @@ export const usageOperationTypeEnum = pgEnum("usage_operation_type", [
   "thumbnail_generation",
 ]);
 
+export const channelProfileStatusEnum = pgEnum("channel_profile_status", [
+  "active",
+  "archived",
+]);
+
+export const channelCadenceEnum = pgEnum("channel_cadence", [
+  "weekly",
+  "biweekly",
+  "monthly",
+  "irregular",
+]);
+
 export const platformConnectionStatusEnum = pgEnum(
   "platform_connection_status",
   ["active", "expired", "revoked"],
@@ -412,6 +424,9 @@ export const usageEventTypeEnum = pgEnum("usage_event_type", [
 
 export const auditActionEnum = pgEnum("audit_action", [
   "workspace_created",
+  "channel_profile_created",
+  "channel_profile_updated",
+  "channel_profile_archived",
   "role_changed",
   "project_archived",
   "project_restored",
@@ -951,6 +966,12 @@ export const projects = pgTable(
     height: integer("height").notNull(),
     framesPerSecond: integer("frames_per_second").notNull(),
     language: text("language").notNull(),
+    /**
+     * Nullable by design: projects created before channel profiles existed have
+     * no correct answer, and guessing one would attribute real production
+     * history to an arbitrary account.
+     */
+    channelProfileId: uuid("channel_profile_id"),
     maximumBudgetCents: integer("maximum_budget_cents").notNull(),
     createdByUserId: uuid("created_by_user_id")
       .notNull()
@@ -981,6 +1002,25 @@ export const projects = pgTable(
       sql`${table.framesPerSecond} between 1 and 120`,
     ),
     check("projects_budget_nonnegative", sql`${table.maximumBudgetCents} >= 0`),
+    index("projects_workspace_channel_index").on(
+      table.workspaceId,
+      table.channelProfileId,
+      table.updatedAt,
+    ),
+    // Tenant-scoped so a project can never be assigned another workspace's
+    // channel; the database refuses the write rather than trusting the caller.
+    //
+    // CASCADE, not SET NULL: a composite SET NULL would null every referencing
+    // column including workspace_id, which is NOT NULL, so deleting a profile
+    // would fail outright. Cascade is only safe because channel profiles are
+    // archived and never hard-deleted by the application — there is no delete
+    // command, and adding one would destroy the channel's projects. Archive
+    // instead. Workspace deletion still cleans up through the workspace cascade.
+    foreignKey({
+      columns: [table.channelProfileId, table.workspaceId],
+      foreignColumns: [channelProfiles.id, channelProfiles.workspaceId],
+      name: "projects_tenant_channel_profile_fkey",
+    }).onDelete("cascade"),
   ],
 );
 
@@ -1673,6 +1713,89 @@ export const platformConnections = pgTable(
       table.platform,
       table.status,
     ),
+  ],
+);
+
+/**
+ * A channel a workspace produces for, as a production identity rather than an
+ * access credential.
+ *
+ * Deliberately separate from `platform_connections`: a connection is an OAuth
+ * grant that expires, gets revoked, and is re-issued with a different row, while
+ * a channel is the editorial thing a creator plans around for years. Modelling
+ * them as one record means revoking OAuth destroys the production identity, and
+ * reconnecting creates a stranger. `externalAccountId` is kept here as a plain
+ * string so a profile can recognise its own channel again after a reconnect
+ * without depending on the connection row surviving.
+ */
+export const channelProfiles = pgTable(
+  "channel_profiles",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    platform: contentPlatformEnum("platform").notNull(),
+    name: text("name").notNull(),
+    /** Stable per-workspace handle used in URLs and selection lists. */
+    slug: text("slug").notNull(),
+    description: text("description").notNull().default(""),
+    audienceDescription: text("audience_description").notNull().default(""),
+    toneDescription: text("tone_description").notNull().default(""),
+    language: text("language").notNull().default("en"),
+    cadence: channelCadenceEnum("cadence").notNull().default("weekly"),
+    /** IANA zone; release planning is meaningless without one. */
+    timeZone: text("time_zone").notNull().default("UTC"),
+    defaultAspectRatio: projectAspectRatioEnum("default_aspect_ratio"),
+    defaultMaximumBudgetCents: integer("default_maximum_budget_cents"),
+    /**
+     * The platform's own account identifier (a YouTube channel id). This is the
+     * whole link to OAuth: the live connection is resolved by
+     * (workspace, platform, externalAccountId) at read time, never by pointing
+     * at a connection row. A revoke deletes the grant, a reconnect writes a new
+     * one, and the profile recognises its channel again either way — which is
+     * exactly what "preserve production identity across reconnects" requires.
+     * Null until the channel has been connected at least once.
+     */
+    externalAccountId: text("external_account_id"),
+    status: channelProfileStatusEnum("status").notNull().default("active"),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    // Lets other tables carry a tenant-scoped composite foreign key to a
+    // profile, so a cross-workspace reference cannot be written at all.
+    uniqueIndex("channel_profiles_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    uniqueIndex("channel_profiles_workspace_slug_unique").on(
+      table.workspaceId,
+      table.slug,
+    ),
+    index("channel_profiles_workspace_platform_index").on(
+      table.workspaceId,
+      table.platform,
+      table.status,
+    ),
+    index("channel_profiles_workspace_account_index").on(
+      table.workspaceId,
+      table.platform,
+      table.externalAccountId,
+    ),
+    check(
+      "channel_profiles_budget_nonnegative",
+      sql`${table.defaultMaximumBudgetCents} is null or ${table.defaultMaximumBudgetCents} >= 0`,
+    ),
+    check("channel_profiles_slug_present", sql`length(${table.slug}) > 0`),
   ],
 );
 
@@ -6094,6 +6217,8 @@ export type ProjectTitleSuggestion =
   typeof projectTitleSuggestions.$inferSelect;
 export type ThumbnailGeneration = typeof thumbnailGenerations.$inferSelect;
 export type PlatformConnection = typeof platformConnections.$inferSelect;
+export type ChannelProfile = typeof channelProfiles.$inferSelect;
+export type ChannelCadenceValue = ChannelProfile["cadence"];
 export type PlatformConnectionStatus =
   (typeof platformConnectionStatusEnum.enumValues)[number];
 export type VideoPublication = typeof videoPublications.$inferSelect;

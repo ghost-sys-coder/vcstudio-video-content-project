@@ -24,6 +24,13 @@ export async function createProject(input: {
   maximumBudgetCents: number;
   userId: string;
   /**
+   * The channel this project is produced for. Null for an unassigned project,
+   * which stays valid: a workspace may produce before it defines channels.
+   * Validated against the workspace by the caller; the composite foreign key
+   * refuses a cross-workspace pairing regardless.
+   */
+  channelProfileId?: string | null;
+  /**
    * When starting a project from a saved Idea Lab idea, seeds the new
    * project's brief with the idea's fields instead of the default blank
    * brief. Omitted (or null) for every other creation path — existing
@@ -56,6 +63,7 @@ export async function createProject(input: {
         framesPerSecond: input.framesPerSecond,
         language: input.language,
         maximumBudgetCents: input.maximumBudgetCents,
+        channelProfileId: input.channelProfileId ?? null,
         createdByUserId: input.userId,
       })
       .returning(),

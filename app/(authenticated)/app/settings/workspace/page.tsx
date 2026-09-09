@@ -1,6 +1,12 @@
 import { redirect } from "next/navigation";
 import { WorkspaceProfilePage } from "@/components/workspace/WorkspaceProfilePage";
+import {
+  countProjectsByChannel,
+  listChannelProfiles,
+  listProjectsForChannel,
+} from "@/db/repositories/channel-profiles.repository";
 import { listCustomVoices } from "@/db/repositories/custom-voice.repository";
+import { buildChannelProfileView } from "@/lib/channels/channel-profile-view";
 import { findWorkspaceLogo } from "@/db/repositories/storage-objects.repository";
 import {
   listPendingWorkspaceInvitations,
@@ -39,6 +45,9 @@ export default async function WorkspaceSettingsPage({
     pendingInvitations,
     marketingStudioEnabled,
     customVoices,
+    channelProfileRows,
+    unassignedProjects,
+    projectCountsByChannel,
   ] = await Promise.all([
     searchParams,
     findWorkspaceLogo(context.activeMembership.workspaceId),
@@ -51,6 +60,14 @@ export default async function WorkspaceSettingsPage({
       workspaceId: context.activeMembership.workspaceId,
     }),
     listCustomVoices({ workspaceId: context.activeMembership.workspaceId }),
+    listChannelProfiles({ workspaceId: context.activeMembership.workspaceId }),
+    listProjectsForChannel({
+      workspaceId: context.activeMembership.workspaceId,
+      channelProfileId: null,
+    }),
+    countProjectsByChannel({
+      workspaceId: context.activeMembership.workspaceId,
+    }),
   ]);
   const logoUrl = logo
     ? await createWorkspaceLogoDownloadUrl(logo.objectKey)
@@ -58,6 +75,17 @@ export default async function WorkspaceSettingsPage({
 
   return (
     <WorkspaceProfilePage
+      canManageChannelProfiles={can(
+        context.activeMembership.role,
+        "manageChannelProfiles",
+      )}
+      channelProfiles={channelProfileRows.map((row) =>
+        buildChannelProfileView({
+          row,
+          projectCount: projectCountsByChannel.get(row.profile.id) ?? 0,
+        }),
+      )}
+      unassignedProjectCount={unassignedProjects.length}
       canManageCustomVoices={can(
         context.activeMembership.role,
         "manageCustomVoices",

@@ -38,6 +38,12 @@ export const createProjectSchema = z.object({
   framesPerSecond: z.coerce.number().int().min(1).max(120),
   language: z.string().trim().min(2).max(40),
   maximumBudgetCents: z.coerce.number().int().min(0).max(100000),
+  // Optional so every existing caller and form keeps working unchanged; an
+  // empty string is the form representation of "no channel".
+  channelProfileId: z
+    .union([z.uuid(), z.literal("")])
+    .optional()
+    .transform((value) => (value ? value : null)),
 });
 
 export const updateProjectSchema = createProjectSchema.extend({
