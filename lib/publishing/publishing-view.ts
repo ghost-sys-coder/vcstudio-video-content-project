@@ -6,6 +6,7 @@ import type {
   TitleGenerationRun,
   VideoPublication,
 } from "@/db/schema";
+import { findChannelProfile } from "@/db/repositories/channel-profiles.repository";
 import {
   listPlatformConnections,
   listProjectVideoPublications,
@@ -113,6 +114,14 @@ export type PublishingView = {
   renders: PublishableRenderView[];
   publications: PublicationView[];
   generatedMetadata: GeneratedPublishingMetadata[];
+  /**
+   * The connection implied by this project's assigned production channel, when
+   * it has one and that channel's account is currently connected. The publish
+   * panel opens on this rather than guessing from the connection list.
+   */
+  channelConnectionId: string | null;
+  /** Name of the assigned channel, for explaining the preselected target. */
+  channelName: string | null;
   maxVideoBytes: number;
 };
 
@@ -127,6 +136,12 @@ export async function loadPublishingView(input: {
   project: Project;
 }): Promise<PublishingView> {
   const environment = getPublishingEnvironment();
+  const channelRow = input.project.channelProfileId
+    ? await findChannelProfile({
+        workspaceId: input.workspaceId,
+        channelProfileId: input.project.channelProfileId,
+      })
+    : null;
   const [connections, renders, publications, metadataRuns] = await Promise.all([
     listPlatformConnections({ workspaceId: input.workspaceId }),
     listRendersWithSource({
@@ -182,6 +197,11 @@ export async function loadPublishingView(input: {
       label: CONTENT_PLATFORM_LABELS[platform],
     })),
     maxVideoBytes: environment.MAX_PUBLISH_VIDEO_BYTES,
+    channelConnectionId:
+      channelRow?.connection?.status === "active"
+        ? channelRow.connection.id
+        : null,
+    channelName: channelRow?.profile.name ?? null,
     generatedMetadata: completeMetadataRuns.map((run) => ({
       generationRunId: run.id,
       platform: run.platform,
