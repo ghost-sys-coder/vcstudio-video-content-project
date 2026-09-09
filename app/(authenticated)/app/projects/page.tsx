@@ -1,4 +1,6 @@
 import { ProjectListPageContent } from "@/components/projects/ProjectListPageContent";
+import { listFormatPresets } from "@/db/repositories/format-presets.repository";
+import { toFormatChoices } from "@/lib/formats/format-choice";
 import { listProjects } from "@/db/repositories/projects.repository";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import { getProjectEnvironment } from "@/lib/env/server";
@@ -20,7 +22,7 @@ export default async function ProjectsPage({
   const params = await searchParams;
   const query = projectListQuerySchema.parse(params);
   const canCreate = canCreateProject(context.activeMembership.role);
-  const [result, ideaGroups] = await Promise.all([
+  const [result, ideaGroups, formatRows] = await Promise.all([
     listProjects({
       workspaceId: context.activeMembership.workspaceId,
       ...query,
@@ -30,9 +32,16 @@ export default async function ProjectsPage({
           workspaceId: context.activeMembership.workspaceId,
         })
       : Promise.resolve([]),
+    canCreate
+      ? listFormatPresets({
+          workspaceId: context.activeMembership.workspaceId,
+        })
+      : Promise.resolve([]),
   ]);
+  const formatChoices = toFormatChoices(formatRows);
   return (
     <ProjectListPageContent
+      formats={formatChoices}
       canCreate={canCreate}
       defaultBudgetCents={getProjectEnvironment().DEFAULT_PROJECT_BUDGET_CENTS}
       ideaGroups={ideaGroups}

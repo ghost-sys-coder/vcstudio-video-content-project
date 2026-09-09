@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createProject } from "@/db/commands/create-project.command";
 import { findChannelProfile } from "@/db/repositories/channel-profiles.repository";
+import { findCurrentFormatPresetVersion } from "@/db/repositories/format-presets.repository";
 import { findContentIdea } from "@/db/repositories/content-ideas.repository";
 import {
   createScriptVersion,
@@ -152,10 +153,24 @@ export async function createProjectAction(
         return { error: "That channel is unavailable.", success: false };
     }
 
+    // Resolve the format to the concrete version being inherited *now*. The
+    // project keeps that version id forever; editing the preset later appends a
+    // new version and leaves this project on the definition it actually used.
+    const formatVersion = parsed.data.formatPresetId
+      ? await findCurrentFormatPresetVersion({
+          workspaceId: context.activeMembership.workspaceId,
+          formatPresetId: parsed.data.formatPresetId,
+        })
+      : null;
+    if (parsed.data.formatPresetId && !formatVersion)
+      return { error: "That format is unavailable.", success: false };
+
     const project = await createProject({
       ...parsed.data,
       workspaceId: context.activeMembership.workspaceId,
       userId: context.user.id,
+      formatPresetVersionId: formatVersion?.id ?? null,
+      sourceContentIdeaId: idea?.id ?? null,
       brief: idea
         ? {
             topic: idea.topic,

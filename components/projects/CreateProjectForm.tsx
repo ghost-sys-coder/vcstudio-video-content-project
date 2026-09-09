@@ -5,6 +5,9 @@ import { createProjectAction } from "@/app/(authenticated)/app/projects/actions"
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FormatInheritanceSummary } from "@/components/projects/FormatInheritanceSummary";
+import type { FormatChoice } from "@/lib/formats/format-choice";
+import { resolveFormatInheritance } from "@/lib/formats/format-inheritance";
 import { Textarea } from "@/components/ui/textarea";
 import { VideoKindSelect } from "@/components/projects/VideoKindSelect";
 import type { ProjectAspectRatio } from "@/db/schema";
@@ -16,10 +19,12 @@ import {
 
 export function CreateProjectForm({
   defaultBudgetCents,
+  formats,
   ideaGroups,
   initialIdeaId,
 }: {
   defaultBudgetCents: number;
+  formats: FormatChoice[];
   ideaGroups: IdeaNicheGroup[];
   initialIdeaId?: string | null;
 }) {
@@ -42,8 +47,44 @@ export function CreateProjectForm({
       ? suggestAspectRatioForPlatform(initialIdea.primaryPlatform)
       : "16:9",
   );
+  const [formatPresetId, setFormatPresetId] = useState("");
+  const [framesPerSecond, setFramesPerSecond] = useState("30");
+  const [budgetDollars, setBudgetDollars] = useState(
+    (defaultBudgetCents / 100).toFixed(2),
+  );
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const selectedFormat =
+    formats.find((format) => format.id === formatPresetId) ?? null;
+
+  /** Seeds the form from the format; the creator may then change anything. */
+  function applyFormat(id: string) {
+    setFormatPresetId(id);
+    const format = formats.find((entry) => entry.id === id);
+    if (!format) return;
+    if (format.values.aspectRatio)
+      setAspectRatio(format.values.aspectRatio as ProjectAspectRatio);
+    if (format.values.framesPerSecond !== null)
+      setFramesPerSecond(String(format.values.framesPerSecond));
+    if (format.values.maximumBudgetCents !== null)
+      setBudgetDollars((format.values.maximumBudgetCents / 100).toFixed(2));
+  }
+
+  const inheritance = selectedFormat
+    ? resolveFormatInheritance({
+        preset: selectedFormat.values,
+        effective: {
+          aspectRatio,
+          framesPerSecond: Number(framesPerSecond),
+          targetDurationSeconds: selectedFormat.values.targetDurationSeconds,
+          maximumBudgetCents: Math.round(Number(budgetDollars) * 100),
+          captionsEnabled: selectedFormat.values.captionsEnabled,
+          voicePresetId: selectedFormat.values.voicePresetId,
+          stylePresetId: selectedFormat.values.stylePresetId,
+        },
+      })
+    : [];
 
   function applyIdea(id: string) {
     setIdeaId(id);
@@ -64,6 +105,25 @@ export function CreateProjectForm({
       className="space-y-4"
     >
       <input name="ideaId" type="hidden" value={ideaId} />
+      <input name="formatPresetId" type="hidden" value={formatPresetId} />
+      {formats.length ? (
+        <div className="space-y-2">
+          <Label htmlFor="project-format">Format</Label>
+          <select
+            className="h-8 w-full rounded-lg border bg-background px-2 text-sm"
+            id="project-format"
+            onChange={(event) => applyFormat(event.target.value)}
+            value={formatPresetId}
+          >
+            <option value="">No format</option>
+            {formats.map((format) => (
+              <option key={format.id} value={format.id}>
+                {format.name} (v{format.versionNumber})
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
       {ideaGroups.length ? (
         <div className="space-y-2">
           <Label htmlFor="project-idea">Start from a saved idea</Label>
@@ -131,9 +191,10 @@ export function CreateProjectForm({
           <Label htmlFor="project-fps">Frame rate</Label>
           <select
             className="h-8 w-full rounded-lg border bg-background px-2 text-sm"
-            defaultValue="30"
             id="project-fps"
             name="framesPerSecond"
+            onChange={(event) => setFramesPerSecond(event.target.value)}
+            value={framesPerSecond}
           >
             <option>24</option>
             <option>25</option>
@@ -153,15 +214,23 @@ export function CreateProjectForm({
         <div className="space-y-2">
           <Label htmlFor="project-budget">Maximum budget (USD)</Label>
           <Input
-            defaultValue={(defaultBudgetCents / 100).toFixed(2)}
             id="project-budget"
             min="0"
             name="budgetDollars"
+            onChange={(event) => setBudgetDollars(event.target.value)}
             step="0.01"
             type="number"
+            value={budgetDollars}
           />
         </div>
       </div>
+      {selectedFormat ? (
+        <FormatInheritanceSummary
+          formatName={selectedFormat.name}
+          resolutions={inheritance}
+          versionNumber={selectedFormat.versionNumber}
+        />
+      ) : null}
       {error ? (
         <p className="text-sm text-destructive" role="alert">
           {error}

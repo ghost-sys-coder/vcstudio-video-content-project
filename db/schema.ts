@@ -373,6 +373,11 @@ export const usageOperationTypeEnum = pgEnum("usage_operation_type", [
   "thumbnail_generation",
 ]);
 
+export const formatPresetStatusEnum = pgEnum("format_preset_status", [
+  "active",
+  "archived",
+]);
+
 export const channelProfileStatusEnum = pgEnum("channel_profile_status", [
   "active",
   "archived",
@@ -972,6 +977,20 @@ export const projects = pgTable(
      * history to an arbitrary account.
      */
     channelProfileId: uuid("channel_profile_id"),
+    /**
+     * The exact format version this project was created from. A snapshot, not a
+     * live link: editing the preset appends a new version and leaves every
+     * in-progress project pointing at the definition it actually used.
+     */
+    formatPresetVersionId: uuid("format_preset_version_id"),
+    /**
+     * The saved idea this project started from, kept so repeat use of an idea
+     * is visible as history rather than silently blocked.
+     */
+    sourceContentIdeaId: uuid("source_content_idea_id").references(
+      () => contentIdeas.id,
+      { onDelete: "set null" },
+    ),
     maximumBudgetCents: integer("maximum_budget_cents").notNull(),
     createdByUserId: uuid("created_by_user_id")
       .notNull()
@@ -1021,6 +1040,18 @@ export const projects = pgTable(
       foreignColumns: [channelProfiles.id, channelProfiles.workspaceId],
       name: "projects_tenant_channel_profile_fkey",
     }).onDelete("cascade"),
+    // NO ACTION rather than cascade: a format version is immutable history and
+    // must not be deletable while a project still cites it, but the check is
+    // deferred to end-of-statement so a workspace cascade that removes both
+    // still succeeds.
+    foreignKey({
+      columns: [table.formatPresetVersionId, table.workspaceId],
+      foreignColumns: [
+        formatPresetVersions.id,
+        formatPresetVersions.workspaceId,
+      ],
+      name: "projects_tenant_format_version_fkey",
+    }),
   ],
 );
 
@@ -1333,6 +1364,11 @@ export const contentIdeas = pgTable(
     rationale: text("rationale").notNull().default(""),
     hookType: text("hook_type").notNull().default(""),
     source: contentIdeaSourceEnum("source").notNull().default("ai"),
+    /** Backlog organisation. All nullable so existing ideas stay valid. */
+    channelProfileId: uuid("channel_profile_id"),
+    formatPresetId: uuid("format_preset_id"),
+    priority: integer("priority").notNull().default(0),
+    plannedReleaseAt: timestamp("planned_release_at", { withTimezone: true }),
     isArchived: boolean("is_archived").notNull().default(false),
     createdByUserId: uuid("created_by_user_id")
       .notNull()
@@ -1353,6 +1389,25 @@ export const contentIdeas = pgTable(
       table.workspaceId,
       table.createdAt,
     ),
+    index("content_ideas_workspace_channel_index").on(
+      table.workspaceId,
+      table.channelProfileId,
+      table.priority,
+    ),
+    // NO ACTION, never composite SET NULL: PostgreSQL nulls every column in a
+    // composite SET NULL, and workspace_id is NOT NULL, so that form would make
+    // deleting a channel fail outright. Deferred to end-of-statement, so a
+    // workspace cascade removing ideas and channels together still succeeds.
+    foreignKey({
+      columns: [table.channelProfileId, table.workspaceId],
+      foreignColumns: [channelProfiles.id, channelProfiles.workspaceId],
+      name: "content_ideas_tenant_channel_fkey",
+    }),
+    foreignKey({
+      columns: [table.formatPresetId, table.workspaceId],
+      foreignColumns: [formatPresets.id, formatPresets.workspaceId],
+      name: "content_ideas_tenant_format_fkey",
+    }),
     check(
       "content_ideas_duration_positive",
       sql`${table.targetDurationSeconds} is null or ${table.targetDurationSeconds} > 0`,
@@ -1796,6 +1851,136 @@ export const channelProfiles = pgTable(
       sql`${table.defaultMaximumBudgetCents} is null or ${table.defaultMaximumBudgetCents} >= 0`,
     ),
     check("channel_profiles_slug_present", sql`length(${table.slug}) > 0`),
+  ],
+);
+
+/**
+ * A reusable recipe for a recurring video: who it is for, how long it runs,
+ * which voice and style it uses, and what it may cost.
+ *
+ * The preset is only an identity. Every editable value lives in an immutable
+ * version row, because a creator editing "Money Made Clear weekly" must not
+ * silently change the three videos already in production against the old
+ * definition.
+ */
+export const formatPresets = pgTable(
+  "format_presets",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    slug: text("slug").notNull(),
+    /** Optional owning channel; a preset may be shared across channels. */
+    channelProfileId: uuid("channel_profile_id"),
+    status: formatPresetStatusEnum("status").notNull().default("active"),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("format_presets_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    uniqueIndex("format_presets_workspace_slug_unique").on(
+      table.workspaceId,
+      table.slug,
+    ),
+    index("format_presets_workspace_status_index").on(
+      table.workspaceId,
+      table.status,
+    ),
+    foreignKey({
+      columns: [table.channelProfileId, table.workspaceId],
+      foreignColumns: [channelProfiles.id, channelProfiles.workspaceId],
+      name: "format_presets_tenant_channel_fkey",
+    }).onDelete("cascade"),
+    check("format_presets_slug_present", sql`length(${table.slug}) > 0`),
+  ],
+);
+
+/**
+ * One immutable definition of a format. Never updated after insert: editing a
+ * preset appends a new version, and a project keeps the exact version it was
+ * created from.
+ */
+export const formatPresetVersions = pgTable(
+  "format_preset_versions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    formatPresetId: uuid("format_preset_id").notNull(),
+    versionNumber: integer("version_number").notNull(),
+    audienceDescription: text("audience_description").notNull().default(""),
+    /** Free-form editorial shape: "hook, three segments, recap". */
+    editorialStructure: text("editorial_structure").notNull().default(""),
+    targetDurationSeconds: integer("target_duration_seconds"),
+    aspectRatio: projectAspectRatioEnum("aspect_ratio").notNull(),
+    framesPerSecond: integer("frames_per_second").notNull().default(30),
+    /**
+     * References to existing resources rather than copies, so a preset never
+     * becomes a second competing library of voices and styles.
+     */
+    voicePresetId: uuid("voice_preset_id"),
+    stylePresetId: uuid("style_preset_id"),
+    captionsEnabled: boolean("captions_enabled").notNull().default(true),
+    /**
+     * A starting budget only. Generation still performs its own estimate,
+     * budget check and confirmation; nothing here bypasses cost control.
+     */
+    defaultMaximumBudgetCents: integer("default_maximum_budget_cents"),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("format_preset_versions_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    uniqueIndex("format_preset_versions_preset_number_unique").on(
+      table.formatPresetId,
+      table.versionNumber,
+    ),
+    index("format_preset_versions_preset_index").on(
+      table.formatPresetId,
+      table.versionNumber,
+    ),
+    foreignKey({
+      columns: [table.formatPresetId, table.workspaceId],
+      foreignColumns: [formatPresets.id, formatPresets.workspaceId],
+      name: "format_preset_versions_tenant_preset_fkey",
+    }).onDelete("cascade"),
+    check(
+      "format_preset_versions_number_positive",
+      sql`${table.versionNumber} > 0`,
+    ),
+    check(
+      "format_preset_versions_duration_positive",
+      sql`${table.targetDurationSeconds} is null or ${table.targetDurationSeconds} > 0`,
+    ),
+    check(
+      "format_preset_versions_budget_nonnegative",
+      sql`${table.defaultMaximumBudgetCents} is null or ${table.defaultMaximumBudgetCents} >= 0`,
+    ),
+    check(
+      "format_preset_versions_fps_valid",
+      sql`${table.framesPerSecond} between 1 and 120`,
+    ),
   ],
 );
 
@@ -6218,6 +6403,8 @@ export type ProjectTitleSuggestion =
 export type ThumbnailGeneration = typeof thumbnailGenerations.$inferSelect;
 export type PlatformConnection = typeof platformConnections.$inferSelect;
 export type ChannelProfile = typeof channelProfiles.$inferSelect;
+export type FormatPreset = typeof formatPresets.$inferSelect;
+export type FormatPresetVersion = typeof formatPresetVersions.$inferSelect;
 export type ChannelCadenceValue = ChannelProfile["cadence"];
 export type PlatformConnectionStatus =
   (typeof platformConnectionStatusEnum.enumValues)[number];

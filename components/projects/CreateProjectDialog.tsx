@@ -2,6 +2,7 @@
 
 import { Plus } from "lucide-react";
 import { CreateProjectForm } from "@/components/projects/CreateProjectForm";
+import type { FormatChoice } from "@/lib/formats/format-choice";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -15,10 +16,12 @@ import type { IdeaNicheGroup } from "@/lib/ideas/ideas-view";
 
 export function CreateProjectDialog({
   defaultBudgetCents,
+  formats,
   ideaGroups,
   initialIdeaId,
 }: {
   defaultBudgetCents: number;
+  formats: FormatChoice[];
   ideaGroups: IdeaNicheGroup[];
   initialIdeaId?: string | null;
 }) {
@@ -38,6 +41,7 @@ export function CreateProjectDialog({
         </DialogHeader>
         <CreateProjectForm
           defaultBudgetCents={defaultBudgetCents}
+          formats={formats}
           ideaGroups={ideaGroups}
           initialIdeaId={initialIdeaId}
         />

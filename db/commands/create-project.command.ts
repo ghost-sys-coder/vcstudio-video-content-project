@@ -31,6 +31,13 @@ export async function createProject(input: {
    */
   channelProfileId?: string | null;
   /**
+   * The exact format version this project inherits from. Stored as a snapshot
+   * so a later edit to the preset cannot reach back into this project.
+   */
+  formatPresetVersionId?: string | null;
+  /** The saved idea this project started from, for repeat-use history. */
+  sourceContentIdeaId?: string | null;
+  /**
    * When starting a project from a saved Idea Lab idea, seeds the new
    * project's brief with the idea's fields instead of the default blank
    * brief. Omitted (or null) for every other creation path — existing
@@ -64,6 +71,8 @@ export async function createProject(input: {
         language: input.language,
         maximumBudgetCents: input.maximumBudgetCents,
         channelProfileId: input.channelProfileId ?? null,
+        formatPresetVersionId: input.formatPresetVersionId ?? null,
+        sourceContentIdeaId: input.sourceContentIdeaId ?? null,
         createdByUserId: input.userId,
       })
       .returning(),

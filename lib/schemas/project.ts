@@ -44,6 +44,12 @@ export const createProjectSchema = z.object({
     .union([z.uuid(), z.literal("")])
     .optional()
     .transform((value) => (value ? value : null)),
+  // The format to inherit from. The project stores the resolved *version*, not
+  // this id, so a later preset edit cannot change an in-progress video.
+  formatPresetId: z
+    .union([z.uuid(), z.literal("")])
+    .optional()
+    .transform((value) => (value ? value : null)),
 });
 
 export const updateProjectSchema = createProjectSchema.extend({

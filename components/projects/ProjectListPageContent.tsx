@@ -3,6 +3,7 @@ import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import type { ProjectListItem } from "@/db/repositories/projects.repository";
 import { buttonVariants } from "@/components/ui/button";
 import { CreateProjectDialog } from "@/components/projects/CreateProjectDialog";
+import type { FormatChoice } from "@/lib/formats/format-choice";
 import { EmptyProjectsState } from "@/components/projects/EmptyProjectsState";
 import { ProjectCard } from "@/components/projects/ProjectCard";
 import type { IdeaNicheGroup } from "@/lib/ideas/ideas-view";
@@ -15,6 +16,7 @@ export function ProjectListPageContent({
   pageCount,
   canCreate,
   defaultBudgetCents,
+  formats,
   ideaGroups,
   initialIdeaId,
 }: {
@@ -23,6 +25,7 @@ export function ProjectListPageContent({
   page: number;
   pageCount: number;
   canCreate: boolean;
+  formats: FormatChoice[];
   defaultBudgetCents: number;
   ideaGroups: IdeaNicheGroup[];
   initialIdeaId?: string | null;
@@ -50,6 +53,7 @@ export function ProjectListPageContent({
         {canCreate ? (
           <CreateProjectDialog
             defaultBudgetCents={defaultBudgetCents}
+            formats={formats}
             ideaGroups={ideaGroups}
             initialIdeaId={initialIdeaId}
           />
