@@ -4,6 +4,11 @@ import { usePathname, useRouter } from "next/navigation";
 import type { Project } from "@/db/schema";
 import { ProjectStatusBadge } from "@/components/projects/ProjectStatusBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  PROJECT_OVERVIEW_TAB,
+  projectTabHref,
+  resolveProjectTab,
+} from "@/lib/production/project-tab";
 
 export function ProjectHeader({
   children,
@@ -14,27 +19,13 @@ export function ProjectHeader({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const activeTab = pathname.endsWith("/settings")
-    ? "settings"
-    : pathname.endsWith("/storyboard")
-      ? "storyboard"
-      : pathname.endsWith("/audio")
-        ? "audio"
-        : pathname.endsWith("/subtitles")
-          ? "subtitles"
-          : pathname.endsWith("/render")
-            ? "render"
-            : pathname.endsWith("/publish")
-              ? "publish"
-              : pathname.endsWith("/scenes")
-                ? "scenes"
-                : "script";
+  const activeTab = resolveProjectTab(pathname);
 
   return (
     <Tabs
       className="min-w-0 max-w-full"
       onValueChange={(value) =>
-        router.push(`/app/projects/${project.id}/${String(value)}`)
+        router.push(projectTabHref(project.id, String(value)))
       }
       value={activeTab}
     >
@@ -47,6 +38,7 @@ export function ProjectHeader({
         </div>
         <div className="mt-5 max-w-full overflow-x-auto pb-1">
           <TabsList variant="line">
+            <TabsTrigger value={PROJECT_OVERVIEW_TAB}>Overview</TabsTrigger>
             <TabsTrigger value="script">Script</TabsTrigger>
             <TabsTrigger value="scenes">Scenes</TabsTrigger>
             <TabsTrigger value="storyboard">Storyboard</TabsTrigger>

@@ -329,3 +329,38 @@ export async function loadProductionQueue(input: {
     pageCount: calculatePagination({ ...query, total }).pageCount,
   };
 }
+
+/**
+ * Readiness for a single project, computed by the same facts loader the queue
+ * uses.
+ *
+ * The overview and the queue must never disagree about what a project needs,
+ * so they share one derivation rather than each interpreting the database in
+ * their own way. Returns null when the project is not in this workspace.
+ */
+export async function loadProjectProductionReadiness(input: {
+  workspaceId: string;
+  projectId: string;
+}): Promise<ProductionReadiness | null> {
+  const [row] = await getDatabase()
+    .select({ plannedReleaseAt: projects.plannedReleaseAt })
+    .from(projects)
+    .where(
+      and(
+        eq(projects.workspaceId, input.workspaceId),
+        eq(projects.id, input.projectId),
+      ),
+    )
+    .limit(1);
+  if (!row) return null;
+
+  const factsByProject = await loadPageFacts({
+    workspaceId: input.workspaceId,
+    projectIds: [input.projectId],
+    plannedReleaseByProject: new Map([
+      [input.projectId, row.plannedReleaseAt],
+    ]),
+  });
+  const facts = factsByProject.get(input.projectId);
+  return facts ? resolveProductionReadiness(facts) : null;
+}

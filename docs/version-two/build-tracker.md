@@ -30,7 +30,7 @@ Acceptance criteria and change areas are in the [implementation plan](implementa
 | V2-04 | Channel profiles                | V2-01                                        | In validation | Channel identity, project assignment, availability and settings UI implemented and tested; publish-target derivation and project-settings assignment UI remain            |
 | V2-05 | Formats and idea backlog        | V2-04                                        | In validation | Versioned presets, project snapshots, inheritance summary and idea backlog implemented and tested; management UIs remain                                                  |
 | V2-06 | Production queue/readiness      | V2-01, V2-04, V2-05                          | In validation | Derived readiness, queue with filters/pagination and the dashboard spend-coverage fix delivered and tested; browser review pending                                        |
-| V2-07 | Guided workspace                | V2-02, V2-03, V2-06                          | Not started   | Map representative journey and preserve deep links                                                                                                                        |
+| V2-07 | Guided workspace                | V2-02, V2-03, V2-06                          | In progress   | Overview and stage-appropriate next step delivered; scene grid/detail unification and caption-in-assembly not started                                                     |
 | V2-08 | Persistent release package      | V2-02, V2-04                                 | Not started   | Define draft/snapshot and output/destination identity                                                                                                                     |
 | V2-09 | YouTube release completion      | V2-08                                        | Not started   | Verify scopes and design resumable finishing steps                                                                                                                        |
 | V2-10 | Scheduling and calendar         | V2-06, V2-09                                 | Not started   | Verify provider scheduling and current worker capacity                                                                                                                    |
@@ -227,6 +227,22 @@ Copy this template below for each slice when work begins. Link commits/PRs and r
 - Known limitations: the queue has no browser verification. Audio blockers rely on succeeded generation counts rather than per-scene coverage, so a project with some narration reports no shortfall until a clip actually fails. `isComplete` treats any succeeded render as sufficient without checking it is the newest one.
 - Measured production impact: not measured.
 
+### V2-07 - Guided production workspace (first increment)
+
+- Owner: Claude. Started / last updated: 2026-09-09. Status: **In progress**. This increment is complete and tested; the slice is not.
+- Scope delivered: a project overview at the project root, a stage-appropriate primary action, stage progress derived from output, reusable-resource links, and an Overview tab. The root previously redirected to `/script`.
+- Central decision - **the overview shares the queue's derivation rather than repeating it**. `loadProjectProductionReadiness` calls the same page-facts loader V2-06 uses, so the overview and the queue cannot disagree about what a project needs or what to do next. No second readiness notion was introduced.
+- Second decision - **every control on the overview is a link**. Opening a project must not start billable work or skip an approval, so the primary action navigates to where the decision is made and nothing more. Stage progress links navigate only.
+- Acceptance criteria addressed by this increment: _the representative workflow can advance without knowing all eight current tabs_ - met; the overview names the next step and links to it at every stage, so the pipeline can be followed without knowing tab names. _Existing routes/bookmarks continue working or redirect to equivalent context_ - met; no tab route changed, tab resolution moved into a pure function so the guarantee is asserted for every pre-existing segment, and the production build lists all eight tab routes plus the new root. _Bulk generation and review remain available; failed scenes and per-operation costs remain visible_ - met by leaving those surfaces untouched. _Navigation changes do not automatically trigger billable work or remove required editorial approval_ - met by construction, as above.
+- **Not delivered, and not claimed**: the scene grid and detail views are not unified into one production context, and caption review has not moved into assembly. Those touch the Scenes and Storyboard surfaces, roughly forty components, and carry the real risk the plan's second criterion guards against - scene selection, filters, drafts, review state and keyboard navigation surviving a view change. That criterion is therefore neither met nor violated by this increment; nothing about scene view state changed. The plan explicitly allows incremental delivery here.
+- Evidence: [overview route](<../../app/(authenticated)/app/projects/[projectId]/page.tsx>), [overview content](../../components/projects/ProjectOverviewPageContent.tsx), [tab resolver](../../lib/production/project-tab.ts), [tab tests](../../lib/production/project-tab.test.ts), [stage progress](../../lib/production/production-stages.ts), [stage tests](../../lib/production/production-stages.test.ts).
+- Commands executed and exact results: `npx vitest run lib/production` passed **36 tests across 4 files**. `npm test` passed **1496 tests across 253 files**. `npm run typecheck` passed. `npm run lint` passed with zero errors and only the pre-existing `IDEA_PLATFORMS` warning. `npm run build` compiled successfully and lists `/app/projects/[projectId]` alongside all eight existing tab routes. `git diff --check` clean.
+- Database migration: none required. No schema, dependency or environment change.
+- Deployment: not deployed. No Trigger.dev task changed.
+- Rollback: restoring the previous redirect in the project root route returns the old behaviour; nothing else depends on the overview.
+- Known limitations: no browser verification, so the overview has not been observed rendering. The remaining slice scope is listed above.
+- Measured production impact: not measured.
+
 ### V2-XX - Title
 
 - Status:
@@ -268,6 +284,8 @@ Copy this template below for each slice when work begins. Link commits/PRs and r
 - Limitation: the production renderer still executes still/audio proxies; this manifest is not shipped mixed-media support. V2-00 remains In progress pending a measured walkthrough.
 
 ## Change log
+
+- 2026-09-09: Started V2-07 with its navigation increment. The project root is now an overview with a stage-appropriate next step instead of a redirect to the script tab, reusing the V2-06 readiness resolver so the overview and the queue cannot disagree. Every control on it is a link, so opening a project cannot start billable work. Tab resolution became a pure function and a test asserts every pre-existing route still lands on the tab it always had. The scene grid/detail unification and caption-in-assembly parts of the slice are not delivered, so V2-07 stays In progress.
 
 - 2026-09-09: Delivered V2-06, the production queue and derived readiness. Readiness is computed from scripts, scenes, assets, renders and publications, and is structurally unable to read the hand-editable project status, so a project labelled "completed" with nothing produced still reports that no script has been written. Published, rendered and scheduled are distinct, and a planned release date never outranks a real render. Fixed a real spend defect: the dashboard presented image-generation cost alone as overall spend, and now reuses the usage read model. Two further defects were caught by live-database tests that unit tests could not see, an inverted `ORDER BY ... nulls last` and an empty seeded script draft being counted as written work.
 
