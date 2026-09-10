@@ -426,7 +426,6 @@ export function PlatformThumbnailsPanel({
             platform={toVideoContentPlatform(current.platform)}
             platformLabel={current.label}
             projectId={projectId}
-            sizeLabel={current.size}
           />
         ) : null}
       </div>

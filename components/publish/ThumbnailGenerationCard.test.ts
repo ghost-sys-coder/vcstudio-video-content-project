@@ -73,6 +73,15 @@ describe("an uploaded thumbnail", () => {
     expect(html).toContain(
       `/api/projects/6f1a2b3c-4d5e-4f60-8a7b-9c0d1e2f3a4b/thumbnails/${uploaded.id}/asset`,
     );
+    // Deleting an upload matters more than deleting a generation: it is the
+    // only way to take back a file that was chosen by mistake.
+    expect(html).toContain("Delete Uploaded");
+  });
+
+  it("can be deleted after a failure too, even without a regenerate action", () => {
+    const html = render({ ...uploaded, status: "failed" });
+    expect(html).toContain("Delete Uploaded");
+    expect(html).not.toContain("Regenerate");
   });
 });
 

@@ -5,10 +5,7 @@ import { z } from "zod";
 import { saveUploadedThumbnail } from "@/db/commands/thumbnail-generation-commands";
 import { findProject } from "@/db/repositories/projects.repository";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
-import {
-  isSceneImageUploadAspectRatioAllowed,
-  sceneImageOutputFormatForUploadContentType,
-} from "@/lib/domain/scene-image";
+import { sceneImageOutputFormatForUploadContentType } from "@/lib/domain/scene-image";
 import { getSceneMediaUploadEnvironment } from "@/lib/env/server";
 import { requireCapability } from "@/lib/policies/workspace-policy";
 import {
@@ -20,6 +17,7 @@ import {
   deleteUploadedThumbnailObject,
   inspectUploadedThumbnail,
 } from "@/lib/storage/thumbnail-storage";
+import { checkThumbnailUploadFit } from "@/lib/thumbnails/thumbnail-upload-fit";
 
 const paramsSchema = z.object({ projectId: z.uuid() });
 
@@ -108,14 +106,21 @@ export async function POST(
       inspected.contentType !== parsed.data.contentType
     )
       throw new Error("THUMBNAIL_UPLOAD_DECLARATION_MISMATCH");
-    if (
-      !isSceneImageUploadAspectRatioAllowed({
-        width: inspected.width,
-        height: inspected.height,
-        targetSize: size,
-      })
-    )
-      throw new Error("THUMBNAIL_UPLOAD_ASPECT_RATIO_MISMATCH");
+    // Judged against the platform's own thumbnail shape, not the size the image
+    // model happens to produce. A refusal names the image, the shape needed and
+    // a size to aim for, so it can be acted on rather than guessed at.
+    const fit = checkThumbnailUploadFit({
+      platform: parsed.data.platform,
+      width: inspected.width,
+      height: inspected.height,
+    });
+    if (!fit.fits) {
+      await deleteUploadedThumbnailObject(parsed.data.objectKey).catch(
+        () => undefined,
+      );
+      uncommittedObjectKey = null;
+      return NextResponse.json({ error: fit.message }, { status: 400 });
+    }
 
     const created = await saveUploadedThumbnail({
       workspaceId,
@@ -147,8 +152,8 @@ export async function POST(
       );
     const message =
       error instanceof Error &&
-      error.message === "THUMBNAIL_UPLOAD_ASPECT_RATIO_MISMATCH"
-        ? "This image's proportions don't match the platform's thumbnail shape closely enough."
+      error.message === "THUMBNAIL_UPLOAD_DECLARATION_MISMATCH"
+        ? "The uploaded file did not match what was authorized, so it was not saved."
         : "The thumbnail could not be saved.";
     return NextResponse.json({ error: message }, { status: 400 });
   }
