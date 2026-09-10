@@ -2,6 +2,23 @@
 
 import { revalidatePath } from "next/cache";
 import {
+  cancelReleaseSchedule,
+  ReleaseAlreadyScheduledError,
+  scheduleRelease,
+} from "@/db/commands/release-schedule-commands";
+import { findReleasePackage } from "@/db/repositories/release-packages.repository";
+import { listReleaseSchedules } from "@/db/repositories/release-schedules.repository";
+import {
+  canScheduleReleasePlatform,
+  describeUnschedulablePlatform,
+} from "@/lib/releases/build-publish-input";
+import { validateReleaseSchedule } from "@/lib/releases/release-schedule";
+import {
+  toReleaseScheduleListView,
+  type ReleaseScheduleListView,
+} from "@/lib/releases/release-schedule-view";
+
+import {
   cancelThumbnailGeneration,
   deleteThumbnailGeneration,
   dismissThumbnailGeneration,
@@ -32,7 +49,9 @@ import {
 } from "@/db/commands/release-package-commands";
 import {
   confirmReleasePackageSchema,
+  cancelReleaseScheduleSchema,
   saveReleasePackageSchema,
+  scheduleReleaseSchema,
 } from "@/lib/schemas/release-package";
 import {
   loadReleasePackagesView,
@@ -786,4 +805,127 @@ export async function loadReleasePackagesAction(
     workspaceId: context.activeMembership.workspaceId,
     project,
   });
+}
+
+export type ReleaseScheduleActionResult = {
+  success: boolean;
+  error: string | null;
+};
+
+/**
+ * Records the intention to publish one confirmed release at a chosen time.
+ *
+ * Nothing is uploaded here. The wall-clock time and its zone are what the
+ * creator chose, and the instant is derived on the server: a browser's own
+ * clock and zone are not trusted to decide when a release goes out.
+ *
+ * A package must be confirmed first. Confirmation is what freezes the wording,
+ * so scheduling an unconfirmed package would promise to publish something
+ * nobody had reviewed.
+ */
+export async function scheduleReleaseAction(
+  input: unknown,
+): Promise<ReleaseScheduleActionResult> {
+  const parsed = scheduleReleaseSchema.safeParse(input);
+  if (!parsed.success)
+    return { success: false, error: "The schedule request is invalid." };
+  try {
+    const { context } = await requirePublishMutation(parsed.data.projectId);
+    const workspaceId = context.activeMembership.workspaceId;
+
+    const releasePackage = await findReleasePackage({
+      workspaceId,
+      projectId: parsed.data.projectId,
+      releasePackageId: parsed.data.releasePackageId,
+    });
+    if (!releasePackage)
+      return { success: false, error: "That release no longer exists." };
+    if (!releasePackage.reviewedAt)
+      return {
+        success: false,
+        error: "Confirm this release package before scheduling it.",
+      };
+
+    const platform = toVideoContentPlatform(releasePackage.platform);
+    if (!canScheduleReleasePlatform(platform))
+      return {
+        success: false,
+        error:
+          describeUnschedulablePlatform(platform) ??
+          "That platform cannot be scheduled.",
+      };
+
+    const validated = validateReleaseSchedule({
+      localDateTime: parsed.data.localDateTime,
+      timeZone: parsed.data.timeZone,
+    });
+    if (!validated.ok) return { success: false, error: validated.message };
+
+    await scheduleRelease({
+      workspaceId,
+      projectId: parsed.data.projectId,
+      releasePackageId: parsed.data.releasePackageId,
+      renderId: parsed.data.renderId,
+      connectionId: parsed.data.connectionId,
+      platform,
+      scheduledAt: validated.scheduledAt,
+      timeZone: parsed.data.timeZone,
+      requestedByUserId: context.user.id,
+    });
+    revalidatePath(`/app/projects/${parsed.data.projectId}/publish`);
+    return { success: true, error: null };
+  } catch (error) {
+    if (error instanceof ReleaseAlreadyScheduledError)
+      return { success: false, error: error.message };
+    return {
+      success: false,
+      error: "That release could not be scheduled.",
+    };
+  }
+}
+
+/** Calls off a schedule that has not been picked up yet. */
+export async function cancelReleaseScheduleAction(
+  input: unknown,
+): Promise<ReleaseScheduleActionResult> {
+  const parsed = cancelReleaseScheduleSchema.safeParse(input);
+  if (!parsed.success)
+    return { success: false, error: "The request is invalid." };
+  try {
+    const { context } = await requirePublishMutation(parsed.data.projectId);
+    const result = await cancelReleaseSchedule({
+      workspaceId: context.activeMembership.workspaceId,
+      projectId: parsed.data.projectId,
+      scheduleId: parsed.data.scheduleId,
+    });
+    if (!result.cancelled)
+      return {
+        success: false,
+        // The likeliest cause by far: the sweeper claimed it first.
+        error:
+          "That release has already started and can no longer be called off.",
+      };
+    revalidatePath(`/app/projects/${parsed.data.projectId}/publish`);
+    return { success: true, error: null };
+  } catch {
+    return { success: false, error: "That schedule could not be cancelled." };
+  }
+}
+
+/** Re-reads this project's schedules after a change. */
+export async function loadReleaseSchedulesAction(
+  projectId: string,
+): Promise<ReleaseScheduleListView | null> {
+  const context = await getAuthenticatedWorkspaceContext();
+  if (!context) return null;
+  const project = await findProject({
+    workspaceId: context.activeMembership.workspaceId,
+    projectId,
+  });
+  if (!project) return null;
+  const rows = await listReleaseSchedules({
+    workspaceId: context.activeMembership.workspaceId,
+    projectId,
+  });
+  return toReleaseScheduleListView(rows);
 }

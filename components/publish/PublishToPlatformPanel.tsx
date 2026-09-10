@@ -16,6 +16,7 @@ import { ConnectTikTokButton } from "@/components/publish/ConnectTikTokButton";
 import { ConnectLinkedInButton } from "@/components/publish/ConnectLinkedInButton";
 import { ConnectXButton } from "@/components/publish/ConnectXButton";
 import { PlatformConnectionRow } from "@/components/publish/PlatformConnectionRow";
+import { ReleaseSchedulePanel } from "@/components/publish/ReleaseSchedulePanel";
 import { VideoPublicationRow } from "@/components/publish/VideoPublicationRow";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/CopyButton";
@@ -43,6 +44,7 @@ import type { PublishingView } from "@/lib/publishing/publishing-view";
 import { createPublishingDraftsFromPackages } from "@/lib/publishing/release-metadata-source";
 import { parseReleaseTags } from "@/lib/schemas/release-package";
 import type { ReleasePackagesView } from "@/lib/releases/release-package-view";
+import type { ReleaseScheduleListView } from "@/lib/releases/release-schedule-view";
 import { selectConnectablePostPlatforms } from "@/lib/social/select-connectable-post-platforms";
 import {
   findActivePublicationForTarget,
@@ -67,12 +69,14 @@ export function PublishToPlatformPanel({
   canPublish,
   initialData,
   releasePackages,
+  initialSchedules,
 }: {
   projectId: string;
   canManageConnections: boolean;
   canPublish: boolean;
   initialData: PublishingView;
   releasePackages: ReleasePackagesView;
+  initialSchedules: ReleaseScheduleListView;
 }) {
   const initialTarget = selectInitialPublishingTarget(initialData);
   const [data, setData] = useState<PublishingView>(initialData);
@@ -981,6 +985,15 @@ export function PublishToPlatformPanel({
                 {metadataNotice}
               </p>
             ) : null}
+
+            <ReleaseSchedulePanel
+              canManage={canPublish}
+              connectionId={activeConnection?.id ?? null}
+              initialSchedules={initialSchedules}
+              projectId={projectId}
+              releasePackage={activeReleasePackage}
+              renderId={selectedRender?.id ?? null}
+            />
             <p className="text-xs text-muted-foreground">
               {instagramSelected
                 ? "Instagram will process this vertical Reel before publishing it."

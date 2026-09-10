@@ -5,6 +5,8 @@ import { PublishToPlatformPanel } from "@/components/publish/PublishToPlatformPa
 import { ReleasePackagePanel } from "@/components/publish/ReleasePackagePanel";
 import { ShareRenderAsPostPanel } from "@/components/publish/ShareRenderAsPostPanel";
 import { loadPublishingView } from "@/lib/publishing/publishing-view";
+import { listReleaseSchedules } from "@/db/repositories/release-schedules.repository";
+import { toReleaseScheduleListView } from "@/lib/releases/release-schedule-view";
 import { findProject } from "@/db/repositories/projects.repository";
 import { findProjectBrief } from "@/db/repositories/project-briefs.repository";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
@@ -37,6 +39,10 @@ export default async function ProjectPublishPage({
   const canGenerate =
     canEditProject(context.activeMembership.role) &&
     project.status !== "archived";
+  const scheduleRows = await listReleaseSchedules({
+    workspaceId: scope.workspaceId,
+    projectId,
+  });
   const [titlesView, thumbnailsView, publishingView, releasePackagesView] =
     await Promise.all([
       loadTitlesView({ workspaceId: scope.workspaceId, project, brief }),
@@ -68,6 +74,7 @@ export default async function ProjectPublishPage({
         canPublish={canGenerate}
         initialData={publishingView}
         projectId={project.id}
+        initialSchedules={toReleaseScheduleListView(scheduleRows)}
         releasePackages={releasePackagesView}
       />
       <ShareRenderAsPostPanel

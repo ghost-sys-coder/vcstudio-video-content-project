@@ -396,6 +396,23 @@ export const platformConnectionStatusEnum = pgEnum(
   ["active", "expired", "revoked"],
 );
 
+/**
+ * A scheduled release's own lifecycle, kept separate from the publication's.
+ *
+ * "Scheduled" is an intention this app holds and can still cancel. "Dispatched"
+ * means the upload was handed to the publication worker. Whether the platform
+ * then accepted, processed or published it is `video_publication_status`'s
+ * business to report; collapsing the two would let a schedule read as published
+ * when nothing had left the building.
+ */
+export const releaseScheduleStatusEnum = pgEnum("release_schedule_status", [
+  "scheduled",
+  "claimed",
+  "dispatched",
+  "cancelled",
+  "failed",
+]);
+
 export const videoPublicationStatusEnum = pgEnum("video_publication_status", [
   "pending",
   "queued",
@@ -3765,6 +3782,121 @@ export const videoPublications = pgTable(
 );
 
 /**
+ * A release a creator asked to go out at a particular time.
+ *
+ * **Why a table rather than a delayed job.** `AGENTS.md` requires PostgreSQL to
+ * be authoritative and forbids background workflow state from being the only
+ * source of truth. With the schedule here: rescheduling and cancelling are
+ * plain updates with nothing to revoke; a dropped or expired delayed run cannot
+ * orphan a release; and a release scheduled while the worker was down still
+ * goes out once it returns. The cost is up to one sweep interval of jitter,
+ * which the interface states rather than hides.
+ *
+ * The instant and the zone are both stored. The instant is what the sweeper
+ * compares against, and the zone is what the creator wrote, so the schedule can
+ * be shown back as the wall-clock time they chose without guessing.
+ */
+export const releaseSchedules = pgTable(
+  "release_schedules",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").notNull(),
+    releasePackageId: uuid("release_package_id").notNull(),
+    /** The exact render to publish. A schedule never re-picks one later. */
+    renderId: uuid("render_id").notNull(),
+    connectionId: uuid("connection_id")
+      .notNull()
+      .references(() => platformConnections.id, { onDelete: "restrict" }),
+    platform: contentPlatformEnum("platform").notNull(),
+    /** The instant to publish at. Compared against `now()` by the sweeper. */
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull(),
+    /** The IANA zone the creator wrote the time in, for display only. */
+    timeZone: text("time_zone").notNull(),
+    status: releaseScheduleStatusEnum("status").notNull().default("scheduled"),
+    /** The publication this became, once it was handed over. */
+    publicationId: uuid("publication_id"),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    safeErrorMessage: text("safe_error_message"),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
+    dispatchedAt: timestamp("dispatched_at", { withTimezone: true }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    requestedByUserId: uuid("requested_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("release_schedules_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    // The sweep's only query: due rows, oldest first.
+    index("release_schedules_due_index").on(table.status, table.scheduledAt),
+    index("release_schedules_workspace_project_index").on(
+      table.workspaceId,
+      table.projectId,
+      table.scheduledAt,
+    ),
+    // One live schedule per destination. Without this, two clicks could queue
+    // the same render to the same channel twice and publish it twice.
+    uniqueIndex("release_schedules_one_pending_per_target")
+      .on(table.releasePackageId, table.renderId, table.connectionId)
+      .where(sql`status in ('scheduled', 'claimed')`),
+    check(
+      "release_schedules_dispatch_fields",
+      sql`(
+        ${table.status} = 'dispatched'
+        and ${table.publicationId} is not null
+        and ${table.dispatchedAt} is not null
+      ) or (
+        ${table.status} <> 'dispatched'
+        and ${table.publicationId} is null
+      )`,
+    ),
+    check(
+      "release_schedules_cancelled_fields",
+      sql`${table.status} <> 'cancelled' or ${table.cancelledAt} is not null`,
+    ),
+    check(
+      "release_schedules_attempts_nonnegative",
+      sql`${table.attemptCount} >= 0`,
+    ),
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [projects.id, projects.workspaceId],
+      name: "release_schedules_tenant_project_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.releasePackageId, table.workspaceId],
+      foreignColumns: [releasePackages.id, releasePackages.workspaceId],
+      name: "release_schedules_tenant_package_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.renderId, table.projectId, table.workspaceId],
+      foreignColumns: [
+        videoRenders.id,
+        videoRenders.projectId,
+        videoRenders.workspaceId,
+      ],
+      name: "release_schedules_tenant_render_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.publicationId, table.workspaceId],
+      foreignColumns: [videoPublications.id, videoPublications.workspaceId],
+      name: "release_schedules_tenant_publication_fkey",
+    }).onDelete("set null"),
+  ],
+);
+
+/**
  * A social post: one piece of writing, optionally with library media, sent to
  * one or more connected accounts.
  *
@@ -6659,6 +6791,7 @@ export type PlatformConnectionStatus =
   (typeof platformConnectionStatusEnum.enumValues)[number];
 export type VideoPublication = typeof videoPublications.$inferSelect;
 export type ReleasePackage = typeof releasePackages.$inferSelect;
+export type ReleaseSchedule = typeof releaseSchedules.$inferSelect;
 export type ReleasePackageRevision =
   typeof releasePackageRevisions.$inferSelect;
 export type VideoPublicationStatus =

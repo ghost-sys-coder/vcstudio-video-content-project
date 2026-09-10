@@ -52,3 +52,22 @@ export function parseReleaseTags(value: string): string[] {
   }
   return tags;
 }
+
+/** Scheduling one release. The wall-clock time and its zone, never an instant. */
+export const scheduleReleaseSchema = z.object({
+  projectId: z.uuid(),
+  releasePackageId: z.uuid(),
+  renderId: z.uuid(),
+  connectionId: z.uuid(),
+  /** `YYYY-MM-DDTHH:mm`, exactly as `<input type="datetime-local">` gives it. */
+  localDateTime: z.string().min(1).max(32),
+  /** An IANA zone name. Validated against the platform's own zone database. */
+  timeZone: z.string().min(1).max(64),
+});
+
+export const cancelReleaseScheduleSchema = z.object({
+  projectId: z.uuid(),
+  scheduleId: z.uuid(),
+});
+
+export type ScheduleReleaseInput = z.infer<typeof scheduleReleaseSchema>;
