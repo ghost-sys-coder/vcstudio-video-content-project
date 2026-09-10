@@ -11,6 +11,7 @@ import {
   toggleThumbnailFavoriteAction,
 } from "@/app/(authenticated)/app/projects/[projectId]/publish/actions";
 import { ThumbnailGenerationCard } from "@/components/publish/ThumbnailGenerationCard";
+import { ThumbnailUploadDialog } from "@/components/publish/ThumbnailUploadDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { MAX_THUMBNAIL_HEADLINE_LENGTH } from "@/lib/schemas/thumbnail";
+import { toVideoContentPlatform } from "@/lib/platforms/video-content-platforms";
 import type { ThumbnailsView } from "@/lib/thumbnails/thumbnail-view";
 
 function formatCents(cents: number): string {
@@ -411,6 +413,22 @@ export function PlatformThumbnailsPanel({
             Cancel
           </Button>
         ) : null}
+
+        {/* Uploading needs no budget, no context and no image generation, so
+            it stays available when generating is unavailable for any of those
+            reasons. It is the free way to get a cover image. */}
+        {canGenerate && current ? (
+          <ThumbnailUploadDialog
+            disabled={busy}
+            onUploaded={async () => {
+              await refresh();
+            }}
+            platform={toVideoContentPlatform(current.platform)}
+            platformLabel={current.label}
+            projectId={projectId}
+            sizeLabel={current.size}
+          />
+        ) : null}
       </div>
 
       {headlineRequired ? (
@@ -422,13 +440,14 @@ export function PlatformThumbnailsPanel({
 
       {!data.generationEnabled ? (
         <p className="text-xs text-muted-foreground">
-          Image generation is currently disabled.
+          Image generation is currently disabled. You can still upload a
+          thumbnail you already have.
         </p>
       ) : null}
       {!data.hasContext ? (
         <p className="text-xs text-muted-foreground">
           Add a topic to the brief or approve a script to enable thumbnail
-          generation.
+          generation. Uploading your own thumbnail needs neither.
         </p>
       ) : null}
       {headlineMissing ? (
@@ -478,7 +497,8 @@ export function PlatformThumbnailsPanel({
         </ul>
       ) : !generating ? (
         <p className="text-sm text-muted-foreground">
-          No {current?.label} thumbnails yet. Generate one to get started.
+          No {current?.label} thumbnails yet. Generate one, or upload a cover
+          image you already have.
         </p>
       ) : null}
     </section>

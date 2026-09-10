@@ -274,6 +274,15 @@ export async function regenerateThumbnailAction(
     });
     if (!previous)
       return { success: false, error: "That thumbnail no longer exists." };
+    // An uploaded thumbnail was never generated from a prompt, so there is
+    // nothing to regenerate it from. Offering to would either invent a prompt
+    // or silently spend money on an unrelated image.
+    if (previous.source !== "ai_generated" || previous.textMode === null)
+      return {
+        success: false,
+        error:
+          "This thumbnail was uploaded, so it cannot be regenerated. Generate a new one instead.",
+      };
 
     const brief = await findProjectBrief({
       workspaceId,

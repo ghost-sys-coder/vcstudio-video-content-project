@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { contentPlatformSchema } from "@/lib/schemas/title-generation";
-import type { SceneImageApiSize } from "@/lib/schemas/scene-image";
+import {
+  SCENE_IMAGE_UPLOAD_CONTENT_TYPES,
+  type SceneImageApiSize,
+} from "@/lib/schemas/scene-image";
 
 /**
  * Upper bound on a baked headline.
@@ -79,3 +82,46 @@ export function getThumbnailSizeForPlatform(
   if (platform === "tiktok" || platform === "instagram") return "1024x1536";
   return "1536x1024";
 }
+
+/**
+ * Authorizes an upload of a thumbnail the creator already has.
+ *
+ * The declared content type and byte length are bound into the signed PUT, so
+ * they have to be validated here even though the file itself is re-inspected
+ * server-side afterwards. Nothing the browser says about the file is trusted
+ * as the final word.
+ */
+export function createThumbnailUploadSchema(input: {
+  allowedTypes: string[];
+  maximumBytes: number;
+}) {
+  return z.object({
+    platform: contentPlatformSchema,
+    contentType: z
+      .enum(SCENE_IMAGE_UPLOAD_CONTENT_TYPES)
+      .refine((value) => input.allowedTypes.includes(value), {
+        message: "Unsupported image type.",
+      }),
+    fileName: z.string().trim().min(1).max(255),
+    sizeBytes: z.number().int().positive().max(input.maximumBytes),
+  });
+}
+
+export function completeThumbnailUploadSchema(input: {
+  allowedTypes: string[];
+  maximumBytes: number;
+}) {
+  return createThumbnailUploadSchema(input)
+    .omit({ fileName: true })
+    .extend({
+      thumbnailGenerationId: z.uuid(),
+      objectKey: z.string().min(1).max(512),
+    });
+}
+
+export type ThumbnailUploadInput = z.infer<
+  ReturnType<typeof createThumbnailUploadSchema>
+>;
+export type CompleteThumbnailUploadInput = z.infer<
+  ReturnType<typeof completeThumbnailUploadSchema>
+>;

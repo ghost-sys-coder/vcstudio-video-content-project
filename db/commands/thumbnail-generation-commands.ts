@@ -9,6 +9,7 @@ import {
   type ThumbnailTextMode,
 } from "@/db/schema";
 import { BudgetExceededError } from "@/lib/domain/errors";
+import type { ImageReferenceMimeType } from "@/lib/openai/image-generation-provider";
 import type {
   SceneImageOutputFormat,
   SceneImageQuality,
@@ -527,4 +528,64 @@ export async function setThumbnailFavorite(input: {
     )
     .returning({ id: thumbnailGenerations.id });
   return { updated: result.length === 1 };
+}
+
+/**
+ * Records a thumbnail the creator supplied themselves.
+ *
+ * No reservation, no idempotency key and no prompt: nothing was bought, so
+ * there is nothing to reserve against a budget and nothing to reproduce. The
+ * row is written already settled at zero cost, which is what keeps an upload
+ * from appearing in the usage ledger as spend.
+ *
+ * The provider columns are left null deliberately rather than filled with
+ * placeholders; a database constraint enforces that they are all absent for an
+ * upload and all present for a generation.
+ */
+export async function saveUploadedThumbnail(input: {
+  workspaceId: string;
+  projectId: string;
+  thumbnailGenerationId: string;
+  platform: ContentPlatform;
+  size: string;
+  outputFormat: SceneImageOutputFormat;
+  objectKey: string;
+  contentType: ImageReferenceMimeType;
+  sizeBytes: number;
+  width: number;
+  height: number;
+  etag: string;
+  requestedByUserId: string;
+}) {
+  const now = new Date();
+  const [created] = await getDatabase()
+    .insert(thumbnailGenerations)
+    .values({
+      id: input.thumbnailGenerationId,
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      requestedByUserId: input.requestedByUserId,
+      platform: input.platform,
+      source: "user_uploaded",
+      textMode: null,
+      headlineText: null,
+      size: input.size,
+      outputFormat: input.outputFormat,
+      status: "succeeded",
+      progressPercent: 100,
+      attemptCount: 0,
+      estimatedCostCents: 0,
+      actualCostCents: 0,
+      assetObjectKey: input.objectKey,
+      assetContentType: input.contentType,
+      assetSizeBytes: input.sizeBytes,
+      assetWidth: input.width,
+      assetHeight: input.height,
+      assetEtag: input.etag,
+      startedAt: now,
+      completedAt: now,
+    })
+    .returning();
+  if (!created) throw new Error("THUMBNAIL_UPLOAD_INSERT_FAILED");
+  return created;
 }

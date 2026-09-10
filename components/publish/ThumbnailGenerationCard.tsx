@@ -35,8 +35,11 @@ export function ThumbnailGenerationCard({
     thumbnail.status === "running";
   const isDead =
     thumbnail.status === "failed" || thumbnail.status === "cancelled";
-  const modeLabel =
-    thumbnail.textMode === "baked" ? "Headline baked in" : "Text-free";
+  // An uploaded image is never described by a text mode: nobody asked a model
+  // for text, so calling it text-free would be an unchecked claim about what
+  // the creator's own file contains.
+  const modeLabel = thumbnail.originLabel;
+  const uploaded = thumbnail.source === "user_uploaded";
 
   return (
     <li className="flex flex-col overflow-hidden rounded-lg border bg-background">
@@ -47,7 +50,9 @@ export function ThumbnailGenerationCard({
             alt={
               thumbnail.headlineText
                 ? `Thumbnail with headline: ${thumbnail.headlineText}`
-                : "Generated thumbnail"
+                : uploaded
+                  ? "Uploaded thumbnail"
+                  : "Generated thumbnail"
             }
             className="h-full w-full object-contain"
             src={assetUrl}
@@ -104,9 +109,11 @@ export function ThumbnailGenerationCard({
             </span>
           ) : null}
           <span>
-            {formatCents(
-              thumbnail.actualCostCents ?? thumbnail.estimatedCostCents,
-            )}
+            {uploaded
+              ? "Free"
+              : formatCents(
+                  thumbnail.actualCostCents ?? thumbnail.estimatedCostCents,
+                )}
           </span>
         </div>
 
@@ -125,7 +132,7 @@ export function ThumbnailGenerationCard({
                 Download
               </a>
             ) : null}
-            {isDead && canManage ? (
+            {isDead && canManage && !uploaded ? (
               <>
                 <Button
                   disabled={busy}

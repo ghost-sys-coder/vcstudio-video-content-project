@@ -1635,25 +1635,40 @@ export const thumbnailGenerations = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
     platform: contentPlatformEnum("platform").notNull(),
-    textMode: thumbnailTextModeEnum("text_mode").notNull(),
+    // How this thumbnail came to exist. A creator can upload one they already
+    // have instead of paying to generate it, and an upload has no prompt, no
+    // model and no idempotency key, so the columns below that describe a
+    // provider call are nullable rather than being filled with invented values
+    // that would corrupt the ledger and the reproducibility guarantee.
+    source: imageGenerationSourceEnum("source")
+      .notNull()
+      .default("ai_generated"),
+    // Null for an upload: nobody asked a model for text, so claiming the image
+    // is text-free or headline-baked would be a guess about its contents.
+    textMode: thumbnailTextModeEnum("text_mode"),
     headlineText: text("headline_text"),
     scriptVersionId: uuid("script_version_id").references(
       () => projectScriptVersions.id,
       { onDelete: "set null" },
     ),
-    promptTemplateVersionId: uuid("prompt_template_version_id")
-      .notNull()
-      .references(() => promptTemplateVersions.id, { onDelete: "restrict" }),
-    promptTemplateVersion: text("prompt_template_version").notNull(),
-    finalPrompt: text("final_prompt").notNull(),
+    promptTemplateVersionId: uuid("prompt_template_version_id").references(
+      () => promptTemplateVersions.id,
+      { onDelete: "restrict" },
+    ),
+    promptTemplateVersion: text("prompt_template_version"),
+    finalPrompt: text("final_prompt"),
     triggerRunId: text("trigger_run_id"),
-    idempotencyKey: text("idempotency_key").notNull(),
-    requestFingerprint: text("request_fingerprint").notNull(),
-    model: text("model").notNull(),
-    quality: imageQualityEnum("quality").notNull(),
+    idempotencyKey: text("idempotency_key"),
+    requestFingerprint: text("request_fingerprint"),
+    model: text("model"),
+    quality: imageQualityEnum("quality"),
+    // The target platform size an upload is checked against, and the size a
+    // generation was produced at, so this stays required for both.
     size: text("size").notNull(),
+    // Meaningful for an upload too: it is the format of the file the creator
+    // actually supplied, and the object key is built from it.
     outputFormat: imageOutputFormatEnum("output_format").notNull(),
-    outputCompression: integer("output_compression").notNull(),
+    outputCompression: integer("output_compression"),
     background: text("background").notNull().default("opaque"),
     status: imageGenerationStatusEnum("status").notNull().default("pending"),
     progressPercent: integer("progress_percent").notNull().default(0),
@@ -1711,7 +1726,15 @@ export const thumbnailGenerations = pgTable(
     ),
     check(
       "thumbnail_generations_headline_matches_text_mode",
-      sql`(${table.textMode} = 'baked' and ${table.headlineText} is not null and length(btrim(${table.headlineText})) > 0) or (${table.textMode} = 'clean' and ${table.headlineText} is null)`,
+      sql`(${table.textMode} = 'baked' and ${table.headlineText} is not null and length(btrim(${table.headlineText})) > 0) or (${table.textMode} = 'clean' and ${table.headlineText} is null) or (${table.textMode} is null and ${table.headlineText} is null)`,
+    ),
+    // The columns that describe a paid provider call must all be present for a
+    // generation and all absent for an upload. Enforced here rather than only
+    // in the command, because a half-filled row would read as a generation
+    // nobody can reproduce, or as an upload that appears to have cost money.
+    check(
+      "thumbnail_generations_source_fields",
+      sql`(${table.source} = 'ai_generated' and ${table.textMode} is not null and ${table.promptTemplateVersionId} is not null and ${table.promptTemplateVersion} is not null and ${table.finalPrompt} is not null and ${table.idempotencyKey} is not null and ${table.requestFingerprint} is not null and ${table.model} is not null and ${table.quality} is not null and ${table.outputCompression} is not null) or (${table.source} = 'user_uploaded' and ${table.textMode} is null and ${table.promptTemplateVersionId} is null and ${table.promptTemplateVersion} is null and ${table.finalPrompt} is null and ${table.idempotencyKey} is null and ${table.requestFingerprint} is null and ${table.model} is null and ${table.quality} is null and ${table.outputCompression} is null and ${table.estimatedCostCents} = 0 and (${table.actualCostCents} is null or ${table.actualCostCents} = 0))`,
     ),
     foreignKey({
       columns: [table.projectId, table.workspaceId],

@@ -16,6 +16,7 @@ import { findApprovedScriptVersion } from "@/db/repositories/scenes.repository";
 import { listProjectThumbnails } from "@/db/repositories/thumbnail-generation.repository";
 import { listProjectTitleSuggestions } from "@/db/repositories/title-generation.repository";
 import { buildHeadlineOptions } from "@/lib/thumbnails/headline-options";
+import { describeThumbnailOrigin } from "@/lib/thumbnails/thumbnail-source";
 import { estimateSceneImageCost } from "@/lib/costs/scene-image-cost";
 import { getSceneImageEnvironment } from "@/lib/env/server";
 import { getSceneImageDimensions } from "@/lib/schemas/scene-image";
@@ -29,6 +30,9 @@ export type ThumbnailView = {
   id: string;
   status: ThumbnailGeneration["status"];
   platform: ContentPlatform;
+  /** Whether a provider made this image or the creator supplied it. */
+  source: ThumbnailGeneration["source"];
+  /** Null for an upload: nothing was prompted, so there is no text mode. */
   textMode: ThumbnailGeneration["textMode"];
   headlineText: string | null;
   width: number | null;
@@ -39,6 +43,8 @@ export type ThumbnailView = {
   errorCategory: string | null;
   safeErrorMessage: string | null;
   hasAsset: boolean;
+  /** How to describe where the image came from, rather than a text mode. */
+  originLabel: string;
   createdAtLabel: string;
 };
 
@@ -70,6 +76,7 @@ function toThumbnailView(generation: ThumbnailGeneration): ThumbnailView {
     id: generation.id,
     status: generation.status,
     platform: generation.platform,
+    source: generation.source,
     textMode: generation.textMode,
     headlineText: generation.headlineText,
     width: generation.assetWidth,
@@ -80,6 +87,7 @@ function toThumbnailView(generation: ThumbnailGeneration): ThumbnailView {
     errorCategory: generation.errorCategory,
     safeErrorMessage: generation.safeErrorMessage,
     hasAsset: generation.assetObjectKey !== null,
+    originLabel: describeThumbnailOrigin(generation),
     createdAtLabel: `${generation.createdAt
       .toISOString()
       .slice(0, 16)

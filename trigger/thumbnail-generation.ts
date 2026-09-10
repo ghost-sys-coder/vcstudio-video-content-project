@@ -22,6 +22,7 @@ import { classifyImageGenerationError } from "@/lib/openai/image-generation-erro
 import { OpenAiImageGenerationProvider } from "@/lib/openai/openai-image-generation-provider";
 import { createThumbnailObjectKey } from "@/lib/storage/object-key";
 import { putThumbnail } from "@/lib/storage/thumbnail-storage";
+import { describeThumbnailGenerationRequest } from "@/lib/thumbnails/thumbnail-source";
 
 export const thumbnailGenerationTaskPayloadSchema = z.object({
   thumbnailGenerationId: z.uuid(),
@@ -58,6 +59,24 @@ export const thumbnailGenerationTask = task({
         status: "cancelled" as const,
       };
 
+    // This task only ever runs for work a provider was asked to do. An uploaded
+    // thumbnail has no prompt, model or reservation, so it must never reach
+    // here; if one does, that is a routing defect and the row is failed rather
+    // than being sent to a paid provider with invented parameters.
+    const request = describeThumbnailGenerationRequest(generation);
+    if (!request) {
+      await failThumbnailGeneration({
+        thumbnailGenerationId: generation.id,
+        category: "preflight_failed",
+        message:
+          "This thumbnail was not created by a generation request, so it cannot be generated.",
+      });
+      return {
+        thumbnailGenerationId: generation.id,
+        status: "failed" as const,
+      };
+    }
+
     const imageEnvironment = getSceneImageEnvironment();
     const textEnvironment = getSceneAnalysisEnvironment();
 
@@ -67,14 +86,14 @@ export const thumbnailGenerationTask = task({
     const reservation = await findThumbnailGenerationReservation(generation.id);
     const expectedFingerprint = createRequestFingerprint(
       textEnvironment.REQUEST_FINGERPRINT_SECRET,
-      generation.finalPrompt,
+      request.finalPrompt,
     );
     if (
       !reservation ||
       reservation.status !== "pending" ||
       reservation.expiresAt.getTime() < Date.now() ||
       reservation.reservedCostCents !== generation.estimatedCostCents ||
-      generation.requestFingerprint !== expectedFingerprint
+      request.requestFingerprint !== expectedFingerprint
     ) {
       await failThumbnailGeneration({
         thumbnailGenerationId: generation.id,
@@ -114,14 +133,14 @@ export const thumbnailGenerationTask = task({
     let result: Awaited<ReturnType<typeof provider.generate>>;
     try {
       result = await provider.generate({
-        model: generation.model,
-        prompt: generation.finalPrompt,
-        quality: generation.quality,
+        model: request.model,
+        prompt: request.finalPrompt,
+        quality: request.quality,
         size: z
           .enum(["1536x1024", "1024x1536", "1024x1024"])
           .parse(generation.size),
         outputFormat: generation.outputFormat,
-        outputCompression: generation.outputCompression,
+        outputCompression: request.outputCompression,
         background: z.enum(["opaque", "auto"]).parse(generation.background),
         endUserId: generation.requestedByUserId,
         references: [],

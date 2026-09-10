@@ -3,7 +3,10 @@ import "server-only";
 import type { ImageGenerationProviderResult } from "@/lib/openai/image-generation-provider";
 import {
   createSceneImageDownloadUrl,
+  createSceneImageUploadUrl,
+  deleteUploadedSceneImageObject,
   findStoredSceneImage,
+  inspectUploadedSceneImage,
   putSceneImage,
   type StoredSceneImage,
 } from "@/lib/storage/scene-image-storage";
@@ -45,4 +48,28 @@ export async function createThumbnailDownloadUrl(
   objectKey: string,
 ): Promise<string> {
   return createSceneImageDownloadUrl(objectKey);
+}
+
+/**
+ * A creator-supplied thumbnail follows the same upload path as a creator-
+ * supplied scene image: a signed PUT bound to the exact type and length, then
+ * a server-side inspection of what actually landed. The declared type and size
+ * are never trusted, because they come from the browser.
+ */
+export async function createThumbnailUploadUrl(input: {
+  objectKey: string;
+  contentType: string;
+  sizeBytes: number;
+}): Promise<string> {
+  return createSceneImageUploadUrl(input);
+}
+
+export async function inspectUploadedThumbnail(objectKey: string) {
+  return inspectUploadedSceneImage(objectKey);
+}
+
+export async function deleteUploadedThumbnailObject(
+  objectKey: string,
+): Promise<void> {
+  return deleteUploadedSceneImageObject(objectKey);
 }
