@@ -104,7 +104,10 @@ describe("a pasted script reaches analysis as narration, not as a document", () 
     expect(result.ok).toBe(false);
   });
 
-  it("still rejects a plan that speaks the production direction", async () => {
+  it("never lets production direction become spoken narration", async () => {
+    // The creator's words are authoritative, so direction the model tried to
+    // speak is replaced rather than the whole run being rejected and charged
+    // for a repair. What matters is the outcome: nothing reads "[VISUAL]".
     const withDirection = script.segments.map((segment, index) =>
       scene(
         index === 0
@@ -113,7 +116,13 @@ describe("a pasted script reaches analysis as narration, not as a document", () 
       ),
     );
     const { result } = await analyse({ scenes: withDirection });
-    expect(result.ok).toBe(false);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    for (const produced of result.output.scenes)
+      expect(produced.narrationText).not.toContain("[VISUAL]");
+    expect(result.output.scenes[0]?.narrationText).toBe(
+      script.segments[0]?.narration,
+    );
   });
 });
 

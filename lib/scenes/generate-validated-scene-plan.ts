@@ -2,6 +2,7 @@ import {
   renderSceneAnalysisRepairPrompt,
   type SceneAnalysisSegmentHint,
 } from "@studio/prompts";
+import { assembleScenesFromCreatorSegments } from "@/lib/scenes/assemble-creator-scenes";
 import {
   checkNarrationCoverage,
   MAX_SCENE_ANALYSIS_REPAIR_ATTEMPTS,
@@ -89,11 +90,24 @@ export async function generateValidatedScenePlan(input: {
     if (result.output.scenes.length > input.maximumScenes)
       throw new Error("OPENAI_INVALID_RESPONSE");
 
+    // When the creator's script already stated its segments, their narration is
+    // authoritative and is put back before validation. The model is then only
+    // responsible for the visual interpretation, which is all it was needed
+    // for, and narration fidelity cannot depend on it echoing 8,000 characters
+    // back without drift.
+    const assembled = input.segments
+      ? assembleScenesFromCreatorSegments({
+          output: result.output,
+          segments: input.segments,
+        })
+      : null;
+    const output = assembled?.output ?? result.output;
+
     const coverage = checkNarrationCoverage({
       approvedScript: input.approvedScript,
-      sceneNarrations: result.output.scenes.map((scene) => scene.narrationText),
+      sceneNarrations: output.scenes.map((scene) => scene.narrationText),
     });
-    if (coverage.ok) return { ok: true, output: result.output, usage };
+    if (coverage.ok) return { ok: true, output, usage };
 
     lastRejection = coverage;
     if (attempt === maximumRepairAttempts) break;
