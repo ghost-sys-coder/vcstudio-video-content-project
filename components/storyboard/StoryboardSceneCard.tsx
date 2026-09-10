@@ -6,7 +6,9 @@ import { RegenerateSceneDialog } from "@/components/storyboard/RegenerateSceneDi
 import { StoryboardSceneImageGroup } from "@/components/storyboard/StoryboardSceneImageGroup";
 import { StoryboardSceneImageReviewRow } from "@/components/storyboard/StoryboardSceneImageReviewRow";
 import { StoryboardSceneMetadata } from "@/components/storyboard/StoryboardSceneMetadata";
+import { StoryboardSceneLink } from "@/components/storyboard/StoryboardSceneLink";
 import { StoryboardSelectionCheckbox } from "@/components/storyboard/StoryboardSelectionCheckbox";
+import type { SceneWorkspaceState } from "@/lib/production/scene-workspace-state";
 import { isSceneSelectableForBulk } from "@/lib/scenes/scene-image-eligibility";
 import type { SceneImageStylePresetView } from "@/lib/scenes/scene-image-view";
 import type {
@@ -31,6 +33,7 @@ export function StoryboardSceneCard({
   onRejectScene,
   onGenerate,
   onUploaded,
+  workspaceState,
 }: {
   projectId: string;
   scene: StoryboardSceneView;
@@ -45,7 +48,9 @@ export function StoryboardSceneCard({
   onRejectScene: StoryboardReviewHandler;
   onGenerate: BulkGenerateHandler;
   onUploaded: () => Promise<void>;
+  workspaceState: SceneWorkspaceState;
 }) {
+  const openInDetail = workspaceState.sceneNumber === scene.sceneNumber;
   const selectable = isSceneSelectableForBulk(scene.eligibility);
   const imagesNeedingReview = scene.images.filter(
     (image) =>
@@ -66,7 +71,13 @@ export function StoryboardSceneCard({
     <article
       className={cn(
         "flex flex-col gap-3 rounded-xl bg-card p-3 ring-1 transition",
-        selected ? "ring-2 ring-primary" : "ring-foreground/10",
+        selected
+          ? "ring-2 ring-primary"
+          : openInDetail
+            ? // The scene the creator was last editing, so the change of view
+              // does not lose their place.
+              "ring-2 ring-foreground/30"
+            : "ring-foreground/10",
       )}
     >
       <div className="flex items-center justify-between gap-2">
@@ -106,6 +117,11 @@ export function StoryboardSceneCard({
 
       <StoryboardSceneImageGroup scene={scene} />
       <StoryboardSceneMetadata scene={scene} />
+      <StoryboardSceneLink
+        projectId={projectId}
+        sceneNumber={scene.sceneNumber}
+        workspaceState={workspaceState}
+      />
 
       {isFailed ? (
         <FailedSceneActions

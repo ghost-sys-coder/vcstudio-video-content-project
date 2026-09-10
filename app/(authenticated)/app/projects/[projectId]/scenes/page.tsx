@@ -17,6 +17,10 @@ import {
 } from "@/db/repositories/characters.repository";
 import { listProjectCast } from "@/db/repositories/project-characters.repository";
 import { listSceneImageGenerationsForSceneVersions } from "@/db/repositories/scene-images.repository";
+import {
+  readSceneWorkspaceState,
+  type SearchParamsInput,
+} from "@/lib/production/scene-workspace-state";
 import { buildSceneImageIndicatorMap } from "@/lib/scenes/scene-image-indicator";
 import { buildScriptCoverageView } from "@/lib/scenes/script-coverage-view";
 import { matchCharacterNamesToCast } from "@/lib/scenes/character-name-matching";
@@ -27,17 +31,12 @@ export default async function ProjectScenesPage({
   searchParams,
 }: {
   params: Promise<{ projectId: string }>;
-  searchParams: Promise<{ scene?: string }>;
+  searchParams: Promise<SearchParamsInput>;
 }) {
   const context = await getAuthenticatedWorkspaceContext();
   if (!context) return null;
   const { projectId } = await params;
-  const { scene: sceneParam } = await searchParams;
-  const parsedSceneNumber = Number(sceneParam);
-  const initialSceneNumber =
-    Number.isInteger(parsedSceneNumber) && parsedSceneNumber > 0
-      ? parsedSceneNumber
-      : null;
+  const workspaceState = readSceneWorkspaceState(await searchParams);
   const scope = {
     workspaceId: context.activeMembership.workspaceId,
     projectId,
@@ -134,7 +133,7 @@ export default async function ProjectScenesPage({
       }
       estimatedCostCents={estimate}
       latestRun={latestRun}
-      initialSceneNumber={initialSceneNumber}
+      workspaceState={workspaceState}
       projectId={project.id}
       rows={rowsWithCharacters}
       scriptCoverage={scriptCoverage}

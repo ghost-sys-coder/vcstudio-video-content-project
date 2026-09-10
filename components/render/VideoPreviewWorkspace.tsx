@@ -5,6 +5,7 @@ import {
   cancelRenderAction,
   startRenderAction,
 } from "@/app/(authenticated)/app/projects/[projectId]/render/actions";
+import { CaptionReviewSummary } from "@/components/render/CaptionReviewSummary";
 import { ExportList } from "@/components/render/ExportList";
 import { RenderProgressPanel } from "@/components/render/RenderProgressPanel";
 import { RenderSettingsForm } from "@/components/render/RenderSettingsForm";
@@ -27,10 +28,12 @@ export function VideoPreviewWorkspace({
   projectId,
   initialData,
   canRender,
+  captionsEnabled,
 }: {
   projectId: string;
   initialData: RenderWorkspaceView;
   canRender: boolean;
+  captionsEnabled: boolean;
 }) {
   const [data, setData] = useState<RenderWorkspaceView>(initialData);
   const [refreshToken, setRefreshToken] = useState(0);
@@ -187,6 +190,12 @@ export function VideoPreviewWorkspace({
 
         <div className="min-w-0 space-y-4">
           <TimelineSummary timeline={data.timeline} />
+          <CaptionReviewSummary
+            captionCount={data.timeline.captionCount}
+            captionsEnabled={captionsEnabled}
+            projectId={projectId}
+            timelineStatus={data.timeline.status}
+          />
           {data.activeRender ? (
             <RenderProgressPanel
               onCancel={handleCancel}

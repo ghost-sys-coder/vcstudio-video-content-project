@@ -6,14 +6,15 @@ import type {
   Character,
   ProjectVideoKind,
 } from "@/db/schema";
+import type { SceneWorkspaceState } from "@/lib/production/scene-workspace-state";
 import type { SceneImageIndicator } from "@/lib/scenes/scene-image-indicator";
 import type { SceneCharacterStaging } from "@/lib/scenes/scene-character-staging";
 import type { ScriptCoverageView } from "@/lib/scenes/script-coverage-view";
 import { ScenePlannerHeader } from "@/components/scenes/ScenePlannerHeader";
+import { SceneWorkspace } from "@/components/scenes/SceneWorkspace";
 import { AnalysisProgressPanel } from "@/components/scenes/AnalysisProgressPanel";
 import { SceneAnalysisErrorState } from "@/components/scenes/SceneAnalysisErrorState";
 import { ScriptCoveragePanel } from "@/components/scenes/ScriptCoveragePanel";
-import { SceneList } from "@/components/scenes/SceneList";
 import {
   ProjectCastPanel,
   type ProjectCastEntry,
@@ -26,7 +27,7 @@ export function ScenePlanner({
   rows,
   estimatedCostCents,
   canEdit,
-  initialSceneNumber,
+  workspaceState,
   availableCharacters,
   cast,
   castAvailableCharacters,
@@ -48,7 +49,7 @@ export function ScenePlanner({
   videoKind: ProjectVideoKind;
   estimatedCostCents: number;
   canEdit: boolean;
-  initialSceneNumber: number | null;
+  workspaceState: SceneWorkspaceState;
   availableCharacters: Character[];
   cast: ProjectCastEntry[];
   castAvailableCharacters: Character[];
@@ -60,7 +61,16 @@ export function ScenePlanner({
     ? ["pending", "queued", "running"].includes(latestRun.status)
     : false;
   return (
-    <div className="space-y-6">
+    <SceneWorkspace
+      availableCharacters={availableCharacters}
+      canEdit={canEdit}
+      canGenerateImages={canGenerateImages}
+      canReviewImages={canReviewImages}
+      initialState={workspaceState}
+      projectId={projectId}
+      rows={rows}
+      videoKind={videoKind}
+    >
       <ScenePlannerHeader
         analysisActive={active}
         approvedVersionId={approvedVersion?.id ?? null}
@@ -84,15 +94,6 @@ export function ScenePlanner({
           totalScenes={rows.length}
         />
       ) : null}
-      <SceneList
-        canEdit={canEdit}
-        initialSceneNumber={initialSceneNumber}
-        rows={rows}
-        availableCharacters={availableCharacters}
-        canGenerateImages={canGenerateImages}
-        canReviewImages={canReviewImages}
-        videoKind={videoKind}
-      />
-    </div>
+    </SceneWorkspace>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { StoryboardSceneCard } from "@/components/storyboard/StoryboardSceneCard";
+import type { SceneWorkspaceState } from "@/lib/production/scene-workspace-state";
 import type { SceneImageStylePresetView } from "@/lib/scenes/scene-image-view";
 import type {
   BulkGenerateHandler,
@@ -23,6 +24,7 @@ export function StoryboardGrid({
   onRejectScene,
   onGenerate,
   onUploaded,
+  workspaceState,
 }: {
   projectId: string;
   scenes: StoryboardSceneView[];
@@ -37,6 +39,7 @@ export function StoryboardGrid({
   onRejectScene: StoryboardReviewHandler;
   onGenerate: BulkGenerateHandler;
   onUploaded: () => Promise<void>;
+  workspaceState: SceneWorkspaceState;
 }) {
   if (scenes.length === 0)
     return (
@@ -63,6 +66,7 @@ export function StoryboardGrid({
           scene={scene}
           selected={selectedSceneIds.has(scene.sceneId)}
           stylePresets={stylePresets}
+          workspaceState={workspaceState}
         />
       ))}
     </div>

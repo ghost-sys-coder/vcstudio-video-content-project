@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 import type {
   Character,
   ProjectVideoKind,
@@ -14,19 +14,31 @@ import { SceneNavigator } from "@/components/scenes/SceneNavigator";
 import { SceneWorkspaceHeader } from "@/components/scenes/SceneWorkspaceHeader";
 import {
   filterSceneRows,
-  findInitialSceneId,
   getAdjacentSceneId,
   type SceneStatusFilter,
 } from "@/lib/scenes/scene-navigation";
 
+/**
+ * The scene detail view: the navigator beside one scene's editor.
+ *
+ * Selection, filters and the unsaved-work guard are owned by the surrounding
+ * workspace, because they have to outlive a change of view. This component only
+ * draws the state it is given and reports what the creator did with it.
+ */
 export function SceneList({
   rows,
   canEdit,
-  initialSceneNumber,
   availableCharacters,
   canGenerateImages,
   canReviewImages,
   videoKind,
+  selectedSceneId,
+  query,
+  status,
+  onQueryChange,
+  onStatusChange,
+  onSelect,
+  onDirtyChange,
 }: {
   rows: Array<{
     scene: Scene;
@@ -36,19 +48,18 @@ export function SceneList({
     imageIndicator: SceneImageIndicator;
   }>;
   canEdit: boolean;
-  initialSceneNumber: number | null;
   availableCharacters: Character[];
   canGenerateImages: boolean;
   canReviewImages: boolean;
   videoKind: ProjectVideoKind;
+  selectedSceneId: string | null;
+  query: string;
+  status: SceneStatusFilter;
+  onQueryChange: (value: string) => void;
+  onStatusChange: (value: SceneStatusFilter) => void;
+  onSelect: (sceneId: string) => void;
+  onDirtyChange: (dirty: boolean) => void;
 }) {
-  const [selectedSceneId, setSelectedSceneId] = useState<string | null>(() =>
-    findInitialSceneId(rows, initialSceneNumber),
-  );
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<SceneStatusFilter>("all");
-  const [dirty, setDirty] = useState(false);
-  const allowPageExit = useRef(false);
   const selectedRow =
     rows.find((row) => row.scene.id === selectedSceneId) ?? rows[0] ?? null;
   const filteredRows = useMemo(
@@ -58,91 +69,6 @@ export function SceneList({
   const approvedCount = rows.filter(
     (row) => row.scene.status === "approved",
   ).length;
-  const updateUrl = useCallback((sceneNumber: number) => {
-    const url = new URL(window.location.href);
-    url.searchParams.set("scene", String(sceneNumber));
-    window.history.pushState({ sceneNumber }, "", url);
-  }, []);
-  const selectScene = useCallback(
-    (sceneId: string, updateHistory = true) => {
-      if (sceneId === selectedSceneId) return;
-      if (
-        dirty &&
-        !window.confirm(
-          "You have unsaved scene changes. Discard them and continue?",
-        )
-      )
-        return;
-
-      const nextRow = rows.find((row) => row.scene.id === sceneId);
-      if (!nextRow) return;
-      setDirty(false);
-      setSelectedSceneId(sceneId);
-      if (updateHistory) updateUrl(nextRow.scene.sceneNumber);
-    },
-    [dirty, rows, selectedSceneId, updateUrl],
-  );
-
-  useEffect(() => {
-    if (!dirty) return;
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (allowPageExit.current) return;
-      event.preventDefault();
-      event.returnValue = "";
-    };
-    const handleDocumentClick = (event: MouseEvent) => {
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-      const link = target.closest("a[href]");
-      if (!(link instanceof HTMLAnchorElement)) return;
-      if (link.href === window.location.href) return;
-      const discardChanges = window.confirm(
-        "You have unsaved scene changes. Discard them and continue?",
-      );
-      if (!discardChanges) {
-        event.preventDefault();
-        event.stopPropagation();
-      } else {
-        allowPageExit.current = true;
-      }
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    document.addEventListener("click", handleDocumentClick, true);
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-      document.removeEventListener("click", handleDocumentClick, true);
-    };
-  }, [dirty]);
-
-  useEffect(() => {
-    const handlePopState = () => {
-      const sceneNumber = Number(
-        new URL(window.location.href).searchParams.get("scene"),
-      );
-      const nextSceneId = findInitialSceneId(
-        rows,
-        Number.isInteger(sceneNumber) ? sceneNumber : null,
-      );
-      if (!nextSceneId || nextSceneId === selectedSceneId) return;
-      if (
-        dirty &&
-        !window.confirm(
-          "You have unsaved scene changes. Discard them and continue?",
-        )
-      ) {
-        if (selectedRow) {
-          const url = new URL(window.location.href);
-          url.searchParams.set("scene", String(selectedRow.scene.sceneNumber));
-          window.history.replaceState({}, "", url);
-        }
-        return;
-      }
-      setDirty(false);
-      setSelectedSceneId(nextSceneId);
-    };
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, [dirty, rows, selectedRow, selectedSceneId]);
 
   if (!selectedRow)
     return (
@@ -165,9 +91,9 @@ export function SceneList({
     <div className="grid items-start gap-5 lg:grid-cols-[20rem_minmax(0,1fr)]">
       <SceneNavigator
         approvedCount={approvedCount}
-        onQueryChange={setQuery}
-        onSelect={selectScene}
-        onStatusChange={setStatus}
+        onQueryChange={onQueryChange}
+        onSelect={onSelect}
+        onStatusChange={onStatusChange}
         query={query}
         rows={filteredRows}
         selectedSceneId={selectedRow.scene.id}
@@ -177,8 +103,8 @@ export function SceneList({
       <div className="min-w-0 space-y-4">
         <SceneWorkspaceHeader
           nextDisabled={!nextSceneId}
-          onNext={() => nextSceneId && selectScene(nextSceneId)}
-          onPrevious={() => previousSceneId && selectScene(previousSceneId)}
+          onNext={() => nextSceneId && onSelect(nextSceneId)}
+          onPrevious={() => previousSceneId && onSelect(previousSceneId)}
           previousDisabled={!previousSceneId}
           sceneNumber={selectedRow.scene.sceneNumber}
           totalCount={rows.length}
@@ -186,10 +112,7 @@ export function SceneList({
         <SceneCard
           canEdit={canEdit}
           key={selectedRow.scene.id}
-          onDirtyChange={(nextDirty) => {
-            allowPageExit.current = false;
-            setDirty(nextDirty);
-          }}
+          onDirtyChange={onDirtyChange}
           scene={selectedRow.scene}
           version={selectedRow.version}
           assignedCharacters={selectedRow.assignedCharacters}

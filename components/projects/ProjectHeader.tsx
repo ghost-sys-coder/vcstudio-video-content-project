@@ -5,7 +5,7 @@ import type { Project } from "@/db/schema";
 import { ProjectStatusBadge } from "@/components/projects/ProjectStatusBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  PROJECT_OVERVIEW_TAB,
+  PROJECT_TABS,
   projectTabHref,
   resolveProjectTab,
 } from "@/lib/production/project-tab";
@@ -38,15 +38,11 @@ export function ProjectHeader({
         </div>
         <div className="mt-5 max-w-full overflow-x-auto pb-1">
           <TabsList variant="line">
-            <TabsTrigger value={PROJECT_OVERVIEW_TAB}>Overview</TabsTrigger>
-            <TabsTrigger value="script">Script</TabsTrigger>
-            <TabsTrigger value="scenes">Scenes</TabsTrigger>
-            <TabsTrigger value="storyboard">Storyboard</TabsTrigger>
-            <TabsTrigger value="audio">Audio</TabsTrigger>
-            <TabsTrigger value="subtitles">Subtitles</TabsTrigger>
-            <TabsTrigger value="render">Render</TabsTrigger>
-            <TabsTrigger value="publish">Publish</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
+            {PROJECT_TABS.map((tab) => (
+              <TabsTrigger key={tab.id} value={tab.id}>
+                {tab.label}
+              </TabsTrigger>
+            ))}
           </TabsList>
         </div>
       </header>

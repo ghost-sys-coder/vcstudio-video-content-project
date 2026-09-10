@@ -9,12 +9,18 @@ import {
   cancelSceneImageBatchAction,
   startBulkSceneImageGenerationAction,
 } from "@/app/(authenticated)/app/projects/[projectId]/storyboard/actions";
+import { WorkspaceViewSwitch } from "@/components/production/WorkspaceViewSwitch";
 import { BulkGenerationProgress } from "@/components/storyboard/BulkGenerationProgress";
 import { StoryboardEmptyState } from "@/components/storyboard/StoryboardEmptyState";
 import { StoryboardIntro } from "@/components/storyboard/StoryboardIntro";
 import { StoryboardGrid } from "@/components/storyboard/StoryboardGrid";
 import { StoryboardToolbar } from "@/components/storyboard/StoryboardToolbar";
 import { isActiveImageGenerationStatus } from "@/lib/domain/bulk-scene-image";
+import {
+  sceneWorkspaceSearch,
+  type SceneWorkspaceState,
+} from "@/lib/production/scene-workspace-state";
+import { SCENE_WORKSPACE_VIEWS } from "@/lib/production/workspace-views";
 import { isSceneSelectableForBulk } from "@/lib/scenes/scene-image-eligibility";
 import {
   filterStoryboardScenes,
@@ -34,18 +40,39 @@ const POLL_INTERVAL_MS = 4_000;
 export function Storyboard({
   projectId,
   initialData,
+  initialState,
   canGenerate,
   canReview,
 }: {
   projectId: string;
   initialData: StoryboardView;
+  initialState: SceneWorkspaceState;
   canGenerate: boolean;
   canReview: boolean;
 }) {
   const [data, setData] = useState<StoryboardView>(initialData);
-  const [filter, setFilter] = useState<StoryboardFilter>("all");
+  // The scene context's shared state. The grid only changes the image filter,
+  // but it carries the rest through so that returning to scene detail lands on
+  // the same scene, search and status the creator left it on.
+  const [state, setState] = useState<SceneWorkspaceState>(initialState);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const refreshing = useRef(false);
+
+  const filter = state.filter;
+
+  const changeFilter = useCallback((next: StoryboardFilter) => {
+    setState((current) => {
+      const updated = { ...current, filter: next };
+      // Written straight to history so narrowing the grid never costs a server
+      // round trip, while a reload still shows the same filtered view.
+      window.history.replaceState(
+        {},
+        "",
+        `${window.location.pathname}${sceneWorkspaceSearch(updated)}`,
+      );
+      return updated;
+    });
+  }, []);
 
   const refresh = useCallback(async () => {
     if (refreshing.current) return;
@@ -199,6 +226,15 @@ export function Storyboard({
       return result;
     }, [data.latestBatch, projectId, refresh]);
 
+  const viewSwitch = (
+    <WorkspaceViewSwitch
+      activeViewId="grid"
+      projectId={projectId}
+      search={sceneWorkspaceSearch(state)}
+      views={SCENE_WORKSPACE_VIEWS}
+    />
+  );
+
   const intro = (
     <StoryboardIntro
       canGenerate={canGenerate && data.configuration.enabled}
@@ -209,6 +245,7 @@ export function Storyboard({
   if (data.scenes.length === 0)
     return (
       <div className="space-y-5">
+        {viewSwitch}
         {intro}
         <StoryboardEmptyState />
       </div>
@@ -224,6 +261,7 @@ export function Storyboard({
 
   return (
     <div className="space-y-5">
+      {viewSwitch}
       {intro}
 
       {data.latestBatch ? (
@@ -245,7 +283,7 @@ export function Storyboard({
         filterCounts={filterCounts}
         onApproveSelected={handleApproveSelected}
         onClearSelection={clearSelection}
-        onFilterChange={setFilter}
+        onFilterChange={changeFilter}
         onGenerate={handleGenerate}
         onSelectAllEligible={selectAllEligible}
         selectedSceneIds={selectableSelected}
@@ -270,6 +308,7 @@ export function Storyboard({
         scenes={filteredScenes}
         selectedSceneIds={selected}
         stylePresets={data.stylePresets}
+        workspaceState={state}
       />
     </div>
   );
