@@ -25,6 +25,20 @@ import {
   disconnectPlatformSchema,
   publishVideoSchema,
 } from "@/lib/schemas/publishing";
+import {
+  confirmReleasePackageAgainstRender,
+  ReleasePackageConflictError,
+  saveReleasePackageDraft,
+} from "@/db/commands/release-package-commands";
+import {
+  confirmReleasePackageSchema,
+  saveReleasePackageSchema,
+} from "@/lib/schemas/release-package";
+import {
+  loadReleasePackagesView,
+  type ReleasePackageActionResult,
+  type ReleasePackagesView,
+} from "@/lib/releases/release-package-view";
 import { createPostFromRenderSchema } from "@/lib/schemas/social-post";
 import {
   createPostFromRender,
@@ -658,4 +672,118 @@ export async function deleteThumbnailAction(
   } catch {
     return { success: false, error: "The thumbnail could not be deleted." };
   }
+}
+
+/**
+ * Saves one destination's release package.
+ *
+ * The optimistic lock is carried by the caller: `expectedRevision` is null to
+ * create and the revision being edited otherwise. A mismatch is reported rather
+ * than applied, because silently overwriting another tab's packaging is exactly
+ * the failure this slice removes.
+ */
+export async function saveReleasePackageAction(
+  input: unknown,
+): Promise<ReleasePackageActionResult> {
+  const parsed = saveReleasePackageSchema.safeParse(input);
+  if (!parsed.success)
+    return {
+      success: false,
+      error: "The release package is invalid.",
+      revision: null,
+    };
+  try {
+    const { context } = await requirePublishMutation(parsed.data.projectId);
+    const saved = await saveReleasePackageDraft({
+      identity: {
+        workspaceId: context.activeMembership.workspaceId,
+        projectId: parsed.data.projectId,
+        outputVariantId: parsed.data.outputVariantId,
+        shortCompositionId: null,
+        platform: parsed.data.platform,
+        channelProfileId: parsed.data.channelProfileId,
+      },
+      content: {
+        title: parsed.data.title,
+        titleSuggestionId: parsed.data.titleSuggestionId,
+        description: parsed.data.description,
+        tags: parsed.data.tags,
+        visibility: parsed.data.visibility,
+        thumbnailGenerationId: parsed.data.thumbnailGenerationId,
+        caption: parsed.data.caption,
+        shareToFeed: parsed.data.shareToFeed,
+        plannedReleaseAt: parsed.data.plannedReleaseAt
+          ? new Date(parsed.data.plannedReleaseAt)
+          : null,
+      },
+      expectedRevision: parsed.data.expectedRevision,
+      actorUserId: context.user.id,
+    });
+    revalidatePath(`/app/projects/${parsed.data.projectId}/publish`);
+    return { success: true, error: null, revision: saved.revision };
+  } catch (error) {
+    if (error instanceof ReleasePackageConflictError)
+      return { success: false, error: error.message, revision: null };
+    return {
+      success: false,
+      error: "The release package could not be saved.",
+      revision: null,
+    };
+  }
+}
+
+/**
+ * Records that a creator reviewed this package against one exact render.
+ *
+ * Separate from saving on purpose: reconfirming a stale package is a decision,
+ * not something that should happen as a side effect of editing a description.
+ */
+export async function confirmReleasePackageAction(
+  input: unknown,
+): Promise<ReleasePackageActionResult> {
+  const parsed = confirmReleasePackageSchema.safeParse(input);
+  if (!parsed.success)
+    return {
+      success: false,
+      error: "The confirmation is invalid.",
+      revision: null,
+    };
+  try {
+    const { context } = await requirePublishMutation(parsed.data.projectId);
+    const confirmed = await confirmReleasePackageAgainstRender({
+      workspaceId: context.activeMembership.workspaceId,
+      projectId: parsed.data.projectId,
+      releasePackageId: parsed.data.releasePackageId,
+      renderId: parsed.data.renderId,
+      expectedRevision: parsed.data.expectedRevision,
+      actorUserId: context.user.id,
+    });
+    revalidatePath(`/app/projects/${parsed.data.projectId}/publish`);
+    return { success: true, error: null, revision: confirmed.revision };
+  } catch (error) {
+    if (error instanceof ReleasePackageConflictError)
+      return { success: false, error: error.message, revision: null };
+    return {
+      success: false,
+      error: "The release package could not be confirmed.",
+      revision: null,
+    };
+  }
+}
+
+/** Re-reads the packages after a save, so the panel shows real stored state. */
+export async function loadReleasePackagesAction(
+  projectId: string,
+): Promise<ReleasePackagesView | null> {
+  const context = await getAuthenticatedWorkspaceContext();
+  if (!context) return null;
+  const project = await findProject({
+    workspaceId: context.activeMembership.workspaceId,
+    projectId,
+  });
+  if (!project) return null;
+  return loadReleasePackagesView({
+    workspaceId: context.activeMembership.workspaceId,
+    project,
+  });
 }

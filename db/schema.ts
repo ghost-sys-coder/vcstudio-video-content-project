@@ -13,6 +13,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  unique,
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
@@ -3443,6 +3444,201 @@ export const videoRenders = pgTable(
  * deliberately does NOT participate in the `usage_reservations` ledger — adding
  * a zero-cost reservation would pollute spend reporting.
  */
+/**
+ * A release package: everything decided about ONE video going to ONE
+ * destination, kept in the database instead of in a form.
+ *
+ * Publishing metadata used to live in React state keyed by platform, so it was
+ * lost on reload and two channels on the same platform shared one copy. The
+ * identity here is deliberately (output variant, optional Short, platform,
+ * optional channel profile): a long-form video and its Shorts are packaged
+ * separately, and two YouTube channels never see each other's copy.
+ *
+ * The destination is a channel profile, never a connection, because a profile
+ * survives a revoke and reconnect while a connection row does not. A package
+ * planned today must still be the same package after the OAuth grant is
+ * replaced.
+ *
+ * This row is the living draft and is edited in place under an optimistic lock.
+ * What was actually submitted is frozen into `release_package_revisions`, so
+ * continuing to edit here can never reach an upload already in flight.
+ */
+export const releasePackages = pgTable(
+  "release_packages",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").notNull(),
+    outputVariantId: uuid("output_variant_id").notNull(),
+    /** Set when this package is for one Short rather than the whole output. */
+    shortCompositionId: uuid("short_composition_id"),
+    platform: contentPlatformEnum("platform").notNull(),
+    /** The destination channel. Null means "this platform, channel undecided". */
+    channelProfileId: uuid("channel_profile_id").references(
+      () => channelProfiles.id,
+      { onDelete: "cascade" },
+    ),
+    title: text("title").notNull().default(""),
+    /**
+     * Which suggestion the title came from, recorded for provenance only. The
+     * authoritative title is the text above: a release must not silently follow
+     * a favourite that someone changes afterwards.
+     */
+    titleSuggestionId: uuid("title_suggestion_id").references(
+      () => projectTitleSuggestions.id,
+      { onDelete: "set null" },
+    ),
+    description: text("description").notNull().default(""),
+    tags: jsonb("tags").$type<string[]>().notNull().default([]),
+    visibility: publicationVisibilityEnum("visibility")
+      .notNull()
+      .default("private"),
+    /** The explicitly chosen thumbnail, not whichever one is favourited. */
+    thumbnailGenerationId: uuid("thumbnail_generation_id").references(
+      () => thumbnailGenerations.id,
+      { onDelete: "set null" },
+    ),
+    /** Instagram's exact caption. Null for platforms with separate metadata. */
+    caption: text("caption"),
+    shareToFeed: boolean("share_to_feed"),
+    /** Editorial release intent. Scheduling itself is a later slice. */
+    plannedReleaseAt: timestamp("planned_release_at", { withTimezone: true }),
+    /**
+     * The render this package was last confirmed against. A newer render means
+     * the source content moved underneath the packaging, so the package is
+     * stale and has to be reconfirmed before it can be dispatched again.
+     */
+    reviewedRenderId: uuid("reviewed_render_id"),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    /** Optimistic lock: a stale tab cannot overwrite a newer edit. */
+    revision: integer("revision").notNull().default(1),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    updatedByUserId: uuid("updated_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("release_packages_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    // NULLS NOT DISTINCT, because a package with no Short and no channel
+    // profile is still exactly one package. Under the default NULLS DISTINCT
+    // every save would insert a duplicate rather than update the draft.
+    unique("release_packages_destination_unique")
+      .on(
+        table.workspaceId,
+        table.projectId,
+        table.outputVariantId,
+        table.shortCompositionId,
+        table.platform,
+        table.channelProfileId,
+      )
+      .nullsNotDistinct(),
+    index("release_packages_workspace_project_index").on(
+      table.workspaceId,
+      table.projectId,
+      table.updatedAt,
+    ),
+    check("release_packages_revision_positive", sql`${table.revision} >= 1`),
+    check("release_packages_title_bounded", sql`length(${table.title}) <= 300`),
+    check(
+      "release_packages_description_bounded",
+      sql`length(${table.description}) <= 10000`,
+    ),
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [projects.id, projects.workspaceId],
+      name: "release_packages_tenant_project_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.outputVariantId, table.workspaceId],
+      foreignColumns: [
+        projectOutputVariants.id,
+        projectOutputVariants.workspaceId,
+      ],
+      name: "release_packages_tenant_output_variant_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.shortCompositionId, table.workspaceId],
+      foreignColumns: [shortCompositions.id, shortCompositions.workspaceId],
+      name: "release_packages_tenant_short_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
+/**
+ * What was actually submitted, frozen.
+ *
+ * A publication points at one of these rows rather than at the living draft, so
+ * editing the package afterwards creates a new revision and cannot reach an
+ * upload already in flight. Nothing updates a row here.
+ */
+export const releasePackageRevisions = pgTable(
+  "release_package_revisions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    releasePackageId: uuid("release_package_id").notNull(),
+    revisionNumber: integer("revision_number").notNull(),
+    /** The exact render dispatched. A package can be planned before one exists. */
+    renderId: uuid("render_id").notNull(),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    tags: jsonb("tags").$type<string[]>().notNull().default([]),
+    visibility: publicationVisibilityEnum("visibility").notNull(),
+    thumbnailGenerationId: uuid("thumbnail_generation_id"),
+    caption: text("caption"),
+    shareToFeed: boolean("share_to_feed"),
+    plannedReleaseAt: timestamp("planned_release_at", { withTimezone: true }),
+    frozenByUserId: uuid("frozen_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    frozenAt: timestamp("frozen_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("release_package_revisions_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    uniqueIndex("release_package_revisions_number_unique").on(
+      table.releasePackageId,
+      table.revisionNumber,
+    ),
+    index("release_package_revisions_package_index").on(
+      table.releasePackageId,
+      table.frozenAt,
+    ),
+    check(
+      "release_package_revisions_number_positive",
+      sql`${table.revisionNumber} >= 1`,
+    ),
+    check(
+      "release_package_revisions_title_present",
+      sql`length(${table.title}) > 0`,
+    ),
+    foreignKey({
+      columns: [table.releasePackageId, table.workspaceId],
+      foreignColumns: [releasePackages.id, releasePackages.workspaceId],
+      name: "release_package_revisions_tenant_package_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
 export const videoPublications = pgTable(
   "video_publications",
   {
@@ -3471,6 +3667,15 @@ export const videoPublications = pgTable(
     attemptCount: integer("attempt_count").notNull().default(0),
     triggerRunId: text("trigger_run_id"),
     idempotencyKey: text("idempotency_key").notNull(),
+    /**
+     * The frozen package this dispatch used. Null for publications made before
+     * release packages existed, and set null rather than restrict so history
+     * survives: the title and description below are already denormalized here.
+     */
+    releasePackageRevisionId: uuid("release_package_revision_id").references(
+      () => releasePackageRevisions.id,
+      { onDelete: "set null" },
+    ),
     /** Platform's id for the created video, once it exists. */
     externalVideoId: text("external_video_id"),
     externalVideoUrl: text("external_video_url"),
@@ -6453,6 +6658,9 @@ export type ChannelCadenceValue = ChannelProfile["cadence"];
 export type PlatformConnectionStatus =
   (typeof platformConnectionStatusEnum.enumValues)[number];
 export type VideoPublication = typeof videoPublications.$inferSelect;
+export type ReleasePackage = typeof releasePackages.$inferSelect;
+export type ReleasePackageRevision =
+  typeof releasePackageRevisions.$inferSelect;
 export type VideoPublicationStatus =
   (typeof videoPublicationStatusEnum.enumValues)[number];
 export type PublicationVisibility =
