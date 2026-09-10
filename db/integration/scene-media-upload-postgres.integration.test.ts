@@ -32,6 +32,10 @@ import {
   rejectSceneAudioGeneration,
   saveRecordedSceneAudio,
 } from "@/db/commands/scene-audio-commands";
+import {
+  completeRecordedAudioInspection,
+  prepareRecordedAudioInspection,
+} from "@/db/commands/media-inspection-commands";
 import { findSceneImageGeneration } from "@/db/repositories/scene-images.repository";
 import { findSceneAudioGeneration } from "@/db/repositories/scene-audio.repository";
 import { getDatabase } from "@/db/drizzle";
@@ -537,6 +541,42 @@ describeDatabase("scene media upload invariants", () => {
     expect(created.inputCharacterCount).toBe(
       "An isolated integration-test narration.".length,
     );
+
+    // A browser recording cannot be approved on the strength of the upload
+    // alone. Nothing has yet confirmed the bytes are playable audio of the
+    // stated length, so approval is refused until inspection has run.
+    await expect(
+      approveSceneAudioGeneration({
+        workspaceId: fixture.workspaceId,
+        projectId: fixture.projectId,
+        generationId,
+        userId: fixture.userId,
+      }),
+    ).rejects.toThrow("SCENE_AUDIO_RECORDING_NOT_INSPECTED");
+
+    await prepareRecordedAudioInspection({
+      workspaceId: fixture.workspaceId,
+      projectId: fixture.projectId,
+      generationId,
+    });
+    const inspected = await completeRecordedAudioInspection({
+      workspaceId: fixture.workspaceId,
+      projectId: fixture.projectId,
+      generationId,
+      metadata: {
+        kind: "audio",
+        durationMilliseconds: 5_400,
+        container: "webm",
+        codec: "opus",
+        channels: 1,
+        sampleRate: 48_000,
+        silenceRatio: 0.05,
+        clippingRatio: 0,
+      },
+      warnings: [],
+      amplitudeEnvelope: [0.1, 0.6, 0.4],
+    });
+    expect(inspected.inspectionStatus).toBe("succeeded");
 
     const approved = await approveSceneAudioGeneration({
       workspaceId: fixture.workspaceId,
