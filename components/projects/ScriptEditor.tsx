@@ -7,6 +7,8 @@ import { ScriptStatistics } from "@/components/projects/ScriptStatistics";
 import { ScriptVersionHistory } from "@/components/projects/ScriptVersionHistory";
 import { ScriptDraftNotices } from "@/components/projects/ScriptDraftNotices";
 import { calculateScriptStatistics } from "@/lib/domain/script-statistics";
+import { buildScriptStructureView } from "@/lib/scripts/script-structure-view";
+import { ScriptStructureNotice } from "@/components/projects/ScriptStructureNotice";
 import { useScriptDraft } from "@/hooks/use-script-draft";
 
 export function ScriptEditor({
@@ -34,6 +36,10 @@ export function ScriptEditor({
     () => calculateScriptStatistics(state.content),
     [state.content],
   );
+  const structure = useMemo(
+    () => buildScriptStructureView(state.content),
+    [state.content],
+  );
   const busy = state.saving || state.approving;
   const unresolved = Boolean(state.remote || state.recovery || state.generated);
   return (
@@ -52,6 +58,7 @@ export function ScriptEditor({
                     ? "Unsaved changes — autosave pending."
                     : "Draft needs attention below."}
         </p>
+        <ScriptStructureNotice view={structure} />
         <Textarea
           aria-label="Narration script"
           className="h-[clamp(28rem,65svh,48rem)] min-h-0 resize-none overflow-y-auto font-mono leading-7 field-sizing-fixed"

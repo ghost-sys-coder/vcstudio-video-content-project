@@ -16,6 +16,7 @@ import { calculateTextCostCents } from "@/lib/costs/scene-analysis-cost";
 import { getSceneAnalysisEnvironment } from "@/lib/env/server";
 import { createRequestFingerprint } from "@/lib/domain/idempotency";
 import { validateSceneAnalysisPreflight } from "@/lib/domain/scene-analysis-preflight";
+import { readScriptForAnalysis } from "@/lib/scenes/script-segment-hints";
 import { generateValidatedScenePlan } from "@/lib/scenes/generate-validated-scene-plan";
 import { NARRATION_FIDELITY_ERROR_CATEGORY } from "@/lib/scenes/scene-analysis-failure";
 import { OpenAiTextGenerationProvider } from "@/lib/openai/openai-text-generation-provider";
@@ -99,12 +100,18 @@ export const sceneAnalysisTask = task({
           environment.OPENAI_TEXT_OUTPUT_COST_PER_MILLION_CENTS,
       });
 
+    const script = readScriptForAnalysis(scriptVersion.content);
+
     try {
       const plan = await generateValidatedScenePlan({
         provider: new OpenAiTextGenerationProvider(),
         model: run.model,
         initialPrompt: run.finalPrompt,
-        approvedScript: scriptVersion.content,
+        // The spoken text, not the whole document: a pasted script's [VISUAL]
+        // and [TEXT OVERLAY] direction is not narration and must not be part
+        // of what the plan is held to reproduce.
+        approvedScript: script.narration,
+        segments: script.segments,
         maximumScenes: environment.MAX_SCENES_PER_PROJECT,
         aspectRatio: project?.aspectRatio ?? "16:9",
         language: project?.language ?? "en",

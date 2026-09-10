@@ -3,6 +3,7 @@ export {
   renderSceneAnalysisRepairPrompt,
   SCENE_ANALYSIS_PROMPT_VERSION,
 } from "./scene-analysis";
+export type { SceneAnalysisSegmentHint } from "./scene-analysis";
 export {
   renderScriptGenerationPrompt,
   SCRIPT_GENERATION_PROMPT_VERSION,

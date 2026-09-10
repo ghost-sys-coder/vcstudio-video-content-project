@@ -46,6 +46,7 @@ import {
 } from "@/lib/schemas/scene";
 import { getSceneAnalysisEnvironment } from "@/lib/env/server";
 import { loadEffectiveWorkspaceBudget } from "@/lib/budgets/workspace-budget";
+import { readScriptForAnalysis } from "@/lib/scenes/script-segment-hints";
 import {
   renderSceneAnalysisPrompt,
   SCENE_ANALYSIS_PROMPT_VERSION,
@@ -317,11 +318,15 @@ export async function startSceneAnalysisAction(
         success: false,
         error: "Approve this script version before analysis.",
       };
+    // Same reading as the analysis starter, so the quoted estimate matches the
+    // prompt that is actually sent.
+    const script = readScriptForAnalysis(version.content);
     const prompt = renderSceneAnalysisPrompt({
-      script: version.content,
+      script: script.narration,
       maximumScenes: environment.MAX_SCENES_PER_PROJECT,
       aspectRatio: project.aspectRatio,
       language: project.language,
+      segments: script.segments,
     });
     const estimate = estimateSceneAnalysisCost({
       prompt,

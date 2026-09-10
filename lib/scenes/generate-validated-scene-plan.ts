@@ -1,4 +1,7 @@
-import { renderSceneAnalysisRepairPrompt } from "@studio/prompts";
+import {
+  renderSceneAnalysisRepairPrompt,
+  type SceneAnalysisSegmentHint,
+} from "@studio/prompts";
 import {
   checkNarrationCoverage,
   MAX_SCENE_ANALYSIS_REPAIR_ATTEMPTS,
@@ -55,6 +58,11 @@ export async function generateValidatedScenePlan(input: {
   aspectRatio: string;
   language: string;
   maximumRepairAttempts?: number;
+  /**
+   * The creator's own segmentation, when their script stated it. Repeated on
+   * the retry so a correction cannot quietly re-segment their script.
+   */
+  segments?: SceneAnalysisSegmentHint[];
 }): Promise<ValidatedScenePlanResult> {
   const maximumRepairAttempts =
     input.maximumRepairAttempts ?? MAX_SCENE_ANALYSIS_REPAIR_ATTEMPTS;
@@ -95,6 +103,7 @@ export async function generateValidatedScenePlan(input: {
       aspectRatio: input.aspectRatio,
       language: input.language,
       discrepancy: coverage.summary,
+      segments: input.segments,
     });
   }
 

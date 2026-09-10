@@ -23,6 +23,7 @@ import {
 } from "@/lib/domain/idempotency";
 import { getSceneAnalysisEnvironment } from "@/lib/env/server";
 import { enforceRateLimit } from "@/lib/rate-limit/enforce-rate-limit";
+import { readScriptForAnalysis } from "@/lib/scenes/script-segment-hints";
 import { resolveSceneAnalysisIdempotency } from "@/lib/workflows/scene-analysis-idempotency";
 import type { sceneAnalysisTask } from "@/trigger/scene-analysis";
 
@@ -37,11 +38,17 @@ export async function startSceneAnalysis(input: {
     operation: "scene_analysis",
   });
   const environment = getSceneAnalysisEnvironment();
+  // A pasted script often already states its own segments and carries
+  // production direction. Analysis is given the spoken text only, plus the
+  // creator's segmentation to honour, so the direction is never treated as
+  // narration to reproduce and the scenes are not invented a second time.
+  const script = readScriptForAnalysis(input.version.content);
   const prompt = renderSceneAnalysisPrompt({
-    script: input.version.content,
+    script: script.narration,
     maximumScenes: environment.MAX_SCENES_PER_PROJECT,
     aspectRatio: input.project.aspectRatio,
     language: input.project.language,
+    segments: script.segments,
   });
   const estimate = estimateSceneAnalysisCost({
     prompt,
