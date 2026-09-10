@@ -10,6 +10,7 @@ import { ReleasePackagePreview } from "@/components/publish/ReleasePackagePrevie
 import { ReleaseThumbnailChooser } from "@/components/publish/ReleaseThumbnailChooser";
 import { ReleaseTitleChooser } from "@/components/publish/ReleaseTitleChooser";
 import { Button } from "@/components/ui/button";
+import { CopyButton } from "@/components/ui/CopyButton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -75,8 +76,12 @@ export function ReleasePackageEditor({
           />
 
           <div className="space-y-2">
-            <Label htmlFor="release-description">Description</Label>
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor="release-description">Description</Label>
+              <CopyButton label="the description" value={description} />
+            </div>
             <Textarea
+              className="max-h-64 overflow-y-auto"
               disabled={disabled}
               id="release-description"
               onChange={(event) => setDescription(event.target.value)}
@@ -86,7 +91,10 @@ export function ReleasePackageEditor({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="release-tags">Tags</Label>
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor="release-tags">Tags</Label>
+              <CopyButton label="the tags" value={tags} />
+            </div>
             <Input
               disabled={disabled}
               id="release-tags"

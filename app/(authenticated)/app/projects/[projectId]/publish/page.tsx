@@ -68,6 +68,7 @@ export default async function ProjectPublishPage({
         canPublish={canGenerate}
         initialData={publishingView}
         projectId={project.id}
+        releasePackages={releasePackagesView}
       />
       <ShareRenderAsPostPanel
         canCompose={can(context.activeMembership.role, "composePosts")}

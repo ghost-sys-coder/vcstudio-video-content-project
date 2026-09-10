@@ -1,5 +1,6 @@
 "use client";
 
+import { CopyButton } from "@/components/ui/CopyButton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { TitleSuggestionView } from "@/lib/titles/title-view";
@@ -28,7 +29,10 @@ export function ReleaseTitleChooser({
 }) {
   return (
     <div className="space-y-2">
-      <Label htmlFor="release-title">Title</Label>
+      <div className="flex items-center justify-between gap-3">
+        <Label htmlFor="release-title">Title</Label>
+        <CopyButton label="the title" value={value} />
+      </div>
       <Input
         disabled={disabled}
         id="release-title"

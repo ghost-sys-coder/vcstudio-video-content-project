@@ -7,6 +7,7 @@ import {
   disconnectPlatformAction,
   loadPublishingViewAction,
   publishVideoAction,
+  saveReleasePackageAction,
 } from "@/app/(authenticated)/app/projects/[projectId]/publish/actions";
 import { ConnectYouTubeButton } from "@/components/publish/ConnectYouTubeButton";
 import { ConnectFacebookButton } from "@/components/publish/ConnectFacebookButton";
@@ -17,6 +18,7 @@ import { ConnectXButton } from "@/components/publish/ConnectXButton";
 import { PlatformConnectionRow } from "@/components/publish/PlatformConnectionRow";
 import { VideoPublicationRow } from "@/components/publish/VideoPublicationRow";
 import { Button } from "@/components/ui/button";
+import { CopyButton } from "@/components/ui/CopyButton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -32,13 +34,15 @@ import { Textarea } from "@/components/ui/textarea";
 import type { ContentPlatform } from "@/db/schema";
 import {
   composeHashtagCaption,
-  createPublishingMetadataDraftMap,
   createPublishingMetadataSignatures,
   hydrateUntouchedPublishingMetadata,
   PUBLISHING_METADATA_UPDATED_EVENT,
 } from "@/lib/publishing/generated-metadata";
 import { groupRendersByKind } from "@/lib/publishing/group-renders";
 import type { PublishingView } from "@/lib/publishing/publishing-view";
+import { createPublishingDraftsFromPackages } from "@/lib/publishing/release-metadata-source";
+import { parseReleaseTags } from "@/lib/schemas/release-package";
+import type { ReleasePackagesView } from "@/lib/releases/release-package-view";
 import { selectConnectablePostPlatforms } from "@/lib/social/select-connectable-post-platforms";
 import {
   findActivePublicationForTarget,
@@ -62,11 +66,13 @@ export function PublishToPlatformPanel({
   canManageConnections,
   canPublish,
   initialData,
+  releasePackages,
 }: {
   projectId: string;
   canManageConnections: boolean;
   canPublish: boolean;
   initialData: PublishingView;
+  releasePackages: ReleasePackagesView;
 }) {
   const initialTarget = selectInitialPublishingTarget(initialData);
   const [data, setData] = useState<PublishingView>(initialData);
@@ -74,9 +80,17 @@ export function PublishToPlatformPanel({
   const [connectionId, setConnectionId] = useState<string>(
     initialTarget.connectionId,
   );
+  // A saved release package wins over generated text: it is what a person
+  // decided and saved, and reopening the page must not discard their editing.
   const [metadataDrafts, setMetadataDrafts] = useState(() =>
-    createPublishingMetadataDraftMap(initialData.generatedMetadata),
+    createPublishingDraftsFromPackages({
+      packages: releasePackages.packages,
+      generated: initialData.generatedMetadata,
+    }),
   );
+  const [savingMetadata, setSavingMetadata] = useState(false);
+  const [metadataNotice, setMetadataNotice] = useState<string | null>(null);
+  const [metadataError, setMetadataError] = useState<string | null>(null);
   const [visibility, setVisibility] = useState<string>("private");
   const [shareToFeed, setShareToFeed] = useState(true);
   const [tiktokConsent, setTikTokConsent] = useState(false);
@@ -187,11 +201,67 @@ export function PublishToPlatformPanel({
     return view;
   }, [projectId]);
 
+  /** The release package this render and channel would be published under. */
+  const activeReleasePackage = useMemo(() => {
+    if (!selectedRender?.outputVariantId || !activeConnection) return null;
+    return (
+      releasePackages.packages.find(
+        (entry) =>
+          entry.outputVariantId === selectedRender.outputVariantId &&
+          entry.platform === activeConnection.platform,
+      ) ?? null
+    );
+  }, [activeConnection, releasePackages.packages, selectedRender]);
+
+  /**
+   * Saves the edited metadata without publishing anything.
+   *
+   * Editing generated text and then having to publish immediately to keep it
+   * was the gap this closes. The fields write to the same release package the
+   * packaging panel edits, so there is one stored copy per destination rather
+   * than two that can disagree.
+   */
+  const saveMetadata = useCallback(async () => {
+    if (!activeReleasePackage) {
+      setMetadataError(
+        "Choose a render and a channel before saving this metadata.",
+      );
+      return;
+    }
+    setSavingMetadata(true);
+    setMetadataError(null);
+    setMetadataNotice(null);
+    const draft = metadataDrafts[activePlatform];
+    const result = await saveReleasePackageAction({
+      projectId,
+      outputVariantId: activeReleasePackage.outputVariantId,
+      platform: activeReleasePackage.platform,
+      channelProfileId: activeReleasePackage.channelProfileId,
+      expectedRevision: activeReleasePackage.revision,
+      title: draft.title.trim(),
+      titleSuggestionId: activeReleasePackage.titleSuggestionId,
+      description: draft.description,
+      tags: parseReleaseTags(draft.tags),
+      visibility: activeReleasePackage.visibility,
+      thumbnailGenerationId: activeReleasePackage.thumbnailGenerationId,
+      caption: activeReleasePackage.caption,
+      shareToFeed: activeReleasePackage.shareToFeed,
+      plannedReleaseAt: activeReleasePackage.plannedReleaseAtIso,
+    });
+    setSavingMetadata(false);
+    if (!result.success) {
+      setMetadataError(result.error);
+      return;
+    }
+    setMetadataNotice("Saved. Nothing has been published.");
+  }, [activePlatform, activeReleasePackage, metadataDrafts, projectId]);
+
   function updateMetadataDraft(
     field: "title" | "description" | "tags",
     value: string,
   ) {
     touchedMetadataRef.current.add(activePlatform);
+    setMetadataNotice(null);
     setMetadataDrafts((previous) => ({
       ...previous,
       [activePlatform]: { ...previous[activePlatform], [field]: value },
@@ -579,9 +649,18 @@ export function PublishToPlatformPanel({
             {instagramSelected ? (
               <div className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label className="text-xs" htmlFor="publish-instagram-title">
-                    Creative title
-                  </Label>
+                  <div className="flex items-center justify-between gap-3">
+                    <Label
+                      className="text-xs"
+                      htmlFor="publish-instagram-title"
+                    >
+                      Creative title
+                    </Label>
+                    <CopyButton
+                      label="the creative title"
+                      value={activeMetadataDraft.title}
+                    />
+                  </div>
                   <Input
                     id="publish-instagram-title"
                     maxLength={100}
@@ -600,11 +679,18 @@ export function PublishToPlatformPanel({
                     <Label className="text-xs" htmlFor="publish-caption">
                       Caption
                     </Label>
-                    <span className="text-xs text-muted-foreground">
-                      {socialCaption.length}/2200 including hashtags
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        {socialCaption.length}/2200 including hashtags
+                      </span>
+                      <CopyButton
+                        label="the caption"
+                        value={activeMetadataDraft.description}
+                      />
+                    </div>
                   </div>
                   <Textarea
+                    className="max-h-64 overflow-y-auto"
                     id="publish-caption"
                     maxLength={2200}
                     onChange={(event) =>
@@ -616,9 +702,15 @@ export function PublishToPlatformPanel({
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs" htmlFor="publish-instagram-tags">
-                    Hashtags
-                  </Label>
+                  <div className="flex items-center justify-between gap-3">
+                    <Label className="text-xs" htmlFor="publish-instagram-tags">
+                      Hashtags
+                    </Label>
+                    <CopyButton
+                      label="the hashtags"
+                      value={activeMetadataDraft.tags}
+                    />
+                  </div>
                   <Input
                     id="publish-instagram-tags"
                     onChange={(event) =>
@@ -661,9 +753,15 @@ export function PublishToPlatformPanel({
                   interactions, and complete publishing.
                 </p>
                 <div className="space-y-1.5">
-                  <Label className="text-xs" htmlFor="publish-tiktok-title">
-                    Suggested TikTok title
-                  </Label>
+                  <div className="flex items-center justify-between gap-3">
+                    <Label className="text-xs" htmlFor="publish-tiktok-title">
+                      Suggested TikTok title
+                    </Label>
+                    <CopyButton
+                      label="the TikTok title"
+                      value={activeMetadataDraft.title}
+                    />
+                  </div>
                   <Input
                     id="publish-tiktok-title"
                     maxLength={100}
@@ -674,10 +772,17 @@ export function PublishToPlatformPanel({
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs" htmlFor="publish-tiktok-caption">
-                    Suggested caption
-                  </Label>
+                  <div className="flex items-center justify-between gap-3">
+                    <Label className="text-xs" htmlFor="publish-tiktok-caption">
+                      Suggested caption
+                    </Label>
+                    <CopyButton
+                      label="the caption"
+                      value={activeMetadataDraft.description}
+                    />
+                  </div>
                   <Textarea
+                    className="max-h-64 overflow-y-auto"
                     id="publish-tiktok-caption"
                     maxLength={2200}
                     onChange={(event) =>
@@ -688,9 +793,15 @@ export function PublishToPlatformPanel({
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs" htmlFor="publish-tiktok-tags">
-                    Suggested hashtags
-                  </Label>
+                  <div className="flex items-center justify-between gap-3">
+                    <Label className="text-xs" htmlFor="publish-tiktok-tags">
+                      Suggested hashtags
+                    </Label>
+                    <CopyButton
+                      label="the hashtags"
+                      value={activeMetadataDraft.tags}
+                    />
+                  </div>
                   <Input
                     id="publish-tiktok-tags"
                     onChange={(event) =>
@@ -720,9 +831,15 @@ export function PublishToPlatformPanel({
             ) : (
               <>
                 <div className="space-y-1.5">
-                  <Label className="text-xs" htmlFor="publish-title">
-                    Title
-                  </Label>
+                  <div className="flex items-center justify-between gap-3">
+                    <Label className="text-xs" htmlFor="publish-title">
+                      Title
+                    </Label>
+                    <CopyButton
+                      label="the title"
+                      value={activeMetadataDraft.title}
+                    />
+                  </div>
                   <Input
                     id="publish-title"
                     maxLength={100}
@@ -735,10 +852,17 @@ export function PublishToPlatformPanel({
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label className="text-xs" htmlFor="publish-description">
-                    Description
-                  </Label>
+                  <div className="flex items-center justify-between gap-3">
+                    <Label className="text-xs" htmlFor="publish-description">
+                      Description
+                    </Label>
+                    <CopyButton
+                      label="the description"
+                      value={activeMetadataDraft.description}
+                    />
+                  </div>
                   <Textarea
+                    className="max-h-64 overflow-y-auto"
                     id="publish-description"
                     maxLength={5000}
                     onChange={(event) =>
@@ -750,9 +874,15 @@ export function PublishToPlatformPanel({
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs" htmlFor="publish-tags">
-                    Tags
-                  </Label>
+                  <div className="flex items-center justify-between gap-3">
+                    <Label className="text-xs" htmlFor="publish-tags">
+                      Tags
+                    </Label>
+                    <CopyButton
+                      label="the tags"
+                      value={activeMetadataDraft.tags}
+                    />
+                  </div>
                   <Input
                     id="publish-tags"
                     onChange={(event) =>
@@ -824,6 +954,16 @@ export function PublishToPlatformPanel({
                         : `Publish to ${activeConnection.platformLabel}`}
                 </span>
               </Button>
+              <Button
+                disabled={
+                  !canPublish || savingMetadata || !activeReleasePackage
+                }
+                onClick={() => void saveMetadata()}
+                type="button"
+                variant="outline"
+              >
+                {savingMetadata ? "Saving…" : "Save metadata"}
+              </Button>
               {selectedRender ? (
                 <span className="text-xs text-muted-foreground">
                   {formatBytes(selectedRender.sizeBytes)} ·{" "}
@@ -831,6 +971,16 @@ export function PublishToPlatformPanel({
                 </span>
               ) : null}
             </div>
+            {metadataError ? (
+              <p className="text-xs text-destructive" role="alert">
+                {metadataError}
+              </p>
+            ) : null}
+            {metadataNotice ? (
+              <p className="text-xs text-muted-foreground" role="status">
+                {metadataNotice}
+              </p>
+            ) : null}
             <p className="text-xs text-muted-foreground">
               {instagramSelected
                 ? "Instagram will process this vertical Reel before publishing it."

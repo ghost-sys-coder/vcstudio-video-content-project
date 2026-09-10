@@ -56,6 +56,11 @@ export type ConnectionView = {
 
 export type PublishableRenderView = {
   id: string;
+  /**
+   * Which output this render belongs to. Carried so the publish panel can find
+   * the release package for the exact destination being published to.
+   */
+  outputVariantId: string | null;
   /** Concise one-line label including kind + source name (used by the closed picker). */
   label: string;
   /** short | variant | longform — drives grouping and the icon in the picker. */
@@ -263,6 +268,7 @@ export async function loadPublishingView(input: {
         });
         return {
           id: render.id,
+          outputVariantId: render.outputVariantId,
           kind: source.kind,
           groupLabel: source.groupLabel,
           sourceName: source.sourceName,
