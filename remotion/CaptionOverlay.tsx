@@ -1,5 +1,6 @@
 import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
 import { computeCaptionSafeArea } from "@/lib/render/caption-safe-area";
+import { resolveCaptionAnimation } from "@/lib/subtitles/caption-animation";
 import type { CaptionStyleData } from "@/lib/subtitles/caption-style-data";
 import type { RenderCaptionData } from "@/lib/render/render-timeline-snapshot";
 
@@ -21,6 +22,18 @@ function verticalAlignment(
 }
 
 /**
+ * The second placement axis. Previously fixed at centre, which remains the
+ * default, so an untouched project renders exactly as it did.
+ */
+function horizontalAlignment(
+  position: CaptionStyleData["horizontalPosition"],
+): "flex-start" | "center" | "flex-end" {
+  if (position === "left") return "flex-start";
+  if (position === "right") return "flex-end";
+  return "center";
+}
+
+/**
  * Draws the single active caption cue for the current (scene-relative) frame,
  * inside the caption-safe rectangle. Cue frames are expected to already be
  * scene-relative so `useCurrentFrame` compares directly.
@@ -33,7 +46,7 @@ export function CaptionOverlay({
   style: CaptionStyleData;
 }) {
   const frame = useCurrentFrame();
-  const { width, height } = useVideoConfig();
+  const { width, height, fps } = useVideoConfig();
 
   const active = captions.find(
     (caption) => frame >= caption.startFrame && frame < caption.endFrame,
@@ -47,6 +60,13 @@ export function CaptionOverlay({
   });
   const fontSize = Math.round((height * style.fontSizePercent) / 100);
   const text = style.uppercase ? active.text.toUpperCase() : active.text;
+  const animation = resolveCaptionAnimation({
+    style,
+    frame,
+    startFrame: active.startFrame,
+    endFrame: active.endFrame,
+    fps,
+  });
 
   return (
     <AbsoluteFill
@@ -54,7 +74,7 @@ export function CaptionOverlay({
         display: "flex",
         flexDirection: "column",
         justifyContent: verticalAlignment(style.position),
-        alignItems: "center",
+        alignItems: horizontalAlignment(style.horizontalPosition),
         paddingTop: safe.marginYPixels,
         paddingBottom: safe.marginYPixels,
         paddingLeft: safe.marginXPixels,
@@ -78,6 +98,8 @@ export function CaptionOverlay({
           lineHeight: 1.25,
           textShadow: `0 2px 6px ${style.outlineColor}`,
           whiteSpace: "pre-line",
+          opacity: animation.opacity,
+          transform: `translate(${animation.translateXPercent}%, ${animation.translateYPercent}%)`,
         }}
       >
         {text}

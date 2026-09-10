@@ -20,6 +20,12 @@ export const captionStyleSchema: z.ZodType<CaptionStyleData> = z.object({
   backgroundColor: hexColorSchema,
   backgroundOpacityPercent: z.coerce.number().int().min(0).max(100),
   position: z.enum(["bottom", "middle", "top"]),
+  horizontalPosition: z.enum(["left", "center", "right"]),
+  entranceEffect: z.enum(["none", "fade", "slide-fade"]),
+  entranceDirection: z.enum(["top", "bottom", "left", "right"]),
+  // Bounded so a style can never stall a cue behind its own animation.
+  entranceDurationMilliseconds: z.coerce.number().int().min(0).max(2000),
+  exitMatchesEntrance: z.boolean(),
   bold: z.boolean(),
   uppercase: z.boolean(),
   maxLineCharacters: z.coerce.number().int().min(16).max(120),
@@ -34,6 +40,13 @@ export const DEFAULT_CAPTION_STYLE: CaptionStyleData = {
   backgroundColor: "#000000",
   backgroundOpacityPercent: 55,
   position: "bottom",
+  // Centre and a hard cut: exactly how captions behaved before these settings
+  // existed, so an untouched project renders identically.
+  horizontalPosition: "center",
+  entranceEffect: "none",
+  entranceDirection: "bottom",
+  entranceDurationMilliseconds: 250,
+  exitMatchesEntrance: true,
   bold: true,
   uppercase: false,
   maxLineCharacters: 42,

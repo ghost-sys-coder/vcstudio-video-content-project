@@ -7,6 +7,22 @@ const POSITION_CLASS: Record<CaptionStyleData["position"], string> = {
   bottom: "items-end",
 };
 
+/** The stage is a flex row, so the horizontal axis is the main one. */
+const HORIZONTAL_CLASS: Record<CaptionStyleData["horizontalPosition"], string> =
+  {
+    left: "justify-start",
+    center: "justify-center",
+    right: "justify-end",
+  };
+
+/** Slide direction, matching the renderer's travel. */
+const SLIDE_CLASS: Record<CaptionStyleData["entranceDirection"], string> = {
+  top: "slide-in-from-top-4",
+  bottom: "slide-in-from-bottom-4",
+  left: "slide-in-from-left-4",
+  right: "slide-in-from-right-4",
+};
+
 function withOpacity(hex: string, opacityPercent: number): string {
   const alpha = Math.round(
     (Math.min(100, Math.max(0, opacityPercent)) / 100) * 255,
@@ -36,15 +52,28 @@ export function SubtitlePreview({
     <div
       aria-label="Caption preview"
       className={cn(
-        "flex justify-center overflow-hidden rounded-xl bg-neutral-900 ring-1 ring-foreground/10",
+        "flex overflow-hidden rounded-xl bg-neutral-900 ring-1 ring-foreground/10",
         POSITION_CLASS[captionStyle.position],
+        HORIZONTAL_CLASS[captionStyle.horizontalPosition],
       )}
       style={{ aspectRatio: "16 / 9", containerType: "size" }}
     >
       <div
-        className="max-w-[80%]"
+        // Remounting on a settings change replays the entrance, so the effect
+        // can be judged from the preview rather than only from a render.
+        key={`${captionStyle.entranceEffect}-${captionStyle.entranceDirection}-${captionStyle.entranceDurationMilliseconds}`}
+        className={cn(
+          "max-w-[80%]",
+          captionStyle.entranceEffect !== "none" && "animate-in fade-in",
+          captionStyle.entranceEffect === "slide-fade" &&
+            SLIDE_CLASS[captionStyle.entranceDirection],
+        )}
         style={{
           padding: `${captionStyle.safeMarginPercent}%`,
+          animationDuration:
+            captionStyle.entranceEffect === "none"
+              ? undefined
+              : `${captionStyle.entranceDurationMilliseconds}ms`,
         }}
       >
         <span

@@ -5,11 +5,33 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type {
+  CaptionEntranceDirection,
+  CaptionEntranceEffect,
   CaptionStyleData,
+  SubtitleHorizontalPosition,
   SubtitlePosition,
 } from "@/lib/subtitles/caption-style-data";
 
 const POSITIONS: SubtitlePosition[] = ["bottom", "middle", "top"];
+const HORIZONTAL_POSITIONS: SubtitleHorizontalPosition[] = [
+  "left",
+  "center",
+  "right",
+];
+const ENTRANCE_EFFECTS: { value: CaptionEntranceEffect; label: string }[] = [
+  { value: "none", label: "None (cut)" },
+  { value: "fade", label: "Fade" },
+  { value: "slide-fade", label: "Fade and slide" },
+];
+const ENTRANCE_DIRECTIONS: {
+  value: CaptionEntranceDirection;
+  label: string;
+}[] = [
+  { value: "bottom", label: "From the bottom" },
+  { value: "top", label: "From the top" },
+  { value: "left", label: "From the left" },
+  { value: "right", label: "From the right" },
+];
 
 /**
  * Edits caption style. On save the assembled style is validated server-side by
@@ -111,7 +133,7 @@ export function CaptionStyleForm({
 
         <div className="space-y-1.5">
           <Label className="text-xs" htmlFor="caption-position">
-            Position
+            Vertical position
           </Label>
           <select
             className="h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm disabled:opacity-50"
@@ -129,6 +151,88 @@ export function CaptionStyleForm({
             ))}
           </select>
         </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs" htmlFor="caption-horizontal-position">
+            Horizontal position
+          </Label>
+          <select
+            className="h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm disabled:opacity-50"
+            disabled={!canManage}
+            id="caption-horizontal-position"
+            onChange={(event) =>
+              update(
+                "horizontalPosition",
+                event.target.value as SubtitleHorizontalPosition,
+              )
+            }
+            value={style.horizontalPosition}
+          >
+            {HORIZONTAL_POSITIONS.map((position) => (
+              <option key={position} value={position}>
+                {position}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs" htmlFor="caption-entrance-effect">
+            Entrance
+          </Label>
+          <select
+            className="h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm disabled:opacity-50"
+            disabled={!canManage}
+            id="caption-entrance-effect"
+            onChange={(event) =>
+              update(
+                "entranceEffect",
+                event.target.value as CaptionEntranceEffect,
+              )
+            }
+            value={style.entranceEffect}
+          >
+            {ENTRANCE_EFFECTS.map((effect) => (
+              <option key={effect.value} value={effect.value}>
+                {effect.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {style.entranceEffect === "slide-fade" ? (
+          <div className="space-y-1.5">
+            <Label className="text-xs" htmlFor="caption-entrance-direction">
+              Slide from
+            </Label>
+            <select
+              className="h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm disabled:opacity-50"
+              disabled={!canManage}
+              id="caption-entrance-direction"
+              onChange={(event) =>
+                update(
+                  "entranceDirection",
+                  event.target.value as CaptionEntranceDirection,
+                )
+              }
+              value={style.entranceDirection}
+            >
+              {ENTRANCE_DIRECTIONS.map((direction) => (
+                <option key={direction.value} value={direction.value}>
+                  {direction.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
+
+        {style.entranceEffect === "none"
+          ? null
+          : numberField("entranceDurationMilliseconds", "Entrance (ms)", {
+              min: 0,
+              max: 2000,
+              step: 50,
+            })}
 
         {colorField("primaryColor", "Text color")}
         {colorField("outlineColor", "Outline color")}
@@ -172,6 +276,20 @@ export function CaptionStyleForm({
           />
           Uppercase
         </label>
+        {style.entranceEffect === "none" ? null : (
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              checked={style.exitMatchesEntrance}
+              className="size-4 accent-primary"
+              disabled={!canManage}
+              onChange={(event) =>
+                update("exitMatchesEntrance", event.target.checked)
+              }
+              type="checkbox"
+            />
+            Leave the same way
+          </label>
+        )}
       </div>
 
       {error ? (

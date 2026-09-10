@@ -56,3 +56,58 @@ describe("caption style validation", () => {
     );
   });
 });
+
+describe("styles stored before placement and motion existed", () => {
+  it("keeps rendering exactly as they did", () => {
+    // Every existing project has a caption style with none of the new fields.
+    // They must come back centred with a hard cut, which is what they have
+    // always looked like, rather than silently gaining an animation.
+    const legacy = {
+      fontFamily: "Inter",
+      fontSizePercent: 4.5,
+      primaryColor: "#ffffff",
+      outlineColor: "#000000",
+      backgroundColor: "#000000",
+      backgroundOpacityPercent: 55,
+      position: "bottom",
+      bold: true,
+      uppercase: false,
+      maxLineCharacters: 42,
+      safeMarginPercent: 8,
+    };
+    const coerced = coerceCaptionStyle(legacy);
+    expect(coerced.horizontalPosition).toBe("center");
+    expect(coerced.entranceEffect).toBe("none");
+    expect(coerced.position).toBe("bottom");
+  });
+
+  it("accepts the new placements and effects", () => {
+    const parsed = parseCaptionStyle({
+      horizontalPosition: "right",
+      entranceEffect: "slide-fade",
+      entranceDirection: "left",
+      entranceDurationMilliseconds: 400,
+      exitMatchesEntrance: false,
+    });
+    expect(parsed.horizontalPosition).toBe("right");
+    expect(parsed.entranceEffect).toBe("slide-fade");
+    expect(parsed.entranceDirection).toBe("left");
+    expect(parsed.entranceDurationMilliseconds).toBe(400);
+    expect(parsed.exitMatchesEntrance).toBe(false);
+  });
+
+  it("refuses an unbounded entrance duration and an unknown placement", () => {
+    expect(
+      captionStyleSchema.safeParse({
+        ...DEFAULT_CAPTION_STYLE,
+        entranceDurationMilliseconds: 60_000,
+      }).success,
+    ).toBe(false);
+    expect(
+      captionStyleSchema.safeParse({
+        ...DEFAULT_CAPTION_STYLE,
+        horizontalPosition: "diagonal",
+      }).success,
+    ).toBe(false);
+  });
+});
