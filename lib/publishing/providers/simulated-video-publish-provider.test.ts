@@ -18,6 +18,7 @@ function request(
     description: "",
     tags: [],
     visibility: "public",
+    disclosures: null,
     caption: "cap",
     shareToFeed: true,
     providerOperationId: null,

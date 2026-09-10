@@ -38,6 +38,13 @@ const publishBaseSchema = z.object({
   projectId: z.uuid(),
   renderId: z.uuid(),
   connectionId: z.uuid(),
+  /**
+   * The packaging this publish came from, when it came from one.
+   *
+   * Optional because a direct publish need not have a saved package, and
+   * required in practice for YouTube, whose declarations live on the package.
+   */
+  releasePackageId: z.uuid().optional(),
   requestNonce: z.string().min(1),
 });
 

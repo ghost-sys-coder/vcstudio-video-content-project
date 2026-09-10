@@ -41,6 +41,9 @@ export function toVideoPublishRequest(
     account: request.account,
     sourceUrl: video.sourceUrl,
     sizeBytes: video.sizeBytes,
+    // A social post carries no release declarations; the platforms it reaches
+    // through this adapter do not ask for any.
+    disclosures: null,
     contentType: video.contentType,
     title: firstLine.slice(0, 100) || "Untitled post",
     description: request.text,

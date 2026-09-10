@@ -7,6 +7,13 @@ import type {
   VideoPublication,
 } from "@/db/schema";
 import { findChannelProfile } from "@/db/repositories/channel-profiles.repository";
+import { listFinishingStepsForPublications } from "@/db/commands/publication-finishing-commands";
+import {
+  toFinishingStepView,
+  type FinishingStepState,
+  type FinishingStepView,
+  type YouTubeFinishingStep,
+} from "@/lib/publishing/youtube-finishing-steps";
 import {
   listPlatformConnections,
   listProjectVideoPublications,
@@ -98,6 +105,8 @@ export type PublicationView = {
   safeErrorMessage: string | null;
   providerOperationStage: string | null;
   createdAtLabel: string;
+  /** What still has to happen before this release is genuinely finished. */
+  finishingSteps: FinishingStepView[];
 };
 
 export type PublishingView = {
@@ -169,6 +178,30 @@ export async function loadPublishingView(input: {
       ),
     ),
   ]);
+  // Finishing steps are read for the publications actually being shown, in one
+  // query rather than one per row, so the count stays bounded by the same
+  // history limit as the publications themselves.
+  const youtubePublicationIds = publications
+    .filter((publication) => publication.platform === "youtube")
+    .map((publication) => publication.id);
+  const finishingRows = await listFinishingStepsForPublications({
+    workspaceId: input.workspaceId,
+    publicationIds: youtubePublicationIds,
+  });
+  const finishingByPublication = new Map<
+    string,
+    {
+      step: YouTubeFinishingStep;
+      state: FinishingStepState;
+      detail: string | null;
+    }[]
+  >();
+  for (const row of finishingRows) {
+    const existing = finishingByPublication.get(row.publicationId) ?? [];
+    existing.push({ step: row.step, state: row.state, detail: row.detail });
+    finishingByPublication.set(row.publicationId, existing);
+  }
+
   const completeMetadataRuns = metadataRuns.filter(
     (run): run is TitleGenerationRun =>
       run !== null &&
@@ -335,6 +368,9 @@ export async function loadPublishingView(input: {
       safeErrorMessage: publication.safeErrorMessage,
       providerOperationStage: publication.providerOperationStage,
       createdAtLabel: formatUtc(publication.createdAt),
+      finishingSteps: (finishingByPublication.get(publication.id) ?? []).map(
+        toFinishingStepView,
+      ),
     })),
   };
 }

@@ -98,6 +98,7 @@ describe("Facebook video publishing provider", () => {
         visibility: "public",
         caption: null,
         shareToFeed: null,
+        disclosures: null,
         providerOperationId: null,
         providerOperationSecret: null,
       }),

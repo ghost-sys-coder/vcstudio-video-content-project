@@ -121,6 +121,9 @@ const content = (title: string) => ({
   caption: null,
   shareToFeed: null,
   plannedReleaseAt: null,
+  madeForKids: null,
+  containsSyntheticMedia: null,
+  youtubePlaylistId: null,
 });
 
 async function addSucceededRender(fixture: Fixture): Promise<string> {

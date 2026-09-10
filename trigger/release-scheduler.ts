@@ -114,6 +114,11 @@ export const releaseSchedulerTask = schedules.task({
           project,
           request: built.input,
           requestedByUserId: releasePackage.updatedByUserId,
+          releasePackageId: releasePackage.id,
+          disclosures: {
+            madeForKids: releasePackage.madeForKids,
+            containsSyntheticMedia: releasePackage.containsSyntheticMedia,
+          },
         });
 
         await markReleaseScheduleDispatched({

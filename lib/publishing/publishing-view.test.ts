@@ -27,6 +27,11 @@ vi.mock("@/lib/env/server", () => ({
     MAX_PUBLISH_VIDEO_BYTES: 1_073_741_824,
   }),
 }));
+// The view now reads finishing steps, which is a database call. Mocked here so
+// the test keeps exercising the view's own mapping rather than a driver.
+vi.mock("@/db/commands/publication-finishing-commands", () => ({
+  listFinishingStepsForPublications: async () => [],
+}));
 vi.mock("@/lib/publishing/provider-registry", () => ({
   PUBLISHABLE_PLATFORMS: ["youtube", "facebook", "instagram", "tiktok"],
 }));

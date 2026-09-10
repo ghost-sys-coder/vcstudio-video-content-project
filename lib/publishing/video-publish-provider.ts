@@ -38,6 +38,17 @@ export type PublishVideoRequest = {
   visibility: PublicationVisibility;
   caption: string | null;
   shareToFeed: boolean | null;
+  /**
+   * The creator's own declarations, for platforms that require them.
+   *
+   * Null for platforms that ask for nothing. A provider that needs a
+   * declaration must refuse rather than substitute a default: sending a legal
+   * statement nobody made is the defect this replaces.
+   */
+  disclosures: {
+    madeForKids: boolean | null;
+    containsSyntheticMedia: boolean | null;
+  } | null;
   /** Existing async operation/container id used to resume a previous attempt. */
   providerOperationId: string | null;
   /** Decrypted, short-lived provider checkpoint credential. Never exposed to UI. */

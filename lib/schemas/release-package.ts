@@ -24,6 +24,14 @@ export const saveReleasePackageSchema = z.object({
   caption: z.string().max(4_000).nullable(),
   shareToFeed: z.boolean().nullable(),
   plannedReleaseAt: z.iso.datetime().nullable(),
+  /**
+   * The creator's own declarations. Null means not answered yet, which is
+   * deliberately different from answered no.
+   */
+  madeForKids: z.boolean().nullable().default(null),
+  containsSyntheticMedia: z.boolean().nullable().default(null),
+  /** Optional playlist to add the published video to, where permitted. */
+  youtubePlaylistId: z.string().trim().max(64).nullable().default(null),
 });
 
 export type SaveReleasePackageInput = z.infer<typeof saveReleasePackageSchema>;

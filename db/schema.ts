@@ -405,6 +405,25 @@ export const platformConnectionStatusEnum = pgEnum(
  * business to report; collapsing the two would let a schedule read as published
  * when nothing had left the building.
  */
+/** The steps that finish a release after the video bytes are up. */
+export const publicationFinishingStepEnum = pgEnum(
+  "publication_finishing_step",
+  ["thumbnail", "captions", "playlist"],
+);
+
+/**
+ * How one finishing step ended.
+ *
+ * `unsupported` is deliberately distinct from `failed`: a failure may succeed
+ * on a retry, while an unsupported step is missing a grant or an account
+ * capability and will fail identically every time, so offering a retry would
+ * only waste the creator's time.
+ */
+export const publicationFinishingStateEnum = pgEnum(
+  "publication_finishing_state",
+  ["pending", "succeeded", "failed", "unsupported", "skipped"],
+);
+
 export const releaseScheduleStatusEnum = pgEnum("release_schedule_status", [
   "scheduled",
   "claimed",
@@ -3520,6 +3539,22 @@ export const releasePackages = pgTable(
     /** Instagram's exact caption. Null for platforms with separate metadata. */
     caption: text("caption"),
     shareToFeed: boolean("share_to_feed"),
+    /**
+     * The creator's own declarations, required by YouTube before an upload.
+     *
+     * Null means "not answered yet", which is deliberately distinct from
+     * "answered no". The upload path used to send a constant false for the
+     * audience declaration, making a legal statement on behalf of someone who
+     * had never been asked; keeping null available is what makes that
+     * impossible to repeat. No check constraint enforces these, because
+     * packages created before the question existed are legitimately null and
+     * must not be retro-invalidated. The requirement is enforced where the
+     * request is built, and tested there.
+     */
+    madeForKids: boolean("made_for_kids"),
+    containsSyntheticMedia: boolean("contains_synthetic_media"),
+    /** Optional playlist to add the published video to, where permitted. */
+    youtubePlaylistId: text("youtube_playlist_id"),
     /** Editorial release intent. Scheduling itself is a later slice. */
     plannedReleaseAt: timestamp("planned_release_at", { withTimezone: true }),
     /**
@@ -3701,6 +3736,22 @@ export const videoPublications = pgTable(
     /** Encrypted ephemeral provider credential, e.g. a TikTok upload URL. */
     providerOperationSecretSealed: text("provider_operation_secret_sealed"),
     providerOperationStage: text("provider_operation_stage"),
+    /**
+     * The packaging this upload came from, when it came from one.
+     *
+     * Recorded so the finishing steps can find the chosen thumbnail and
+     * playlist without re-deriving the package from the render and channel,
+     * which would silently pick a different package if the assignment changed.
+     */
+    releasePackageId: uuid("release_package_id"),
+    /**
+     * The declarations that were actually sent with this upload.
+     *
+     * Recorded on the publication as well as the package so the history says
+     * what was declared at the time, not what the package happens to say now.
+     */
+    madeForKids: boolean("made_for_kids"),
+    containsSyntheticMedia: boolean("contains_synthetic_media"),
     /** Required evidence of explicit consent for TikTok inbox delivery. */
     consentConfirmedAt: timestamp("consent_confirmed_at", {
       withTimezone: true,
@@ -3777,6 +3828,62 @@ export const videoPublications = pgTable(
         videoRenders.workspaceId,
       ],
       name: "video_publications_tenant_render_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
+/**
+ * One step that finishes a release after the video itself is uploaded.
+ *
+ * Uploading the video and finishing the package are different operations with
+ * different failure modes. Tracking them separately is what allows a thumbnail
+ * that failed to attach to be retried on its own, without sending several
+ * hundred megabytes of video a second time, and what stops a publication being
+ * described as complete while a piece of it is still outstanding.
+ */
+export const publicationFinishingSteps = pgTable(
+  "publication_finishing_steps",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    publicationId: uuid("publication_id").notNull(),
+    step: publicationFinishingStepEnum("step").notNull(),
+    state: publicationFinishingStateEnum("state").notNull().default("pending"),
+    /** The safe reason a creator can act on. Never a raw provider error. */
+    detail: text("detail"),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    // One row per step per publication: a step is a state, not an event log.
+    uniqueIndex("publication_finishing_steps_unique").on(
+      table.publicationId,
+      table.step,
+    ),
+    index("publication_finishing_steps_workspace_index").on(
+      table.workspaceId,
+      table.publicationId,
+    ),
+    check(
+      "publication_finishing_steps_attempts_nonnegative",
+      sql`${table.attemptCount} >= 0`,
+    ),
+    check(
+      "publication_finishing_steps_settled_fields",
+      sql`${table.state} in ('pending') or ${table.completedAt} is not null`,
+    ),
+    foreignKey({
+      columns: [table.publicationId, table.workspaceId],
+      foreignColumns: [videoPublications.id, videoPublications.workspaceId],
+      name: "publication_finishing_steps_tenant_publication_fkey",
     }).onDelete("cascade"),
   ],
 );
@@ -6792,6 +6899,8 @@ export type PlatformConnectionStatus =
 export type VideoPublication = typeof videoPublications.$inferSelect;
 export type ReleasePackage = typeof releasePackages.$inferSelect;
 export type ReleaseSchedule = typeof releaseSchedules.$inferSelect;
+export type PublicationFinishingStep =
+  typeof publicationFinishingSteps.$inferSelect;
 export type ReleasePackageRevision =
   typeof releasePackageRevisions.$inferSelect;
 export type VideoPublicationStatus =

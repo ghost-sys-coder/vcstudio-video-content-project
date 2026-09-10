@@ -5,6 +5,13 @@ import {
   YOUTUBE_DESCRIPTION_MAX_LENGTH,
   YOUTUBE_TITLE_MAX_LENGTH,
 } from "@/lib/publishing/platform-limits";
+import { buildYouTubeStatusDisclosures } from "@/lib/publishing/youtube-disclosure";
+import {
+  YOUTUBE_THUMBNAIL_CONTENT_TYPES,
+  YOUTUBE_THUMBNAIL_MAX_BYTES,
+  type FinishingStepOutcome,
+  type VideoFinishingProvider,
+} from "@/lib/publishing/video-finishing-provider";
 import {
   PublishProviderError,
   type AuthorizationRequest,
@@ -22,6 +29,12 @@ const CHANNELS_ENDPOINT =
   "https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true";
 const RESUMABLE_UPLOAD_ENDPOINT =
   "https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status";
+const THUMBNAIL_SET_ENDPOINT =
+  "https://www.googleapis.com/upload/youtube/v3/thumbnails/set";
+const CAPTIONS_INSERT_ENDPOINT =
+  "https://www.googleapis.com/upload/youtube/v3/captions?part=snippet&uploadType=multipart";
+const PLAYLIST_ITEMS_ENDPOINT =
+  "https://www.googleapis.com/youtube/v3/playlistItems?part=snippet";
 
 /**
  * `youtube.upload` is the narrowest scope that can insert a video;
@@ -111,7 +124,9 @@ function failureForStatus(status: number, reason: string): PublishFailure {
   };
 }
 
-export class YouTubeVideoPublishProvider implements VideoPublishProvider {
+export class YouTubeVideoPublishProvider
+  implements VideoPublishProvider, VideoFinishingProvider
+{
   readonly platform: ContentPlatform = "youtube";
   readonly accountLabel = "YouTube channel";
 
@@ -231,6 +246,21 @@ export class YouTubeVideoPublishProvider implements VideoPublishProvider {
   private async startResumableSession(
     request: PublishVideoRequest,
   ): Promise<string> {
+    // Refused rather than defaulted. This upload previously sent
+    // selfDeclaredMadeForKids as a constant false, which made a legal audience
+    // declaration on behalf of someone who had never been asked.
+    const disclosures = request.disclosures
+      ? buildYouTubeStatusDisclosures(request.disclosures)
+      : null;
+    if (!disclosures)
+      fail({
+        category: "invalid_metadata",
+        safeMessage:
+          "Declare the audience and AI disclosure for this release before publishing to YouTube.",
+        retriable: false,
+        mayHavePublished: false,
+      });
+
     const response = await fetch(RESUMABLE_UPLOAD_ENDPOINT, {
       method: "POST",
       headers: {
@@ -250,7 +280,7 @@ export class YouTubeVideoPublishProvider implements VideoPublishProvider {
         },
         status: {
           privacyStatus: request.visibility,
-          selfDeclaredMadeForKids: false,
+          ...disclosures,
         },
       }),
     });
@@ -339,5 +369,181 @@ export class YouTubeVideoPublishProvider implements VideoPublishProvider {
       retriable: false,
       mayHavePublished: true,
     });
+  }
+
+  // ---------------------------------------------------------------------
+  // Finishing steps. Each returns an outcome rather than throwing, because a
+  // finishing failure must not undo or obscure a video that uploaded fine.
+  // ---------------------------------------------------------------------
+
+  /**
+   * Attaches the chosen thumbnail.
+   *
+   * Works on the upload-only grant: `thumbnails.set` accepts
+   * `youtube.upload`, verified against the reference on 2026-09-11. A 403 here
+   * usually means the channel itself is not permitted custom thumbnails, which
+   * no retry will fix, so it is reported as unsupported with an instruction
+   * rather than as a failure.
+   */
+  async setThumbnail(input: {
+    accessToken: string;
+    videoId: string;
+    imageUrl: string;
+    contentType: string;
+    sizeBytes: number;
+  }): Promise<FinishingStepOutcome> {
+    if (input.sizeBytes > YOUTUBE_THUMBNAIL_MAX_BYTES)
+      return {
+        state: "failed",
+        detail: `That thumbnail is ${Math.round(input.sizeBytes / 1024)}KB. YouTube's limit is 2MB. Choose or re-generate a smaller image.`,
+      };
+    if (!YOUTUBE_THUMBNAIL_CONTENT_TYPES.includes(input.contentType))
+      return {
+        state: "failed",
+        detail: `YouTube accepts JPEG and PNG thumbnails, not ${input.contentType}.`,
+      };
+
+    try {
+      const source = await fetch(input.imageUrl);
+      if (!source.ok)
+        return {
+          state: "failed",
+          detail: "The thumbnail image could not be read from storage.",
+        };
+      const bytes = new Uint8Array(await source.arrayBuffer());
+
+      const url = new URL(THUMBNAIL_SET_ENDPOINT);
+      url.searchParams.set("videoId", input.videoId);
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${input.accessToken}`,
+          "Content-Type": input.contentType,
+          "Content-Length": String(bytes.byteLength),
+        },
+        body: bytes,
+      });
+      if (response.ok) return { state: "succeeded", detail: null };
+      if (response.status === 403)
+        return {
+          state: "unsupported",
+          detail:
+            "This channel is not permitted to set custom thumbnails. YouTube usually requires a verified channel for that.",
+        };
+      return {
+        state: "failed",
+        detail: `YouTube rejected the thumbnail (HTTP ${response.status}).`,
+      };
+    } catch {
+      return {
+        state: "failed",
+        detail: "The thumbnail could not be sent to YouTube.",
+      };
+    }
+  }
+
+  /**
+   * Uploads a caption track.
+   *
+   * `captions.insert` accepts only `youtube.force-ssl` (or the partner scope),
+   * so an upload-only connection cannot reach this at all. The caller checks
+   * the grant first; this handles the case where the grant exists but YouTube
+   * still refuses.
+   */
+  async insertCaptions(input: {
+    accessToken: string;
+    videoId: string;
+    language: string;
+    name: string;
+    body: string;
+  }): Promise<FinishingStepOutcome> {
+    if (!input.body.trim())
+      return { state: "skipped", detail: "There were no captions to upload." };
+
+    try {
+      const metadata = {
+        snippet: {
+          videoId: input.videoId,
+          language: input.language,
+          name: input.name,
+          isDraft: false,
+        },
+      };
+      const form = new FormData();
+      form.append(
+        "snippet",
+        new Blob([JSON.stringify(metadata)], { type: "application/json" }),
+      );
+      form.append(
+        "file",
+        new Blob([input.body], { type: "application/octet-stream" }),
+      );
+
+      const response = await fetch(CAPTIONS_INSERT_ENDPOINT, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${input.accessToken}` },
+        body: form,
+      });
+      if (response.ok) return { state: "succeeded", detail: null };
+      if (response.status === 403)
+        return {
+          state: "unsupported",
+          detail:
+            "This connection is not permitted to upload captions to that channel.",
+        };
+      return {
+        state: "failed",
+        detail: `YouTube rejected the caption track (HTTP ${response.status}).`,
+      };
+    } catch {
+      return {
+        state: "failed",
+        detail: "The caption track could not be sent to YouTube.",
+      };
+    }
+  }
+
+  /** Adds the published video to a playlist. */
+  async addToPlaylist(input: {
+    accessToken: string;
+    videoId: string;
+    playlistId: string;
+  }): Promise<FinishingStepOutcome> {
+    try {
+      const response = await fetch(PLAYLIST_ITEMS_ENDPOINT, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${input.accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          snippet: {
+            playlistId: input.playlistId,
+            resourceId: { kind: "youtube#video", videoId: input.videoId },
+          },
+        }),
+      });
+      if (response.ok) return { state: "succeeded", detail: null };
+      if (response.status === 404)
+        return {
+          state: "failed",
+          detail: "That playlist no longer exists on this channel.",
+        };
+      if (response.status === 403)
+        return {
+          state: "unsupported",
+          detail:
+            "This connection is not permitted to change playlists on that channel.",
+        };
+      return {
+        state: "failed",
+        detail: `YouTube rejected the playlist change (HTTP ${response.status}).`,
+      };
+    } catch {
+      return {
+        state: "failed",
+        detail: "The playlist change could not be sent to YouTube.",
+      };
+    }
   }
 }

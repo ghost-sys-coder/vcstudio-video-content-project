@@ -17,6 +17,7 @@ const publication: PublicationView = {
   externalVideoUrl: null,
   safeErrorMessage: null,
   providerOperationStage: "uploading",
+  finishingSteps: [],
   createdAtLabel: "2026-07-22 23:00 UTC",
 };
 

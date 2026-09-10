@@ -22,6 +22,7 @@ const request = () => ({
   description: "",
   tags: [],
   visibility: "public" as const,
+  disclosures: null,
   caption: "A caption #vcstudio",
   shareToFeed: true,
   providerOperationId: null,

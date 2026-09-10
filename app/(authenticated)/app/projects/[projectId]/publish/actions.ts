@@ -468,6 +468,7 @@ export async function publishVideoAction(
     shareToFeed: formData.get("shareToFeed") ?? undefined,
     consentConfirmed: formData.get("consentConfirmed") ?? undefined,
     visibility: formData.get("visibility"),
+    releasePackageId: formData.get("releasePackageId") ?? undefined,
     requestNonce: formData.get("requestNonce"),
   });
   if (!parsed.success)
@@ -476,11 +477,28 @@ export async function publishVideoAction(
     const { context, project } = await requirePublishMutation(
       parsed.data.projectId,
     );
+    // The declarations are read from the stored package, never from the form:
+    // they are part of the packaging a person reviewed and confirmed, and a
+    // browser must not be able to assert them independently of it.
+    const releasePackage = parsed.data.releasePackageId
+      ? await findReleasePackage({
+          workspaceId: context.activeMembership.workspaceId,
+          projectId: parsed.data.projectId,
+          releasePackageId: parsed.data.releasePackageId,
+        })
+      : null;
     const { publicationId } = await startVideoPublication({
       workspaceId: context.activeMembership.workspaceId,
       project,
       request: parsed.data,
       requestedByUserId: context.user.id,
+      releasePackageId: releasePackage?.id ?? null,
+      disclosures: releasePackage
+        ? {
+            madeForKids: releasePackage.madeForKids,
+            containsSyntheticMedia: releasePackage.containsSyntheticMedia,
+          }
+        : null,
     });
     await recordAuditEvent({
       workspaceId: context.activeMembership.workspaceId,
@@ -734,6 +752,9 @@ export async function saveReleasePackageAction(
         plannedReleaseAt: parsed.data.plannedReleaseAt
           ? new Date(parsed.data.plannedReleaseAt)
           : null,
+        madeForKids: parsed.data.madeForKids,
+        containsSyntheticMedia: parsed.data.containsSyntheticMedia,
+        youtubePlaylistId: parsed.data.youtubePlaylistId,
       },
       expectedRevision: parsed.data.expectedRevision,
       actorUserId: context.user.id,

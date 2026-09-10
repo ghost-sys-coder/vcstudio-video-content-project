@@ -3,6 +3,7 @@
 import { ExternalLinkIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VideoPublicationChannelBadge } from "@/components/publish/VideoPublicationChannelBadge";
+import { PublicationFinishingList } from "@/components/publish/PublicationFinishingList";
 import { VideoPublicationStatusBadge } from "@/components/publish/VideoPublicationStatusBadge";
 import type { PublicationView } from "@/lib/publishing/publishing-view";
 
@@ -117,6 +118,8 @@ export function VideoPublicationRow({
           </Button>
         ) : null}
       </div>
+
+      <PublicationFinishingList steps={publication.finishingSteps} />
     </li>
   );
 }

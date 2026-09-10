@@ -26,6 +26,7 @@ const request = () => ({
   visibility: "platform_default" as const,
   caption: null,
   shareToFeed: null,
+  disclosures: null,
   providerOperationId: null,
   providerOperationSecret: null,
 });

@@ -15,6 +15,11 @@ import {
 import { findVideoRender } from "@/db/repositories/video-render.repository";
 import { createVideoPublicationIdempotencyKey } from "@/lib/domain/idempotency";
 import {
+  areDisclosuresComplete,
+  findMissingDisclosures,
+  type YouTubeDisclosures,
+} from "@/lib/publishing/youtube-disclosure";
+import {
   getPublishingEnvironment,
   getSceneAnalysisEnvironment,
 } from "@/lib/env/server";
@@ -48,6 +53,16 @@ export async function startVideoPublication(input: {
   project: Project;
   request: PublishVideoInput;
   requestedByUserId: string;
+  /**
+   * The creator's own declarations, read from the release package.
+   *
+   * Required for YouTube and refused when incomplete. This is what makes it
+   * impossible to reach the provider without them, rather than relying on the
+   * provider to notice.
+   */
+  disclosures?: YouTubeDisclosures | null;
+  /** The release package this publish came from, for the finishing steps. */
+  releasePackageId?: string | null;
 }): Promise<{ publicationId: string; created: boolean }> {
   const environment = getPublishingEnvironment();
   if (!environment.ENABLE_VIDEO_PUBLISHING)
@@ -112,6 +127,20 @@ export async function startVideoPublication(input: {
     if (!validation.eligible)
       throw new VideoPublicationRequestError(validation.reason);
   }
+
+  const disclosures: YouTubeDisclosures = input.disclosures ?? {
+    madeForKids: null,
+    containsSyntheticMedia: null,
+  };
+  if (
+    input.request.platform === "youtube" &&
+    !areDisclosuresComplete(disclosures)
+  )
+    throw new VideoPublicationRequestError(
+      findMissingDisclosures(disclosures)
+        .map((entry) => entry.message)
+        .join(" "),
+    );
 
   const connection = await findPlatformConnectionSummary({
     workspaceId: input.workspaceId,
@@ -179,6 +208,9 @@ export async function startVideoPublication(input: {
     shareToFeed:
       input.request.platform === "instagram" ? input.request.shareToFeed : null,
     consentConfirmedAt: input.request.platform === "tiktok" ? new Date() : null,
+    releasePackageId: input.releasePackageId ?? null,
+    madeForKids: disclosures.madeForKids,
+    containsSyntheticMedia: disclosures.containsSyntheticMedia,
     idempotencyKey,
     requestedByUserId: input.requestedByUserId,
   });

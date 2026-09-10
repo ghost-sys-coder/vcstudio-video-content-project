@@ -341,6 +341,10 @@ export function PublishToPlatformPanel({
         formData.set("tags", activeMetadataDraft.tags);
       }
       formData.set("visibility", effectiveVisibility);
+      // Sent so the server can read the declarations from the stored package.
+      // The browser never asserts them itself.
+      if (activeReleasePackage?.id)
+        formData.set("releasePackageId", activeReleasePackage.id);
       formData.set("requestNonce", crypto.randomUUID());
       const result = await publishVideoAction(formData);
       if (!result.success) {

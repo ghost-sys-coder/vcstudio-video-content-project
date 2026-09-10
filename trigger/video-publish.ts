@@ -26,6 +26,11 @@ import {
   PlatformNotConfiguredError,
 } from "@/lib/publishing/provider-registry";
 import { createVideoExportDownloadUrl } from "@/lib/storage/video-export-storage";
+import { runYouTubeFinishing } from "@/lib/publishing/run-youtube-finishing";
+import { supportsFinishing } from "@/lib/publishing/video-finishing-provider";
+import { buildSubtitleContext } from "@/lib/subtitles/subtitle-workspace-details";
+import { formatSrt } from "@/lib/subtitles/subtitle-srt";
+import { findProject } from "@/db/repositories/projects.repository";
 
 export const videoPublishTaskPayloadSchema = z.object({
   publicationId: z.uuid(),
@@ -198,6 +203,10 @@ export const videoPublishTask = task({
           visibility: publication.visibility,
           caption: publication.caption,
           shareToFeed: publication.shareToFeed,
+          disclosures: {
+            madeForKids: publication.madeForKids,
+            containsSyntheticMedia: publication.containsSyntheticMedia,
+          },
           providerOperationId: publication.providerOperationId,
           providerOperationSecret: publication.providerOperationSecretSealed
             ? openSecret({
@@ -244,6 +253,61 @@ export const videoPublishTask = task({
           uploadedBytes: result.uploadedBytes,
           completionStage: result.completionStage,
         });
+
+        // Finishing runs after the video is recorded as published, and never
+        // throws. The bytes are already on YouTube by this point, so letting a
+        // thumbnail failure bubble up would turn a successful upload into a
+        // failed publication and invite a retry that would upload it twice.
+        if (
+          publication.platform === "youtube" &&
+          result.externalVideoId &&
+          supportsFinishing(provider)
+        )
+          try {
+            const project = await findProject({
+              workspaceId: scope.workspaceId,
+              projectId: input.projectId,
+            });
+            let captions: {
+              language: string;
+              name: string;
+              body: string;
+            } | null = null;
+            if (project) {
+              const subtitles = await buildSubtitleContext({
+                workspaceId: scope.workspaceId,
+                project,
+              });
+              const body = formatSrt(subtitles.track, {
+                maxLineCharacters: subtitles.captionStyle.maxLineCharacters,
+              });
+              if (body.trim())
+                captions = {
+                  language: project.language,
+                  name: "Captions",
+                  body,
+                };
+            }
+            await runYouTubeFinishing({
+              workspaceId: scope.workspaceId,
+              projectId: input.projectId,
+              publicationId: publication.id,
+              releasePackageId: publication.releasePackageId,
+              videoId: result.externalVideoId,
+              accessToken,
+              grantedScopes: connection.scopes
+                ? connection.scopes.split(" ").filter(Boolean)
+                : [],
+              provider,
+              captions,
+            });
+          } catch (finishingError) {
+            console.error("youtube finishing failed", {
+              publicationId: publication.id,
+              error: finishingError,
+            });
+          }
+
         return { publicationId: publication.id, status: "succeeded" as const };
       } catch (error) {
         const failure: PublishFailure =

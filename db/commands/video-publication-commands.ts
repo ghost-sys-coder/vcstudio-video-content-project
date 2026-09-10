@@ -25,6 +25,11 @@ export async function createVideoPublication(input: {
   caption: string | null;
   shareToFeed: boolean | null;
   consentConfirmedAt: Date | null;
+  /** The packaging this upload came from, when it came from one. */
+  releasePackageId: string | null;
+  /** The creator's own declarations, recorded as sent. Null where not asked. */
+  madeForKids: boolean | null;
+  containsSyntheticMedia: boolean | null;
   idempotencyKey: string;
   requestedByUserId: string;
 }): Promise<VideoPublication> {
@@ -37,6 +42,9 @@ export async function createVideoPublication(input: {
       renderId: input.renderId,
       connectionId: input.connectionId,
       platform: input.platform,
+      releasePackageId: input.releasePackageId,
+      madeForKids: input.madeForKids,
+      containsSyntheticMedia: input.containsSyntheticMedia,
       title: input.title,
       description: input.description,
       tags: input.tags,

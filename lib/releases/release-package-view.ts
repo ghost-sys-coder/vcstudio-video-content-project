@@ -46,6 +46,9 @@ export interface ReleasePackageView {
   caption: string | null;
   shareToFeed: boolean | null;
   plannedReleaseAtIso: string | null;
+  madeForKids: boolean | null;
+  containsSyntheticMedia: boolean | null;
+  youtubePlaylistId: string | null;
   latestRenderId: string | null;
   reviewedRenderId: string | null;
   state: ReleasePackageState;
@@ -186,6 +189,9 @@ export async function loadReleasePackagesView(input: {
         shareToFeed: saved?.package.shareToFeed ?? null,
         plannedReleaseAtIso:
           saved?.package.plannedReleaseAt?.toISOString() ?? null,
+        madeForKids: saved?.package.madeForKids ?? null,
+        containsSyntheticMedia: saved?.package.containsSyntheticMedia ?? null,
+        youtubePlaylistId: saved?.package.youtubePlaylistId ?? null,
         latestRenderId,
         reviewedRenderId: saved?.package.reviewedRenderId ?? null,
         state: resolveReleasePackageState({

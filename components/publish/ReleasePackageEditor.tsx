@@ -6,6 +6,7 @@ import {
   confirmReleasePackageAction,
   saveReleasePackageAction,
 } from "@/app/(authenticated)/app/projects/[projectId]/publish/actions";
+import { ReleaseDisclosureFields } from "@/components/publish/ReleaseDisclosureFields";
 import { ReleasePackagePreview } from "@/components/publish/ReleasePackagePreview";
 import { ReleaseThumbnailChooser } from "@/components/publish/ReleaseThumbnailChooser";
 import { ReleaseTitleChooser } from "@/components/publish/ReleaseTitleChooser";
@@ -55,6 +56,11 @@ export function ReleasePackageEditor({
   const [plannedReleaseDate, setPlannedReleaseDate] = useState(
     entry.plannedReleaseAtIso?.slice(0, 10) ?? "",
   );
+  const [madeForKids, setMadeForKids] = useState(entry.madeForKids);
+  const [containsSyntheticMedia, setContainsSyntheticMedia] = useState(
+    entry.containsSyntheticMedia,
+  );
+  const [playlistId, setPlaylistId] = useState(entry.youtubePlaylistId ?? "");
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -114,6 +120,18 @@ export function ReleasePackageEditor({
               thumbnails={thumbnails}
             />
           </div>
+
+          {entry.platform === "youtube" ? (
+            <ReleaseDisclosureFields
+              containsSyntheticMedia={containsSyntheticMedia}
+              disabled={disabled}
+              madeForKids={madeForKids}
+              onMadeForKidsChange={setMadeForKids}
+              onPlaylistChange={setPlaylistId}
+              onSyntheticMediaChange={setContainsSyntheticMedia}
+              playlistId={playlistId}
+            />
+          ) : null}
 
           <div className="space-y-2">
             <Label className="text-xs" htmlFor="release-planned">
@@ -204,6 +222,9 @@ export function ReleasePackageEditor({
                 tags: parseReleaseTags(tags),
                 visibility: entry.visibility,
                 thumbnailGenerationId,
+                madeForKids,
+                containsSyntheticMedia,
+                youtubePlaylistId: playlistId.trim() || null,
                 caption: entry.caption,
                 shareToFeed: entry.shareToFeed,
                 plannedReleaseAt: plannedReleaseDate

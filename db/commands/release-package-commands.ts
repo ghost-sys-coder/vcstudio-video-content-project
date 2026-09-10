@@ -47,6 +47,9 @@ export interface ReleasePackageContent {
   caption: string | null;
   shareToFeed: boolean | null;
   plannedReleaseAt: Date | null;
+  madeForKids: boolean | null;
+  containsSyntheticMedia: boolean | null;
+  youtubePlaylistId: string | null;
 }
 
 /**
