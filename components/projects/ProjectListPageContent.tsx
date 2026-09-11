@@ -7,6 +7,7 @@ import type { FormatChoice } from "@/lib/formats/format-choice";
 import { EmptyProjectsState } from "@/components/projects/EmptyProjectsState";
 import { ProjectCard } from "@/components/projects/ProjectCard";
 import type { IdeaNicheGroup } from "@/lib/ideas/ideas-view";
+import type { SceneImageStylePresetView } from "@/lib/scenes/scene-image-view";
 import { cn } from "@/lib/utils";
 
 export function ProjectListPageContent({
@@ -19,6 +20,7 @@ export function ProjectListPageContent({
   formats,
   ideaGroups,
   initialIdeaId,
+  styles,
 }: {
   projects: ProjectListItem[];
   total: number;
@@ -29,6 +31,7 @@ export function ProjectListPageContent({
   defaultBudgetCents: number;
   ideaGroups: IdeaNicheGroup[];
   initialIdeaId?: string | null;
+  styles: SceneImageStylePresetView[];
 }) {
   return (
     <section className="space-y-8">
@@ -56,6 +59,7 @@ export function ProjectListPageContent({
             formats={formats}
             ideaGroups={ideaGroups}
             initialIdeaId={initialIdeaId}
+            styles={styles}
           />
         ) : null}
       </div>

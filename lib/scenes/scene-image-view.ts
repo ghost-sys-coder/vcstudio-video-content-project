@@ -54,6 +54,14 @@ export interface SceneImageClientConfiguration {
 
 export interface SceneImageDetailsView {
   stylePresets: SceneImageStylePresetView[];
+  /**
+   * The style version this project was created with, when it has one. The
+   * generate dialogs preselect it so a project keeps producing the look it was
+   * started in without anyone having to remember which that was. Null for
+   * projects created before a project-level style existed, and for those the
+   * dialogs fall back to the workspace default exactly as before.
+   */
+  projectStylePresetVersionId: string | null;
   references: SceneImageReferenceView[];
   generations: SceneImageGenerationView[];
   configuration: SceneImageClientConfiguration;

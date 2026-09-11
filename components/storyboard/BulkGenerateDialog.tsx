@@ -48,10 +48,10 @@ export function BulkGenerateDialog({
   availableBudgetCents: number;
   onGenerate: BulkGenerateHandler;
 }) {
-  const defaultPresetId =
-    stylePresets.find((preset) => preset.isDefault)?.versionId ??
-    stylePresets[0]?.versionId ??
-    "";
+  // The list arrives ordered best-default-first by
+  // `orderStylePresetsForProject`: this project's own style if it has one,
+  // otherwise the workspace default. Taking the head is the whole rule.
+  const defaultPresetId = stylePresets[0]?.versionId ?? "";
   const [stylePresetVersionId, setStylePresetVersionId] =
     useState(defaultPresetId);
   const [quality, setQuality] = useState<SceneImageQuality>(

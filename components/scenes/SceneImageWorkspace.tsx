@@ -72,9 +72,9 @@ export function SceneImageWorkspace({
   const applyDetails = useCallback((nextDetails: SceneImageDetailsView) => {
     setDetails(nextDetails);
     setSelection((current) => {
-      const defaultPreset =
-        nextDetails.stylePresets.find((preset) => preset.isDefault) ??
-        nextDetails.stylePresets[0];
+      // Ordered best-default-first by `orderStylePresetsForProject`: this
+      // project's own style if it has one, else the workspace default.
+      const defaultPreset = nextDetails.stylePresets[0];
       const currentPresetExists = nextDetails.stylePresets.some(
         (preset) => preset.versionId === current?.stylePresetVersionId,
       );

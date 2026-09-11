@@ -2,6 +2,7 @@ import { ProjectListPageContent } from "@/components/projects/ProjectListPageCon
 import { listFormatPresets } from "@/db/repositories/format-presets.repository";
 import { toFormatChoices } from "@/lib/formats/format-choice";
 import { listProjects } from "@/db/repositories/projects.repository";
+import { listLatestStylePresetVersions } from "@/db/repositories/scene-images.repository";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import { getProjectEnvironment } from "@/lib/env/server";
 import { loadIdeaPickerGroups } from "@/lib/ideas/ideas-view";
@@ -22,7 +23,7 @@ export default async function ProjectsPage({
   const params = await searchParams;
   const query = projectListQuerySchema.parse(params);
   const canCreate = canCreateProject(context.activeMembership.role);
-  const [result, ideaGroups, formatRows] = await Promise.all([
+  const [result, ideaGroups, formatRows, stylePresetRows] = await Promise.all([
     listProjects({
       workspaceId: context.activeMembership.workspaceId,
       ...query,
@@ -34,6 +35,11 @@ export default async function ProjectsPage({
       : Promise.resolve([]),
     canCreate
       ? listFormatPresets({
+          workspaceId: context.activeMembership.workspaceId,
+        })
+      : Promise.resolve([]),
+    canCreate
+      ? listLatestStylePresetVersions({
           workspaceId: context.activeMembership.workspaceId,
         })
       : Promise.resolve([]),
@@ -49,6 +55,17 @@ export default async function ProjectsPage({
       page={result.page}
       pageCount={result.pageCount}
       projects={result.items}
+      styles={stylePresetRows.map(({ preset, version }) => ({
+        id: preset.id,
+        versionId: version.id,
+        name: version.name,
+        description: version.description,
+        version: version.version,
+        isDefault: preset.isDefault,
+        positivePrompt: version.positivePrompt,
+        negativePrompt: version.negativePrompt,
+        defaultAspectRatio: version.defaultAspectRatio,
+      }))}
       total={result.total}
     />
   );

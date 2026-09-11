@@ -536,6 +536,9 @@ export const auditActionEnum = pgEnum("audit_action", [
   "google_business_synced",
   "google_business_disconnected",
   "storage_reconciled",
+  "style_preset_created",
+  "style_preset_updated",
+  "style_preset_archived",
 ]);
 
 export const userThemePreferenceEnum = pgEnum("user_theme_preference", [
@@ -1056,6 +1059,19 @@ export const projects = pgTable(
      */
     formatPresetVersionId: uuid("format_preset_version_id"),
     /**
+     * The visual style this project's images default to, chosen when the
+     * project is created. A snapshot of one style *version*, matching
+     * `formatPresetVersionId` above and matching what every image generation
+     * already records, so editing the style later cannot silently change what
+     * a half-finished project is producing.
+     *
+     * Nullable, and it stays nullable: projects created before a project-level
+     * style existed have no correct answer, and generation still falls back to
+     * the workspace default. It is a default, not a lock — the generate dialog
+     * may still choose another style for one batch.
+     */
+    stylePresetVersionId: uuid("style_preset_version_id"),
+    /**
      * The saved idea this project started from, kept so repeat use of an idea
      * is visible as history rather than silently blocked.
      */
@@ -1134,6 +1150,16 @@ export const projects = pgTable(
         formatPresetVersions.workspaceId,
       ],
       name: "projects_tenant_format_version_fkey",
+    }),
+    // Same reasoning as the format version above: tenant-scoped so a project
+    // can never cite another workspace's style, and NO ACTION because a style
+    // version is immutable history that must not vanish from under a project
+    // still pointing at it. Archiving a style leaves this intact by design —
+    // the project keeps rendering in the look it was started in.
+    foreignKey({
+      columns: [table.stylePresetVersionId, table.workspaceId],
+      foreignColumns: [stylePresetVersions.id, stylePresetVersions.workspaceId],
+      name: "projects_tenant_style_version_fkey",
     }),
   ],
 );

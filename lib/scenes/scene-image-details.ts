@@ -27,6 +27,7 @@ import {
   sceneImageApiSizeSchema,
 } from "@/lib/schemas/scene-image";
 import { SCENE_IMAGE_PROMPT_VERSION } from "@studio/prompts";
+import { orderStylePresetsForProject } from "@/lib/scenes/order-style-presets";
 
 const referenceTypeLabels = {
   master: "Master identity",
@@ -205,17 +206,23 @@ export async function loadSceneImageDetails(input: {
   );
 
   return {
-    stylePresets: stylePresetRows.map(({ preset, version }) => ({
-      id: preset.id,
-      versionId: version.id,
-      name: version.name,
-      description: version.description,
-      version: version.version,
-      isDefault: preset.isDefault,
-      positivePrompt: version.positivePrompt,
-      negativePrompt: version.negativePrompt,
-      defaultAspectRatio: version.defaultAspectRatio,
-    })),
+    projectStylePresetVersionId: input.project.stylePresetVersionId,
+    // Ordered so the first entry is the one a generate dialog should
+    // preselect: this project's style, else the workspace default.
+    stylePresets: orderStylePresetsForProject(
+      stylePresetRows.map(({ preset, version }) => ({
+        id: preset.id,
+        versionId: version.id,
+        name: version.name,
+        description: version.description,
+        version: version.version,
+        isDefault: preset.isDefault,
+        positivePrompt: version.positivePrompt,
+        negativePrompt: version.negativePrompt,
+        defaultAspectRatio: version.defaultAspectRatio,
+      })),
+      input.project.stylePresetVersionId,
+    ),
     references: referenceRows.map(({ character, reference }) => ({
       id: reference.id,
       characterId: character.id,

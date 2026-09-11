@@ -2,6 +2,7 @@ import { MarketingStudioSection } from "@/components/workspace/MarketingStudioSe
 import { WorkspaceChannelProfilesSection } from "@/components/workspace/WorkspaceChannelProfilesSection";
 import { WorkspaceCustomVoicesSection } from "@/components/workspace/WorkspaceCustomVoicesSection";
 import { WorkspaceProfileForm } from "@/components/workspace/WorkspaceProfileForm";
+import { WorkspaceStylePresetsSection } from "@/components/workspace/WorkspaceStylePresetsSection";
 import { WorkspaceChannelsSection } from "@/components/workspace/WorkspaceChannelsSection";
 import { WorkspaceMembersSection } from "@/components/workspace/WorkspaceMembersSection";
 import type {
@@ -11,10 +12,12 @@ import type {
 import type { CustomVoiceSummary } from "@/lib/audio/custom-voice-client";
 import type { ChannelProfileView } from "@/lib/channels/channel-profile-view";
 import type { WorkspaceChannelsView } from "@/lib/publishing/workspace-connections-view";
+import type { StylePresetSettingsView } from "@/lib/styles/style-preset-view";
 
 export function WorkspaceProfilePage({
   canManageChannelProfiles,
   canManageCustomVoices,
+  canManageStylePresets,
   channelProfiles,
   unassignedProjectCount,
   channelsView,
@@ -26,11 +29,13 @@ export function WorkspaceProfilePage({
   members,
   oauthStatus,
   pendingInvitations,
+  stylePresets,
   workspaceId,
   workspaceName,
 }: {
   canManageChannelProfiles: boolean;
   canManageCustomVoices: boolean;
+  canManageStylePresets: boolean;
   channelProfiles: ChannelProfileView[];
   unassignedProjectCount: number;
   channelsView: WorkspaceChannelsView;
@@ -49,6 +54,7 @@ export function WorkspaceProfilePage({
     youtube: string | null;
   };
   pendingInvitations: WorkspaceInvitationView[];
+  stylePresets: StylePresetSettingsView[];
   workspaceId: string;
   workspaceName: string;
 }) {
@@ -89,6 +95,12 @@ export function WorkspaceProfilePage({
           canManage={canManageChannelProfiles}
           channels={channelProfiles}
           unassignedProjectCount={unassignedProjectCount}
+        />
+      </div>
+      <div className="mt-6">
+        <WorkspaceStylePresetsSection
+          canManage={canManageStylePresets}
+          presets={stylePresets}
         />
       </div>
       <div className="mt-6">
