@@ -123,9 +123,10 @@ export function GenerateScriptPanel({
           </p>
           {requireHistoricalAccuracy ? (
             <p className="mt-1 text-xs font-medium text-amber-600 dark:text-amber-400">
-              Historical niche detected — factual-accuracy mode is on. The
-              storyline will stick to verifiable events; still review before
-              publishing.
+              Historical niche detected, so the prompt instructs the model to
+              stay with the documented record and to say when accounts differ.
+              That is an instruction, not a check: nothing here verifies a date,
+              a figure or a quotation. Review the claims before approving.
             </p>
           ) : null}
         </div>

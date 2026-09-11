@@ -2,6 +2,54 @@ import "server-only";
 import { sql } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
 import { calculateScriptStatistics } from "@/lib/domain/script-statistics";
+import { NARRATION_NORMALIZATION_POLICY_VERSION } from "@/lib/domain/narration-normalization";
+import { SCRIPT_EVIDENCE_RECORD_VERSION } from "@/lib/editorial/version-evidence";
+
+/**
+ * The claims, verdicts and citations as they stand, aggregated for one project.
+ *
+ * Built in SQL and inside the approving statement on purpose. Reading the
+ * review in the application and passing it back would leave a window in which a
+ * reviewer changes a verdict between the read and the approval, and the frozen
+ * record would then describe a review nobody made. Here the snapshot and the
+ * approved version are the same statement: either both exist or neither does.
+ */
+const evidenceAggregate = sql`
+  select
+    jsonb_agg(
+      jsonb_build_object(
+        'claimId', c.id,
+        'quotedText', c.quoted_text,
+        'reviewState', c.review_state,
+        'reviewNote', c.review_note,
+        'reviewedByUserId', c.reviewed_by_user_id,
+        'reviewedAt', c.reviewed_at,
+        'citations', coalesce(cit.citations, '[]'::jsonb)
+      ) order by c.created_at
+    ) as claims,
+    count(*) as claim_count,
+    count(*) filter (where c.review_state = 'supported') as supported_count,
+    count(*) filter (where c.review_state = 'disputed') as disputed_count,
+    count(*) filter (where c.review_state = 'unchecked') as unchecked_count
+  from script_claims c
+  left join lateral (
+    select jsonb_agg(
+      jsonb_build_object(
+        'sourceId', s.id,
+        'stance', cs.stance,
+        'title', s.title,
+        'url', s.url,
+        'host', s.host,
+        'excerpt', cs.excerpt
+      ) order by cs.created_at
+    ) as citations
+    from script_claim_sources cs
+    join project_sources s
+      on s.id = cs.source_id and s.workspace_id = cs.workspace_id
+    where cs.claim_id = c.id and cs.workspace_id = c.workspace_id
+  ) cit on true
+  where c.workspace_id = i.workspace_id and c.project_id = i.project_id
+`;
 
 /** The draft claim, optional approval swap and immutable snapshot succeed together. */
 export async function commitScriptVersion(input: {
@@ -48,7 +96,25 @@ export async function commitScriptVersion(input: {
         ${input.approve ? "approved" : "draft"}::script_version_status,
         ${input.approve ? input.userId : null}::uuid, case when ${input.approve} then now() else null end
       from claimed c cross join (select count(*) from superseded) dependency
-      returning id, source_draft_revision as revision
+      returning id, workspace_id, project_id, source_draft_revision as revision
+    ), evidence as (
+      insert into script_version_evidence (workspace_id, project_id, script_version_id, evidence,
+        claim_count, supported_count, disputed_count, unchecked_count, signed_off_by_user_id, signed_off_at)
+      select i.workspace_id, i.project_id, i.id,
+        jsonb_build_object(
+          'recordVersion', ${SCRIPT_EVIDENCE_RECORD_VERSION}::text,
+          'normalizationPolicyVersion', ${NARRATION_NORMALIZATION_POLICY_VERSION}::text,
+          'claims', coalesce(a.claims, '[]'::jsonb)
+        ),
+        coalesce(a.claim_count, 0), coalesce(a.supported_count, 0),
+        coalesce(a.disputed_count, 0), coalesce(a.unchecked_count, 0),
+        signoff.signed_by_user_id, signoff.signed_at
+      from inserted i
+      left join lateral (${evidenceAggregate}) a on true
+      left join script_editorial_signoffs signoff
+        on signoff.workspace_id = i.workspace_id and signoff.project_id = i.project_id
+      where ${input.approve}
+      returning id
     ) select id, revision from inserted
   `);
   const committed = result.rows[0];

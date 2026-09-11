@@ -26,6 +26,8 @@ import type { PortableDocument } from "@/lib/social/portable-document";
 import type { MarketingChatMessagePart } from "@/lib/schemas/marketing-chat-message";
 import type { MarketingWeeklyDigestSnapshot } from "@/lib/marketing/digests/weekly-digest";
 import type { VerifiedMediaMetadata } from "@/lib/media/media-inspection";
+import type { ClaimReviewState } from "@/lib/editorial/editorial-review";
+import type { ScriptVersionEvidenceRecord } from "@/lib/editorial/version-evidence";
 
 export const workspaceRoleEnum = pgEnum("workspace_role", [
   "owner",
@@ -423,6 +425,38 @@ export const publicationFinishingStateEnum = pgEnum(
   "publication_finishing_state",
   ["pending", "succeeded", "failed", "unsupported", "skipped"],
 );
+
+/**
+ * Where a piece of evidence came from.
+ *
+ * `link` is a citation anybody can open. `note` is a reviewer writing down what
+ * they know or what an offline source says. They are separate kinds rather than
+ * one nullable URL because a note is weaker evidence, and a reader has to be
+ * able to see which one is holding a claim up.
+ */
+export const editorialSourceKindEnum = pgEnum("editorial_source_kind", [
+  "link",
+  "note",
+]);
+
+/**
+ * What a review found.
+ *
+ * `unchecked` is the default and the only state this application ever assigns.
+ * `supported` means a person attached a source and judged the claim to hold, so
+ * it records who looked, never that anything was verified automatically.
+ */
+export const claimReviewStateEnum = pgEnum("claim_review_state", [
+  "unchecked",
+  "supported",
+  "disputed",
+]);
+
+/** Whether a cited source backs a claim up or contradicts it. */
+export const claimSourceStanceEnum = pgEnum("claim_source_stance", [
+  "supports",
+  "disputes",
+]);
 
 export const releaseScheduleStatusEnum = pgEnum("release_schedule_status", [
   "scheduled",
@@ -1245,6 +1279,13 @@ export const projectScriptVersions = pgTable(
     uniqueIndex("project_script_versions_project_number_unique").on(
       table.projectId,
       table.versionNumber,
+    ),
+    // Referenced by script_version_evidence, so an evidence row cannot be
+    // attached to a version belonging to another project or workspace.
+    uniqueIndex("project_script_versions_tenant_unique").on(
+      table.id,
+      table.projectId,
+      table.workspaceId,
     ),
     uniqueIndex("project_script_versions_draft_revision_unique").on(
       table.projectId,
@@ -7047,3 +7088,318 @@ export type GoogleBusinessLocation =
 export type GoogleBusinessLocationSnapshot =
   typeof googleBusinessLocationSnapshots.$inferSelect;
 export type RateLimitCounter = typeof rateLimitCounters.$inferSelect;
+
+/* ------------------------------------------------------------------------- */
+/* Source-backed editorial review (V2-11)                                     */
+/* ------------------------------------------------------------------------- */
+
+/**
+ * A piece of evidence a person attached to a project by hand.
+ *
+ * Archived, never deleted, for the same reason approved script versions are
+ * kept: a review record that cites a source is worthless if the source can be
+ * removed and leave a claim reading as "supported" by nothing. Archiving hides
+ * it from the picker while every existing citation keeps resolving.
+ *
+ * `host` is stored beside `url` so an interface can show where a link actually
+ * points. A source titled "Federal Reserve" can address anywhere, and a
+ * reviewer deciding whether to trust a citation needs the domain, not the name
+ * chosen by whoever pasted it.
+ */
+export const projectSources = pgTable(
+  "project_sources",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").notNull(),
+    kind: editorialSourceKindEnum("kind").notNull(),
+    title: text("title").notNull(),
+    /** Normalized absolute http(s) URL. Null for a source that is only a note. */
+    url: text("url"),
+    /** Host of `url`, denormalized so a list can show it without reparsing. */
+    host: text("host"),
+    /** Untrusted free text: what this source is and what it says. */
+    notes: text("notes").notNull().default(""),
+    addedByUserId: uuid("added_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("project_sources_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    index("project_sources_workspace_project_index").on(
+      table.workspaceId,
+      table.projectId,
+      table.createdAt,
+    ),
+    check(
+      "project_sources_title_present",
+      sql`length(btrim(${table.title})) > 0`,
+    ),
+    // A link source without a link cannot be opened, and a link without its
+    // host would let the display disagree with the destination.
+    check(
+      "project_sources_link_fields",
+      sql`(${table.kind} = 'link' and ${table.url} is not null and ${table.host} is not null)
+        or (${table.kind} <> 'link' and ${table.url} is null and ${table.host} is null)`,
+    ),
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [projects.id, projects.workspaceId],
+      name: "project_sources_tenant_project_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
+/**
+ * One factual assertion a reviewer pulled out of the script.
+ *
+ * The claim stores the sentence *verbatim* rather than an offset. An offset
+ * into a document that is still being typed points at different words a minute
+ * later, which would silently move a review onto text nobody checked. Holding
+ * the exact quote makes the opposite true: when the sentence changes, the quote
+ * stops matching, and the review is visibly stale instead of quietly wrong.
+ *
+ * The claim belongs to the project, not to a script version, because claims are
+ * reviewed while the script is still a draft. The immutable copy is taken at
+ * approval and lives in `script_version_evidence`.
+ */
+export const scriptClaims = pgTable(
+  "script_claims",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").notNull(),
+    /** The sentence exactly as it was quoted out of the script. */
+    quotedText: text("quoted_text").notNull(),
+    reviewState: claimReviewStateEnum("review_state")
+      .notNull()
+      .default("unchecked"),
+    /** Why the reviewer decided what they decided. Untrusted free text. */
+    reviewNote: text("review_note").notNull().default(""),
+    reviewedByUserId: uuid("reviewed_by_user_id").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("script_claims_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    index("script_claims_workspace_project_index").on(
+      table.workspaceId,
+      table.projectId,
+      table.createdAt,
+    ),
+    check(
+      "script_claims_quote_present",
+      sql`length(btrim(${table.quotedText})) > 0`,
+    ),
+    // A verdict without a reviewer is an unattributable claim of checking.
+    check(
+      "script_claims_review_attribution",
+      sql`${table.reviewState} = 'unchecked'
+        or (${table.reviewedByUserId} is not null and ${table.reviewedAt} is not null)`,
+    ),
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [projects.id, projects.workspaceId],
+      name: "script_claims_tenant_project_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
+/**
+ * A source cited for or against one claim.
+ *
+ * The stance is on the citation rather than the claim, because a real review
+ * often has both: two sources agreeing and one contradicting. Collapsing that
+ * into a single verdict on the claim would throw away the disagreement, which
+ * is the part a reviewer most needs to see.
+ */
+export const scriptClaimSources = pgTable(
+  "script_claim_sources",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    claimId: uuid("claim_id").notNull(),
+    sourceId: uuid("source_id").notNull(),
+    stance: claimSourceStanceEnum("stance").notNull(),
+    /** What the source says, in the words of the reviewer. Untrusted text. */
+    excerpt: text("excerpt").notNull().default(""),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    // One stance per source per claim: citing the same page twice for the same
+    // claim adds no evidence and would double-count in any summary.
+    uniqueIndex("script_claim_sources_unique").on(
+      table.claimId,
+      table.sourceId,
+    ),
+    index("script_claim_sources_workspace_index").on(
+      table.workspaceId,
+      table.claimId,
+    ),
+    foreignKey({
+      columns: [table.claimId, table.workspaceId],
+      foreignColumns: [scriptClaims.id, scriptClaims.workspaceId],
+      name: "script_claim_sources_tenant_claim_fkey",
+    }).onDelete("cascade"),
+    // Restrict, not cascade: removing a source must not silently strip the
+    // citations that justified a verdict. Sources are archived instead.
+    foreignKey({
+      columns: [table.sourceId, table.workspaceId],
+      foreignColumns: [projectSources.id, projectSources.workspaceId],
+      name: "script_claim_sources_tenant_source_fkey",
+    }).onDelete("restrict"),
+  ],
+);
+
+/**
+ * A statement by a person that they reviewed the claims in the current draft.
+ *
+ * One row per project, replaced on each sign-off. It records the claim ids and
+ * the verdicts they carried, plus a fingerprint of the normalized script text,
+ * so `resolveEditorialSignoff` can tell an edit that invalidates the sign-off
+ * from one that merely happened after it.
+ *
+ * There is no `valid` column, and deliberately so. Validity is derived from the
+ * script and the claims every time it is read; a stored flag would need to be
+ * recomputed by whichever writer happened to touch the draft, and the one that
+ * forgot would leave a withdrawn sign-off reading as current.
+ */
+export const scriptEditorialSignoffs = pgTable(
+  "script_editorial_signoffs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").notNull(),
+    /** Normalized script text the sign-off was made against. */
+    scriptFingerprint: text("script_fingerprint").notNull(),
+    /** One entry per claim the sign-off covered, with the verdict it carried. */
+    coveredClaims: jsonb("covered_claims")
+      .$type<{ id: string; reviewState: ClaimReviewState }[]>()
+      .notNull(),
+    note: text("note").notNull().default(""),
+    signedByUserId: uuid("signed_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    signedAt: timestamp("signed_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("script_editorial_signoffs_project_unique").on(table.projectId),
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [projects.id, projects.workspaceId],
+      name: "script_editorial_signoffs_tenant_project_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
+/**
+ * The immutable copy of the review, taken when a script version is approved.
+ *
+ * This is what makes approved evidence reproducible. The claims table keeps
+ * changing with the draft; this row does not. It is written inside the same
+ * statement that creates the approved version, so an approved script can never
+ * exist without the review record that was true at the moment of approval, and
+ * an empty record is itself the honest answer that nothing had been reviewed.
+ *
+ * Nothing updates this table.
+ */
+export const scriptVersionEvidence = pgTable(
+  "script_version_evidence",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").notNull(),
+    scriptVersionId: uuid("script_version_id").notNull(),
+    /** Full claim, verdict and citation record, exactly as it stood. */
+    evidence: jsonb("evidence").$type<ScriptVersionEvidenceRecord>().notNull(),
+    claimCount: integer("claim_count").notNull(),
+    supportedCount: integer("supported_count").notNull(),
+    disputedCount: integer("disputed_count").notNull(),
+    uncheckedCount: integer("unchecked_count").notNull(),
+    /** Who had signed off on the draft, when a sign-off was in force. */
+    signedOffByUserId: uuid("signed_off_by_user_id").references(
+      () => users.id,
+      { onDelete: "restrict" },
+    ),
+    signedOffAt: timestamp("signed_off_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("script_version_evidence_version_unique").on(
+      table.scriptVersionId,
+    ),
+    index("script_version_evidence_workspace_project_index").on(
+      table.workspaceId,
+      table.projectId,
+    ),
+    check(
+      "script_version_evidence_counts_nonnegative",
+      sql`${table.claimCount} >= 0 and ${table.supportedCount} >= 0
+        and ${table.disputedCount} >= 0 and ${table.uncheckedCount} >= 0`,
+    ),
+    check(
+      "script_version_evidence_counts_total",
+      sql`${table.claimCount} = ${table.supportedCount} + ${table.disputedCount} + ${table.uncheckedCount}`,
+    ),
+    foreignKey({
+      columns: [table.scriptVersionId, table.projectId, table.workspaceId],
+      foreignColumns: [
+        projectScriptVersions.id,
+        projectScriptVersions.projectId,
+        projectScriptVersions.workspaceId,
+      ],
+      name: "script_version_evidence_tenant_version_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
+export type ProjectSource = typeof projectSources.$inferSelect;
+export type ScriptClaim = typeof scriptClaims.$inferSelect;
+export type ScriptClaimSource = typeof scriptClaimSources.$inferSelect;
+export type ScriptEditorialSignoff =
+  typeof scriptEditorialSignoffs.$inferSelect;
+export type ScriptVersionEvidence = typeof scriptVersionEvidence.$inferSelect;
+export type EditorialSourceKind =
+  (typeof editorialSourceKindEnum.enumValues)[number];
