@@ -3,6 +3,8 @@
 import { useTransition } from "react";
 import { AlertTriangleIcon, CalendarClockIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ScheduleCountdown } from "@/components/ui/ScheduleCountdown";
+import { RELEASE_SCHEDULE_SWEEP_MINUTES } from "@/lib/releases/release-schedule";
 import type { ReleaseScheduleEntryView } from "@/lib/releases/release-schedule-view";
 import { cn } from "@/lib/utils";
 
@@ -51,6 +53,14 @@ export function ReleaseScheduleRow({
           >
             {entry.stateLabel}
           </span>
+          {/* Only while it is still waiting. A countdown beside a dispatched
+              or cancelled release would be counting to nothing. */}
+          {entry.state === "scheduled" ? (
+            <ScheduleCountdown
+              scheduledAt={entry.scheduledAtIso}
+              sweepWindowMinutes={RELEASE_SCHEDULE_SWEEP_MINUTES}
+            />
+          ) : null}
         </div>
 
         {entry.overdue ? (

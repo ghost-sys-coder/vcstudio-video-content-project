@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { CalendarClockIcon, Loader2Icon } from "lucide-react";
 import { cancelSocialPostScheduleAction } from "@/app/(authenticated)/app/social/posts/actions";
 import { Button } from "@/components/ui/button";
+import { ScheduleCountdown } from "@/components/ui/ScheduleCountdown";
+import { SOCIAL_SWEEP_WINDOW_MINUTES } from "@/lib/social/schedule-window";
 
 /**
  * Shows when a post is scheduled, and lets it be pulled back.
@@ -50,6 +52,10 @@ export function ScheduledPostBanner({
           </time>{" "}
           <span className="text-muted-foreground">(set in {timezone})</span>
         </span>
+        <ScheduleCountdown
+          scheduledAt={scheduledAt}
+          sweepWindowMinutes={SOCIAL_SWEEP_WINDOW_MINUTES}
+        />
       </p>
       {error ? (
         <p aria-live="polite" className="text-sm text-destructive">

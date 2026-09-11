@@ -3,7 +3,9 @@ import { ImageIcon } from "lucide-react";
 import { DeleteDraftPostDialog } from "@/components/social/DeleteDraftPostDialog";
 import { PostStatusBadge } from "@/components/social/PostStatusBadge";
 import { Badge } from "@/components/ui/badge";
+import { ScheduleCountdown } from "@/components/ui/ScheduleCountdown";
 import { formatShortDate } from "@/lib/format/date";
+import { SOCIAL_SWEEP_WINDOW_MINUTES } from "@/lib/social/schedule-window";
 import type { SocialPostSummaryView } from "@/lib/social/social-post-view";
 
 export function SocialPostRow({
@@ -52,6 +54,14 @@ export function SocialPostRow({
                 ? `Scheduled ${formatShortDate(post.scheduledAt)}`
                 : `Created ${formatShortDate(post.createdAt)}`}
             </span>
+            {/* Only for a post still waiting: one already published or
+                cancelled has nothing left to count down to. */}
+            {post.scheduledAt && post.status === "scheduled" ? (
+              <ScheduleCountdown
+                scheduledAt={post.scheduledAt}
+                sweepWindowMinutes={SOCIAL_SWEEP_WINDOW_MINUTES}
+              />
+            ) : null}
           </div>
         </div>
       </Link>
