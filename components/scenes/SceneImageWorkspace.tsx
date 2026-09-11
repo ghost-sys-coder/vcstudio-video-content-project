@@ -79,6 +79,9 @@ export function SceneImageWorkspace({
         (preset) => preset.versionId === current?.stylePresetVersionId,
       );
       return {
+        // Targeting the scene's first image unless the person changes it, so
+        // the default behaviour is exactly what it was before shots existed.
+        shotIndex: current?.shotIndex ?? 0,
         stylePresetVersionId:
           current && currentPresetExists
             ? current.stylePresetVersionId
@@ -187,6 +190,7 @@ export function SceneImageWorkspace({
       formData.set("projectId", scene.projectId);
       formData.set("sceneId", scene.id);
       formData.set("sceneVersionId", sceneVersion.id);
+      formData.set("shotIndex", String(request.shotIndex));
       formData.set("stylePresetVersionId", request.stylePresetVersionId);
       formData.set("requestNonce", request.requestNonce);
       formData.set("quality", request.quality);

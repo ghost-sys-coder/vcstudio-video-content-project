@@ -15,6 +15,7 @@ import {
 import { listSucceededSceneImageGenerationsByIds } from "@/db/repositories/scene-images.repository";
 import { listCurrentScenes } from "@/db/repositories/scenes.repository";
 import { listApprovedSceneImageAssets } from "@/db/repositories/subtitle.repository";
+import { primaryImageBySceneVersion } from "@/lib/scenes/approved-shots";
 import {
   listProjectShortClips,
   listShortCompositions,
@@ -276,9 +277,10 @@ export async function loadRenderWorkspace(input: {
   const exports = renders.map(toExportView);
   const activeRender =
     exports.find((render) => ACTIVE_STATUSES.has(render.status)) ?? null;
-  const imageByVersion = new Map(
-    approvedImages.map((image) => [image.sceneVersionId, image]),
-  );
+  // Shot 0, explicitly. A scene may now hold several approved images and this
+  // map must hold the one that represents the scene, not whichever row the
+  // query happened to return last.
+  const imageByVersion = primaryImageBySceneVersion(approvedImages);
   // When the output variant's target size equals the project's own canonical
   // size, the primary approved image already IS the native match (no extra
   // query was made above) — otherwise use the separately-fetched native set.

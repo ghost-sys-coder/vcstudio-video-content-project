@@ -25,6 +25,7 @@ import {
   findStoredVideoExport,
   putVideoExportFromFile,
 } from "@/lib/storage/video-export-storage";
+import { collectRenderAssetObjectKeys } from "@/lib/render/render-asset-keys";
 
 export const videoRenderTaskPayloadSchema = z.object({
   renderId: z.uuid(),
@@ -141,18 +142,7 @@ export const videoRenderTask = task({
 
     // Resolve every scene asset to a short-lived signed URL, then validate the
     // fully-resolved composition props before any pixels are rendered.
-    const objectKeys = render.timelineSnapshot.scenes.flatMap((scene) => [
-      scene.image.objectKey,
-      scene.audio.objectKey,
-      // Animated scenes also need their four pose stills signed; absent for
-      // static-image projects.
-      ...(scene.characters ?? []).flatMap((character) => [
-        character.poses.idle,
-        character.poses.talkOpen,
-        character.poses.talkClosed,
-        character.poses.blink,
-      ]),
-    ]);
+    const objectKeys = collectRenderAssetObjectKeys(render.timelineSnapshot);
     // Sign for the full render window, not the short default download TTL. The
     // worker downloads Chromium, bundles the composition, and renders every
     // frame before it finishes fetching assets; on a long timeline that can

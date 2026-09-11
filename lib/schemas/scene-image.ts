@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MAX_SHOTS_PER_SCENE } from "@/lib/scenes/shot-timing";
 
 export const SCENE_IMAGE_API_SIZES = [
   "1536x1024",
@@ -56,6 +57,14 @@ export const startSceneImageGenerationSchema = z.object({
   projectId: z.uuid(),
   sceneId: z.uuid(),
   sceneVersionId: z.uuid(),
+  // Which image of the scene this is for. Defaults to the first, so every
+  // existing caller and form keeps requesting exactly what it did before.
+  shotIndex: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(MAX_SHOTS_PER_SCENE - 1)
+    .default(0),
   stylePresetVersionId: z.uuid(),
   requestNonce: z.uuid(),
   quality: sceneImageQualitySchema,
@@ -132,6 +141,12 @@ export function createSceneImageUploadSchema(input: {
   return z.object({
     sceneId: z.uuid(),
     sceneVersionId: z.uuid(),
+    shotIndex: z.coerce
+      .number()
+      .int()
+      .min(0)
+      .max(MAX_SHOTS_PER_SCENE - 1)
+      .default(0),
     size: sceneImageApiSizeSchema,
     contentType: z
       .enum(SCENE_IMAGE_UPLOAD_CONTENT_TYPES)

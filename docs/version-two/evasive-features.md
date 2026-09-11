@@ -13,11 +13,11 @@ production.
 
 ## Status
 
-| Feature                        | State       | Proven by                                              |
-| ------------------------------ | ----------- | ------------------------------------------------------ |
-| Visual style per niche/project | Built       | 29 unit tests, migration applied and verified in place |
-| Held scene, sound, animation   | Not started | —                                                      |
-| Multiple images per scene      | Not started | —                                                      |
+| Feature                        | State       | Proven by                                                  |
+| ------------------------------ | ----------- | ---------------------------------------------------------- |
+| Visual style per niche/project | Built       | 29 unit tests, migration applied and verified in place     |
+| Multiple images per scene      | Built       | 36 unit tests, 6 live PostgreSQL tests, migration verified |
+| Held scene, sound, animation   | Not started | —                                                          |
 
 No part of this branch has been observed in a browser. The environment's
 command policy blocks starting the development server, so every claim below
@@ -104,18 +104,61 @@ the code when the work begins:
 
 ## 3. Multiple images per scene
 
-Not started, and the most invasive of the three. One image per scene is
-enforced in four places:
+Built. This is the feature the branch exists to exercise, and it should not be
+treated as finished on the strength of tests alone: no multi-image scene has
+been rendered.
 
-1. A partial unique index over approved images per scene version and size, so
-   the database refuses a second approved still outright.
-2. `RenderSceneData.image` is a single object.
-3. `VideoCompositionScene.imageUrl` is a single string.
-4. `SceneTransition` is an entry effect wrapping a whole scene, not something
-   between two stills.
+### What it does
 
-Any new snapshot field must be optional so existing renders still reproduce,
-following the precedent already set by the character field.
+A scene may hold several approved stills. They divide the scene's narration
+between them and each change is placed on a **caption boundary**, so it lands
+where the narrator paused rather than over a word. Images cross-dissolve.
 
-This is the feature the branch exists to exercise, and it should not be
-considered done on the strength of tests alone.
+### Why caption boundaries
+
+Caption times are already snapped onto silences measured in the narration's
+amplitude envelope. Reusing them costs nothing, needs no new data to author,
+and puts image changes in gaps in the voice. The alternatives were an even
+split, which can change image mid-sentence, and hand-set durations, which have
+to be re-checked every time the narration is replaced.
+
+The placement divides the scene by time and then moves each division to the
+nearest caption change. It cannot decide _which_ image belongs to which
+sentence: a scene with two images and eight caption lines changes near the
+middle, not at the semantically right moment.
+
+### Two defects this exposed
+
+**Approval demoted the wrong images.** Approving an image un-approved every
+other approved image for that scene version at that size. With shots, approving
+the second image would have silently emptied the first. Approval is now scoped
+to the shot for exactly the reason it was already scoped to the size. There is
+a live PostgreSQL test for this specific case.
+
+**Two maps kept the wrong row.** Queries that returned at most one approved
+image per scene version now return several, and two call sites built a map
+straight from the array, which keeps whichever row arrived last. Both now call
+a helper that states which image it wants, and the query orders by shot
+explicitly so a render reproduces.
+
+### What keeps existing work safe
+
+The frozen render snapshot carries `shots` only when a scene has more than one
+image — absent, not empty — so an existing render is byte-identical and
+re-renders to the same video. `scene.image` stays populated as the scene's
+representative still, so anything that does not understand shots still shows
+the scene. Every pre-existing row carries shot 0, so the old uniqueness rule is
+this rule restricted to a single shot.
+
+A missing signed URL for a shot throws rather than falling back to the first
+image. A silently single-image scene would look like the feature never applied,
+and nothing would report it.
+
+### Not done
+
+- No multi-image scene has been rendered, so the dissolve has been verified by
+  schema and unit test rather than by watching it.
+- Reused images carried across a scene revision are always shot 0; multi-image
+  reuse is not carried across a revision.
+- Camera motion applies to the whole scene rather than per shot.
+- Only two transitions exist, cut and fade, and shots always dissolve.

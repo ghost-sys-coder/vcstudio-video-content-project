@@ -58,6 +58,18 @@ export const videoCompositionSceneCharacterSchema = z
   })
   .strict();
 
+const videoCompositionSceneShotSchema = z
+  .object({
+    imageUrl: z.url(),
+    framing: renderImageFramingSchema.optional(),
+    startFrame: z.number().int().nonnegative(),
+    endFrame: z.number().int().nonnegative(),
+  })
+  .strict()
+  .refine((shot) => shot.endFrame > shot.startFrame, {
+    message: "A shot must end after it starts.",
+  });
+
 const videoCompositionSceneSchema = z
   .object({
     sceneId: z.uuid(),
@@ -70,10 +82,20 @@ const videoCompositionSceneSchema = z
     imageFraming: renderImageFramingSchema.optional(),
     audioUrl: z.url(),
     audioTrimBeforeFrames: z.number().int().nonnegative().optional(),
+    shots: z.array(videoCompositionSceneShotSchema).min(2).optional(),
     captions: z.array(renderCaptionSchema),
     characters: z.array(videoCompositionSceneCharacterSchema).optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (scene) =>
+      !scene.shots ||
+      scene.shots.every(
+        (shot, index) =>
+          index === 0 || shot.startFrame >= scene.shots![index - 1]!.endFrame,
+      ),
+    { message: "Shots must not overlap." },
+  );
 
 /**
  * Validates the resolved composition props before they are handed to Remotion.
@@ -157,6 +179,26 @@ export function buildVideoCompositionInput(input: {
       imageFraming: scene.image.framing ?? DEFAULT_SCENE_FRAMING,
       audioUrl,
       audioTrimBeforeFrames: scene.audio.trimBeforeFrames ?? 0,
+      ...(scene.shots?.length
+        ? {
+            shots: scene.shots.map((shot) => {
+              const shotUrl = input.imageUrlByObjectKey[shot.objectKey];
+              // Throwing beats rendering the scene's first image for every
+              // shot: a silently single-image scene looks like the feature was
+              // never applied, and nothing would report it.
+              if (!shotUrl)
+                throw new Error(
+                  `Missing signed image URL for a shot of scene ${scene.sceneNumber}.`,
+                );
+              return {
+                imageUrl: shotUrl,
+                framing: shot.framing ?? DEFAULT_SCENE_FRAMING,
+                startFrame: shot.startFrame,
+                endFrame: shot.endFrame,
+              };
+            }),
+          }
+        : {}),
       captions: input.snapshot.includeCaptions ? scene.captions : [],
       ...(scene.characters?.length
         ? {

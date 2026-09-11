@@ -18,6 +18,7 @@ import { findShortCompositionWithClips } from "@/db/repositories/shorts.reposito
 import { buildShortTimeline } from "@/lib/shorts/short-timeline";
 import { resolveShortClips } from "@/lib/shorts/short-anchors";
 import { listCurrentScenes } from "@/db/repositories/scenes.repository";
+import { collectRenderAssetObjectKeys } from "@/lib/render/render-asset-keys";
 
 export type RenderPreviewResult =
   | { status: "ready"; input: ValidatedVideoCompositionInput }
@@ -98,16 +99,7 @@ export async function loadRenderPreview(input: {
     charactersBySceneVersionId,
   });
 
-  const objectKeys = snapshot.scenes.flatMap((scene) => [
-    scene.image.objectKey,
-    scene.audio.objectKey,
-    ...(scene.characters ?? []).flatMap((character) => [
-      character.poses.idle,
-      character.poses.talkOpen,
-      character.poses.talkClosed,
-      character.poses.blink,
-    ]),
-  ]);
+  const objectKeys = collectRenderAssetObjectKeys(snapshot);
   // Sign for the whole preview session: a full-length preview can play and be
   // replayed for minutes, and the rolling preloader fetches later scenes on
   // demand, so a short-lived URL would expire mid-session and stall playback.

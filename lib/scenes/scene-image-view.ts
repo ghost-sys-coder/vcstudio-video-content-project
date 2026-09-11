@@ -77,6 +77,11 @@ export type SceneImageDetailsResponse =
   | { success: false; error: string };
 
 export interface SceneImageSelection {
+  /**
+   * Which image of the scene this generation is for, zero-based. Zero is the
+   * scene's first and, for almost every scene, only image.
+   */
+  shotIndex: number;
   stylePresetVersionId: string;
   quality: SceneImageQuality;
   sizes: SceneImageApiSize[];
@@ -100,6 +105,8 @@ export interface SceneImageGenerationView {
   reused?: boolean;
   id: string;
   generationVersion: number;
+  /** Which image of the scene this generation is for. */
+  shotIndex: number;
   status: SceneImageGenerationStatus;
   reviewStatus: SceneImageReviewStatus;
   source: "ai_generated" | "user_uploaded";

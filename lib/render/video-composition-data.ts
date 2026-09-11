@@ -33,6 +33,23 @@ export type VideoCompositionSceneCharacter = {
   amplitudeEnvelope: number[];
 };
 
+/**
+ * One still within a multi-image scene, with its object key already resolved
+ * to a signed URL and its frames relative to the scene's own start.
+ */
+export type VideoCompositionSceneShot = {
+  imageUrl: string;
+  framing?: {
+    mode: "cover" | "contain" | "outpaint";
+    focalPointXBps: number;
+    focalPointYBps: number;
+    scaleBps: number;
+    backgroundColor: string;
+  };
+  startFrame: number;
+  endFrame: number;
+};
+
 export type VideoCompositionScene = {
   sceneId: string;
   sceneNumber: number;
@@ -48,6 +65,11 @@ export type VideoCompositionScene = {
     scaleBps: number;
     backgroundColor: string;
   };
+  /**
+   * Present only when the scene holds more than one image. Absent for every
+   * single-image scene, which renders through `imageUrl` exactly as before.
+   */
+  shots?: VideoCompositionSceneShot[];
   audioUrl: string;
   audioTrimBeforeFrames?: number;
   captions: RenderCaptionData[];

@@ -33,6 +33,10 @@ import {
   type SubtitleTrack,
 } from "@/lib/subtitles/subtitle-track";
 import type { RemotionCaption } from "@/lib/subtitles/remotion-captions";
+import {
+  primaryImageBySceneVersion,
+  shotsBySceneVersion,
+} from "@/lib/scenes/approved-shots";
 import { buildProjectTimeline } from "@/lib/timeline/scene-timeline";
 import {
   buildVideoTimeline,
@@ -139,16 +143,19 @@ export async function buildSubtitleContext(input: {
     }),
   ]);
 
-  const imageByVersion = new Map<string, ApprovedImage>(
-    approvedImages.map((row) => [row.sceneVersionId, row] as const),
-  );
+  // Shot 0, explicitly: a scene may hold several approved images now, and this
+  // map is "the image that represents the scene".
+  const imageByVersion: Map<string, ApprovedImage> =
+    primaryImageBySceneVersion(approvedImages);
+  // Every approved image per scene, in shot order, for the multi-image render.
+  const shotsByVersion = shotsBySceneVersion(approvedImages);
   // Same identity-match rule as the query above: when the render target's
   // native size equals the project's canonical size, the canonical approved
   // image already IS the native match.
   const nativeByVersion: Map<string, ApprovedImage> =
     nativeSize === canonicalSize
       ? imageByVersion
-      : new Map(nativeImages.map((row) => [row.sceneVersionId, row] as const));
+      : primaryImageBySceneVersion(nativeImages);
   const audioByVersion = new Map<string, ApprovedAudio>(
     approvedAudios.map((row) => [row.sceneVersionId, row] as const),
   );
@@ -291,6 +298,25 @@ export async function buildSubtitleContext(input: {
               framing: resolved.framing,
             }
           : null,
+        // Shots after the first, in order. Only the scene's own approved
+        // images qualify: a variant-outpainted or reused image resolves to the
+        // scene's single representative still and carries no shot of its own,
+        // so a multi-image scene falls back to one image in those paths rather
+        // than mixing sources.
+        additionalShots: (shotsByVersion.get(version.id) ?? [])
+          .filter(
+            (shot) =>
+              shot.shotIndex > 0 &&
+              shot.assetObjectKey !== null &&
+              shot.generationId !== resolved?.image.generationId,
+          )
+          .map((shot) => ({
+            generationId: shot.generationId,
+            objectKey: shot.assetObjectKey as string,
+            width: shot.assetWidth,
+            height: shot.assetHeight,
+            framing: resolved?.framing,
+          })),
         audio:
           audio && audio.assetObjectKey
             ? {

@@ -41,6 +41,37 @@ export interface RenderSceneImageData {
   };
 }
 
+/**
+ * One still within a multi-image scene, with its frames already resolved
+ * relative to the scene's own start.
+ *
+ * Frozen into the snapshot like everything else here, so a render reproduces
+ * even after the scene's images, captions or narration change. Scene-relative
+ * frames rather than project-absolute ones, because the Remotion component
+ * renders inside the scene's own Sequence and an earlier scene changing length
+ * must not move these.
+ */
+export interface RenderSceneShotData {
+  objectKey: string;
+  width: number | null;
+  height: number | null;
+  framing?: {
+    mode: "cover" | "contain" | "outpaint";
+    focalPointXBps: number;
+    focalPointYBps: number;
+    scaleBps: number;
+    backgroundColor: string;
+  };
+  startFrame: number;
+  endFrame: number;
+  /**
+   * Whether this shot begins where a caption line begins. False means it was
+   * placed by even division because no caption boundary was usable, and the
+   * change does not follow the narration.
+   */
+  startedOnCueBoundary: boolean;
+}
+
 export interface RenderSceneAudioData {
   objectKey: string;
   durationMilliseconds: number;
@@ -83,6 +114,17 @@ export interface RenderSceneData {
   cameraMotion: RenderCameraMotion;
   transition: RenderSceneTransition;
   image: RenderSceneImageData;
+  /**
+   * Present only when the scene holds more than one image. Absent, not empty,
+   * for every single-image scene — so an existing render's frozen snapshot is
+   * byte-identical to what it was before multi-image scenes existed, and
+   * re-rendering it produces the same video.
+   *
+   * When present, the first entry corresponds to `image` above, which stays
+   * populated so any consumer that does not understand shots still shows the
+   * scene's representative still rather than nothing.
+   */
+  shots?: RenderSceneShotData[];
   audio: RenderSceneAudioData;
   captions: RenderCaptionData[];
   /**

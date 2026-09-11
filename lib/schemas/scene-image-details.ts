@@ -37,6 +37,7 @@ const referenceViewSchema = z.object({
 const generationViewSchema = z.object({
   id: z.uuid(),
   generationVersion: z.number().int().positive(),
+  shotIndex: z.number().int().nonnegative(),
   status: z.enum([
     "pending",
     "queued",

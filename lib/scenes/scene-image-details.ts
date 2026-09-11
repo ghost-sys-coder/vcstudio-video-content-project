@@ -177,6 +177,7 @@ export async function loadSceneImageDetails(input: {
         id: generation.id,
         reused,
         generationVersion: generation.generationVersion,
+        shotIndex: generation.shotIndex,
         status: generation.status,
         reviewStatus: generation.reviewStatus,
         source: generation.source,

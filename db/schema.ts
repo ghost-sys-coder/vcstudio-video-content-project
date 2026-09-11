@@ -2572,6 +2572,19 @@ export const sceneImageGenerations = pgTable(
     projectId: uuid("project_id").notNull(),
     sceneId: uuid("scene_id").notNull(),
     sceneVersionId: uuid("scene_version_id").notNull(),
+    /**
+     * Which image this is within the scene, zero-based.
+     *
+     * A scene may hold several stills that change on caption boundaries. Shot
+     * 0 is the scene's first and, for every scene that has only one image, its
+     * only one — which is why the default is 0 and why every row written
+     * before multi-image scenes existed is already correct.
+     *
+     * This is part of the approved-image identity, not a display hint: the
+     * partial unique index below keys on it, so a scene can hold one approved
+     * image per size *per shot* rather than one per size.
+     */
+    shotIndex: integer("shot_index").notNull().default(0),
     purpose: imageGenerationPurposeEnum("purpose").notNull().default("scene"),
     source: imageGenerationSourceEnum("source")
       .notNull()
@@ -2652,10 +2665,14 @@ export const sceneImageGenerations = pgTable(
       table.workspaceId,
       table.requestNonce,
     ),
-    // One approved image PER SIZE per scene version — a scene can have up to
-    // three simultaneously-approved images (one per size), not just one.
+    // One approved image per size PER SHOT of a scene version. Before
+    // multi-image scenes this keyed on (scene version, size) alone; adding the
+    // shot is what permits a second approved still, and keeping the index
+    // rather than dropping it is what still prevents two rival images claiming
+    // the same shot. Every pre-existing row carries shot 0, so the old rule is
+    // exactly this rule restricted to a single shot.
     uniqueIndex("scene_image_generations_approved_scene_version_size_unique")
-      .on(table.sceneVersionId, table.size)
+      .on(table.sceneVersionId, table.size, table.shotIndex)
       .where(sql`${table.reviewStatus} = 'approved'`),
     index("scene_image_generations_workspace_project_scene_index").on(
       table.workspaceId,
@@ -2674,6 +2691,10 @@ export const sceneImageGenerations = pgTable(
     check(
       "scene_image_generations_version_positive",
       sql`${table.generationVersion} > 0`,
+    ),
+    check(
+      "scene_image_generations_shot_index_nonnegative",
+      sql`${table.shotIndex} >= 0`,
     ),
     check(
       "scene_image_generations_cost_nonnegative",

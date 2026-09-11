@@ -43,6 +43,17 @@ export interface TimelineSceneAssetInput {
   /** Expected duration from analysis, used only for mismatch warnings. */
   expectedDurationMilliseconds: number | null;
   image: TimelineImageAsset | null;
+  /**
+   * Images after the first, in shot order, for a scene that changes image
+   * partway through. Empty or absent for the overwhelming majority of scenes.
+   *
+   * Deliberately separate from `image` rather than turning `image` into an
+   * array: `image` is what makes a scene renderable at all, and every
+   * readiness check, warning and fallback in this module is written against
+   * it. Keeping it as the first shot means a multi-image scene is validated by
+   * exactly the same rules as a single-image one.
+   */
+  additionalShots?: TimelineImageAsset[];
   audio: TimelineAudioAsset | null;
   cameraMotion?: CameraMotion;
   transition?: SceneTransition;
@@ -59,6 +70,8 @@ export interface VideoTimelineScene {
   endFrame: number;
   durationFrames: number;
   image: TimelineImageAsset;
+  /** Images after the first, in shot order. Empty for a single-image scene. */
+  additionalShots: TimelineImageAsset[];
   audio: Required<Pick<TimelineAudioAsset, "durationMilliseconds">> &
     TimelineAudioAsset;
   audioTrimBeforeFrames?: number;
@@ -240,6 +253,7 @@ export function buildVideoTimeline(input: {
       endFrame,
       durationFrames: endFrame - startFrame,
       image,
+      additionalShots: scene.additionalShots ?? [],
       audio: { ...audio, durationMilliseconds },
       cameraMotion: scene.cameraMotion ?? "none",
       transition: scene.transition ?? "cut",
