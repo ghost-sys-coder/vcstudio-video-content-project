@@ -12,6 +12,16 @@
  */
 
 /**
+ * How often the post sweeper runs, and therefore how late a scheduled post can
+ * be without anything being wrong.
+ *
+ * Was stated only in prose here. Made a value because the interface now counts
+ * down to a scheduled post, and a countdown that does not know the delivery
+ * window would promise a firing instant this does not have.
+ */
+export const SOCIAL_SWEEP_WINDOW_MINUTES = 1;
+
+/**
  * The sweeper runs about once a minute, so anything closer than this would fire
  * immediately and make "scheduled" a lie. A user who wants it now has Publish.
  */
