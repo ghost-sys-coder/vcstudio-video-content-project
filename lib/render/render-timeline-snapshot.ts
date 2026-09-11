@@ -77,6 +77,35 @@ export interface RenderSceneAudioData {
   durationMilliseconds: number;
   format: string;
   trimBeforeFrames?: number;
+  /**
+   * The narration's measured loudness, carried only when this project draws a
+   * level meter. Static-image projects previously had nowhere to put it — it
+   * reached the renderer solely through animated character data — and copying
+   * it into every snapshot regardless would inflate stored renders for a
+   * feature most projects leave off.
+   */
+  amplitudeEnvelope?: number[];
+  amplitudeSampleRateHz?: number;
+}
+
+/** Where a narration level meter sits in the frame. */
+export type RenderLevelMeterPosition =
+  | "bottomLeft"
+  | "bottomCenter"
+  | "bottomRight"
+  | "topLeft"
+  | "topCenter"
+  | "topRight";
+
+/**
+ * A sound bed under the whole video, frozen at render request time like every
+ * other asset: an object key, never a signed URL.
+ */
+export interface RenderBackgroundAudioData {
+  objectKey: string;
+  /** Percent of the file's own level. */
+  volumePercent: number;
+  loop: boolean;
 }
 
 export type RenderSceneCharacterStageSlot = "left" | "center" | "right";
@@ -144,4 +173,13 @@ export interface RenderTimelineSnapshot {
   includeWatermark: boolean;
   captionStyle: CaptionStyleData;
   scenes: RenderSceneData[];
+  /**
+   * Present only when this project has a sound bed. Absent, not null, so a
+   * render frozen before background audio existed is unchanged and reproduces.
+   */
+  backgroundAudio?: RenderBackgroundAudioData;
+  /**
+   * Present only when the level meter is switched on, for the same reason.
+   */
+  levelMeter?: { position: RenderLevelMeterPosition };
 }

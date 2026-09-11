@@ -14,7 +14,16 @@ import {
   createShortComposition,
   updateShortComposition,
 } from "@/db/commands/short-commands";
+import {
+  RenderEffectsConflictError,
+  RenderEffectsMediaError,
+  saveProjectRenderEffects,
+} from "@/db/commands/project-render-effects-commands";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
+import {
+  readRenderEffectsForm,
+  saveRenderEffectsSchema,
+} from "@/lib/schemas/render-effects";
 import {
   BudgetExceededError,
   RateLimitExceededError,
@@ -549,5 +558,72 @@ export async function updateShortCompositionAction(formData: FormData) {
             ? "That short no longer exists."
             : "The short could not be updated.",
     };
+  }
+}
+
+export type RenderEffectsActionState = {
+  error: string | null;
+  success: boolean;
+};
+
+/**
+ * Saves the project's sound bed and level meter.
+ *
+ * The project is re-resolved from the authenticated workspace rather than
+ * trusted from the form, and the chosen media asset is checked inside that
+ * workspace by the command, so neither identifier from the browser can reach
+ * another workspace's data.
+ */
+export async function saveRenderEffectsAction(
+  formData: FormData,
+): Promise<RenderEffectsActionState> {
+  const parsed = saveRenderEffectsSchema.safeParse(
+    readRenderEffectsForm(formData),
+  );
+  if (!parsed.success)
+    return {
+      error: parsed.error.issues[0]?.message ?? "Those settings are not valid.",
+      success: false,
+    };
+
+  try {
+    const context = await getAuthenticatedWorkspaceContext();
+    if (!context)
+      return { error: "Workspace context is unavailable.", success: false };
+    requireCapability(context.activeMembership.role, "renderVideo");
+
+    const project = await findProject({
+      workspaceId: context.activeMembership.workspaceId,
+      projectId: parsed.data.projectId,
+    });
+    if (!project)
+      return { error: "That project is unavailable.", success: false };
+
+    await saveProjectRenderEffects({
+      workspaceId: context.activeMembership.workspaceId,
+      projectId: project.id,
+      userId: context.user.id,
+      backgroundMediaAssetId: parsed.data.backgroundMediaAssetId,
+      backgroundVolumePercent: parsed.data.backgroundVolumePercent,
+      backgroundLoop: parsed.data.backgroundLoop,
+      levelMeterEnabled: parsed.data.levelMeterEnabled,
+      levelMeterPosition: parsed.data.levelMeterPosition,
+      expectedRevision: parsed.data.expectedRevision,
+    });
+    revalidatePath(`/app/projects/${project.id}/render`);
+    return { error: null, success: true };
+  } catch (error) {
+    if (error instanceof RenderEffectsConflictError)
+      return {
+        error:
+          "Somebody else changed these settings while you were working. Reload before saving again.",
+        success: false,
+      };
+    if (error instanceof RenderEffectsMediaError)
+      return { error: error.message, success: false };
+    console.error("Saving render effects failed", {
+      message: error instanceof Error ? error.message : "unknown error",
+    });
+    return { error: "Those settings could not be saved.", success: false };
   }
 }

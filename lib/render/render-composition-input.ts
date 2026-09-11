@@ -83,6 +83,7 @@ const videoCompositionSceneSchema = z
     audioUrl: z.url(),
     audioTrimBeforeFrames: z.number().int().nonnegative().optional(),
     shots: z.array(videoCompositionSceneShotSchema).min(2).optional(),
+    narrationEnvelope: z.array(z.number().min(0).max(1)).optional(),
     captions: z.array(renderCaptionSchema),
     characters: z.array(videoCompositionSceneCharacterSchema).optional(),
   })
@@ -114,6 +115,27 @@ export const videoCompositionInputSchema = z
     watermarkText: z.string(),
     captionStyle: captionStyleSchema,
     scenes: z.array(videoCompositionSceneSchema).min(1),
+    backgroundAudio: z
+      .object({
+        url: z.url(),
+        volume: z.number().min(0).max(1),
+        loop: z.boolean(),
+      })
+      .strict()
+      .optional(),
+    levelMeter: z
+      .object({
+        position: z.enum([
+          "bottomLeft",
+          "bottomCenter",
+          "bottomRight",
+          "topLeft",
+          "topCenter",
+          "topRight",
+        ]),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -179,6 +201,18 @@ export function buildVideoCompositionInput(input: {
       imageFraming: scene.image.framing ?? DEFAULT_SCENE_FRAMING,
       audioUrl,
       audioTrimBeforeFrames: scene.audio.trimBeforeFrames ?? 0,
+      ...(scene.audio.amplitudeEnvelope?.length
+        ? {
+            narrationEnvelope: resampleAmplitudeEnvelope({
+              envelope: scene.audio.amplitudeEnvelope,
+              envelopeSampleRateHz:
+                scene.audio.amplitudeSampleRateHz ??
+                AMPLITUDE_ENVELOPE_SAMPLE_RATE_HZ,
+              frameCount: scene.durationFrames,
+              framesPerSecond: input.snapshot.framesPerSecond,
+            }),
+          }
+        : {}),
       ...(scene.shots?.length
         ? {
             shots: scene.shots.map((shot) => {
@@ -256,5 +290,27 @@ export function buildVideoCompositionInput(input: {
     watermarkText: input.watermarkText,
     captionStyle: input.snapshot.captionStyle,
     scenes,
+    ...(input.snapshot.backgroundAudio
+      ? {
+          backgroundAudio: {
+            url: (() => {
+              const url =
+                input.audioUrlByObjectKey[
+                  input.snapshot.backgroundAudio.objectKey
+                ];
+              // Throwing beats rendering in silence: a video that quietly
+              // lost its sound bed looks finished and is not.
+              if (!url)
+                throw new Error("Missing signed URL for the background audio.");
+              return url;
+            })(),
+            volume: input.snapshot.backgroundAudio.volumePercent / 100,
+            loop: input.snapshot.backgroundAudio.loop,
+          },
+        }
+      : {}),
+    ...(input.snapshot.levelMeter
+      ? { levelMeter: input.snapshot.levelMeter }
+      : {}),
   };
 }

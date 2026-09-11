@@ -21,9 +21,22 @@ export const MEDIA_VIDEO_CONTENT_TYPES = [
   "video/webm",
 ] as const;
 
+/**
+ * Accepted for background sound beds. Narrower than what ffprobe can read, on
+ * the same allow-list principle as the others: the stored extension, the
+ * renderer's decode and every downstream consumer are derived from this list.
+ */
+export const MEDIA_AUDIO_CONTENT_TYPES = [
+  "audio/mpeg",
+  "audio/mp4",
+  "audio/wav",
+  "audio/ogg",
+] as const;
+
 export const mediaContentTypeSchema = z.enum([
   ...MEDIA_IMAGE_CONTENT_TYPES,
   ...MEDIA_VIDEO_CONTENT_TYPES,
+  ...MEDIA_AUDIO_CONTENT_TYPES,
 ]);
 
 export type MediaContentType = z.infer<typeof mediaContentTypeSchema>;
@@ -36,6 +49,10 @@ export const MEDIA_ASSET_KIND_BY_CONTENT_TYPE = {
   "video/mp4": "video",
   "video/quicktime": "video",
   "video/webm": "video",
+  "audio/mpeg": "audio",
+  "audio/mp4": "audio",
+  "audio/wav": "audio",
+  "audio/ogg": "audio",
 } as const satisfies Record<MediaContentType, MediaAssetKind>;
 
 export const MEDIA_FILE_EXTENSION_BY_CONTENT_TYPE = {
@@ -46,6 +63,10 @@ export const MEDIA_FILE_EXTENSION_BY_CONTENT_TYPE = {
   "video/mp4": "mp4",
   "video/quicktime": "mov",
   "video/webm": "webm",
+  "audio/mpeg": "mp3",
+  "audio/mp4": "m4a",
+  "audio/wav": "wav",
+  "audio/ogg": "ogg",
 } as const satisfies Record<MediaContentType, string>;
 
 export const MAX_MEDIA_TITLE_LENGTH = 200;

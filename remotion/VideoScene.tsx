@@ -1,6 +1,10 @@
 import { AbsoluteFill, Sequence } from "remotion";
 import { CameraMotion } from "@/remotion/CameraMotion";
 import { CaptionOverlay } from "@/remotion/CaptionOverlay";
+import {
+  NarrationLevelMeter,
+  type NarrationLevelMeterPosition,
+} from "@/remotion/NarrationLevelMeter";
 import { CharacterSpriteLayer } from "@/remotion/CharacterSpriteLayer";
 import { SceneAudioTrack } from "@/remotion/SceneAudioTrack";
 import { SceneImage } from "@/remotion/SceneImage";
@@ -20,11 +24,14 @@ export function VideoScene({
   visibleDurationFrames,
   captionStyle,
   includeCaptions,
+  levelMeterPosition,
 }: {
   scene: VideoCompositionScene;
   visibleDurationFrames: number;
   captionStyle: CaptionStyleData;
   includeCaptions: boolean;
+  /** Absent when this project does not draw a meter. */
+  levelMeterPosition?: NarrationLevelMeterPosition;
 }) {
   const relativeCaptions = scene.captions.map((caption) => ({
     ...caption,
@@ -70,6 +77,15 @@ export function VideoScene({
 
       {includeCaptions ? (
         <CaptionOverlay captions={relativeCaptions} style={captionStyle} />
+      ) : null}
+
+      {/* Inside the scene, because the envelope it reads is this scene's own
+          narration and its frames are scene-relative. */}
+      {levelMeterPosition && scene.narrationEnvelope?.length ? (
+        <NarrationLevelMeter
+          envelope={scene.narrationEnvelope}
+          position={levelMeterPosition}
+        />
       ) : null}
     </AbsoluteFill>
   );

@@ -16,6 +16,9 @@ export function collectRenderAssetObjectKeys(
   snapshot: RenderTimelineSnapshot,
 ): string[] {
   const keys = new Set<string>();
+  // The sound bed plays under every scene, so it belongs to the snapshot
+  // rather than to any one scene.
+  if (snapshot.backgroundAudio) keys.add(snapshot.backgroundAudio.objectKey);
   for (const scene of snapshot.scenes) {
     keys.add(scene.image.objectKey);
     keys.add(scene.audio.objectKey);

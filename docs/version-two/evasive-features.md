@@ -13,11 +13,11 @@ production.
 
 ## Status
 
-| Feature                        | State       | Proven by                                                  |
-| ------------------------------ | ----------- | ---------------------------------------------------------- |
-| Visual style per niche/project | Built       | 29 unit tests, migration applied and verified in place     |
-| Multiple images per scene      | Built       | 36 unit tests, 6 live PostgreSQL tests, migration verified |
-| Held scene, sound, animation   | Not started | —                                                          |
+| Feature                        | State | Proven by                                                  |
+| ------------------------------ | ----- | ---------------------------------------------------------- |
+| Visual style per niche/project | Built | 29 unit tests, migration applied and verified in place     |
+| Multiple images per scene      | Built | 36 unit tests, 6 live PostgreSQL tests, migration verified |
+| Held scene, sound, animation   | Built | 24 unit tests, migration applied and verified in place     |
 
 No part of this branch has been observed in a browser. The environment's
 command policy blocks starting the development server, so every claim below
@@ -85,22 +85,77 @@ creating one. An existing project changes style per generation instead.
 
 ## 2. Held scene with sound and reactive animation
 
-Not started. Design notes from the feasibility review, to be confirmed against
-the code when the work begins:
+Built, except for the part that turned out not to need building.
 
-- A long held image is better expressed as several scenes sharing one image
-  than as one long scene. `MAX_SCENE_DURATION_MILLISECONDS` defaults to 60000
-  and `MAX_NARRATION_CHARACTERS` to 4000, the latter near the speech provider's
-  own per-request ceiling. Splitting also keeps caption timing per scene, which
-  matters because a ten-minute scene divided by character count would be badly
-  mistimed and the existing pause snapping is bounded at 400 ms.
-- Background sound does not exist anywhere: not in the schema, not in
-  `RenderTimelineSnapshot`, not in the Remotion tree. The media library is
-  close but its kind enum admits images and video only.
-- The reactive volume animation needs no new data. Every narration clip already
-  stores a loudness envelope at 50 Hz, measured once with ffmpeg because the
-  renderer needs it for mouth movement. The gap is that it reaches the
-  composition only through character data, which static projects omit.
+### The held image needed nothing
+
+A scene holding one image for its whole length is already what every scene
+does. Long narration is split across scenes by scene analysis, and nothing
+forces those scenes to use different images. The multi-image work below made
+the opposite case possible; it did not remove the default.
+
+Two limits still bound a single very long scene, and neither was changed:
+`MAX_SCENE_DURATION_MILLISECONDS` defaults to 60000, and
+`MAX_NARRATION_CHARACTERS` to 4000, the latter near the speech provider's own
+per-request ceiling. Splitting long narration across scenes is the supported
+shape, and it also keeps caption timing per scene, which matters because a
+ten-minute scene divided by character count would be badly mistimed.
+
+### The sound bed
+
+The media library gained an `audio` kind. Its ffprobe inspection pass already
+understood audio — `verifiedAudioMetadataSchema` predates this work — so the
+library simply had no kind to file a sound under. One track therefore serves
+every project in the workspace, with the library's existing limits, inspection
+and soft deletion all applying.
+
+The bed is mounted at the composition level rather than inside a scene
+Sequence. A bed mounted per scene restarts on every scene and breaks across the
+joins.
+
+It plays flat rather than ducking under narration. Ducking would need the
+narration envelope evaluated against the bed frame by frame, and a bed quiet
+enough to sit under speech does not need it; one loud enough to need it is set
+too loud. The default volume is low for the same reason.
+
+### The level meter
+
+This needed no new measurement at all. Every narration clip already carries a
+loudness envelope at 50 Hz, computed once with ffmpeg because the renderer
+needs it for mouth movement, and the composition layer already had the
+resampler that turns it into one value per frame.
+
+Until now that envelope reached the renderer only through animated character
+data, so a static-image project could not use it. Scene audio in the snapshot
+now carries it, but only when a meter will actually be drawn: copying a
+per-frame array into every stored render for a feature most projects leave off
+is pure weight.
+
+It is off by default, and the interface says plainly that it shows loudness
+rather than speech. A cough, a held breath or a loud room all move it, because
+the measurement cannot tell them from a word.
+
+### What happens when the sound file goes
+
+The library soft-deletes, so a project's bed can outlive the file it names. The
+resolver distinguishes deleted, not-yet-uploaded and missing, drops the bed,
+and says which happened. It never substitutes another sound: a video that
+quietly lost its bed looks finished and is not. A missing signed URL for a
+chosen bed throws rather than rendering in silence.
+
+Zero volume is treated as no bed, because "muted" and "none" are the same video
+and freezing a silent track costs a download and a decode for nothing audible.
+
+### Not done
+
+- No video has been rendered with either, so both are verified by schema and
+  unit test rather than by watching or listening.
+- Audio shares the video upload size ceiling. A dedicated limit would mean a
+  deployment variable across four env files that nobody would tune.
+- Only one bed per project, with no fades at the start or end and no per-scene
+  sound effects.
+- Arbitrary motion graphics beyond the level meter are still open-ended and
+  need a scope decision before they are worth estimating.
 
 ## 3. Multiple images per scene
 

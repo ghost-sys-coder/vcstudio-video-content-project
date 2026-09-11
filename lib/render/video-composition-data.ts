@@ -75,6 +75,11 @@ export type VideoCompositionScene = {
   captions: RenderCaptionData[];
   /** Absent for static-image projects. */
   characters?: VideoCompositionSceneCharacter[];
+  /**
+   * The narration's loudness, one value per frame of this scene, 0..1. Present
+   * only when this project draws a level meter.
+   */
+  narrationEnvelope?: number[];
 };
 
 // A type alias (not an interface) so it satisfies `Record<string, unknown>`,
@@ -89,4 +94,21 @@ export type VideoCompositionInput = {
   watermarkText: string;
   captionStyle: CaptionStyleData;
   scenes: VideoCompositionScene[];
+  /** Present only when this project has a sound bed. */
+  backgroundAudio?: {
+    url: string;
+    /** 0..1, already converted from the stored percent. */
+    volume: number;
+    loop: boolean;
+  };
+  /** Present only when the level meter is switched on. */
+  levelMeter?: {
+    position:
+      | "bottomLeft"
+      | "bottomCenter"
+      | "bottomRight"
+      | "topLeft"
+      | "topCenter"
+      | "topRight";
+  };
 };

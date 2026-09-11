@@ -12,6 +12,7 @@ import type {
 } from "@/db/schema";
 import { getMarketingEnvironment } from "@/lib/env/server";
 import { createMediaAssetDownloadUrl } from "@/lib/storage/media-asset-storage";
+import { isVisualMediaKind } from "@/lib/media/visual-media-kind";
 
 export type KnowledgeDocumentView = {
   id: string;
@@ -74,15 +75,20 @@ export async function loadMarketingAssetsView(input: {
   ]);
 
   const assetViews = await Promise.all(
-    brandAssets.map(async (row) => ({
-      id: row.brandAsset.id,
-      mediaAssetId: row.brandAsset.mediaAssetId,
-      role: row.brandAsset.role,
-      notes: row.brandAsset.notes,
-      title: row.media.title ?? row.media.originalFileName,
-      previewUrl: await createMediaAssetDownloadUrl(row.media.objectKey),
-      kind: row.media.kind,
-    })),
+    brandAssets
+      // A sound file is not a brand asset. The library accepts audio now for
+      // background beds, and one reaching this screen would be drawn as a
+      // broken image rather than reported.
+      .filter((row) => isVisualMediaKind(row.media.kind))
+      .map(async (row) => ({
+        id: row.brandAsset.id,
+        mediaAssetId: row.brandAsset.mediaAssetId,
+        role: row.brandAsset.role,
+        notes: row.brandAsset.notes,
+        title: row.media.title ?? row.media.originalFileName,
+        previewUrl: await createMediaAssetDownloadUrl(row.media.objectKey),
+        kind: row.media.kind as "image" | "video",
+      })),
   );
 
   return {

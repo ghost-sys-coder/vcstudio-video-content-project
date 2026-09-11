@@ -49,6 +49,10 @@ export const storageObjectKindEnum = pgEnum("storage_object_kind", [
 export const mediaAssetKindEnum = pgEnum("media_asset_kind", [
   "image",
   "video",
+  // Added for background sound beds and effects. The library's inspection
+  // pipeline already understood audio — `verifiedAudioMetadataSchema` and the
+  // ffprobe path predate this — it simply had no kind to store one under.
+  "audio",
 ]);
 
 // Library uploads are two-phase (authorize a signed PUT, then confirm), so a row
@@ -6766,6 +6770,93 @@ export const taskHeartbeats = pgTable(
       .notNull(),
   },
   (table) => [primaryKey({ columns: [table.taskId, table.environment] })],
+);
+
+/**
+ * How a project's video presents itself beyond its scenes: a background sound
+ * bed, and whether a narration level meter is drawn.
+ *
+ * One row per project, created on first use. Both settings live together
+ * because they are the same kind of thing — presentation applied at render
+ * time, over every scene — and splitting them would mean two tables of two
+ * columns each, loaded on the same screen and written by the same form.
+ *
+ * `revision` is an optimistic lock, matching the caption corrections: the form
+ * writes the whole row, so last-writer-wins would discard a change somebody
+ * else made to a different field of it.
+ */
+export const projectRenderEffects = pgTable(
+  "project_render_effects",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").notNull(),
+    /**
+     * The sound bed, drawn from the workspace media library rather than from
+     * its own upload path, so one piece of music can serve every project and
+     * the library's existing inspection, limits and soft deletion all apply.
+     */
+    backgroundMediaAssetId: uuid("background_media_asset_id"),
+    /**
+     * Percent of the asset's own level. Low by default: a bed that competes
+     * with narration is worse than no bed, and a creator who wants it louder
+     * can say so deliberately.
+     */
+    backgroundVolumePercent: integer("background_volume_percent")
+      .notNull()
+      .default(12),
+    /** Beds are usually shorter than the video, so looping is the default. */
+    backgroundLoop: boolean("background_loop").notNull().default(true),
+    /**
+     * Draws a meter that moves with the narration's measured loudness. Off by
+     * default: it is a deliberate stylistic choice, not an improvement every
+     * video wants.
+     */
+    levelMeterEnabled: boolean("level_meter_enabled").notNull().default(false),
+    levelMeterPosition: text("level_meter_position")
+      .notNull()
+      .default("bottomRight"),
+    revision: integer("revision").notNull().default(1),
+    updatedByUserId: uuid("updated_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("project_render_effects_project_unique").on(table.projectId),
+    check(
+      "project_render_effects_volume_range",
+      sql`${table.backgroundVolumePercent} between 0 and 100`,
+    ),
+    check(
+      "project_render_effects_revision_positive",
+      sql`${table.revision} > 0`,
+    ),
+    check(
+      "project_render_effects_meter_position",
+      sql`${table.levelMeterPosition} in ('bottomLeft', 'bottomCenter', 'bottomRight', 'topLeft', 'topCenter', 'topRight')`,
+    ),
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [projects.id, projects.workspaceId],
+      name: "project_render_effects_tenant_project_fkey",
+    }).onDelete("cascade"),
+    // NO ACTION, and safe: library assets are soft deleted and never removed,
+    // so this can never block. A composite SET NULL is not an option — it would
+    // null workspace_id too, which is NOT NULL.
+    foreignKey({
+      columns: [table.backgroundMediaAssetId, table.workspaceId],
+      foreignColumns: [mediaAssets.id, mediaAssets.workspaceId],
+      name: "project_render_effects_tenant_media_fkey",
+    }),
+  ],
 );
 
 export const projectSubtitleSettings = pgTable(

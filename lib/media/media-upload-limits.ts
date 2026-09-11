@@ -30,6 +30,10 @@ export function checkMediaUpload(input: {
   if (!Number.isInteger(input.sizeBytes) || input.sizeBytes <= 0)
     return { allowed: false, reason: "That file is empty." };
 
+  // Audio shares the video ceiling deliberately, rather than introducing a
+  // deployment variable for it. A sound bed is far smaller than either limit,
+  // so a separate number would be configuration nobody ever tunes; the type
+  // allow-list is what actually keeps unwanted files out.
   const maximumBytes =
     input.kind === "image"
       ? input.limits.maxImageBytes

@@ -21,6 +21,8 @@ import {
 import { BudgetExceededError } from "@/lib/domain/errors";
 import { getRenderEnvironment } from "@/lib/env/server";
 import { buildRenderTimelineSnapshot } from "@/lib/render/build-render-snapshot";
+import { findProjectRenderEffects } from "@/db/repositories/project-render-effects.repository";
+import { resolveRenderEffects } from "@/lib/render/resolve-render-effects";
 import { resolveSceneCharactersBySceneVersion } from "@/lib/render/resolve-scene-characters";
 import { defaultPresetForAspectRatio } from "@/lib/render/render-formats";
 import { estimateRenderCostCents } from "@/lib/render/render-cost";
@@ -176,12 +178,23 @@ export async function startVideoRender(input: {
         })
       : undefined;
 
+  // Presentation effects are resolved here rather than inside the builder so
+  // the builder stays a pure transform of the timeline, and so a bed whose
+  // file has gone is dropped once, in one place, for both render paths.
+  const renderEffects = resolveRenderEffects(
+    await findProjectRenderEffects({
+      workspaceId: input.workspaceId,
+      projectId: input.project.id,
+    }),
+  );
+
   const snapshot = buildRenderTimelineSnapshot({
     timeline: renderTimeline,
     captionStyle: context.captionStyle,
     includeCaptions: input.includeCaptions,
     includeWatermark: input.includeWatermark,
     charactersBySceneVersionId,
+    effects: renderEffects,
   });
 
   const effectiveLimits = await loadEffectiveWorkspaceLimits({

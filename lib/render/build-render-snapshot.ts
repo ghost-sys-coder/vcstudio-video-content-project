@@ -5,6 +5,8 @@ import {
   deriveSceneTransition,
 } from "@/lib/render/scene-motion";
 import type {
+  RenderBackgroundAudioData,
+  RenderLevelMeterPosition,
   RenderSceneCharacterData,
   RenderTimelineSnapshot,
 } from "@/lib/render/render-timeline-snapshot";
@@ -32,6 +34,15 @@ export function buildRenderTimelineSnapshot(input: {
    * which leaves `characters` absent on every scene exactly as before.
    */
   charactersBySceneVersionId?: ReadonlyMap<string, RenderSceneCharacterData[]>;
+  /**
+   * Presentation effects applied over the whole video. Omitted for a project
+   * that has none, which leaves the snapshot exactly as it was before these
+   * existed.
+   */
+  effects?: {
+    backgroundAudio?: RenderBackgroundAudioData;
+    levelMeter?: { position: RenderLevelMeterPosition };
+  };
 }): RenderTimelineSnapshot {
   const { timeline } = input;
   return {
@@ -116,6 +127,14 @@ export function buildRenderTimelineSnapshot(input: {
             scene.audio.durationMilliseconds ?? scene.durationMilliseconds,
           format: scene.audio.format,
           trimBeforeFrames: scene.audioTrimBeforeFrames ?? 0,
+          // Only when a meter will actually be drawn: otherwise this is a
+          // per-frame array stored on every render that nothing reads.
+          ...(input.effects?.levelMeter && scene.audio.amplitudeEnvelope?.length
+            ? {
+                amplitudeEnvelope: scene.audio.amplitudeEnvelope,
+                amplitudeSampleRateHz: AMPLITUDE_ENVELOPE_SAMPLE_RATE_HZ,
+              }
+            : {}),
         },
         captions: input.includeCaptions
           ? scene.captions.map((caption) => ({
@@ -143,5 +162,13 @@ export function buildRenderTimelineSnapshot(input: {
           : {}),
       };
     }),
+    // Absent rather than null, so a snapshot frozen before these existed is
+    // byte-identical and re-renders to the same video.
+    ...(input.effects?.backgroundAudio
+      ? { backgroundAudio: input.effects.backgroundAudio }
+      : {}),
+    ...(input.effects?.levelMeter
+      ? { levelMeter: input.effects.levelMeter }
+      : {}),
   };
 }
