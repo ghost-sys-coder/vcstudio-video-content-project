@@ -1,6 +1,15 @@
 import type { SubtitleGranularity } from "@/lib/subtitles/caption-style-data";
 import { buildSceneTextChunks } from "@/lib/subtitles/subtitle-segmentation";
 import { millisecondsToFrames } from "@/lib/timeline/scene-timeline";
+import type { CaptionCue } from "@/lib/subtitles/cue-editing";
+import {
+  findSilenceWindows,
+  snapBoundariesToPauses,
+} from "@/lib/subtitles/pause-alignment";
+import {
+  summarizeTrackTimingSource,
+  type CueTimingSource,
+} from "@/lib/subtitles/cue-timing-source";
 
 export interface SubtitleTrackSceneInput {
   sceneId: string;
@@ -11,6 +20,19 @@ export interface SubtitleTrackSceneInput {
   startMilliseconds: number;
   /** Absolute scene end in the project timeline, integer milliseconds. */
   endMilliseconds: number;
+  /**
+   * The narration's measured loudness envelope, when one exists. Used only to
+   * move line breaks onto real pauses; absent means the scene keeps the
+   * estimate, which is the long-standing behaviour and is never relabelled.
+   */
+  audioEnvelope?: readonly number[] | null;
+  envelopeSampleRateHz?: number | null;
+  /**
+   * Times a person set by hand for this scene, relative to its narration.
+   * When present these win outright: a correction must not be re-derived by
+   * the next thing that touches the track.
+   */
+  manualCues?: readonly CaptionCue[] | null;
 }
 
 export interface SubtitleSegment {
@@ -26,6 +48,8 @@ export interface SubtitleSegment {
   endMilliseconds: number;
   startFrame: number;
   endFrame: number;
+  /** Where this cue's timing came from. Never claims more than was done. */
+  timingSource: CueTimingSource;
 }
 
 export interface SubtitleTrack {
@@ -33,6 +57,8 @@ export interface SubtitleTrack {
   framesPerSecond: number;
   segments: SubtitleSegment[];
   totalDurationMilliseconds: number;
+  /** The weakest source present, so a mixed track never overstates itself. */
+  timingSource: CueTimingSource;
 }
 
 export interface SubtitleTrackOptions {
@@ -117,9 +143,19 @@ function mergeShortSegments(
 }
 
 /**
- * Builds an ordered, non-overlapping subtitle track. Each scene's known audio
- * duration is distributed across its text chunks proportionally to their
- * character length; absolute timings are laid out with a forward cursor so a
+ * Builds an ordered, non-overlapping subtitle track.
+ *
+ * Three ways a scene can be timed, in strict order of authority:
+ *
+ * 1. **Times a person set by hand** win outright. A correction that the next
+ *    build quietly re-derived would be worthless.
+ * 2. Otherwise each scene's known audio duration is distributed across its text
+ *    chunks proportionally to character length, and the line breaks are then
+ *    moved onto silences measured in the narration where one is close enough.
+ * 3. With no envelope, or with no pause near a break, the proportional estimate
+ *    stands unchanged. It is reported as estimated, never dressed up as more.
+ *
+ * Absolute timings are laid out with a forward cursor in every case, so a
  * segment can never start before the previous one ends.
  */
 export function assembleSubtitleTrack(
@@ -130,50 +166,28 @@ export function assembleSubtitleTrack(
   const maxCaptionCharacters = Math.max(1, options.maxLineCharacters * 2);
   const segments: SubtitleSegment[] = [];
 
+  const sceneSources: CueTimingSource[] = [];
+
   for (const scene of [...scenes].sort(
     (left, right) => left.sceneNumber - right.sceneNumber,
   )) {
     const sceneDuration = scene.endMilliseconds - scene.startMilliseconds;
     if (sceneDuration <= 0) continue;
 
-    const chunks = buildSceneTextChunks({
-      narrationText: scene.narrationText,
-      granularity: options.granularity,
+    const placed = placeSceneCues(scene, sceneDuration, options, {
       maxCaptionCharacters,
     });
-    if (chunks.length === 0) continue;
+    if (placed.cues.length === 0) continue;
+    sceneSources.push(placed.source);
 
-    const weights = chunks.map((chunk) => Math.max(1, chunk.length));
-    const durations = distributeInteger(sceneDuration, weights);
-    const pending: PendingSegment[] = chunks.map((chunk, index) => ({
-      text: chunk,
-      weight: weights[index]!,
-      durationMilliseconds: durations[index]!,
-    }));
-
-    const finalized = mergeShortSegments(
-      pending,
-      options.minSegmentDurationMilliseconds,
-    );
-
-    // Re-normalize durations so they still sum exactly to the scene duration
-    // after merging, then lay out absolute times with a monotonic cursor.
-    const mergedDurations = distributeInteger(
-      sceneDuration,
-      finalized.map((segment) => segment.weight),
-    );
-
-    let cursor = scene.startMilliseconds;
-    finalized.forEach((segment, index) => {
-      const isLast = index === finalized.length - 1;
-      const startMilliseconds = cursor;
-      const endMilliseconds = isLast
-        ? scene.endMilliseconds
-        : startMilliseconds + mergedDurations[index]!;
-      cursor = endMilliseconds;
-
+    placed.cues.forEach((cue, index) => {
       const key = `${scene.sceneVersionId}:${index}`;
-      const overrideText = overrides[key];
+      // A hand-set cue already carries the corrected words; re-applying the
+      // settings-level override on top would undo the correction.
+      const overrideText =
+        placed.source === "manual" ? undefined : overrides[key];
+      const startMilliseconds = scene.startMilliseconds + cue.startMilliseconds;
+      const endMilliseconds = scene.startMilliseconds + cue.endMilliseconds;
       segments.push({
         sceneId: scene.sceneId,
         sceneNumber: scene.sceneNumber,
@@ -183,7 +197,7 @@ export function assembleSubtitleTrack(
         text:
           overrideText !== undefined && overrideText.trim().length > 0
             ? overrideText.trim()
-            : segment.text,
+            : cue.text,
         startMilliseconds,
         endMilliseconds,
         startFrame: millisecondsToFrames(
@@ -194,6 +208,7 @@ export function assembleSubtitleTrack(
           endMilliseconds,
           options.framesPerSecond,
         ),
+        timingSource: placed.source,
       });
     });
   }
@@ -206,5 +221,83 @@ export function assembleSubtitleTrack(
     framesPerSecond: options.framesPerSecond,
     segments,
     totalDurationMilliseconds,
+    timingSource: summarizeTrackTimingSource(sceneSources),
   };
+}
+
+/**
+ * One scene's cues, relative to its own narration, and where they came from.
+ *
+ * Kept separate from the absolute layout above because the three sources differ
+ * only in how they produce these relative times; everything after is
+ * identical for all of them.
+ */
+function placeSceneCues(
+  scene: SubtitleTrackSceneInput,
+  sceneDuration: number,
+  options: SubtitleTrackOptions,
+  derived: { maxCaptionCharacters: number },
+): { cues: CaptionCue[]; source: CueTimingSource } {
+  if (scene.manualCues && scene.manualCues.length > 0)
+    return {
+      cues: scene.manualCues.map((cue) => ({ ...cue })),
+      source: "manual",
+    };
+
+  const chunks = buildSceneTextChunks({
+    narrationText: scene.narrationText,
+    granularity: options.granularity,
+    maxCaptionCharacters: derived.maxCaptionCharacters,
+  });
+  if (chunks.length === 0) return { cues: [], source: "estimated" };
+
+  const weights = chunks.map((chunk) => Math.max(1, chunk.length));
+  const durations = distributeInteger(sceneDuration, weights);
+  const pending: PendingSegment[] = chunks.map((chunk, index) => ({
+    text: chunk,
+    weight: weights[index]!,
+    durationMilliseconds: durations[index]!,
+  }));
+
+  const finalized = mergeShortSegments(
+    pending,
+    options.minSegmentDurationMilliseconds,
+  );
+
+  // Re-normalize durations so they still sum exactly to the scene duration
+  // after merging, then express the result as interior boundaries.
+  const mergedDurations = distributeInteger(
+    sceneDuration,
+    finalized.map((segment) => segment.weight),
+  );
+  const boundaries: number[] = [];
+  let running = 0;
+  for (let index = 0; index < finalized.length - 1; index += 1) {
+    running += mergedDurations[index]!;
+    boundaries.push(running);
+  }
+
+  let source: CueTimingSource = "estimated";
+  let placedBoundaries = boundaries;
+  const envelope = scene.audioEnvelope;
+  const sampleRateHz = scene.envelopeSampleRateHz ?? 0;
+  if (envelope && envelope.length > 0 && sampleRateHz > 0) {
+    const snapped = snapBoundariesToPauses({
+      boundaries,
+      silences: findSilenceWindows({ envelope, sampleRateHz }),
+      sceneDurationMilliseconds: sceneDuration,
+      minimumCueDurationMilliseconds: options.minSegmentDurationMilliseconds,
+    });
+    placedBoundaries = snapped.boundaries;
+    // Only claim an adjustment that actually happened.
+    if (snapped.movedCount > 0) source = "pause_adjusted";
+  }
+
+  const edges = [0, ...placedBoundaries, sceneDuration];
+  const cues = finalized.map((segment, index) => ({
+    text: segment.text,
+    startMilliseconds: edges[index]!,
+    endMilliseconds: edges[index + 1]!,
+  }));
+  return { cues, source };
 }

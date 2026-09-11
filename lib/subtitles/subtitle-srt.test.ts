@@ -19,6 +19,7 @@ function segment(
     endMilliseconds,
     startFrame: 0,
     endFrame: 0,
+    timingSource: "estimated" as const,
   };
 }
 
@@ -26,6 +27,7 @@ const TRACK: SubtitleTrack = {
   granularity: "sentence",
   framesPerSecond: 30,
   totalDurationMilliseconds: 4500,
+  timingSource: "estimated",
   segments: [
     segment(0, "Hello world", 0, 2000),
     segment(1, "Second caption line", 2000, 4500),

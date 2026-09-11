@@ -151,8 +151,15 @@ export function SubtitleWorkspace({
         </div>
         <SubtitleEditor
           canManage={canManage}
+          minimumCueDurationMilliseconds={
+            data.configuration.minSegmentDurationMilliseconds
+          }
+          onCuesSaved={() => void refresh()}
           onSave={saveSegment}
+          projectId={projectId}
+          scenes={data.scenes}
           segments={data.segments}
+          timingSource={data.timingSource}
         />
       </div>
     </div>

@@ -7,17 +7,26 @@ import { SubtitleSceneGroup } from "@/components/subtitles/SubtitleSceneGroup";
 import { groupSegmentsByScene } from "@/lib/subtitles/subtitle-segment-groups";
 import type {
   SaveSubtitleSegmentHandler,
+  SubtitleSceneSummaryView,
   SubtitleSegmentView,
 } from "@/lib/subtitles/subtitle-view";
 
 export function SubtitleSegmentList({
   segments,
+  scenes,
+  projectId,
   canManage,
+  minimumCueDurationMilliseconds,
   onSave,
+  onCuesSaved,
 }: {
   segments: SubtitleSegmentView[];
+  scenes: SubtitleSceneSummaryView[];
+  projectId: string;
   canManage: boolean;
+  minimumCueDurationMilliseconds: number;
   onSave: SaveSubtitleSegmentHandler;
+  onCuesSaved: () => void;
 }) {
   const groups = useMemo(() => groupSegmentsByScene(segments), [segments]);
   const signature = groups.map((group) => group.sceneId).join("|");
@@ -61,7 +70,11 @@ export function SubtitleSegmentList({
             canManage={canManage}
             group={group}
             key={group.sceneId}
+            minimumCueDurationMilliseconds={minimumCueDurationMilliseconds}
+            onCuesSaved={onCuesSaved}
             onSave={onSave}
+            projectId={projectId}
+            scene={scenes.find((entry) => entry.sceneId === group.sceneId)}
           />
         ))}
       </Accordion>

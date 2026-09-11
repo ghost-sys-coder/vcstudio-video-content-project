@@ -6,6 +6,7 @@ const TRACK: SubtitleTrack = {
   granularity: "sentence",
   framesPerSecond: 30,
   totalDurationMilliseconds: 4500,
+  timingSource: "estimated",
   segments: [
     {
       sceneId: "scene-1",
@@ -18,6 +19,7 @@ const TRACK: SubtitleTrack = {
       endMilliseconds: 2000,
       startFrame: 0,
       endFrame: 60,
+      timingSource: "estimated",
     },
     {
       sceneId: "scene-2",
@@ -30,6 +32,7 @@ const TRACK: SubtitleTrack = {
       endMilliseconds: 4500,
       startFrame: 60,
       endFrame: 135,
+      timingSource: "estimated",
     },
   ],
 };

@@ -9,6 +9,9 @@ import {
 } from "@/db/repositories/subtitle.repository";
 import { listSucceededSceneImageGenerationsByIds } from "@/db/repositories/scene-images.repository";
 import { listCurrentScenes } from "@/db/repositories/scenes.repository";
+import { listSceneCaptionCues } from "@/db/repositories/scene-caption-cues.repository";
+import { AMPLITUDE_ENVELOPE_SAMPLE_RATE_HZ } from "@/lib/media/amplitude-envelope";
+import type { CueTimingSource } from "@/lib/subtitles/cue-timing-source";
 import {
   getSceneAudioEnvironment,
   getSubtitleEnvironment,
@@ -187,9 +190,27 @@ export async function buildSubtitleContext(input: {
     slotTimeline.scenes.map((scene) => [scene.sceneId, scene] as const),
   );
 
+  // Corrections are fetched by the approved audio's own id, so a scene whose
+  // narration has been replaced simply has none to find.
+  const approvedAudioIds = currentScenes
+    .map(({ version }) => audioByVersion.get(version.id)?.generationId)
+    .filter((value): value is string => typeof value === "string");
+  const cueRows = await listSceneCaptionCues({
+    workspaceId: input.workspaceId,
+    projectId: input.project.id,
+    audioGenerationIds: approvedAudioIds,
+  });
+  const cuesByAudioId = new Map(
+    cueRows.map((row) => [row.audioGenerationId, row] as const),
+  );
+
   const track = assembleSubtitleTrack(
     currentScenes.map(({ scene, version }) => {
       const slot = slotBySceneId.get(scene.id);
+      const audio = audioByVersion.get(version.id);
+      const corrections = audio
+        ? cuesByAudioId.get(audio.generationId)
+        : undefined;
       return {
         sceneId: scene.id,
         sceneNumber: scene.sceneNumber,
@@ -197,6 +218,9 @@ export async function buildSubtitleContext(input: {
         narrationText: version.narrationText,
         startMilliseconds: slot?.startMilliseconds ?? 0,
         endMilliseconds: slot?.endMilliseconds ?? 0,
+        audioEnvelope: audio?.amplitudeEnvelope ?? null,
+        envelopeSampleRateHz: AMPLITUDE_ENVELOPE_SAMPLE_RATE_HZ,
+        manualCues: corrections?.cues ?? null,
       };
     }),
     {
@@ -282,17 +306,25 @@ export async function buildSubtitleContext(input: {
   });
 
   const segmentCountByScene = new Map<string, number>();
-  for (const segment of track.segments)
+  const timingSourceByScene = new Map<string, CueTimingSource>();
+  for (const segment of track.segments) {
     segmentCountByScene.set(
       segment.sceneId,
       (segmentCountByScene.get(segment.sceneId) ?? 0) + 1,
     );
+    timingSourceByScene.set(segment.sceneId, segment.timingSource);
+  }
 
   const scenes: SubtitleSceneSummaryView[] = currentScenes.map(
     ({ scene, version }) => {
       const narration = normalizeNarration(version.narrationText);
+      const audio = audioByVersion.get(version.id);
+      const corrections = audio
+        ? cuesByAudioId.get(audio.generationId)
+        : undefined;
       return {
         sceneId: scene.id,
+        sceneVersionId: version.id,
         sceneNumber: scene.sceneNumber,
         sceneApproved: scene.status === "approved",
         hasApprovedImage: imageByVersion.has(version.id),
@@ -300,6 +332,12 @@ export async function buildSubtitleContext(input: {
         segmentCount: segmentCountByScene.get(scene.id) ?? 0,
         narrationPreview:
           narration.length > 160 ? `${narration.slice(0, 160)}…` : narration,
+        audioGenerationId: audio?.generationId ?? null,
+        audioDurationMilliseconds: audio?.durationMilliseconds ?? 0,
+        sceneStartMilliseconds:
+          slotBySceneId.get(scene.id)?.startMilliseconds ?? 0,
+        cueRevision: corrections?.revision ?? null,
+        timingSource: timingSourceByScene.get(scene.id) ?? "estimated",
       };
     },
   );
@@ -347,6 +385,7 @@ export async function loadSubtitleWorkspace(input: {
         endFrame: segment.endFrame,
         exceedsMaxDuration:
           durationMilliseconds > context.maxSegmentDurationMilliseconds,
+        timingSource: segment.timingSource,
       };
     },
   );
@@ -401,6 +440,7 @@ export async function loadSubtitleWorkspace(input: {
       maxSegmentDurationMilliseconds: context.maxSegmentDurationMilliseconds,
     },
     totalDurationMilliseconds: context.track.totalDurationMilliseconds,
+    timingSource: context.track.timingSource,
     hasSubtitles: context.track.segments.length > 0,
   };
 }

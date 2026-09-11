@@ -27,6 +27,7 @@ import type { MarketingChatMessagePart } from "@/lib/schemas/marketing-chat-mess
 import type { MarketingWeeklyDigestSnapshot } from "@/lib/marketing/digests/weekly-digest";
 import type { VerifiedMediaMetadata } from "@/lib/media/media-inspection";
 import type { ClaimReviewState } from "@/lib/editorial/editorial-review";
+import type { CaptionCue } from "@/lib/subtitles/cue-editing";
 import type { ScriptVersionEvidenceRecord } from "@/lib/editorial/version-evidence";
 
 export const workspaceRoleEnum = pgEnum("workspace_role", [
@@ -7403,3 +7404,92 @@ export type ScriptEditorialSignoff =
 export type ScriptVersionEvidence = typeof scriptVersionEvidence.$inferSelect;
 export type EditorialSourceKind =
   (typeof editorialSourceKindEnum.enumValues)[number];
+
+/**
+ * Caption times a person set by hand for one scene's narration.
+ *
+ * **Keyed on the audio generation, and that is the whole design.** A correction
+ * is a statement about a specific recording: this phrase ends *here*, in this
+ * clip. Replacing the narration produces a new generation id, so the old row
+ * stops applying by construction rather than by a cleanup job that might not
+ * run. Only that scene is affected, and only that clip — every other scene's
+ * corrections are untouched, which is exactly what the acceptance criterion
+ * asks for. The old row is kept rather than deleted, so re-approving the
+ * earlier take brings its corrections back with it.
+ *
+ * Times inside `cues` are relative to the start of the narration, never to the
+ * project timeline. A correction stored against absolute project time would
+ * break the moment an earlier scene changed length, which is precisely when a
+ * creator is most likely to be relying on it.
+ *
+ * `revision` is an optimistic lock. Two tabs editing the same scene must not
+ * silently overwrite each other, and cue lists are whole-list writes, so a
+ * last-writer-wins update would discard a split somebody else had just made.
+ */
+export const sceneCaptionCues = pgTable(
+  "scene_caption_cues",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").notNull(),
+    sceneId: uuid("scene_id").notNull(),
+    sceneVersionId: uuid("scene_version_id").notNull(),
+    /** The exact narration these times describe. */
+    audioGenerationId: uuid("audio_generation_id").notNull(),
+    /** Ordered, non-overlapping cues, relative to the narration start. */
+    cues: jsonb("cues").$type<CaptionCue[]>().notNull(),
+    revision: integer("revision").notNull().default(1),
+    updatedByUserId: uuid("updated_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("scene_caption_cues_version_audio_unique").on(
+      table.sceneVersionId,
+      table.audioGenerationId,
+    ),
+    index("scene_caption_cues_workspace_project_index").on(
+      table.workspaceId,
+      table.projectId,
+    ),
+    // An empty correction is not a correction; it would blank the scene.
+    check(
+      "scene_caption_cues_not_empty",
+      sql`jsonb_typeof(${table.cues}) = 'array' and jsonb_array_length(${table.cues}) > 0`,
+    ),
+    check("scene_caption_cues_revision_positive", sql`${table.revision} > 0`),
+    foreignKey({
+      columns: [
+        table.sceneVersionId,
+        table.sceneId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        sceneVersions.id,
+        sceneVersions.sceneId,
+        sceneVersions.projectId,
+        sceneVersions.workspaceId,
+      ],
+      name: "scene_caption_cues_tenant_version_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.audioGenerationId, table.workspaceId],
+      foreignColumns: [
+        sceneAudioGenerations.id,
+        sceneAudioGenerations.workspaceId,
+      ],
+      name: "scene_caption_cues_tenant_audio_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
+export type SceneCaptionCues = typeof sceneCaptionCues.$inferSelect;

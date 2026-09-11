@@ -2,24 +2,42 @@
 
 import { CaptionsIcon } from "lucide-react";
 import { SubtitleSegmentList } from "@/components/subtitles/SubtitleSegmentList";
+import { CaptionTimingNotice } from "@/components/subtitles/CaptionTimingNotice";
+import type { CueTimingSource } from "@/lib/subtitles/cue-timing-source";
 import type {
   SaveSubtitleSegmentHandler,
+  SubtitleSceneSummaryView,
   SubtitleSegmentView,
 } from "@/lib/subtitles/subtitle-view";
 
 /**
- * Lists the derived caption segments and lets editors override individual cue
- * text. Timing is never hand-edited: it is recomputed deterministically from
- * approved narration audio, so only the words are editable here.
+ * Lists the caption segments, their words, and how each scene's times were
+ * arrived at.
+ *
+ * The claim this comment used to make — that timing is never hand-edited and is
+ * always recomputed from the audio — stopped being true when cue correction
+ * arrived. Times are derived by default, moved onto measured pauses where the
+ * narration has them, and replaced outright by anything a person sets; the
+ * per-scene editor inside each group is where that happens.
  */
 export function SubtitleEditor({
   segments,
+  scenes,
+  projectId,
+  timingSource,
   canManage,
+  minimumCueDurationMilliseconds,
   onSave,
+  onCuesSaved,
 }: {
   segments: SubtitleSegmentView[];
+  scenes: SubtitleSceneSummaryView[];
+  projectId: string;
+  timingSource: CueTimingSource;
   canManage: boolean;
+  minimumCueDurationMilliseconds: number;
   onSave: SaveSubtitleSegmentHandler;
+  onCuesSaved: () => void;
 }) {
   return (
     <section aria-label="Caption segments" className="space-y-3">
@@ -41,11 +59,18 @@ export function SubtitleEditor({
           </p>
         </div>
       ) : (
-        <SubtitleSegmentList
-          canManage={canManage}
-          onSave={onSave}
-          segments={segments}
-        />
+        <>
+          <CaptionTimingNotice source={timingSource} />
+          <SubtitleSegmentList
+            canManage={canManage}
+            minimumCueDurationMilliseconds={minimumCueDurationMilliseconds}
+            onCuesSaved={onCuesSaved}
+            onSave={onSave}
+            projectId={projectId}
+            scenes={scenes}
+            segments={segments}
+          />
+        </>
       )}
     </section>
   );

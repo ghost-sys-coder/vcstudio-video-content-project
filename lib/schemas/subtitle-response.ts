@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { captionStyleSchema } from "@/lib/subtitles/caption-style";
 
+/** Kept in step with `CueTimingSource`; a new source must be added here too. */
+const timingSourceSchema = z.enum(["estimated", "pause_adjusted", "manual"]);
+
 const segmentSchema = z.object({
   key: z.string(),
   sceneId: z.uuid(),
@@ -14,16 +17,23 @@ const segmentSchema = z.object({
   startFrame: z.number().int().nonnegative(),
   endFrame: z.number().int().nonnegative(),
   exceedsMaxDuration: z.boolean(),
+  timingSource: timingSourceSchema,
 });
 
 const sceneSummarySchema = z.object({
   sceneId: z.uuid(),
+  sceneVersionId: z.uuid(),
   sceneNumber: z.number().int().positive(),
   sceneApproved: z.boolean(),
   hasApprovedImage: z.boolean(),
   hasApprovedAudio: z.boolean(),
   segmentCount: z.number().int().nonnegative(),
   narrationPreview: z.string(),
+  audioGenerationId: z.uuid().nullable(),
+  audioDurationMilliseconds: z.number().int().nonnegative(),
+  sceneStartMilliseconds: z.number().int().nonnegative(),
+  cueRevision: z.number().int().positive().nullable(),
+  timingSource: timingSourceSchema,
 });
 
 const issueSchema = z.object({
@@ -72,6 +82,7 @@ export const subtitleWorkspaceResponseSchema = z.discriminatedUnion("success", [
       }),
       totalDurationMilliseconds: z.number().int().nonnegative(),
       hasSubtitles: z.boolean(),
+      timingSource: timingSourceSchema,
     }),
   }),
   z.object({ success: z.literal(false), error: z.string() }),

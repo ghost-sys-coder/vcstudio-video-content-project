@@ -138,3 +138,24 @@ export async function listApprovedSceneAudioAssets(input: {
       })),
   ];
 }
+
+/**
+ * The approved narration for one scene version, or `null` when there is none.
+ *
+ * Delegates to the list query rather than writing a second one, so the rule for
+ * what counts as approved narration, including audio reused from an earlier
+ * revision, stays in a single place. Two queries would drift, and this one
+ * decides which recording a caption correction is allowed to describe.
+ */
+export async function findApprovedSceneAudioForVersion(input: {
+  workspaceId: string;
+  projectId: string;
+  sceneVersionId: string;
+}) {
+  const rows = await listApprovedSceneAudioAssets({
+    workspaceId: input.workspaceId,
+    projectId: input.projectId,
+    sceneVersionIds: [input.sceneVersionId],
+  });
+  return rows[0] ?? null;
+}

@@ -16,6 +16,7 @@ function segment(
     startFrame: 0,
     endFrame: 30,
     exceedsMaxDuration: false,
+    timingSource: "estimated" as const,
     ...overrides,
   };
 }
