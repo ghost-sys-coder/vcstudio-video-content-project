@@ -54,6 +54,14 @@ export interface SceneImageClientConfiguration {
 
 export interface SceneImageDetailsView {
   stylePresets: SceneImageStylePresetView[];
+  /**
+   * The style version this project was created with, when it has one. The
+   * generate dialogs preselect it so a project keeps producing the look it was
+   * started in without anyone having to remember which that was. Null for
+   * projects created before a project-level style existed, and for those the
+   * dialogs fall back to the workspace default exactly as before.
+   */
+  projectStylePresetVersionId: string | null;
   references: SceneImageReferenceView[];
   generations: SceneImageGenerationView[];
   configuration: SceneImageClientConfiguration;
@@ -69,6 +77,11 @@ export type SceneImageDetailsResponse =
   | { success: false; error: string };
 
 export interface SceneImageSelection {
+  /**
+   * Which image of the scene this generation is for, zero-based. Zero is the
+   * scene's first and, for almost every scene, only image.
+   */
+  shotIndex: number;
   stylePresetVersionId: string;
   quality: SceneImageQuality;
   sizes: SceneImageApiSize[];
@@ -92,6 +105,8 @@ export interface SceneImageGenerationView {
   reused?: boolean;
   id: string;
   generationVersion: number;
+  /** Which image of the scene this generation is for. */
+  shotIndex: number;
   status: SceneImageGenerationStatus;
   reviewStatus: SceneImageReviewStatus;
   source: "ai_generated" | "user_uploaded";

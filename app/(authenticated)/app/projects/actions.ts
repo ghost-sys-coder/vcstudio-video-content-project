@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createProject } from "@/db/commands/create-project.command";
+import { findLatestStylePresetVersion } from "@/db/commands/style-preset-commands";
 import { findChannelProfile } from "@/db/repositories/channel-profiles.repository";
 import { findCurrentFormatPresetVersion } from "@/db/repositories/format-presets.repository";
 import { findContentIdea } from "@/db/repositories/content-ideas.repository";
@@ -165,11 +166,24 @@ export async function createProjectAction(
     if (parsed.data.formatPresetId && !formatVersion)
       return { error: "That format is unavailable.", success: false };
 
+    // Same resolution for the visual style. Looked up inside the caller's
+    // workspace, so a style id from the browser can never reach another
+    // workspace's wording; the composite foreign key refuses it regardless.
+    const styleVersion = parsed.data.stylePresetId
+      ? await findLatestStylePresetVersion({
+          workspaceId: context.activeMembership.workspaceId,
+          stylePresetId: parsed.data.stylePresetId,
+        })
+      : null;
+    if (parsed.data.stylePresetId && !styleVersion)
+      return { error: "That visual style is unavailable.", success: false };
+
     const project = await createProject({
       ...parsed.data,
       workspaceId: context.activeMembership.workspaceId,
       userId: context.user.id,
       formatPresetVersionId: formatVersion?.id ?? null,
+      stylePresetVersionId: styleVersion?.version.id ?? null,
       sourceContentIdeaId: idea?.id ?? null,
       brief: idea
         ? {

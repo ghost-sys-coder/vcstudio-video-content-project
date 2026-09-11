@@ -33,6 +33,23 @@ export type VideoCompositionSceneCharacter = {
   amplitudeEnvelope: number[];
 };
 
+/**
+ * One still within a multi-image scene, with its object key already resolved
+ * to a signed URL and its frames relative to the scene's own start.
+ */
+export type VideoCompositionSceneShot = {
+  imageUrl: string;
+  framing?: {
+    mode: "cover" | "contain" | "outpaint";
+    focalPointXBps: number;
+    focalPointYBps: number;
+    scaleBps: number;
+    backgroundColor: string;
+  };
+  startFrame: number;
+  endFrame: number;
+};
+
 export type VideoCompositionScene = {
   sceneId: string;
   sceneNumber: number;
@@ -48,11 +65,21 @@ export type VideoCompositionScene = {
     scaleBps: number;
     backgroundColor: string;
   };
+  /**
+   * Present only when the scene holds more than one image. Absent for every
+   * single-image scene, which renders through `imageUrl` exactly as before.
+   */
+  shots?: VideoCompositionSceneShot[];
   audioUrl: string;
   audioTrimBeforeFrames?: number;
   captions: RenderCaptionData[];
   /** Absent for static-image projects. */
   characters?: VideoCompositionSceneCharacter[];
+  /**
+   * The narration's loudness, one value per frame of this scene, 0..1. Present
+   * only when this project draws a level meter.
+   */
+  narrationEnvelope?: number[];
 };
 
 // A type alias (not an interface) so it satisfies `Record<string, unknown>`,
@@ -67,4 +94,21 @@ export type VideoCompositionInput = {
   watermarkText: string;
   captionStyle: CaptionStyleData;
   scenes: VideoCompositionScene[];
+  /** Present only when this project has a sound bed. */
+  backgroundAudio?: {
+    url: string;
+    /** 0..1, already converted from the stored percent. */
+    volume: number;
+    loop: boolean;
+  };
+  /** Present only when the level meter is switched on. */
+  levelMeter?: {
+    position:
+      | "bottomLeft"
+      | "bottomCenter"
+      | "bottomRight"
+      | "topLeft"
+      | "topCenter"
+      | "topRight";
+  };
 };

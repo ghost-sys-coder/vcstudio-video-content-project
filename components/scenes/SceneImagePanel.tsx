@@ -21,6 +21,7 @@ import { ImageSizeMultiSelect } from "@/components/scenes/ImageSizeMultiSelect";
 import { ReferenceAssetSelector } from "@/components/scenes/ReferenceAssetSelector";
 import { SceneImageSizeGroup } from "@/components/scenes/SceneImageSizeGroup";
 import { SceneImageUploadDialog } from "@/components/scenes/SceneImageUploadDialog";
+import { SceneShotSelector } from "@/components/scenes/SceneShotSelector";
 import { StylePresetSelector } from "@/components/scenes/StylePresetSelector";
 
 export function SceneImagePanel({
@@ -93,6 +94,14 @@ export function SceneImagePanel({
     (preset) => preset.versionId === selection.stylePresetVersionId,
   );
   const configurationDisabled = Boolean(activeGeneration);
+  // How many images the scene actually has approved, which is what decides
+  // how many slots to offer. Counted from distinct shot indexes rather than
+  // from approved rows, because one shot can be approved at several sizes.
+  const approvedShotCount = new Set(
+    generations
+      .filter((generation) => generation.reviewStatus === "approved")
+      .map((generation) => generation.shotIndex),
+  ).size;
   const generationDisabled =
     !sceneApproved ||
     !canGenerate ||
@@ -162,6 +171,15 @@ export function SceneImagePanel({
           id={`${idPrefix}-image-size`}
           onChange={(sizes) => onSelectionChange({ ...selection, sizes })}
           value={selection.sizes}
+        />
+        <SceneShotSelector
+          approvedShotCount={approvedShotCount}
+          disabled={configurationDisabled || !canGenerate}
+          id={`${idPrefix}-shot-index`}
+          onChange={(shotIndex) =>
+            onSelectionChange({ ...selection, shotIndex })
+          }
+          value={selection.shotIndex}
         />
       </div>
       <ImageQualitySelector

@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FormatInheritanceSummary } from "@/components/projects/FormatInheritanceSummary";
+import { ProjectStyleField } from "@/components/projects/ProjectStyleField";
 import type { FormatChoice } from "@/lib/formats/format-choice";
 import { resolveFormatInheritance } from "@/lib/formats/format-inheritance";
 import { Textarea } from "@/components/ui/textarea";
 import { VideoKindSelect } from "@/components/projects/VideoKindSelect";
 import type { ProjectAspectRatio } from "@/db/schema";
 import type { IdeaNicheGroup, SavedIdeaView } from "@/lib/ideas/ideas-view";
+import type { SceneImageStylePresetView } from "@/lib/scenes/scene-image-view";
 import {
   suggestAspectRatioForPlatform,
   suggestProjectNameFromTopic,
@@ -22,11 +24,13 @@ export function CreateProjectForm({
   formats,
   ideaGroups,
   initialIdeaId,
+  styles,
 }: {
   defaultBudgetCents: number;
   formats: FormatChoice[];
   ideaGroups: IdeaNicheGroup[];
   initialIdeaId?: string | null;
+  styles: SceneImageStylePresetView[];
 }) {
   const ideasById = useMemo(() => {
     const map = new Map<string, SavedIdeaView>();
@@ -48,6 +52,11 @@ export function CreateProjectForm({
       : "16:9",
   );
   const [formatPresetId, setFormatPresetId] = useState("");
+  // Defaults to the workspace default so a creator who ignores the field gets
+  // exactly the behaviour projects had before it existed.
+  const [stylePresetId, setStylePresetId] = useState(
+    styles.find((style) => style.isDefault)?.id ?? styles[0]?.id ?? "",
+  );
   const [framesPerSecond, setFramesPerSecond] = useState("30");
   const [budgetDollars, setBudgetDollars] = useState(
     (defaultBudgetCents / 100).toFixed(2),
@@ -69,6 +78,13 @@ export function CreateProjectForm({
       setFramesPerSecond(String(format.values.framesPerSecond));
     if (format.values.maximumBudgetCents !== null)
       setBudgetDollars((format.values.maximumBudgetCents / 100).toFixed(2));
+    // A format may name a style. Adopt it, but only when this workspace still
+    // offers it, so an archived style cannot be reintroduced by an old format.
+    if (
+      format.values.stylePresetId &&
+      styles.some((style) => style.id === format.values.stylePresetId)
+    )
+      setStylePresetId(format.values.stylePresetId);
   }
 
   const inheritance = selectedFormat
@@ -124,6 +140,11 @@ export function CreateProjectForm({
           </select>
         </div>
       ) : null}
+      <ProjectStyleField
+        onChange={setStylePresetId}
+        styles={styles}
+        value={stylePresetId}
+      />
       {ideaGroups.length ? (
         <div className="space-y-2">
           <Label htmlFor="project-idea">Start from a saved idea</Label>

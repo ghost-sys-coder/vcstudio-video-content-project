@@ -5,11 +5,18 @@ import {
   deriveSceneTransition,
 } from "@/lib/render/scene-motion";
 import type {
+  RenderBackgroundAudioData,
+  RenderLevelMeterPosition,
   RenderSceneCharacterData,
   RenderTimelineSnapshot,
 } from "@/lib/render/render-timeline-snapshot";
 import { AMPLITUDE_ENVELOPE_SAMPLE_RATE_HZ } from "@/lib/media/amplitude-envelope";
 import { DEFAULT_SCENE_FRAMING } from "@/lib/output-variants/scene-framing";
+import {
+  MINIMUM_SHOT_DURATION_MILLISECONDS,
+  placeShotsOnCueBoundaries,
+} from "@/lib/scenes/shot-timing";
+import { millisecondsToFrames } from "@/lib/timeline/scene-timeline";
 
 /**
  * Freezes a ready {@link VideoTimeline} into the serializable render snapshot,
@@ -27,6 +34,15 @@ export function buildRenderTimelineSnapshot(input: {
    * which leaves `characters` absent on every scene exactly as before.
    */
   charactersBySceneVersionId?: ReadonlyMap<string, RenderSceneCharacterData[]>;
+  /**
+   * Presentation effects applied over the whole video. Omitted for a project
+   * that has none, which leaves the snapshot exactly as it was before these
+   * existed.
+   */
+  effects?: {
+    backgroundAudio?: RenderBackgroundAudioData;
+    levelMeter?: { position: RenderLevelMeterPosition };
+  };
 }): RenderTimelineSnapshot {
   const { timeline } = input;
   return {
@@ -42,6 +58,48 @@ export function buildRenderTimelineSnapshot(input: {
       const characters = input.charactersBySceneVersionId?.get(
         scene.sceneVersionId,
       );
+
+      // Shots are placed against the scene's caption lines even when captions
+      // are not burned in. The lines are the record of where the narrator
+      // paused, and turning subtitles off does not move the pauses.
+      const shotImages = [scene.image, ...scene.additionalShots];
+      const placement =
+        shotImages.length > 1
+          ? placeShotsOnCueBoundaries({
+              shotCount: shotImages.length,
+              sceneDurationMilliseconds: scene.durationMilliseconds,
+              cueStartMilliseconds: scene.captions.map(
+                (caption) => caption.startMs - scene.startMilliseconds,
+              ),
+              minimumShotDurationMilliseconds:
+                MINIMUM_SHOT_DURATION_MILLISECONDS,
+            })
+          : null;
+      // A scene too short to hold its images collapses to one placement. The
+      // extra images are then dropped rather than flashed, and `image` alone
+      // renders the scene exactly as a single-image scene would.
+      const shots =
+        placement && placement.shots.length > 1
+          ? placement.shots.map((slot, index) => {
+              const source = shotImages[index] ?? scene.image;
+              return {
+                objectKey: source.objectKey,
+                width: source.width,
+                height: source.height,
+                framing: source.framing ?? DEFAULT_SCENE_FRAMING,
+                startFrame: millisecondsToFrames(
+                  slot.startMilliseconds,
+                  timeline.framesPerSecond,
+                ),
+                endFrame: millisecondsToFrames(
+                  slot.endMilliseconds,
+                  timeline.framesPerSecond,
+                ),
+                startedOnCueBoundary: slot.startedOnCueBoundary,
+              };
+            })
+          : null;
+
       return {
         sceneId: scene.sceneId,
         sceneNumber: scene.sceneNumber,
@@ -58,6 +116,9 @@ export function buildRenderTimelineSnapshot(input: {
           height: scene.image.height,
           framing: scene.image.framing ?? DEFAULT_SCENE_FRAMING,
         },
+        // Absent, not empty, for a single-image scene, so an existing frozen
+        // snapshot is unchanged and re-rendering it reproduces.
+        ...(shots ? { shots } : {}),
         audio: {
           objectKey: scene.audio.objectKey,
           // A ready timeline guarantees a measured duration; the scene slot
@@ -66,6 +127,14 @@ export function buildRenderTimelineSnapshot(input: {
             scene.audio.durationMilliseconds ?? scene.durationMilliseconds,
           format: scene.audio.format,
           trimBeforeFrames: scene.audioTrimBeforeFrames ?? 0,
+          // Only when a meter will actually be drawn: otherwise this is a
+          // per-frame array stored on every render that nothing reads.
+          ...(input.effects?.levelMeter && scene.audio.amplitudeEnvelope?.length
+            ? {
+                amplitudeEnvelope: scene.audio.amplitudeEnvelope,
+                amplitudeSampleRateHz: AMPLITUDE_ENVELOPE_SAMPLE_RATE_HZ,
+              }
+            : {}),
         },
         captions: input.includeCaptions
           ? scene.captions.map((caption) => ({
@@ -93,5 +162,13 @@ export function buildRenderTimelineSnapshot(input: {
           : {}),
       };
     }),
+    // Absent rather than null, so a snapshot frozen before these existed is
+    // byte-identical and re-renders to the same video.
+    ...(input.effects?.backgroundAudio
+      ? { backgroundAudio: input.effects.backgroundAudio }
+      : {}),
+    ...(input.effects?.levelMeter
+      ? { levelMeter: input.effects.levelMeter }
+      : {}),
   };
 }

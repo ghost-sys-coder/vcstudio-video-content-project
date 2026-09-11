@@ -22,6 +22,7 @@ import {
   type SocialPostTargetView,
 } from "@/lib/social/social-post-view";
 import { CONTENT_PLATFORM_LABELS } from "@/lib/titles/title-view";
+import { toVisualMediaKind } from "@/lib/media/visual-media-kind";
 
 async function loadConnectionsByIdAndList(workspaceId: string): Promise<{
   byId: Map<string, PostConnectionView>;
@@ -114,7 +115,9 @@ export async function loadSocialPostsView(input: {
         mediaPreviewUrl: first
           ? await createMediaAssetDownloadUrl(first.objectKey)
           : null,
-        mediaKind: first?.kind ?? null,
+        // Null for a sound file rather than a guess: the preview tile shows
+        // an image or a video, and audio is not attachable to a post.
+        mediaKind: first ? toVisualMediaKind(first.kind) : null,
       });
     }),
   );

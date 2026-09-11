@@ -50,6 +50,15 @@ export const createProjectSchema = z.object({
     .union([z.uuid(), z.literal("")])
     .optional()
     .transform((value) => (value ? value : null)),
+  // The visual style this project's images default to. Like the format above,
+  // the project stores the resolved *version*, not this id, so editing the
+  // style later cannot change what a half-finished project is producing.
+  // Omitted means "use the workspace default", which is what every project
+  // created before this field existed did.
+  stylePresetId: z
+    .union([z.uuid(), z.literal("")])
+    .optional()
+    .transform((value) => (value ? value : null)),
 });
 
 export const updateProjectSchema = createProjectSchema.extend({

@@ -6,6 +6,7 @@ import {
   listProjectsForChannel,
 } from "@/db/repositories/channel-profiles.repository";
 import { listCustomVoices } from "@/db/repositories/custom-voice.repository";
+import { listLatestStylePresetVersions } from "@/db/repositories/scene-images.repository";
 import { buildChannelProfileView } from "@/lib/channels/channel-profile-view";
 import { findWorkspaceLogo } from "@/db/repositories/storage-objects.repository";
 import {
@@ -18,6 +19,7 @@ import { isMarketingStudioEnabledForWorkspace } from "@/lib/marketing/marketing-
 import { can, canManageWorkspace } from "@/lib/policies/workspace-policy";
 import { loadWorkspaceChannelsView } from "@/lib/publishing/workspace-connections-view";
 import { createWorkspaceLogoDownloadUrl } from "@/lib/storage/workspace-logo-storage";
+import { buildStylePresetSettingsView } from "@/lib/styles/style-preset-view";
 
 export default async function WorkspaceSettingsPage({
   searchParams,
@@ -48,6 +50,7 @@ export default async function WorkspaceSettingsPage({
     channelProfileRows,
     unassignedProjects,
     projectCountsByChannel,
+    stylePresetRows,
   ] = await Promise.all([
     searchParams,
     findWorkspaceLogo(context.activeMembership.workspaceId),
@@ -67,6 +70,12 @@ export default async function WorkspaceSettingsPage({
     }),
     countProjectsByChannel({
       workspaceId: context.activeMembership.workspaceId,
+    }),
+    // Archived styles are included so the settings screen can offer restoring
+    // one; the generate dialog loads the same list without them.
+    listLatestStylePresetVersions({
+      workspaceId: context.activeMembership.workspaceId,
+      includeArchived: true,
     }),
   ]);
   const logoUrl = logo
@@ -89,6 +98,10 @@ export default async function WorkspaceSettingsPage({
       canManageCustomVoices={can(
         context.activeMembership.role,
         "manageCustomVoices",
+      )}
+      canManageStylePresets={can(
+        context.activeMembership.role,
+        "manageStylePresets",
       )}
       channelsView={channelsView}
       currentUserId={context.user.id}
@@ -114,6 +127,7 @@ export default async function WorkspaceSettingsPage({
         youtube: youtube ?? null,
       }}
       pendingInvitations={pendingInvitations}
+      stylePresets={stylePresetRows.map(buildStylePresetSettingsView)}
       workspaceId={context.activeMembership.workspaceId}
       workspaceName={context.activeMembership.workspaceName}
     />

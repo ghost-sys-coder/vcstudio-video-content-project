@@ -49,6 +49,10 @@ export const storageObjectKindEnum = pgEnum("storage_object_kind", [
 export const mediaAssetKindEnum = pgEnum("media_asset_kind", [
   "image",
   "video",
+  // Added for background sound beds and effects. The library's inspection
+  // pipeline already understood audio — `verifiedAudioMetadataSchema` and the
+  // ffprobe path predate this — it simply had no kind to store one under.
+  "audio",
 ]);
 
 // Library uploads are two-phase (authorize a signed PUT, then confirm), so a row
@@ -536,6 +540,9 @@ export const auditActionEnum = pgEnum("audit_action", [
   "google_business_synced",
   "google_business_disconnected",
   "storage_reconciled",
+  "style_preset_created",
+  "style_preset_updated",
+  "style_preset_archived",
 ]);
 
 export const userThemePreferenceEnum = pgEnum("user_theme_preference", [
@@ -1056,6 +1063,19 @@ export const projects = pgTable(
      */
     formatPresetVersionId: uuid("format_preset_version_id"),
     /**
+     * The visual style this project's images default to, chosen when the
+     * project is created. A snapshot of one style *version*, matching
+     * `formatPresetVersionId` above and matching what every image generation
+     * already records, so editing the style later cannot silently change what
+     * a half-finished project is producing.
+     *
+     * Nullable, and it stays nullable: projects created before a project-level
+     * style existed have no correct answer, and generation still falls back to
+     * the workspace default. It is a default, not a lock — the generate dialog
+     * may still choose another style for one batch.
+     */
+    stylePresetVersionId: uuid("style_preset_version_id"),
+    /**
      * The saved idea this project started from, kept so repeat use of an idea
      * is visible as history rather than silently blocked.
      */
@@ -1134,6 +1154,16 @@ export const projects = pgTable(
         formatPresetVersions.workspaceId,
       ],
       name: "projects_tenant_format_version_fkey",
+    }),
+    // Same reasoning as the format version above: tenant-scoped so a project
+    // can never cite another workspace's style, and NO ACTION because a style
+    // version is immutable history that must not vanish from under a project
+    // still pointing at it. Archiving a style leaves this intact by design —
+    // the project keeps rendering in the look it was started in.
+    foreignKey({
+      columns: [table.stylePresetVersionId, table.workspaceId],
+      foreignColumns: [stylePresetVersions.id, stylePresetVersions.workspaceId],
+      name: "projects_tenant_style_version_fkey",
     }),
   ],
 );
@@ -2546,6 +2576,19 @@ export const sceneImageGenerations = pgTable(
     projectId: uuid("project_id").notNull(),
     sceneId: uuid("scene_id").notNull(),
     sceneVersionId: uuid("scene_version_id").notNull(),
+    /**
+     * Which image this is within the scene, zero-based.
+     *
+     * A scene may hold several stills that change on caption boundaries. Shot
+     * 0 is the scene's first and, for every scene that has only one image, its
+     * only one — which is why the default is 0 and why every row written
+     * before multi-image scenes existed is already correct.
+     *
+     * This is part of the approved-image identity, not a display hint: the
+     * partial unique index below keys on it, so a scene can hold one approved
+     * image per size *per shot* rather than one per size.
+     */
+    shotIndex: integer("shot_index").notNull().default(0),
     purpose: imageGenerationPurposeEnum("purpose").notNull().default("scene"),
     source: imageGenerationSourceEnum("source")
       .notNull()
@@ -2626,10 +2669,14 @@ export const sceneImageGenerations = pgTable(
       table.workspaceId,
       table.requestNonce,
     ),
-    // One approved image PER SIZE per scene version — a scene can have up to
-    // three simultaneously-approved images (one per size), not just one.
+    // One approved image per size PER SHOT of a scene version. Before
+    // multi-image scenes this keyed on (scene version, size) alone; adding the
+    // shot is what permits a second approved still, and keeping the index
+    // rather than dropping it is what still prevents two rival images claiming
+    // the same shot. Every pre-existing row carries shot 0, so the old rule is
+    // exactly this rule restricted to a single shot.
     uniqueIndex("scene_image_generations_approved_scene_version_size_unique")
-      .on(table.sceneVersionId, table.size)
+      .on(table.sceneVersionId, table.size, table.shotIndex)
       .where(sql`${table.reviewStatus} = 'approved'`),
     index("scene_image_generations_workspace_project_scene_index").on(
       table.workspaceId,
@@ -2648,6 +2695,10 @@ export const sceneImageGenerations = pgTable(
     check(
       "scene_image_generations_version_positive",
       sql`${table.generationVersion} > 0`,
+    ),
+    check(
+      "scene_image_generations_shot_index_nonnegative",
+      sql`${table.shotIndex} >= 0`,
     ),
     check(
       "scene_image_generations_cost_nonnegative",
@@ -6719,6 +6770,93 @@ export const taskHeartbeats = pgTable(
       .notNull(),
   },
   (table) => [primaryKey({ columns: [table.taskId, table.environment] })],
+);
+
+/**
+ * How a project's video presents itself beyond its scenes: a background sound
+ * bed, and whether a narration level meter is drawn.
+ *
+ * One row per project, created on first use. Both settings live together
+ * because they are the same kind of thing — presentation applied at render
+ * time, over every scene — and splitting them would mean two tables of two
+ * columns each, loaded on the same screen and written by the same form.
+ *
+ * `revision` is an optimistic lock, matching the caption corrections: the form
+ * writes the whole row, so last-writer-wins would discard a change somebody
+ * else made to a different field of it.
+ */
+export const projectRenderEffects = pgTable(
+  "project_render_effects",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").notNull(),
+    /**
+     * The sound bed, drawn from the workspace media library rather than from
+     * its own upload path, so one piece of music can serve every project and
+     * the library's existing inspection, limits and soft deletion all apply.
+     */
+    backgroundMediaAssetId: uuid("background_media_asset_id"),
+    /**
+     * Percent of the asset's own level. Low by default: a bed that competes
+     * with narration is worse than no bed, and a creator who wants it louder
+     * can say so deliberately.
+     */
+    backgroundVolumePercent: integer("background_volume_percent")
+      .notNull()
+      .default(12),
+    /** Beds are usually shorter than the video, so looping is the default. */
+    backgroundLoop: boolean("background_loop").notNull().default(true),
+    /**
+     * Draws a meter that moves with the narration's measured loudness. Off by
+     * default: it is a deliberate stylistic choice, not an improvement every
+     * video wants.
+     */
+    levelMeterEnabled: boolean("level_meter_enabled").notNull().default(false),
+    levelMeterPosition: text("level_meter_position")
+      .notNull()
+      .default("bottomRight"),
+    revision: integer("revision").notNull().default(1),
+    updatedByUserId: uuid("updated_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("project_render_effects_project_unique").on(table.projectId),
+    check(
+      "project_render_effects_volume_range",
+      sql`${table.backgroundVolumePercent} between 0 and 100`,
+    ),
+    check(
+      "project_render_effects_revision_positive",
+      sql`${table.revision} > 0`,
+    ),
+    check(
+      "project_render_effects_meter_position",
+      sql`${table.levelMeterPosition} in ('bottomLeft', 'bottomCenter', 'bottomRight', 'topLeft', 'topCenter', 'topRight')`,
+    ),
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [projects.id, projects.workspaceId],
+      name: "project_render_effects_tenant_project_fkey",
+    }).onDelete("cascade"),
+    // NO ACTION, and safe: library assets are soft deleted and never removed,
+    // so this can never block. A composite SET NULL is not an option — it would
+    // null workspace_id too, which is NOT NULL.
+    foreignKey({
+      columns: [table.backgroundMediaAssetId, table.workspaceId],
+      foreignColumns: [mediaAssets.id, mediaAssets.workspaceId],
+      name: "project_render_effects_tenant_media_fkey",
+    }),
+  ],
 );
 
 export const projectSubtitleSettings = pgTable(

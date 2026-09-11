@@ -37,6 +37,7 @@ const referenceViewSchema = z.object({
 const generationViewSchema = z.object({
   id: z.uuid(),
   generationVersion: z.number().int().positive(),
+  shotIndex: z.number().int().nonnegative(),
   status: z.enum([
     "pending",
     "queued",
@@ -72,6 +73,7 @@ export const sceneImageDetailsResponseSchema = z.discriminatedUnion("success", [
     success: z.literal(true),
     data: z.object({
       stylePresets: z.array(stylePresetViewSchema),
+      projectStylePresetVersionId: z.uuid().nullable(),
       references: z.array(referenceViewSchema),
       generations: z.array(generationViewSchema),
       configuration: z.object({

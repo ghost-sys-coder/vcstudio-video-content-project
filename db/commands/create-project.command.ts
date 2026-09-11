@@ -35,6 +35,11 @@ export async function createProject(input: {
    * so a later edit to the preset cannot reach back into this project.
    */
   formatPresetVersionId?: string | null;
+  /**
+   * The visual style version this project's images default to. A snapshot for
+   * the same reason as the format version above.
+   */
+  stylePresetVersionId?: string | null;
   /** The saved idea this project started from, for repeat-use history. */
   sourceContentIdeaId?: string | null;
   /**
@@ -72,6 +77,7 @@ export async function createProject(input: {
         maximumBudgetCents: input.maximumBudgetCents,
         channelProfileId: input.channelProfileId ?? null,
         formatPresetVersionId: input.formatPresetVersionId ?? null,
+        stylePresetVersionId: input.stylePresetVersionId ?? null,
         sourceContentIdeaId: input.sourceContentIdeaId ?? null,
         createdByUserId: input.userId,
       })

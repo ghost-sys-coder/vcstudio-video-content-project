@@ -150,6 +150,12 @@ export async function createSceneImageGenerationReservation(input: {
   projectId: string;
   sceneId: string;
   sceneVersionId: string;
+  /**
+   * Which image of the scene this generation is for. Defaults to the scene's
+   * first and only image, which is what every caller wanted before scenes
+   * could hold more than one.
+   */
+  shotIndex?: number;
   purpose?: "scene" | "variant_outpaint";
   outputVariantId?: string | null;
   sourceImageGenerationId?: string | null;
@@ -372,7 +378,7 @@ export async function createSceneImageGenerationReservation(input: {
       inserted_generation as (
         insert into scene_image_generations (
           id, workspace_id, project_id, scene_id, scene_version_id,
-          purpose, output_variant_id, source_image_generation_id,
+          shot_index, purpose, output_variant_id, source_image_generation_id,
           style_preset_version_id, prompt_template_version_id,
           generation_version, request_nonce, idempotency_key,
           request_fingerprint, model, quality, size, output_format,
@@ -386,6 +392,7 @@ export async function createSceneImageGenerationReservation(input: {
           ${input.projectId}::uuid,
           ${input.sceneId}::uuid,
           ${input.sceneVersionId}::uuid,
+          ${input.shotIndex ?? 0},
           ${input.purpose ?? "scene"}::image_generation_purpose,
           ${input.outputVariantId ?? null}::uuid,
           ${input.sourceImageGenerationId ?? null}::uuid,
@@ -1493,6 +1500,11 @@ export async function approveSceneImageGeneration(input: {
           // SIZE now, so approving one size must not demote another size's
           // already-approved image.
           eq(sceneImageGenerations.size, generation.size),
+          // And scoped to the same shot, for exactly the same reason. A scene
+          // may hold several stills that change on caption boundaries;
+          // approving the image for shot 1 must not un-approve shot 0, which
+          // would silently empty the scene's first image.
+          eq(sceneImageGenerations.shotIndex, generation.shotIndex),
           eq(sceneImageGenerations.reviewStatus, "approved"),
           ne(sceneImageGenerations.id, input.generationId),
         ),
@@ -1648,6 +1660,8 @@ export async function saveUploadedSceneImage(input: {
   size: SceneImageApiSize;
   objectKey: string;
   generationId: string;
+  /** Which image of the scene this upload becomes. Defaults to the first. */
+  shotIndex?: number;
   contentType: ImageReferenceMimeType;
   sizeBytes: number;
   width: number;
@@ -1671,6 +1685,7 @@ export async function saveUploadedSceneImage(input: {
         projectId: input.projectId,
         sceneId: input.sceneId,
         sceneVersionId: input.sceneVersionId,
+        shotIndex: input.shotIndex ?? 0,
         purpose: "scene",
         source: "user_uploaded",
         generationVersion,

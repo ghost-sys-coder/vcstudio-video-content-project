@@ -1,7 +1,8 @@
 import "server-only";
 
-import { and, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
+import { MAX_SHOTS_PER_SCENE } from "@/lib/scenes/shot-timing";
 import {
   listReusedImages,
   listReusedAudio,
@@ -55,6 +56,7 @@ export async function listApprovedSceneImageAssets(input: {
     .select({
       generationId: sceneImageGenerations.id,
       sceneVersionId: sceneImageGenerations.sceneVersionId,
+      shotIndex: sceneImageGenerations.shotIndex,
       assetObjectKey: sceneImageGenerations.assetObjectKey,
       assetWidth: sceneImageGenerations.assetWidth,
       assetHeight: sceneImageGenerations.assetHeight,
@@ -72,7 +74,16 @@ export async function listApprovedSceneImageAssets(input: {
         isNotNull(sceneImageGenerations.assetObjectKey),
       ),
     )
-    .limit(MAX_SCENE_VERSIONS);
+    // Ordered because a scene version may now hold several approved images,
+    // one per shot. Without an explicit order the caller's "first row wins"
+    // map would pick whichever row the planner returned first, and a render
+    // would not reproduce. The limit is raised in step, since the old ceiling
+    // assumed one row per scene version.
+    .orderBy(
+      asc(sceneImageGenerations.sceneVersionId),
+      asc(sceneImageGenerations.shotIndex),
+    )
+    .limit(MAX_SCENE_VERSIONS * MAX_SHOTS_PER_SCENE);
   const present = new Set(native.map((row) => row.sceneVersionId));
   const reused = await listReusedImages({ ...input, sceneVersionIds });
   return [
@@ -84,6 +95,9 @@ export async function listApprovedSceneImageAssets(input: {
       .map((row) => ({
         generationId: row.id,
         sceneVersionId: row.sceneVersionId,
+        // A reused image carried across a scene revision is always the
+        // scene's first image; multi-image reuse is not carried across.
+        shotIndex: 0,
         assetObjectKey: row.assetObjectKey,
         assetWidth: row.assetWidth,
         assetHeight: row.assetHeight,

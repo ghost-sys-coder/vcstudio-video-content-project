@@ -3,6 +3,8 @@ import "server-only";
 import type { Project } from "@/db/schema";
 import { getRenderEnvironment } from "@/lib/env/server";
 import { buildRenderTimelineSnapshot } from "@/lib/render/build-render-snapshot";
+import { findProjectRenderEffects } from "@/db/repositories/project-render-effects.repository";
+import { resolveRenderEffects } from "@/lib/render/resolve-render-effects";
 import { resolveSceneCharactersBySceneVersion } from "@/lib/render/resolve-scene-characters";
 import {
   buildVideoCompositionInput,
@@ -18,6 +20,7 @@ import { findShortCompositionWithClips } from "@/db/repositories/shorts.reposito
 import { buildShortTimeline } from "@/lib/shorts/short-timeline";
 import { resolveShortClips } from "@/lib/shorts/short-anchors";
 import { listCurrentScenes } from "@/db/repositories/scenes.repository";
+import { collectRenderAssetObjectKeys } from "@/lib/render/render-asset-keys";
 
 export type RenderPreviewResult =
   | { status: "ready"; input: ValidatedVideoCompositionInput }
@@ -90,24 +93,26 @@ export async function loadRenderPreview(input: {
         })
       : undefined;
 
+  // Presentation effects are resolved here rather than inside the builder so
+  // the builder stays a pure transform of the timeline, and so a bed whose
+  // file has gone is dropped once, in one place, for both render paths.
+  const renderEffects = resolveRenderEffects(
+    await findProjectRenderEffects({
+      workspaceId: input.workspaceId,
+      projectId: input.project.id,
+    }),
+  );
+
   const snapshot = buildRenderTimelineSnapshot({
     timeline: renderTimeline,
     captionStyle: context.captionStyle,
     includeCaptions: true,
     includeWatermark: environment.VIDEO_WATERMARK_TEXT.length > 0,
     charactersBySceneVersionId,
+    effects: renderEffects,
   });
 
-  const objectKeys = snapshot.scenes.flatMap((scene) => [
-    scene.image.objectKey,
-    scene.audio.objectKey,
-    ...(scene.characters ?? []).flatMap((character) => [
-      character.poses.idle,
-      character.poses.talkOpen,
-      character.poses.talkClosed,
-      character.poses.blink,
-    ]),
-  ]);
+  const objectKeys = collectRenderAssetObjectKeys(snapshot);
   // Sign for the whole preview session: a full-length preview can play and be
   // replayed for minutes, and the rolling preloader fetches later scenes on
   // demand, so a short-lived URL would expire mid-session and stall playback.

@@ -13,17 +13,20 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import type { IdeaNicheGroup } from "@/lib/ideas/ideas-view";
+import type { SceneImageStylePresetView } from "@/lib/scenes/scene-image-view";
 
 export function CreateProjectDialog({
   defaultBudgetCents,
   formats,
   ideaGroups,
   initialIdeaId,
+  styles,
 }: {
   defaultBudgetCents: number;
   formats: FormatChoice[];
   ideaGroups: IdeaNicheGroup[];
   initialIdeaId?: string | null;
+  styles: SceneImageStylePresetView[];
 }) {
   return (
     <Dialog defaultOpen={Boolean(initialIdeaId)}>
@@ -47,6 +50,7 @@ export function CreateProjectDialog({
           formats={formats}
           ideaGroups={ideaGroups}
           initialIdeaId={initialIdeaId}
+          styles={styles}
         />
       </DialogContent>
     </Dialog>

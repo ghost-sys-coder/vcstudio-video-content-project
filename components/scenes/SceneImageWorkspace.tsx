@@ -72,13 +72,16 @@ export function SceneImageWorkspace({
   const applyDetails = useCallback((nextDetails: SceneImageDetailsView) => {
     setDetails(nextDetails);
     setSelection((current) => {
-      const defaultPreset =
-        nextDetails.stylePresets.find((preset) => preset.isDefault) ??
-        nextDetails.stylePresets[0];
+      // Ordered best-default-first by `orderStylePresetsForProject`: this
+      // project's own style if it has one, else the workspace default.
+      const defaultPreset = nextDetails.stylePresets[0];
       const currentPresetExists = nextDetails.stylePresets.some(
         (preset) => preset.versionId === current?.stylePresetVersionId,
       );
       return {
+        // Targeting the scene's first image unless the person changes it, so
+        // the default behaviour is exactly what it was before shots existed.
+        shotIndex: current?.shotIndex ?? 0,
         stylePresetVersionId:
           current && currentPresetExists
             ? current.stylePresetVersionId
@@ -187,6 +190,7 @@ export function SceneImageWorkspace({
       formData.set("projectId", scene.projectId);
       formData.set("sceneId", scene.id);
       formData.set("sceneVersionId", sceneVersion.id);
+      formData.set("shotIndex", String(request.shotIndex));
       formData.set("stylePresetVersionId", request.stylePresetVersionId);
       formData.set("requestNonce", request.requestNonce);
       formData.set("quality", request.quality);

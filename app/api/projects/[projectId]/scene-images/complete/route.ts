@@ -134,6 +134,7 @@ export async function POST(
       projectId: project.id,
       sceneId: parsed.data.sceneId,
       sceneVersionId: parsed.data.sceneVersionId,
+      shotIndex: parsed.data.shotIndex,
       generationId: parsed.data.generationId,
       size: parsed.data.size,
       objectKey: parsed.data.objectKey,

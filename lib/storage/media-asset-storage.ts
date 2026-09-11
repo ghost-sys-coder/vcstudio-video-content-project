@@ -83,7 +83,7 @@ export async function downloadMediaAssetBytes(
  */
 export async function inspectMediaAsset(input: {
   objectKey: string;
-  kind: "image" | "video";
+  kind: "image" | "video" | "audio";
 }): Promise<{
   sizeBytes: number;
   contentType: string | null;
@@ -102,7 +102,9 @@ export async function inspectMediaAsset(input: {
   if (sizeBytes <= 0)
     throw new MediaAssetStorageError("MEDIA_ASSET_OBJECT_EMPTY");
 
-  if (input.kind === "video")
+  // Neither video nor audio is decoded here: `sharp` reads still images only,
+  // and both are measured properly by the ffprobe inspection pass instead.
+  if (input.kind === "video" || input.kind === "audio")
     return {
       sizeBytes,
       contentType: head.ContentType ?? null,

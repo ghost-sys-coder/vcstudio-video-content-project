@@ -1,4 +1,5 @@
 import { AbsoluteFill, Sequence, useVideoConfig } from "remotion";
+import { BackgroundAudioTrack } from "@/remotion/BackgroundAudioTrack";
 import { SafeAreaGuides } from "@/remotion/SafeAreaGuides";
 import { VideoBackground } from "@/remotion/VideoBackground";
 import { VideoScene } from "@/remotion/VideoScene";
@@ -33,6 +34,8 @@ export function VideoComposition({
   includeWatermark,
   watermarkText,
   captionStyle,
+  backgroundAudio,
+  levelMeter,
   showSafeAreaGuides = false,
 }: VideoCompositionProps) {
   const { fps } = useVideoConfig();
@@ -41,6 +44,16 @@ export function VideoComposition({
   return (
     <AbsoluteFill>
       <VideoBackground />
+
+      {/* Outside every scene Sequence on purpose: a bed mounted per scene
+          would restart on each one and break across the joins. */}
+      {backgroundAudio ? (
+        <BackgroundAudioTrack
+          loop={backgroundAudio.loop}
+          src={backgroundAudio.url}
+          volume={backgroundAudio.volume}
+        />
+      ) : null}
 
       {scenes.map((scene, index) => {
         const next = scenes[index + 1];
@@ -65,6 +78,7 @@ export function VideoComposition({
               visibleDurationFrames={visibleDurationFrames}
               captionStyle={captionStyle}
               includeCaptions={includeCaptions}
+              levelMeterPosition={levelMeter?.position}
             />
           </Sequence>
         );

@@ -100,6 +100,7 @@ export const storyboardResponseSchema = z.discriminatedUnion("success", [
     data: z.object({
       scenes: z.array(storyboardSceneSchema),
       stylePresets: z.array(stylePresetViewSchema),
+      projectStylePresetVersionId: z.uuid().nullable(),
       latestBatch: storyboardBatchSchema.nullable(),
       configuration: z.object({
         enabled: z.boolean(),

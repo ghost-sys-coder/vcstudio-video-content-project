@@ -497,6 +497,7 @@ export async function startSceneImageGeneration(input: {
           projectId: input.project.id,
           sceneId: input.request.sceneId,
           sceneVersionId: input.request.sceneVersionId,
+          shotIndex: input.request.shotIndex,
           stylePresetVersionId: stylePreset.version.id,
           promptTemplateVersionId: promptTemplate.id,
           generationVersion,

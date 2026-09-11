@@ -58,6 +58,18 @@ export const videoCompositionSceneCharacterSchema = z
   })
   .strict();
 
+const videoCompositionSceneShotSchema = z
+  .object({
+    imageUrl: z.url(),
+    framing: renderImageFramingSchema.optional(),
+    startFrame: z.number().int().nonnegative(),
+    endFrame: z.number().int().nonnegative(),
+  })
+  .strict()
+  .refine((shot) => shot.endFrame > shot.startFrame, {
+    message: "A shot must end after it starts.",
+  });
+
 const videoCompositionSceneSchema = z
   .object({
     sceneId: z.uuid(),
@@ -70,10 +82,21 @@ const videoCompositionSceneSchema = z
     imageFraming: renderImageFramingSchema.optional(),
     audioUrl: z.url(),
     audioTrimBeforeFrames: z.number().int().nonnegative().optional(),
+    shots: z.array(videoCompositionSceneShotSchema).min(2).optional(),
+    narrationEnvelope: z.array(z.number().min(0).max(1)).optional(),
     captions: z.array(renderCaptionSchema),
     characters: z.array(videoCompositionSceneCharacterSchema).optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (scene) =>
+      !scene.shots ||
+      scene.shots.every(
+        (shot, index) =>
+          index === 0 || shot.startFrame >= scene.shots![index - 1]!.endFrame,
+      ),
+    { message: "Shots must not overlap." },
+  );
 
 /**
  * Validates the resolved composition props before they are handed to Remotion.
@@ -92,6 +115,27 @@ export const videoCompositionInputSchema = z
     watermarkText: z.string(),
     captionStyle: captionStyleSchema,
     scenes: z.array(videoCompositionSceneSchema).min(1),
+    backgroundAudio: z
+      .object({
+        url: z.url(),
+        volume: z.number().min(0).max(1),
+        loop: z.boolean(),
+      })
+      .strict()
+      .optional(),
+    levelMeter: z
+      .object({
+        position: z.enum([
+          "bottomLeft",
+          "bottomCenter",
+          "bottomRight",
+          "topLeft",
+          "topCenter",
+          "topRight",
+        ]),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -157,6 +201,38 @@ export function buildVideoCompositionInput(input: {
       imageFraming: scene.image.framing ?? DEFAULT_SCENE_FRAMING,
       audioUrl,
       audioTrimBeforeFrames: scene.audio.trimBeforeFrames ?? 0,
+      ...(scene.audio.amplitudeEnvelope?.length
+        ? {
+            narrationEnvelope: resampleAmplitudeEnvelope({
+              envelope: scene.audio.amplitudeEnvelope,
+              envelopeSampleRateHz:
+                scene.audio.amplitudeSampleRateHz ??
+                AMPLITUDE_ENVELOPE_SAMPLE_RATE_HZ,
+              frameCount: scene.durationFrames,
+              framesPerSecond: input.snapshot.framesPerSecond,
+            }),
+          }
+        : {}),
+      ...(scene.shots?.length
+        ? {
+            shots: scene.shots.map((shot) => {
+              const shotUrl = input.imageUrlByObjectKey[shot.objectKey];
+              // Throwing beats rendering the scene's first image for every
+              // shot: a silently single-image scene looks like the feature was
+              // never applied, and nothing would report it.
+              if (!shotUrl)
+                throw new Error(
+                  `Missing signed image URL for a shot of scene ${scene.sceneNumber}.`,
+                );
+              return {
+                imageUrl: shotUrl,
+                framing: shot.framing ?? DEFAULT_SCENE_FRAMING,
+                startFrame: shot.startFrame,
+                endFrame: shot.endFrame,
+              };
+            }),
+          }
+        : {}),
       captions: input.snapshot.includeCaptions ? scene.captions : [],
       ...(scene.characters?.length
         ? {
@@ -214,5 +290,27 @@ export function buildVideoCompositionInput(input: {
     watermarkText: input.watermarkText,
     captionStyle: input.snapshot.captionStyle,
     scenes,
+    ...(input.snapshot.backgroundAudio
+      ? {
+          backgroundAudio: {
+            url: (() => {
+              const url =
+                input.audioUrlByObjectKey[
+                  input.snapshot.backgroundAudio.objectKey
+                ];
+              // Throwing beats rendering in silence: a video that quietly
+              // lost its sound bed looks finished and is not.
+              if (!url)
+                throw new Error("Missing signed URL for the background audio.");
+              return url;
+            })(),
+            volume: input.snapshot.backgroundAudio.volumePercent / 100,
+            loop: input.snapshot.backgroundAudio.loop,
+          },
+        }
+      : {}),
+    ...(input.snapshot.levelMeter
+      ? { levelMeter: input.snapshot.levelMeter }
+      : {}),
   };
 }

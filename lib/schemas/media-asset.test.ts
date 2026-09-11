@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   completeMediaUploadSchema,
   MEDIA_ASSET_KIND_BY_CONTENT_TYPE,
+  MEDIA_AUDIO_CONTENT_TYPES,
   MEDIA_FILE_EXTENSION_BY_CONTENT_TYPE,
   requestMediaUploadSchema,
   sanitizeMediaFileName,
@@ -39,13 +40,35 @@ describe("content type maps", () => {
     for (const contentType of Object.keys(
       MEDIA_ASSET_KIND_BY_CONTENT_TYPE,
     ) as (keyof typeof MEDIA_ASSET_KIND_BY_CONTENT_TYPE)[]) {
-      expect(["image", "video"]).toContain(
+      expect(["image", "video", "audio"]).toContain(
         MEDIA_ASSET_KIND_BY_CONTENT_TYPE[contentType],
       );
       expect(MEDIA_FILE_EXTENSION_BY_CONTENT_TYPE[contentType]).toMatch(
         /^[a-z0-9]+$/,
       );
     }
+  });
+});
+
+describe("audio in the media library", () => {
+  it("classifies every audio type as audio, not as video", () => {
+    // A sound bed misfiled as video would be offered as a post attachment and
+    // rendered as a broken player.
+    for (const contentType of MEDIA_AUDIO_CONTENT_TYPES)
+      expect(MEDIA_ASSET_KIND_BY_CONTENT_TYPE[contentType]).toBe("audio");
+  });
+
+  it("gives each audio type a distinct, storable extension", () => {
+    const extensions = MEDIA_AUDIO_CONTENT_TYPES.map(
+      (contentType) => MEDIA_FILE_EXTENSION_BY_CONTENT_TYPE[contentType],
+    );
+    expect(new Set(extensions).size).toBe(extensions.length);
+  });
+
+  it("still refuses a type outside the allow-list", () => {
+    expect(Object.keys(MEDIA_ASSET_KIND_BY_CONTENT_TYPE)).not.toContain(
+      "audio/flac",
+    );
   });
 });
 

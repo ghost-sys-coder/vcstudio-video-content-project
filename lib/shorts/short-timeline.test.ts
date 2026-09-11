@@ -15,6 +15,7 @@ const source: VideoTimeline = {
       sceneId: "11111111-1111-4111-8111-111111111111",
       sceneVersionId: "22222222-2222-4222-8222-222222222222",
       sceneNumber: 1,
+      additionalShots: [],
       startMilliseconds: 0,
       endMilliseconds: 10_000,
       durationMilliseconds: 10_000,
