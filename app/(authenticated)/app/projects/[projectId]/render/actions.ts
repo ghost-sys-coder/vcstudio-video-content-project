@@ -28,6 +28,7 @@ import {
   planProjectReframe,
   startProjectReframe,
 } from "@/lib/reframe/start-reframe";
+import type { ReframePlanSummary } from "@/lib/reframe/reframe-confirmation";
 import {
   cancelReframeSchema,
   reframeRequestSchema,
@@ -689,22 +690,21 @@ export async function planReframeAction(formData: FormData) {
       project,
       outputVariant,
     });
-    return {
-      success: true as const,
-      plan: {
-        sceneCount: plan.scenes.length,
-        extendCount: plan.extendCount,
-        cropCount: plan.cropCount,
-        readyCount: plan.readyCount,
-        blockedSceneNumbers: plan.scenes
-          .filter((scene) => scene.action === "blocked")
-          .map((scene) => scene.sceneNumber),
-        croppedSceneNumbers: plan.scenes
-          .filter((scene) => scene.action === "crop")
-          .map((scene) => scene.sceneNumber),
-      },
-      estimatedCostCents,
+    // Annotated so the confirmation dialog and this response can never drift:
+    // the dialog states what will be spent, and it reads these totals.
+    const summary: ReframePlanSummary = {
+      sceneCount: plan.scenes.length,
+      extendCount: plan.extendCount,
+      cropCount: plan.cropCount,
+      readyCount: plan.readyCount,
+      blockedSceneNumbers: plan.scenes
+        .filter((scene) => scene.action === "blocked")
+        .map((scene) => scene.sceneNumber),
+      croppedSceneNumbers: plan.scenes
+        .filter((scene) => scene.action === "crop")
+        .map((scene) => scene.sceneNumber),
     };
+    return { success: true as const, plan: summary, estimatedCostCents };
   } catch (error) {
     if (error instanceof ReframeNotPossibleError)
       return { success: false as const, error: error.message };
