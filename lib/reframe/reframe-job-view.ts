@@ -2,7 +2,15 @@ import "server-only";
 
 import type { Project } from "@/db/schema";
 import { listProjectOutputVariants } from "@/db/repositories/output-variants.repository";
-import { findLatestReframeJob } from "@/db/repositories/reframe-jobs.repository";
+import {
+  findLatestReframeJob,
+  listReframeExtensionOutcomes,
+} from "@/db/repositories/reframe-jobs.repository";
+import { findVideoRender } from "@/db/repositories/video-render.repository";
+import {
+  describeReframeProgress,
+  type ReframeProgress,
+} from "@/lib/reframe/reframe-progress";
 
 export interface ReframeTargetView {
   outputVariantId: string;
@@ -21,6 +29,8 @@ export interface ReframeTargetView {
     estimatedCostCents: number;
     renderId: string | null;
     safeErrorMessage: string | null;
+    /** Measured, never estimated. See `describeReframeProgress`. */
+    progress: ReframeProgress;
     /** Still doing something, so the panel offers cancelling rather than starting. */
     active: boolean;
   } | null;
@@ -58,6 +68,26 @@ export async function loadReframeTargets(input: {
           projectId: input.project.id,
           outputVariantId: variant.id,
         });
+
+        // Counted from the generation rows rather than from anything the job
+        // wrote down, so progress reflects what actually happened even if the
+        // run that started it has gone.
+        const outcomes = job
+          ? await listReframeExtensionOutcomes({
+              workspaceId: input.workspaceId,
+              projectId: input.project.id,
+              generationIds: job.extendGenerationIds,
+            })
+          : [];
+        const render =
+          job?.renderId !== null && job?.renderId !== undefined
+            ? await findVideoRender({
+                workspaceId: input.workspaceId,
+                projectId: input.project.id,
+                renderId: job.renderId,
+              })
+            : null;
+
         return {
           outputVariantId: variant.id,
           name: variant.name,
@@ -76,6 +106,18 @@ export async function loadReframeTargets(input: {
                 estimatedCostCents: job.estimatedCostCents,
                 renderId: job.renderId,
                 safeErrorMessage: job.safeErrorMessage,
+                progress: describeReframeProgress({
+                  status: job.status,
+                  totalExtensions: job.extendGenerationIds.length,
+                  succeededExtensions: outcomes.filter(
+                    (row) => row.status === "succeeded",
+                  ).length,
+                  failedExtensions: outcomes.filter(
+                    (row) =>
+                      row.status === "failed" || row.status === "cancelled",
+                  ).length,
+                  renderPercent: render?.progressPercent ?? null,
+                }),
                 active:
                   job.status === "extending" || job.status === "rendering",
               }
