@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { ProgressBar } from "@/components/ui/ProgressBar";
 import {
   cancelReframeAction,
   planReframeAction,
@@ -187,11 +188,26 @@ export function ReframeTargetRow({
       ) : null}
 
       {job ? (
-        <div className="mt-3 space-y-1 text-xs">
-          <p>
-            <span className="font-medium">{job.statusLabel}</span>
-            {running ? " — you can leave this page." : ""}
-          </p>
+        <div className="mt-3 space-y-2 text-xs">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <span className="font-medium">{job.progress.label}</span>
+            {job.progress.detail ? (
+              <span className="text-muted-foreground">
+                {job.progress.detail}
+              </span>
+            ) : null}
+          </div>
+          {running ? (
+            <ProgressBar
+              label={`${job.progress.label} for ${target.aspectRatio}`}
+              percent={job.progress.percent}
+            />
+          ) : null}
+          {running ? (
+            <p className="text-muted-foreground">
+              This continues without you. You can leave this page.
+            </p>
+          ) : null}
           {job.croppedSceneNumbers.length > 0 ? (
             <p className="text-amber-700 dark:text-amber-400">
               Cropped rather than extended: scenes{" "}
