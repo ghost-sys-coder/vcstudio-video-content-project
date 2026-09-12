@@ -26,6 +26,8 @@ function confirm(
   return describeReframeConfirmation({
     summary: summary(overrides),
     aspectRatio: "9:16",
+    frameWidth: 1080,
+    frameHeight: 1920,
     estimatedCostCents,
   });
 }
@@ -52,6 +54,30 @@ describe("what the dialog commits a person to", () => {
     expect(
       paid.lines.some((line) => line.text.includes("Estimated cost $0.64")),
     ).toBe(true);
+  });
+
+  it("discloses the trim the image provider's sizes force on every scene", () => {
+    // The provider has no 9:16 canvas. Its nearest portrait size is 2:3, which
+    // loses 7.8% off each side when cover-fitted into 9:16. Saying nothing is
+    // what produced a video cut down both sides with no warning.
+    const described = confirm();
+    const trim = described.lines.find((line) => line.text.includes("trimmed"));
+    expect(trim?.text).toContain("7.8%");
+    expect(trim?.text).toContain("each side");
+    expect(trim?.tone).toBe("caution");
+  });
+
+  it("says nothing about trimming for a square, which needs none", () => {
+    const described = describeReframeConfirmation({
+      summary: summary(),
+      aspectRatio: "1:1",
+      frameWidth: 1080,
+      frameHeight: 1080,
+      estimatedCostCents: 64,
+    });
+    expect(described.lines.some((line) => line.text.includes("trimmed"))).toBe(
+      false,
+    );
   });
 
   it("names the shape being made, so two targets never look alike", () => {

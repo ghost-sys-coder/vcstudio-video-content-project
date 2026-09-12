@@ -36,9 +36,9 @@ import {
 import { loadEffectiveWorkspaceBudget } from "@/lib/budgets/workspace-budget";
 import { loadEffectiveWorkspaceLimits } from "@/lib/budgets/current-settings";
 import { estimateSceneOutpaintCost } from "@/lib/output-variants/start-scene-outpaint";
+import { buildSceneOutpaintPrompt } from "@/lib/output-variants/scene-outpaint-prompt";
 import { getSceneImageSizeForAspectRatio } from "@/lib/schemas/scene-image";
 import { sumDurationMilliseconds } from "@/lib/shorts/short-editor";
-import { renderSceneOutpaintPrompt } from "@studio/prompts";
 import {
   buildOutputVariantTimelineContext,
   resolveProjectOutputVariant,
@@ -230,11 +230,7 @@ export async function loadRenderWorkspace(input: {
       })
     : 0;
   const outpaintEstimatedCostCents = estimateSceneOutpaintCost({
-    prompt: renderSceneOutpaintPrompt({
-      aspectRatio: selectedVariant.aspectRatio,
-      width: selectedVariant.width,
-      height: selectedVariant.height,
-    }),
+    prompt: buildSceneOutpaintPrompt(selectedVariant),
     aspectRatio: selectedVariant.aspectRatio,
   });
   const withinDurationLimit =

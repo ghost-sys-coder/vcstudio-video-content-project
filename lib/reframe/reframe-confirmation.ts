@@ -10,6 +10,14 @@
  */
 
 import { formatUsdCents } from "@/lib/format/currency";
+import {
+  describeCoverCrop,
+  measureCoverCrop,
+} from "@/lib/render/frame-geometry";
+import {
+  getSceneImageDimensions,
+  getSceneImageSizeForAspectRatio,
+} from "@/lib/schemas/scene-image";
 
 /** The planner's totals as they cross the wire to the browser. */
 export interface ReframePlanSummary {
@@ -47,7 +55,10 @@ export interface ReframeConfirmation {
 
 export function describeReframeConfirmation(input: {
   summary: ReframePlanSummary;
-  aspectRatio: string;
+  aspectRatio: "16:9" | "9:16" | "1:1";
+  /** The video frame, needed to state the trim the provider's sizes force. */
+  frameWidth: number;
+  frameHeight: number;
   estimatedCostCents: number;
 }): ReframeConfirmation {
   const { summary } = input;
@@ -70,7 +81,7 @@ export function describeReframeConfirmation(input: {
   if (summary.readyCount > 0)
     lines.push({
       tone: "neutral",
-      text: `${summary.readyCount} already ${summary.readyCount === 1 ? "has an image" : "have images"} in this shape and will cost nothing.`,
+      text: `${summary.readyCount} already ${summary.readyCount === 1 ? "has a usable image" : "have usable images"} for this shape and will cost nothing.`,
     });
 
   if (summary.croppedSceneNumbers.length > 0)
@@ -84,6 +95,22 @@ export function describeReframeConfirmation(input: {
       tone: "blocking",
       text: `Approve an image for ${summary.blockedSceneNumbers.length === 1 ? "scene" : "scenes"} ${summary.blockedSceneNumbers.join(", ")} before reframing.`,
     });
+
+  // The image provider has no 9:16 or 16:9 canvas, so a margin is always
+  // trimmed. Saying so is the difference between a known bleed and the
+  // surprise of a video cut down both sides.
+  const canvas = getSceneImageDimensions(
+    getSceneImageSizeForAspectRatio(input.aspectRatio),
+  );
+  const trim = describeCoverCrop(
+    measureCoverCrop({
+      imageWidth: canvas.width,
+      imageHeight: canvas.height,
+      frameWidth: input.frameWidth,
+      frameHeight: input.frameHeight,
+    }),
+  );
+  if (trim !== null) lines.push({ tone: "caution", text: trim });
 
   // Stated even when it is nothing, because "no charge" is itself the answer
   // to the question the dialog exists to answer.

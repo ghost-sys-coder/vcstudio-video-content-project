@@ -104,6 +104,8 @@ export function ReframeTargetRow({
     ? describeReframeConfirmation({
         summary,
         aspectRatio: target.aspectRatio,
+        frameWidth: target.width,
+        frameHeight: target.height,
         estimatedCostCents: costCents,
       })
     : null;

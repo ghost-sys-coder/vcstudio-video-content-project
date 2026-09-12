@@ -1,10 +1,7 @@
 import "server-only";
 
 import { tasks } from "@trigger.dev/sdk";
-import {
-  renderSceneOutpaintPrompt,
-  SCENE_OUTPAINT_PROMPT_VERSION,
-} from "@studio/prompts";
+import { SCENE_OUTPAINT_PROMPT_VERSION } from "@studio/prompts";
 import type {
   Project,
   ProjectOutputVariant,
@@ -34,6 +31,7 @@ import {
   getSceneImageCompression,
 } from "@/lib/scenes/scene-image-configuration";
 import { getSceneImageSizeForAspectRatio } from "@/lib/schemas/scene-image";
+import { buildSceneOutpaintPrompt } from "@/lib/output-variants/scene-outpaint-prompt";
 import type { sceneImageGenerationTask } from "@/trigger/scene-image-generation";
 
 export function estimateSceneOutpaintCost(input: {
@@ -95,11 +93,7 @@ export async function startSceneOutpaint(input: {
   if (!stylePreset || !promptTemplate)
     throw new Error("The source image configuration is unavailable.");
 
-  const prompt = renderSceneOutpaintPrompt({
-    aspectRatio: input.outputVariant.aspectRatio,
-    width: input.outputVariant.width,
-    height: input.outputVariant.height,
-  });
+  const prompt = buildSceneOutpaintPrompt(input.outputVariant);
   const quality = "low" as const;
   const size = getSceneImageSizeForAspectRatio(input.outputVariant.aspectRatio);
   const compression = getSceneImageCompression(environment, quality);

@@ -59,6 +59,7 @@ describe("reusing what an earlier run already paid for", () => {
           generationId: "variant-1",
           sourceImageGenerationId: "image-1",
           status: "succeeded",
+          matchesCurrentPrompt: true,
         },
       }),
     ]);
@@ -75,6 +76,7 @@ describe("reusing what an earlier run already paid for", () => {
           generationId: "variant-1",
           sourceImageGenerationId: "image-1",
           status: "succeeded",
+          matchesCurrentPrompt: true,
         },
       }),
     ]);
@@ -88,6 +90,7 @@ describe("reusing what an earlier run already paid for", () => {
           generationId: "variant-1",
           sourceImageGenerationId: "image-1",
           status: "failed",
+          matchesCurrentPrompt: true,
         },
       }),
     ]);
@@ -102,10 +105,45 @@ describe("reusing what an earlier run already paid for", () => {
           generationId: "variant-1",
           sourceImageGenerationId: "image-1",
           status: "running",
+          matchesCurrentPrompt: true,
         },
       }),
     ]);
     expect(plan.scenes[0]?.action).toBe("extend");
+  });
+
+  it("pays again when the extension was composed for the wrong canvas", () => {
+    // scene-outpaint-v1 told the model it was filling a 9:16 frame while the
+    // canvas it produced was 2:3, so the renderer cropped the sides of every
+    // scene. Reusing one of those would reproduce the defect the person
+    // clicked the button to fix, which is worth more than the cost of redoing.
+    const plan = planReframe([
+      scene({
+        existingVariantImage: {
+          generationId: "variant-1",
+          sourceImageGenerationId: "image-1",
+          status: "succeeded",
+          matchesCurrentPrompt: false,
+        },
+      }),
+    ]);
+    expect(plan.scenes[0]?.action).toBe("extend");
+    expect(plan.scenes[0]?.reason).toContain("wrong canvas");
+  });
+
+  it("still prefers a native still over remaking a stale extension", () => {
+    const plan = planReframe([
+      scene({
+        hasNativeImage: true,
+        existingVariantImage: {
+          generationId: "variant-1",
+          sourceImageGenerationId: "image-1",
+          status: "succeeded",
+          matchesCurrentPrompt: false,
+        },
+      }),
+    ]);
+    expect(plan.scenes[0]?.action).toBe("native");
   });
 
   it("prefers a native still over paying to extend", () => {
@@ -116,6 +154,7 @@ describe("reusing what an earlier run already paid for", () => {
           generationId: "variant-1",
           sourceImageGenerationId: "image-1",
           status: "succeeded",
+          matchesCurrentPrompt: true,
         },
       }),
     ]);

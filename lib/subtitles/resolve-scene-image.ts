@@ -43,9 +43,12 @@ const DEFAULT_FRAMING: SceneImageFraming = {
 
 /**
  * Decides which image a scene should render with, in priority order:
- * (1) a natively-generated approved image at this render's exact size — used
- *     as-is with the identity framing, no crop needed (the whole point of
- *     generating natively is to skip the crop/outpaint step for this size);
+ * (1) a natively-generated approved image at this render's own image size —
+ *     used with the identity framing, since there is no better placement to
+ *     choose. Note that "native" does not mean "no crop": the image provider's
+ *     portrait size is 2:3 and its landscape size is 3:2, while we render 9:16
+ *     and 16:9, so a cover fit still trims a margin. See
+ *     `lib/render/frame-geometry.ts`, which measures exactly how much;
  * (2) the paid AI-outpainted image stored for this output variant, with its
  *     saved framing;
  * (3) the primary approved image, cropped/fit per its stored framing (or the

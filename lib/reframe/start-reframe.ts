@@ -2,7 +2,7 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { tasks } from "@trigger.dev/sdk";
-import { renderSceneOutpaintPrompt } from "@studio/prompts";
+import { SCENE_OUTPAINT_PROMPT_VERSION } from "@studio/prompts";
 import type { Project, ProjectOutputVariant } from "@/db/schema";
 import {
   attachReframeJobRun,
@@ -19,6 +19,7 @@ import {
   estimateSceneOutpaintCost,
   startSceneOutpaint,
 } from "@/lib/output-variants/start-scene-outpaint";
+import { buildSceneOutpaintPrompt } from "@/lib/output-variants/scene-outpaint-prompt";
 import { planReframe, type ReframePlan } from "@/lib/reframe/reframe-plan";
 import { getSceneImageSizeForAspectRatio } from "@/lib/schemas/scene-image";
 import { findSceneImageGeneration } from "@/db/repositories/scene-images.repository";
@@ -68,7 +69,11 @@ export async function planProjectReframe(input: {
       sceneVersionIds,
       size: canonicalSize,
     }),
-    listApprovedSceneImageAssets({ ...scope, sceneVersionIds, size: nativeSize }),
+    listApprovedSceneImageAssets({
+      ...scope,
+      sceneVersionIds,
+      size: nativeSize,
+    }),
     listSceneVariantOutpaints({
       ...scope,
       outputVariantId: input.outputVariant.id,
@@ -94,15 +99,24 @@ export async function planProjectReframe(input: {
 
   const outpaintByVersion = new Map<
     string,
-    { generationId: string; sourceImageGenerationId: string; status: string }
+    {
+      generationId: string;
+      sourceImageGenerationId: string;
+      status: string;
+      promptTemplateVersion: string | null;
+    }
   >();
   // Newest first from the query, so the first seen is the latest attempt.
   for (const row of existingOutpaints)
-    if (!outpaintByVersion.has(row.sceneVersionId) && row.sourceImageGenerationId)
+    if (
+      !outpaintByVersion.has(row.sceneVersionId) &&
+      row.sourceImageGenerationId
+    )
       outpaintByVersion.set(row.sceneVersionId, {
         generationId: row.id,
         sourceImageGenerationId: row.sourceImageGenerationId,
         status: row.status,
+        promptTemplateVersion: row.promptTemplateVersion,
       });
 
   const plan = planReframe(
@@ -128,11 +142,10 @@ export async function planProjectReframe(input: {
               generationId: existing.generationId,
               sourceImageGenerationId: existing.sourceImageGenerationId,
               status: existing.status as
-                | "succeeded"
-                | "running"
-                | "queued"
-                | "pending"
-                | "failed",
+                "succeeded" | "running" | "queued" | "pending" | "failed",
+              matchesCurrentPrompt:
+                existing.promptTemplateVersion ===
+                SCENE_OUTPAINT_PROMPT_VERSION,
             }
           : null,
       };
@@ -142,11 +155,7 @@ export async function planProjectReframe(input: {
   // One prompt serves every scene: the outpaint instruction depends on the
   // target canvas, not on the picture, so the estimate is the same each time.
   const perSceneCents = estimateSceneOutpaintCost({
-    prompt: renderSceneOutpaintPrompt({
-      aspectRatio: input.outputVariant.aspectRatio,
-      width: input.outputVariant.width,
-      height: input.outputVariant.height,
-    }),
+    prompt: buildSceneOutpaintPrompt(input.outputVariant),
     aspectRatio: input.outputVariant.aspectRatio,
   });
 

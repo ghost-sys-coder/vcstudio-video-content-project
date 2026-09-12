@@ -38,6 +38,16 @@ export interface ReframeSceneInput {
     generationId: string;
     sourceImageGenerationId: string;
     status: "succeeded" | "running" | "queued" | "pending" | "failed";
+    /**
+     * False when the extension was made by a superseded prompt version.
+     *
+     * This is not pedantry about versions. `scene-outpaint-v1` told the model
+     * it was filling a 9:16 frame when the canvas it actually produced was
+     * 2:3, so it composed across a width the renderer then cropped, and every
+     * video made that way lost picture down both sides. Reusing one of those
+     * would reproduce exactly the defect the person clicked the button to fix.
+     */
+    matchesCurrentPrompt: boolean;
   } | null;
 }
 
@@ -83,16 +93,20 @@ export function planReframe(scenes: ReframeSceneInput[]): ReframePlan {
         sceneVersionId: scene.sceneVersionId,
         action: "native",
         sourceGenerationId: null,
-        reason: "Already has an approved image in this shape.",
+        reason:
+          "Already has an approved image at this size, so nothing will be generated.",
       };
 
-    // Only an extension descended from the *currently* approved still counts.
-    // One made from an image that has since been replaced would quietly render
-    // the old picture, which is worse than paying to extend again.
+    // Only an extension descended from the *currently* approved still counts,
+    // and only one made by the current prompt. An extension from an image
+    // since replaced would quietly render the old picture; one from a
+    // superseded prompt would reproduce the composition defect that prompt
+    // caused. Both are worse than paying to extend again.
     const existing = scene.existingVariantImage;
     if (
       existing &&
       existing.status === "succeeded" &&
+      existing.matchesCurrentPrompt &&
       existing.sourceImageGenerationId === scene.approvedImage.generationId
     )
       return {
@@ -121,7 +135,12 @@ export function planReframe(scenes: ReframeSceneInput[]): ReframePlan {
       sceneVersionId: scene.sceneVersionId,
       action: "extend",
       sourceGenerationId: scene.approvedImage.generationId,
-      reason: "Will be extended onto the new canvas.",
+      reason:
+        existing &&
+        existing.status === "succeeded" &&
+        !existing.matchesCurrentPrompt
+          ? "An earlier extension exists but was composed for the wrong canvas, so it will be remade."
+          : "Will be extended onto the new canvas.",
     };
   });
 
