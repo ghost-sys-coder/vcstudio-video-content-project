@@ -1,11 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { task } from "@trigger.dev/sdk";
-import {
-  SCENE_IMAGE_PROMPT_TEMPLATE_SOURCE_HASH,
-  SCENE_IMAGE_PROMPT_VERSION,
-  SCENE_OUTPAINT_PROMPT_TEMPLATE_SOURCE_HASH,
-  SCENE_OUTPAINT_PROMPT_VERSION,
-} from "@studio/prompts";
 import { z } from "zod";
 import {
   completeSceneImageProviderAttempt,
@@ -29,6 +23,8 @@ import {
 import { assertAiGeneratedSceneImage } from "@/lib/domain/scene-image";
 import { validateSceneImagePreflight } from "@/lib/domain/scene-image-preflight";
 import { getSceneImageEnvironment } from "@/lib/env/server";
+import { verifyPromptTemplate } from "@/lib/prompts/prompt-template-registry";
+import { holdSceneImageGenerationForPromptTemplate } from "@/lib/trigger/hold-scene-image-generation";
 import {
   classifyImageGenerationError,
   shouldRetryImageGeneration,
@@ -52,6 +48,12 @@ export const sceneImageGenerationTaskPayloadSchema = z.object({
   generationId: z.uuid(),
   workspaceId: z.uuid(),
   projectId: z.uuid(),
+  /**
+   * How many times this job has already been parked waiting for a worker that
+   * carries its prompt version. Carried in the payload rather than stored,
+   * because it describes this chain of dispatches and nothing else.
+   */
+  promptTemplateHoldAttempt: z.number().int().min(0).max(16).optional(),
 });
 
 type SceneImageTaskPayload = z.infer<
@@ -193,22 +195,53 @@ export const sceneImageGenerationTask = task({
     }
 
     const isOutpaint = generation.purpose === "variant_outpaint";
-    const expectedPromptVersion = isOutpaint
-      ? SCENE_OUTPAINT_PROMPT_VERSION
-      : SCENE_IMAGE_PROMPT_VERSION;
-    const expectedPromptHash = isOutpaint
-      ? SCENE_OUTPAINT_PROMPT_TEMPLATE_SOURCE_HASH
-      : SCENE_IMAGE_PROMPT_TEMPLATE_SOURCE_HASH;
     const promptTemplate = await findPromptTemplateVersion({
       templateKey: isOutpaint ? "scene-outpaint" : "scene-image",
       version: generation.promptTemplateVersion,
     });
-    if (
-      !promptTemplate ||
-      promptTemplate.id !== generation.promptTemplateVersionId ||
-      promptTemplate.version !== expectedPromptVersion ||
-      promptTemplate.sourceHash !== expectedPromptHash
-    ) {
+    // Asks whether this job's template is genuine, not whether it is the newest
+    // one this worker happens to carry. Those used to be the same question, and
+    // every job created while the website was ahead of the workers died of it.
+    const verification = verifyPromptTemplate({
+      templateKey: isOutpaint ? "scene-outpaint" : "scene-image",
+      pinnedVersion: generation.promptTemplateVersion,
+      pinnedVersionId: generation.promptTemplateVersionId,
+      storedTemplate: promptTemplate
+        ? {
+            id: promptTemplate.id,
+            version: promptTemplate.version,
+            sourceHash: promptTemplate.sourceHash,
+          }
+        : null,
+    });
+    if (verification.outcome === "mismatch") {
+      await failSceneImageGeneration({
+        ...scope,
+        category: "prompt_template_mismatch",
+        safeErrorMessage:
+          "The versioned image prompt template could not be verified, so no provider request was made.",
+      });
+      return { generationId: generation.id, status: "failed" as const };
+    }
+    if (verification.outcome === "unknownVersion") {
+      // Not a fault. This worker is older than the job, so the job waits for a
+      // worker that understands it rather than being thrown away.
+      const held = await holdSceneImageGenerationForPromptTemplate({
+        ...scope,
+        currentTriggerRunId: ctx.run.id,
+        attemptsSoFar: input.promptTemplateHoldAttempt ?? 0,
+        unknownVersion: verification.version,
+      });
+      if (held.outcome === "held")
+        return { generationId: generation.id, status: "held" as const };
+      await failSceneImageGeneration({
+        ...scope,
+        category: "prompt_template_unavailable",
+        safeErrorMessage: held.safeErrorMessage,
+      });
+      return { generationId: generation.id, status: "failed" as const };
+    }
+    if (!promptTemplate) {
       await failSceneImageGeneration({
         ...scope,
         category: "prompt_template_mismatch",

@@ -547,6 +547,41 @@ export async function createSceneImageGenerationReservation(input: {
   return { generation, created: true as const };
 }
 
+/**
+ * Moves a generation from the run that is finishing to the one taking over.
+ *
+ * Needed because a worker that is behind on prompt versions re-dispatches its
+ * own job to run again later, and the reconciler must follow the job to the new
+ * run. Without this the generation would still point at a run that has already
+ * finished, and the reconciler would conclude the work was abandoned and fail
+ * it while the replacement was still waiting to start.
+ *
+ * A compare-and-set on the outgoing run id rather than a plain write, so two
+ * workers racing to hand the same generation on cannot both succeed.
+ */
+export async function handOffSceneImageTriggerRun(input: {
+  workspaceId: string;
+  projectId: string;
+  generationId: string;
+  fromTriggerRunId: string;
+  toTriggerRunId: string;
+}): Promise<boolean> {
+  const [updated] = await getDatabase()
+    .update(sceneImageGenerations)
+    .set({ triggerRunId: input.toTriggerRunId, updatedAt: new Date() })
+    .where(
+      and(
+        eq(sceneImageGenerations.workspaceId, input.workspaceId),
+        eq(sceneImageGenerations.projectId, input.projectId),
+        eq(sceneImageGenerations.id, input.generationId),
+        eq(sceneImageGenerations.triggerRunId, input.fromTriggerRunId),
+        inArray(sceneImageGenerations.status, ["pending", "queued", "running"]),
+      ),
+    )
+    .returning({ id: sceneImageGenerations.id });
+  return updated !== undefined;
+}
+
 export async function attachSceneImageTriggerRun(input: {
   workspaceId: string;
   projectId: string;

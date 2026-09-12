@@ -1,10 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { task } from "@trigger.dev/sdk";
-import {
-  CHARACTER_REFERENCE_PROMPT_TEMPLATE_SOURCE_HASH,
-  CHARACTER_REFERENCE_PROMPT_VERSION,
-} from "@studio/prompts";
 import { z } from "zod";
+import { verifyPromptTemplate } from "@/lib/prompts/prompt-template-registry";
 import {
   claimCharacterReferenceGenerationRunning,
   completeCharacterReferenceGeneration,
@@ -136,17 +133,29 @@ export const characterReferenceGenerationTask = task({
       templateKey: "character-reference",
       version: generation.promptTemplateVersion,
     });
-    if (
-      !promptTemplate ||
-      promptTemplate.id !== generation.promptTemplateVersionId ||
-      promptTemplate.version !== CHARACTER_REFERENCE_PROMPT_VERSION ||
-      promptTemplate.sourceHash !==
-        CHARACTER_REFERENCE_PROMPT_TEMPLATE_SOURCE_HASH
-    ) {
+    // Any published version is acceptable, not only the newest this worker
+    // carries; see `lib/prompts/prompt-template-registry.ts`. Portraits have no
+    // hold path of their own, so a job from a newer website is refused rather
+    // than parked, but it is refused with the reason and the remedy.
+    const verification = verifyPromptTemplate({
+      templateKey: "character-reference",
+      pinnedVersion: generation.promptTemplateVersion,
+      pinnedVersionId: generation.promptTemplateVersionId,
+      storedTemplate: promptTemplate
+        ? {
+            id: promptTemplate.id,
+            version: promptTemplate.version,
+            sourceHash: promptTemplate.sourceHash,
+          }
+        : null,
+    });
+    if (verification.outcome !== "verified" || !promptTemplate) {
       await failCharacterReferenceGeneration({
         ...scope,
         safeErrorMessage:
-          "The versioned portrait prompt template could not be verified, so no provider request was made.",
+          verification.outcome === "unknownVersion"
+            ? "This portrait needs a newer background worker than the one running. Deploy the workers, then generate again."
+            : "The versioned portrait prompt template could not be verified, so no provider request was made.",
       });
       return { generationId: generation.id, status: "failed" as const };
     }
