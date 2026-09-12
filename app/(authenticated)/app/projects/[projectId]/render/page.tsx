@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { WorkspaceViewSwitch } from "@/components/production/WorkspaceViewSwitch";
+import { ReframePanel } from "@/components/render/ReframePanel";
 import { RenderEffectsPanel } from "@/components/render/RenderEffectsPanel";
 import { VideoPreviewWorkspace } from "@/components/render/VideoPreviewWorkspace";
 import { findProject } from "@/db/repositories/projects.repository";
@@ -8,6 +9,7 @@ import { can } from "@/lib/policies/workspace-policy";
 import { getSubtitleEnvironment } from "@/lib/env/server";
 import { ASSEMBLY_WORKSPACE_VIEWS } from "@/lib/production/workspace-views";
 import { loadRenderEffectsView } from "@/lib/render/render-effects-view";
+import { loadReframeTargets } from "@/lib/reframe/reframe-job-view";
 import { loadRenderWorkspace } from "@/lib/render/render-workspace-details";
 
 export default async function ProjectRenderPage({
@@ -22,9 +24,10 @@ export default async function ProjectRenderPage({
   const project = await findProject({ workspaceId, projectId });
   if (!project) notFound();
 
-  const [data, effects] = await Promise.all([
+  const [data, effects, reframeTargets] = await Promise.all([
     loadRenderWorkspace({ workspaceId, project }),
     loadRenderEffectsView({ workspaceId, projectId: project.id }),
+    loadReframeTargets({ workspaceId, project }),
   ]);
   const notArchived = project.status !== "archived";
   const role = context.activeMembership.role;
@@ -41,6 +44,11 @@ export default async function ProjectRenderPage({
         captionsEnabled={getSubtitleEnvironment().ENABLE_SUBTITLES}
         initialData={data}
         projectId={project.id}
+      />
+      <ReframePanel
+        canStart={can(role, "renderVideo") && notArchived}
+        projectId={project.id}
+        targets={reframeTargets}
       />
       <RenderEffectsPanel
         canEdit={can(role, "renderVideo") && notArchived}
