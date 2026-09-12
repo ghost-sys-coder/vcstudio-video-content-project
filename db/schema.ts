@@ -177,6 +177,21 @@ export const outputVariantStatusEnum = pgEnum("output_variant_status", [
   "archived",
 ]);
 
+/**
+ * How far a one-click reframe has got.
+ *
+ * Separate from the render's own status on purpose: a reframe is several paid
+ * image generations followed by a render, and collapsing the two would let the
+ * job read as finished while its stills were still being extended.
+ */
+export const reframeJobStatusEnum = pgEnum("reframe_job_status", [
+  "extending",
+  "rendering",
+  "completed",
+  "failed",
+  "cancelled",
+]);
+
 export const sceneFramingModeEnum = pgEnum("scene_framing_mode", [
   "cover",
   "contain",
@@ -6785,6 +6800,104 @@ export const taskHeartbeats = pgTable(
  * writes the whole row, so last-writer-wins would discard a change somebody
  * else made to a different field of it.
  */
+/**
+ * One run of "reframe this finished video into another shape".
+ *
+ * Exists so the sequence is recoverable and reviewable rather than living only
+ * inside a background run: `AGENTS.md` requires PostgreSQL to be the
+ * authoritative state, and this job spans several paid generations and a
+ * render, any of which can outlive the run that started them.
+ *
+ * It records what was decided as well as what happened, because the decisions
+ * are the part a creator needs to see afterwards — which scenes were extended,
+ * and which were cropped because they could not be.
+ */
+export const projectReframeJobs = pgTable(
+  "project_reframe_jobs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").notNull(),
+    outputVariantId: uuid("output_variant_id").notNull(),
+    status: reframeJobStatusEnum("status").notNull().default("extending"),
+    /** What the plan decided, frozen at the moment it was approved. */
+    sceneCount: integer("scene_count").notNull().default(0),
+    extendCount: integer("extend_count").notNull().default(0),
+    cropCount: integer("crop_count").notNull().default(0),
+    readyCount: integer("ready_count").notNull().default(0),
+    estimatedCostCents: integer("estimated_cost_cents").notNull().default(0),
+    /**
+     * The extensions this job is waiting on. Stored rather than re-derived so
+     * a later approval cannot change what this job treats as outstanding.
+     */
+    extendGenerationIds: jsonb("extend_generation_ids")
+      .$type<string[]>()
+      .notNull()
+      .default([]),
+    /**
+     * Scene numbers that ended up cropped: those that could not be extended,
+     * plus any whose extension failed. Shown rather than hidden, because a
+     * cropped scene is a visible quality decision.
+     */
+    croppedSceneNumbers: jsonb("cropped_scene_numbers")
+      .$type<number[]>()
+      .notNull()
+      .default([]),
+    renderId: uuid("render_id"),
+    safeErrorMessage: text("safe_error_message"),
+    triggerRunId: text("trigger_run_id"),
+    requestedByUserId: uuid("requested_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("project_reframe_jobs_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    // At most one job in flight per shape. This is the guard that stops a
+    // second click spending a second time on the same work.
+    uniqueIndex("project_reframe_jobs_active_unique")
+      .on(table.projectId, table.outputVariantId)
+      .where(sql`status in ('extending', 'rendering')`),
+    index("project_reframe_jobs_workspace_project_index").on(
+      table.workspaceId,
+      table.projectId,
+      table.createdAt,
+    ),
+    check(
+      "project_reframe_jobs_counts_nonnegative",
+      sql`${table.sceneCount} >= 0 and ${table.extendCount} >= 0 and ${table.cropCount} >= 0 and ${table.readyCount} >= 0`,
+    ),
+    check(
+      "project_reframe_jobs_cost_nonnegative",
+      sql`${table.estimatedCostCents} >= 0`,
+    ),
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [projects.id, projects.workspaceId],
+      name: "project_reframe_jobs_tenant_project_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.outputVariantId, table.workspaceId],
+      foreignColumns: [
+        projectOutputVariants.id,
+        projectOutputVariants.workspaceId,
+      ],
+      name: "project_reframe_jobs_tenant_variant_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
 export const projectRenderEffects = pgTable(
   "project_render_effects",
   {

@@ -19,6 +19,19 @@ import {
   RenderEffectsMediaError,
   saveProjectRenderEffects,
 } from "@/db/commands/project-render-effects-commands";
+import {
+  ReframeJobInFlightError,
+  cancelReframeJob,
+} from "@/db/commands/reframe-job-commands";
+import {
+  ReframeNotPossibleError,
+  planProjectReframe,
+  startProjectReframe,
+} from "@/lib/reframe/start-reframe";
+import {
+  cancelReframeSchema,
+  reframeRequestSchema,
+} from "@/lib/schemas/reframe";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import {
   readRenderEffectsForm,
@@ -625,5 +638,177 @@ export async function saveRenderEffectsAction(
       message: error instanceof Error ? error.message : "unknown error",
     });
     return { error: "Those settings could not be saved.", success: false };
+  }
+}
+
+export type ReframeActionState = {
+  error: string | null;
+  success: boolean;
+};
+
+/**
+ * Prices a reframe without starting one, so the confirmation can say what it
+ * is about to spend and which scenes will be cropped rather than extended.
+ */
+export async function planReframeAction(formData: FormData) {
+  const parsed = reframeRequestSchema.safeParse({
+    projectId: formData.get("projectId"),
+    outputVariantId: formData.get("outputVariantId"),
+  });
+  if (!parsed.success)
+    return {
+      success: false as const,
+      error: "That reframe request is invalid.",
+    };
+
+  try {
+    const context = await getAuthenticatedWorkspaceContext();
+    if (!context)
+      return {
+        success: false as const,
+        error: "Workspace context is unavailable.",
+      };
+    requireCapability(context.activeMembership.role, "renderVideo");
+    const workspaceId = context.activeMembership.workspaceId;
+    const [project, outputVariant] = await Promise.all([
+      findProject({ workspaceId, projectId: parsed.data.projectId }),
+      findProjectOutputVariant({
+        workspaceId,
+        projectId: parsed.data.projectId,
+        outputVariantId: parsed.data.outputVariantId,
+      }),
+    ]);
+    if (!project || !outputVariant)
+      return {
+        success: false as const,
+        error: "That project or shape is unavailable.",
+      };
+
+    const { plan, estimatedCostCents } = await planProjectReframe({
+      workspaceId,
+      project,
+      outputVariant,
+    });
+    return {
+      success: true as const,
+      plan: {
+        sceneCount: plan.scenes.length,
+        extendCount: plan.extendCount,
+        cropCount: plan.cropCount,
+        readyCount: plan.readyCount,
+        blockedSceneNumbers: plan.scenes
+          .filter((scene) => scene.action === "blocked")
+          .map((scene) => scene.sceneNumber),
+        croppedSceneNumbers: plan.scenes
+          .filter((scene) => scene.action === "crop")
+          .map((scene) => scene.sceneNumber),
+      },
+      estimatedCostCents,
+    };
+  } catch (error) {
+    if (error instanceof ReframeNotPossibleError)
+      return { success: false as const, error: error.message };
+    console.error("Planning a reframe failed", {
+      message: error instanceof Error ? error.message : "unknown error",
+    });
+    return {
+      success: false as const,
+      error: "That reframe could not be planned.",
+    };
+  }
+}
+
+/**
+ * Starts the reframe. Everything after this point runs in the worker.
+ *
+ * The project and the shape are both re-resolved inside the caller's own
+ * workspace, so neither identifier from the browser can reach another
+ * workspace's video.
+ */
+export async function startReframeAction(
+  formData: FormData,
+): Promise<ReframeActionState> {
+  const parsed = reframeRequestSchema.safeParse({
+    projectId: formData.get("projectId"),
+    outputVariantId: formData.get("outputVariantId"),
+  });
+  if (!parsed.success)
+    return { error: "That reframe request is invalid.", success: false };
+
+  try {
+    const context = await getAuthenticatedWorkspaceContext();
+    if (!context)
+      return { error: "Workspace context is unavailable.", success: false };
+    requireCapability(context.activeMembership.role, "renderVideo");
+    const workspaceId = context.activeMembership.workspaceId;
+    const [project, outputVariant] = await Promise.all([
+      findProject({ workspaceId, projectId: parsed.data.projectId }),
+      findProjectOutputVariant({
+        workspaceId,
+        projectId: parsed.data.projectId,
+        outputVariantId: parsed.data.outputVariantId,
+      }),
+    ]);
+    if (!project || !outputVariant)
+      return { error: "That project or shape is unavailable.", success: false };
+    if (project.status === "archived")
+      return { error: "This project is archived.", success: false };
+
+    await startProjectReframe({
+      workspaceId,
+      requestedByUserId: context.user.id,
+      project,
+      outputVariant,
+    });
+    revalidatePath(`/app/projects/${project.id}/render`);
+    return { error: null, success: true };
+  } catch (error) {
+    if (error instanceof ReframeNotPossibleError)
+      return { error: error.message, success: false };
+    if (error instanceof ReframeJobInFlightError)
+      return { error: error.message, success: false };
+    if (error instanceof BudgetExceededError)
+      return {
+        error:
+          "Reframing every scene would exceed the remaining budget. Raise the limit or reframe later.",
+        success: false,
+      };
+    console.error("Starting a reframe failed", {
+      message: error instanceof Error ? error.message : "unknown error",
+    });
+    return { error: "That reframe could not be started.", success: false };
+  }
+}
+
+export async function cancelReframeAction(
+  formData: FormData,
+): Promise<ReframeActionState> {
+  const parsed = cancelReframeSchema.safeParse({
+    projectId: formData.get("projectId"),
+    jobId: formData.get("jobId"),
+  });
+  if (!parsed.success)
+    return { error: "That reframe request is invalid.", success: false };
+
+  try {
+    const context = await getAuthenticatedWorkspaceContext();
+    if (!context)
+      return { error: "Workspace context is unavailable.", success: false };
+    requireCapability(context.activeMembership.role, "renderVideo");
+    // Marks the job cancelled so the panel stops reporting it and a new one can
+    // start. Extensions already paid for are left alone rather than discarded:
+    // the next reframe reuses them, so cancelling costs nothing already spent.
+    await cancelReframeJob({
+      workspaceId: context.activeMembership.workspaceId,
+      projectId: parsed.data.projectId,
+      jobId: parsed.data.jobId,
+    });
+    revalidatePath(`/app/projects/${parsed.data.projectId}/render`);
+    return { error: null, success: true };
+  } catch (error) {
+    console.error("Cancelling a reframe failed", {
+      message: error instanceof Error ? error.message : "unknown error",
+    });
+    return { error: "That reframe could not be cancelled.", success: false };
   }
 }
