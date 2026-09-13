@@ -62,6 +62,9 @@ export function ScenePlanner({
     : false;
   return (
     <SceneWorkspace
+      // A project whose script version is known is one whose scenes are
+      // covering it, which is what makes a deletion leave a gap worth saying.
+      coversApprovedScript={scriptCoverage.scriptVersionNumber !== null}
       availableCharacters={availableCharacters}
       canEdit={canEdit}
       canGenerateImages={canGenerateImages}

@@ -39,6 +39,7 @@ import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import { requireCapability } from "@/lib/policies/workspace-policy";
 import {
   approveAllScenesSchema,
+  deleteSceneSchema,
   approveSceneSchema,
   approveScriptVersionSchema,
   reconcileSceneAnalysisSchema,
@@ -64,11 +65,17 @@ import {
 } from "@/lib/domain/errors";
 import { enforceRateLimit } from "@/lib/rate-limit/enforce-rate-limit";
 import { recordAuditEvent } from "@/lib/audit/record-audit-event";
+import {
+  deleteSceneAndRenumber,
+  SceneNotFoundError,
+} from "@/db/commands/scene-delete-commands";
 
 export type SceneActionState = {
   success: boolean;
   error: string | null;
   changed?: boolean;
+  /** Present after a deletion, so the interface can say what is left. */
+  remainingSceneCount?: number;
 };
 
 async function requireProjectMutation(
@@ -572,6 +579,56 @@ export async function approveSceneAction(
     return { success: true, error: null };
   } catch {
     return { success: false, error: "The scene could not be approved." };
+  }
+}
+
+/**
+ * Removes a scene and closes the gap in the numbering.
+ *
+ * Destructive and recorded as such. The scene's images, narration and clip go
+ * with it by database cascade, so there is no list here that could fall out of
+ * date with what a scene actually owns.
+ */
+export async function deleteSceneAction(
+  formData: FormData,
+): Promise<SceneActionState> {
+  const parsed = deleteSceneSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { success: false, error: "Invalid scene." };
+  try {
+    const { context } = await requireProjectMutation(
+      parsed.data.projectId,
+      "editScenes",
+    );
+    const result = await deleteSceneAndRenumber({
+      workspaceId: context.activeMembership.workspaceId,
+      projectId: parsed.data.projectId,
+      sceneId: parsed.data.sceneId,
+    });
+    await recordAuditEvent({
+      workspaceId: context.activeMembership.workspaceId,
+      actorUserId: context.user.id,
+      projectId: parsed.data.projectId,
+      action: "scene_deleted",
+      targetType: "scene",
+      targetId: parsed.data.sceneId,
+    });
+    // The storyboard, the subtitles and the render all read scene numbers, so
+    // every one of them is stale the moment a scene goes.
+    for (const section of ["scenes", "storyboard", "subtitles", "render"])
+      revalidatePath(`/app/projects/${parsed.data.projectId}/${section}`);
+    return {
+      success: true,
+      error: null,
+      remainingSceneCount: result.remainingSceneCount,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof SceneNotFoundError
+          ? error.message
+          : "The scene could not be deleted.",
+    };
   }
 }
 

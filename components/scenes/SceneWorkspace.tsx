@@ -45,6 +45,7 @@ export function SceneWorkspace({
   canGenerateImages,
   canReviewImages,
   videoKind,
+  coversApprovedScript,
 }: {
   children: React.ReactNode;
   projectId: string;
@@ -61,6 +62,7 @@ export function SceneWorkspace({
   canGenerateImages: boolean;
   canReviewImages: boolean;
   videoKind: ProjectVideoKind;
+  coversApprovedScript: boolean;
 }) {
   const [state, setState] = useState<SceneWorkspaceState>(initialState);
   const [dirty, setDirty] = useState(false);
@@ -163,6 +165,7 @@ export function SceneWorkspace({
       />
       {children}
       <SceneList
+        coversApprovedScript={coversApprovedScript}
         availableCharacters={availableCharacters}
         canEdit={canEdit}
         canGenerateImages={canGenerateImages}

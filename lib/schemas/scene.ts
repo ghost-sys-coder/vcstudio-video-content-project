@@ -45,5 +45,18 @@ export const approveSceneSchema = z.object({
 
 export const approveAllScenesSchema = z.object({ projectId: z.uuid() });
 
+/**
+ * Deleting takes a scene id and nothing else.
+ *
+ * No expected version: a revision conflict is a reason to refuse a *save*,
+ * because the creator would overwrite someone's work. Refusing a delete on the
+ * same grounds would only mean deleting the scene a moment later, having made
+ * the person reload first.
+ */
+export const deleteSceneSchema = z.object({
+  projectId: z.uuid(),
+  sceneId: z.uuid(),
+});
+
 export type SceneContent = z.infer<typeof sceneContentSchema>;
 export type SceneAnalysisOutput = z.infer<typeof sceneAnalysisOutputSchema>;

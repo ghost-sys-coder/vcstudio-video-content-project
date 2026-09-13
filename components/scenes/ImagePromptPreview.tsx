@@ -1,3 +1,6 @@
+"use client";
+
+import { CopyButton } from "@/components/ui/CopyButton";
 import { Badge } from "@/components/ui/badge";
 
 export function ImagePromptPreview({
@@ -17,7 +20,12 @@ export function ImagePromptPreview({
         <h3 className="text-sm font-medium" id={`${id}-heading`}>
           Prompt preview{sizeLabel ? ` — ${sizeLabel}` : ""}
         </h3>
-        <Badge variant="secondary">Template {promptTemplateVersion}</Badge>
+        <div className="flex items-center gap-2">
+          {/* The prompt is what a generation is actually held to, so being able
+              to take it away and compare it is worth more than it looks. */}
+          <CopyButton label="prompt" value={prompt} />
+          <Badge variant="secondary">Template {promptTemplateVersion}</Badge>
+        </div>
       </div>
       <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded-xl border bg-muted/30 p-4 font-sans text-xs leading-5 text-foreground">
         {prompt || "Choose a style preset to preview the exact prompt."}

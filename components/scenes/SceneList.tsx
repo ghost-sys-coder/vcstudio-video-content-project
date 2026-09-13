@@ -32,6 +32,7 @@ export function SceneList({
   canGenerateImages,
   canReviewImages,
   videoKind,
+  coversApprovedScript,
   selectedSceneId,
   query,
   status,
@@ -52,6 +53,8 @@ export function SceneList({
   canGenerateImages: boolean;
   canReviewImages: boolean;
   videoKind: ProjectVideoKind;
+  /** True when these scenes are covering an approved script. */
+  coversApprovedScript: boolean;
   selectedSceneId: string | null;
   query: string;
   status: SceneStatusFilter;
@@ -121,6 +124,8 @@ export function SceneList({
           canGenerateImages={canGenerateImages}
           canReviewImages={canReviewImages}
           imageIndicator={selectedRow.imageIndicator}
+          totalSceneCount={rows.length}
+          coversApprovedScript={coversApprovedScript}
           videoKind={videoKind}
         />
       </div>

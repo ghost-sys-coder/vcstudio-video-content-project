@@ -11,6 +11,7 @@ import { SceneImageIndicatorBadge } from "@/components/scenes/SceneImageIndicato
 import { SceneStatusBadge } from "@/components/scenes/SceneStatusBadge";
 import { SceneEditor } from "@/components/scenes/SceneEditor";
 import { ApproveSceneButton } from "@/components/scenes/ApproveSceneButton";
+import { DeleteSceneButton } from "@/components/scenes/DeleteSceneButton";
 import { SceneCharacterList } from "@/components/scenes/SceneCharacterList";
 import { SceneImageWorkspace } from "@/components/scenes/SceneImageWorkspace";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -27,6 +28,8 @@ export function SceneCard({
   canReviewImages,
   imageIndicator,
   videoKind,
+  totalSceneCount,
+  coversApprovedScript,
 }: {
   scene: Scene;
   version: SceneVersion;
@@ -39,6 +42,10 @@ export function SceneCard({
   canReviewImages: boolean;
   imageIndicator?: SceneImageIndicator;
   videoKind: ProjectVideoKind;
+  /** How many scenes the project has, so deletion can say what is renumbered. */
+  totalSceneCount: number;
+  /** True when the project's scenes are covering an approved script. */
+  coversApprovedScript: boolean;
 }) {
   return (
     <Card>
@@ -82,13 +89,31 @@ export function SceneCard({
               scene={scene}
               version={version}
             />
-            <ApproveSceneButton
-              approved={scene.status === "approved"}
-              disabled={!canEdit}
-              projectId={scene.projectId}
-              sceneId={scene.id}
-              version={scene.currentVersion}
-            />
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <ApproveSceneButton
+                approved={scene.status === "approved"}
+                disabled={!canEdit}
+                projectId={scene.projectId}
+                sceneId={scene.id}
+                version={scene.currentVersion}
+              />
+              {canEdit ? (
+                <DeleteSceneButton
+                  deletion={{
+                    sceneNumber: scene.sceneNumber,
+                    totalSceneCount,
+                    // The indicator knows whether a scene has generated work,
+                    // not how much, which is exactly what the warning claims.
+                    hasGeneratedWork:
+                      imageIndicator !== undefined &&
+                      imageIndicator.state !== "none",
+                    coversApprovedScript,
+                  }}
+                  projectId={scene.projectId}
+                  sceneId={scene.id}
+                />
+              ) : null}
+            </div>
           </TabsContent>
           <TabsContent className="pt-4" value="images">
             <SceneImageWorkspace
