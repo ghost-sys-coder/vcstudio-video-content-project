@@ -6,12 +6,14 @@ import type {
 } from "@/db/schema";
 import type { SceneImageIndicator } from "@/lib/scenes/scene-image-indicator";
 import type { SceneCharacterStaging } from "@/lib/scenes/scene-character-staging";
+import type { SceneMergeNeighbour } from "@/lib/scenes/scene-merge-neighbours";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SceneImageIndicatorBadge } from "@/components/scenes/SceneImageIndicatorBadge";
 import { SceneStatusBadge } from "@/components/scenes/SceneStatusBadge";
 import { SceneEditor } from "@/components/scenes/SceneEditor";
 import { ApproveSceneButton } from "@/components/scenes/ApproveSceneButton";
 import { DeleteSceneButton } from "@/components/scenes/DeleteSceneButton";
+import { MergeScenesButton } from "@/components/scenes/MergeScenesButton";
 import { SceneCharacterList } from "@/components/scenes/SceneCharacterList";
 import { SceneImageWorkspace } from "@/components/scenes/SceneImageWorkspace";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -30,6 +32,7 @@ export function SceneCard({
   videoKind,
   totalSceneCount,
   coversApprovedScript,
+  mergeNeighbours,
 }: {
   scene: Scene;
   version: SceneVersion;
@@ -46,6 +49,8 @@ export function SceneCard({
   totalSceneCount: number;
   /** True when the project's scenes are covering an approved script. */
   coversApprovedScript: boolean;
+  /** The scenes either side of this one, which are the only merge targets. */
+  mergeNeighbours: SceneMergeNeighbour[];
 }) {
   return (
     // `overflow-visible` is load-bearing, not cosmetic: the card clips by
@@ -102,20 +107,37 @@ export function SceneCard({
                 version={scene.currentVersion}
               />
               {canEdit ? (
-                <DeleteSceneButton
-                  deletion={{
-                    sceneNumber: scene.sceneNumber,
-                    totalSceneCount,
-                    // The indicator knows whether a scene has generated work,
-                    // not how much, which is exactly what the warning claims.
-                    hasGeneratedWork:
+                <div className="flex flex-wrap items-start gap-2">
+                  <MergeScenesButton
+                    hasApprovedImages={
                       imageIndicator !== undefined &&
-                      imageIndicator.state !== "none",
-                    coversApprovedScript,
-                  }}
-                  projectId={scene.projectId}
-                  sceneId={scene.id}
-                />
+                      imageIndicator.state === "approved"
+                    }
+                    hasGeneratedWork={
+                      imageIndicator !== undefined &&
+                      imageIndicator.state !== "none"
+                    }
+                    neighbours={mergeNeighbours}
+                    projectId={scene.projectId}
+                    sceneId={scene.id}
+                    sceneNumber={scene.sceneNumber}
+                    totalSceneCount={totalSceneCount}
+                  />
+                  <DeleteSceneButton
+                    deletion={{
+                      sceneNumber: scene.sceneNumber,
+                      totalSceneCount,
+                      // The indicator knows whether a scene has generated work,
+                      // not how much, which is what the warning claims.
+                      hasGeneratedWork:
+                        imageIndicator !== undefined &&
+                        imageIndicator.state !== "none",
+                      coversApprovedScript,
+                    }}
+                    projectId={scene.projectId}
+                    sceneId={scene.id}
+                  />
+                </div>
               ) : null}
             </div>
           </TabsContent>

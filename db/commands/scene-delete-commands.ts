@@ -34,7 +34,7 @@ import { scenes } from "@/db/schema";
  * Scene numbers are positive by database constraint, so the parking range has
  * to be above the real ones rather than negative.
  */
-const PARKING_OFFSET = 1_000_000;
+export const PARKING_OFFSET = 1_000_000;
 
 export class SceneNotFoundError extends Error {
   constructor() {

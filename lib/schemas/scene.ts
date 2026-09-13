@@ -58,5 +58,19 @@ export const deleteSceneSchema = z.object({
   sceneId: z.uuid(),
 });
 
+/**
+ * Which scene lives on, and which is absorbed into it.
+ *
+ * No expected versions, for the same reason the delete carries none: the server
+ * re-reads both scenes, and the merge statement re-checks that they are still
+ * neighbours in the same analysis run before it changes anything. A stale
+ * version number from the browser would only make a creator reload first.
+ */
+export const mergeScenesSchema = z.object({
+  projectId: z.uuid(),
+  survivorSceneId: z.uuid(),
+  absorbedSceneId: z.uuid(),
+});
+
 export type SceneContent = z.infer<typeof sceneContentSchema>;
 export type SceneAnalysisOutput = z.infer<typeof sceneAnalysisOutputSchema>;

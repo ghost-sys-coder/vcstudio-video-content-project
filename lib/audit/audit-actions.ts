@@ -14,6 +14,7 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   script_restored: "Script version restored",
   scene_approved: "Scene approved",
   scene_deleted: "Scene deleted",
+  scenes_merged: "Scenes merged",
   asset_approved: "Asset approved",
   generation_started: "Generation started",
   generation_cancelled: "Generation cancelled",

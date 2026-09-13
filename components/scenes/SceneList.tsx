@@ -10,6 +10,7 @@ import type {
 import type { SceneImageIndicator } from "@/lib/scenes/scene-image-indicator";
 import type { SceneCharacterStaging } from "@/lib/scenes/scene-character-staging";
 import { SceneCard } from "@/components/scenes/SceneCard";
+import { findSceneMergeNeighbours } from "@/lib/scenes/scene-merge-neighbours";
 import { SceneNavigator } from "@/components/scenes/SceneNavigator";
 import { SceneWorkspaceHeader } from "@/components/scenes/SceneWorkspaceHeader";
 import {
@@ -83,6 +84,19 @@ export function SceneList({
       </div>
     );
 
+  // Merge targets come from every scene, not the filtered list: a search that
+  // hides scene 4 must not make scene 3 look unmergeable.
+  const mergeNeighbours = findSceneMergeNeighbours({
+    sceneNumber: selectedRow.scene.sceneNumber,
+    rows: rows.map((row) => ({
+      sceneId: row.scene.id,
+      sceneNumber: row.scene.sceneNumber,
+      narrationText: row.version.narrationText,
+      hasApprovedImages: row.imageIndicator.state === "approved",
+      hasGeneratedWork: row.imageIndicator.state !== "none",
+    })),
+  });
+
   const previousSceneId = getAdjacentSceneId(
     rows,
     selectedRow.scene.id,
@@ -124,6 +138,7 @@ export function SceneList({
           canGenerateImages={canGenerateImages}
           canReviewImages={canReviewImages}
           imageIndicator={selectedRow.imageIndicator}
+          mergeNeighbours={mergeNeighbours}
           totalSceneCount={rows.length}
           coversApprovedScript={coversApprovedScript}
           videoKind={videoKind}

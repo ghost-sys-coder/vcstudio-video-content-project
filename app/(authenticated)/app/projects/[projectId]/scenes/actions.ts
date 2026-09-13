@@ -40,6 +40,7 @@ import { requireCapability } from "@/lib/policies/workspace-policy";
 import {
   approveAllScenesSchema,
   deleteSceneSchema,
+  mergeScenesSchema,
   approveSceneSchema,
   approveScriptVersionSchema,
   reconcileSceneAnalysisSchema,
@@ -66,7 +67,12 @@ import {
 import { enforceRateLimit } from "@/lib/rate-limit/enforce-rate-limit";
 import { recordAuditEvent } from "@/lib/audit/record-audit-event";
 import { SceneNotFoundError } from "@/db/commands/scene-delete-commands";
+import { SceneMergeConflictError } from "@/db/commands/merge-scenes-command";
 import { deleteScenePermanently } from "@/lib/scenes/delete-scene-permanently";
+import {
+  mergeScenesPermanently,
+  SceneMergeRefusedError,
+} from "@/lib/scenes/merge-scenes-permanently";
 import { StoragePurgeError } from "@/lib/storage/purge-object-prefix";
 
 export type SceneActionState = {
@@ -628,6 +634,58 @@ export async function deleteSceneAction(
           "The scene's generated files could not be removed, so nothing was deleted. Try again.",
       };
     return { success: false, error: "The scene could not be deleted." };
+  }
+}
+
+export async function mergeScenesAction(
+  formData: FormData,
+): Promise<SceneActionState> {
+  const parsed = mergeScenesSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { success: false, error: "Invalid scenes." };
+  try {
+    const { context } = await requireProjectMutation(
+      parsed.data.projectId,
+      "editScenes",
+    );
+    // Cancels the absorbed scene's work, purges its stored files, then writes
+    // the merged version, removes it and closes the numbering in one
+    // transaction. Audited in there, where the counts it records are known.
+    const result = await mergeScenesPermanently({
+      workspaceId: context.activeMembership.workspaceId,
+      projectId: parsed.data.projectId,
+      survivorSceneId: parsed.data.survivorSceneId,
+      absorbedSceneId: parsed.data.absorbedSceneId,
+      actorUserId: context.user.id,
+    });
+    // Scene numbers moved and the narration changed, so the storyboard, the
+    // subtitles and the render are all stale.
+    for (const section of ["scenes", "storyboard", "subtitles", "render"])
+      revalidatePath(`/app/projects/${parsed.data.projectId}/${section}`);
+    return {
+      success: true,
+      error: null,
+      remainingSceneCount: result.remainingSceneCount,
+    };
+  } catch (error) {
+    if (error instanceof SceneNotFoundError)
+      return { success: false, error: error.message };
+    if (error instanceof SceneMergeRefusedError)
+      return { success: false, error: error.message };
+    if (error instanceof SceneMergeConflictError)
+      return {
+        success: false,
+        error:
+          "These scenes changed in another session, so nothing was merged. Refresh and try again.",
+      };
+    // A storage failure happens before anything is written, so both scenes are
+    // still exactly as they were.
+    if (error instanceof StoragePurgeError)
+      return {
+        success: false,
+        error:
+          "The absorbed scene's generated files could not be removed, so nothing was merged. Try again.",
+      };
+    return { success: false, error: "The scenes could not be merged." };
   }
 }
 
