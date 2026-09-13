@@ -287,6 +287,28 @@ export const sceneImageEnvironmentSchema = z.object({
     .transform((value) => value === "true"),
 });
 
+export const sceneVideoEnvironmentSchema = z.object({
+  OPENAI_API_KEY: z.string().min(1, "OPENAI_API_KEY is required"),
+  OPENAI_VIDEO_MODEL: z.string().min(1).default("sora-2"),
+  /**
+   * Deliberately conservative. The published price is not something this
+   * repository can know, and a reservation that is too small spends past the
+   * budget that was meant to stop it, while one that is too large is released
+   * again on reconciliation. Set it to the real rate before relying on the
+   * recorded cost for accounting.
+   */
+  OPENAI_VIDEO_COST_PER_SECOND_CENTS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(50),
+  /** Off by default: this spends money per scene and is new. */
+  ENABLE_SCENE_VIDEO_GENERATION: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
+});
+
 export const sceneAudioEnvironmentSchema = z.object({
   OPENAI_API_KEY: z.string().min(1, "OPENAI_API_KEY is required"),
   OPENAI_TTS_MODEL: z.string().min(1).default("gpt-4o-mini-tts"),
@@ -890,6 +912,7 @@ export type PublishingEnvironment = z.infer<typeof publishingEnvironmentSchema>;
 export type PublishingWebEnvironment = z.infer<
   typeof publishingWebEnvironmentSchema
 >;
+export type SceneVideoEnvironment = z.infer<typeof sceneVideoEnvironmentSchema>;
 export type SceneAudioEnvironment = z.infer<typeof sceneAudioEnvironmentSchema>;
 export type SubtitleEnvironment = z.infer<typeof subtitleEnvironmentSchema>;
 export type RenderEnvironment = z.infer<typeof renderEnvironmentSchema>;

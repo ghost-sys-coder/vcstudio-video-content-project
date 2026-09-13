@@ -7,6 +7,7 @@ import {
   projectEnvironmentSchema,
   sceneAnalysisEnvironmentSchema,
   sceneImageEnvironmentSchema,
+  sceneVideoEnvironmentSchema,
   sceneAudioEnvironmentSchema,
   subtitleEnvironmentSchema,
   renderEnvironmentSchema,
@@ -24,6 +25,7 @@ import {
   type ProjectEnvironment,
   type SceneAnalysisEnvironment,
   type SceneImageEnvironment,
+  type SceneVideoEnvironment,
   type SceneAudioEnvironment,
   type SubtitleEnvironment,
   type RenderEnvironment,
@@ -43,6 +45,7 @@ let storageEnvironment: StorageEnvironment | null = null;
 let projectEnvironment: ProjectEnvironment | null = null;
 let sceneAnalysisEnvironment: SceneAnalysisEnvironment | null = null;
 let sceneImageEnvironment: SceneImageEnvironment | null = null;
+let sceneVideoEnvironment: SceneVideoEnvironment | null = null;
 let sceneAudioEnvironment: SceneAudioEnvironment | null = null;
 let subtitleEnvironment: SubtitleEnvironment | null = null;
 let renderEnvironment: RenderEnvironment | null = null;
@@ -109,6 +112,11 @@ export function getSceneAnalysisEnvironment(): SceneAnalysisEnvironment {
 export function getSceneImageEnvironment(): SceneImageEnvironment {
   sceneImageEnvironment ??= sceneImageEnvironmentSchema.parse(process.env);
   return sceneImageEnvironment;
+}
+
+export function getSceneVideoEnvironment(): SceneVideoEnvironment {
+  sceneVideoEnvironment ??= sceneVideoEnvironmentSchema.parse(process.env);
+  return sceneVideoEnvironment;
 }
 
 export function getSceneAudioEnvironment(): SceneAudioEnvironment {

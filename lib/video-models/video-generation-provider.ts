@@ -65,8 +65,6 @@ export type VideoGenerationStatus =
   | { state: "running"; progressPercent: number | null }
   | {
       state: "succeeded";
-      /** Where the finished clip can be fetched from, valid briefly. */
-      downloadUrl: string;
       mimeType: string;
       durationMilliseconds: number | null;
       width: number | null;
@@ -104,4 +102,16 @@ export interface VideoGenerationProvider {
   readonly providerKey: string;
   start(request: VideoGenerationRequest): Promise<VideoGenerationJob>;
   check(job: VideoGenerationJob): Promise<VideoGenerationStatus>;
+  /**
+   * The finished clip's bytes.
+   *
+   * Separate from `check` because vendors genuinely differ here and pretending
+   * otherwise forced a lie into the contract: some hand back a short-lived URL,
+   * OpenAI streams the file from an endpoint of its own. Asking the adapter for
+   * bytes lets each do what it does, and keeps signed URLs and vendor tokens
+   * from leaking into the rest of the application.
+   */
+  download(
+    job: VideoGenerationJob,
+  ): Promise<{ bytes: Uint8Array; mimeType: string }>;
 }
