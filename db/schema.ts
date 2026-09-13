@@ -428,6 +428,7 @@ export const usageOperationTypeEnum = pgEnum("usage_operation_type", [
   "script_generation",
   "title_generation",
   "thumbnail_generation",
+  "scene_video_generation",
 ]);
 
 export const formatPresetStatusEnum = pgEnum("format_preset_status", [
