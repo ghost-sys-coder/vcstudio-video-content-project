@@ -81,7 +81,13 @@ export function ThemeSwitcher({
         value={theme}
       >
         <TabsList
-          className={cn("w-full bg-sidebar-accent", collapsed && "gap-0.5 p-1")}
+          className={cn(
+            "bg-sidebar-accent",
+            // Collapsed, the control is one icon wide and sits on the same
+            // vertical line as the navigation icons above it, rather than
+            // stretching to a rail narrower than the icon plus its padding.
+            collapsed ? "w-8 gap-0.5 p-0.5" : "w-full",
+          )}
         >
           {THEME_OPTIONS.map(({ value, label, Icon }) => (
             <Tooltip key={value}>
@@ -89,7 +95,18 @@ export function ThemeSwitcher({
                 render={
                   <TabsTrigger
                     aria-label={label}
-                    className="text-sidebar-foreground/70 hover:text-sidebar-foreground data-active:border-transparent data-active:bg-sidebar data-active:text-sidebar-foreground dark:data-active:border-transparent dark:data-active:bg-sidebar dark:data-active:text-sidebar-foreground"
+                    className={cn(
+                      "text-sidebar-foreground/70 hover:text-sidebar-foreground data-active:border-transparent data-active:bg-sidebar data-active:text-sidebar-foreground dark:data-active:border-transparent dark:data-active:bg-sidebar dark:data-active:text-sidebar-foreground",
+                      // A vertical tab list left-aligns its triggers, which is
+                      // right when each one carries a label. Collapsed there is
+                      // no label, only the icon, so left-alignment plus the
+                      // trigger's own side padding pushed it off the rail's
+                      // centre and hard against the right edge. Written with the
+                      // same variant prefix the default uses, so the merge drops
+                      // that rule instead of losing to its higher specificity.
+                      collapsed &&
+                        "size-7 px-0 group-data-vertical/tabs:justify-center",
+                    )}
                     disabled={isPending}
                     value={value}
                   />
