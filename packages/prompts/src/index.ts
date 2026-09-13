@@ -93,6 +93,12 @@ export {
   SCENE_OUTPAINT_PROMPT_TEMPLATE_SOURCE_HASH,
   SCENE_OUTPAINT_PROMPT_VERSION,
 } from "./scene-outpaint";
+export {
+  renderSceneMotionPrompt,
+  SCENE_MOTION_PROMPT_TEMPLATE_SOURCE,
+  SCENE_MOTION_PROMPT_TEMPLATE_SOURCE_HASH,
+  SCENE_MOTION_PROMPT_VERSION,
+} from "./scene-motion";
 export type {
   SceneImagePromptCharacter,
   SceneImagePromptInput,

@@ -29,6 +29,8 @@ import {
   CHARACTER_REFERENCE_PROMPT_VERSION,
   SCENE_IMAGE_PROMPT_TEMPLATE_SOURCE_HASH,
   SCENE_IMAGE_PROMPT_VERSION,
+  SCENE_MOTION_PROMPT_TEMPLATE_SOURCE_HASH,
+  SCENE_MOTION_PROMPT_VERSION,
   SCENE_OUTPAINT_PROMPT_TEMPLATE_SOURCE_HASH,
   SCENE_OUTPAINT_PROMPT_VERSION,
   THUMBNAIL_PROMPT_TEMPLATE_SOURCE_HASH,
@@ -36,7 +38,11 @@ import {
 } from "@studio/prompts";
 
 export type PromptTemplateKey =
-  "scene-image" | "scene-outpaint" | "character-reference" | "thumbnail";
+  | "scene-image"
+  | "scene-outpaint"
+  | "character-reference"
+  | "thumbnail"
+  | "scene-motion";
 
 export interface KnownPromptTemplate {
   templateKey: PromptTemplateKey;
@@ -114,6 +120,11 @@ const CURRENT_PROMPT_TEMPLATES: readonly KnownPromptTemplate[] = [
     templateKey: "thumbnail",
     version: THUMBNAIL_PROMPT_VERSION,
     sourceHash: THUMBNAIL_PROMPT_TEMPLATE_SOURCE_HASH,
+  },
+  {
+    templateKey: "scene-motion",
+    version: SCENE_MOTION_PROMPT_VERSION,
+    sourceHash: SCENE_MOTION_PROMPT_TEMPLATE_SOURCE_HASH,
   },
 ];
 
