@@ -402,6 +402,12 @@ export async function startSceneAnalysisAction(
       model: environment.OPENAI_TEXT_MODEL,
       promptVersion: SCENE_ANALYSIS_PROMPT_VERSION,
       finalPrompt: prompt,
+      // Frozen beside the prompt, so the worker validates against the same
+      // text rather than extracting it a second time in another deployment.
+      scriptSnapshot: {
+        narration: script.narration,
+        segments: script.segments,
+      },
       estimatedCostCents: estimate.estimatedCostCents,
       expiresAt: new Date(
         Date.now() + environment.GENERATION_RESERVATION_EXPIRY_MINUTES * 60_000,

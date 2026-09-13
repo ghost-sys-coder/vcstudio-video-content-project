@@ -133,6 +133,7 @@ async function reserve(fixture: Fixture, estimatedCostCents: number) {
     model: "integration-text-model",
     promptVersion: "scene-analysis-v2",
     finalPrompt: "Integration scene analysis prompt.",
+    scriptSnapshot: { narration: "", segments: [] },
     estimatedCostCents,
     expiresAt: new Date(now.getTime() + 15 * 60_000),
     budget: {

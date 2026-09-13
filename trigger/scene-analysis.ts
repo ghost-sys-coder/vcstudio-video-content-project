@@ -100,7 +100,11 @@ export const sceneAnalysisTask = task({
           environment.OPENAI_TEXT_OUTPUT_COST_PER_MILLION_CENTS,
       });
 
-    const script = readScriptForAnalysis(scriptVersion.content);
+    // Prefer what the request froze. Extracting again here is what let an
+    // older worker judge the model against a script it was never shown; the
+    // fallback exists only for runs created before the snapshot did.
+    const script =
+      run.scriptSnapshot ?? readScriptForAnalysis(scriptVersion.content);
 
     try {
       const plan = await generateValidatedScenePlan({

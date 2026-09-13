@@ -1,3 +1,4 @@
+import type { SceneAnalysisSegmentHint } from "@studio/prompts";
 import "server-only";
 
 import { and, eq, ne, sql } from "drizzle-orm";
@@ -82,6 +83,14 @@ export async function createSceneAnalysisReservation(input: {
   model: string;
   promptVersion: string;
   finalPrompt: string;
+  /**
+   * The narration and segments the prompt was rendered from, frozen so the
+   * worker validates the model's answer against the text it was actually shown.
+   */
+  scriptSnapshot: {
+    narration: string;
+    segments: SceneAnalysisSegmentHint[];
+  };
   estimatedCostCents: number;
   expiresAt: Date;
   budget: {
@@ -155,7 +164,8 @@ export async function createSceneAnalysisReservation(input: {
       insert into scene_analysis_runs (
         id, workspace_id, project_id, script_version_id,
         requested_by_user_id, idempotency_key, request_fingerprint,
-        model, prompt_version, final_prompt, estimated_cost_cents
+        model, prompt_version, final_prompt, script_snapshot,
+        estimated_cost_cents
       )
       select
         ${input.id}::uuid,
@@ -168,6 +178,7 @@ export async function createSceneAnalysisReservation(input: {
         ${input.model},
         ${input.promptVersion},
         ${input.finalPrompt},
+        ${JSON.stringify(input.scriptSnapshot)}::jsonb,
         ${input.estimatedCostCents}
       from eligible
       returning id

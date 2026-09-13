@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import type { SceneAnalysisSegmentHint } from "@studio/prompts";
 import {
   boolean,
   check,
@@ -2199,6 +2200,20 @@ export const sceneAnalysisRuns = pgTable(
     model: text("model").notNull(),
     promptVersion: text("prompt_version").notNull(),
     finalPrompt: text("final_prompt").notNull(),
+    /**
+     * What the model was asked to reproduce, frozen when the run was created.
+     *
+     * The request path extracts narration from the stored script and renders it
+     * into the prompt; the worker used to extract it again and validate against
+     * its own extraction. Two extractions in two deployments, with nothing
+     * requiring them to agree, and when they disagreed the model was judged
+     * against text it had never been shown. Freezing it removes the second
+     * extraction. Null means a run created before this column existed.
+     */
+    scriptSnapshot: jsonb("script_snapshot").$type<{
+      narration: string;
+      segments: SceneAnalysisSegmentHint[];
+    } | null>(),
     status: sceneAnalysisStatusEnum("status").notNull().default("pending"),
     progressPercent: integer("progress_percent").notNull().default(0),
     providerRequestId: text("provider_request_id"),

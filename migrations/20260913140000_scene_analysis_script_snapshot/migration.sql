@@ -1,0 +1,20 @@
+-- Freezes what the model was asked to reproduce onto the run that asked it.
+--
+-- The request path extracted the narration from the stored script, rendered it
+-- into the prompt, and saved the prompt. The worker then extracted the
+-- narration again, from the same stored script, and validated the model's
+-- answer against *its* extraction. Two extractions, two deployments, and
+-- nothing requiring them to agree.
+--
+-- They disagreed. A script written as `[VISUAL CUE: ...]` was understood by a
+-- newer request path and not by an older worker, so the model was asked to
+-- reproduce 5,077 characters of narration and was judged against 7,248
+-- characters of raw document. It failed at character zero, on a stage
+-- direction, having done exactly what it was told.
+--
+-- Snapshotting removes the second extraction. The worker now validates against
+-- the same text the prompt contained, so a version difference between the two
+-- halves can no longer turn into a fidelity failure that blames the model.
+-- Null means a run created before this column existed; the worker falls back to
+-- extracting, which is what those runs always did.
+ALTER TABLE "scene_analysis_runs" ADD COLUMN IF NOT EXISTS "script_snapshot" jsonb;
