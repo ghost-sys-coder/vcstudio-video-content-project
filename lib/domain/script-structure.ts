@@ -90,7 +90,49 @@ export interface ScriptStructure {
  * short phrase. Requiring the absence of lower-case is what keeps an ordinary
  * aside like "[see chapter two]" in the narration where it belongs.
  */
-const MARKER_PATTERN = /\[([^\[\]\n]{1,60})\]/gu;
+const MARKER_PATTERN = /\[([^\[\]]{1,600})\]/gu;
+
+/**
+ * A speaker attribution on a line of its own, such as `HOST (ON CAMERA):`.
+ *
+ * Unbracketed, so the pattern above never saw it, yet it is never spoken: it
+ * names who says the lines that follow. The name must carry no lower-case,
+ * which keeps an ordinary sentence ending in a colon out of this, and it must
+ * be followed by something, because a label introducing nothing is not a label.
+ *
+ * Its kind is always narration, never looked up in the vocabulary. An
+ * unrecognised name such as `ANNOUNCER:` would otherwise be classified as
+ * unknown direction and would silence every line that speaker says, which is
+ * exactly the silent, unrecoverable loss this module exists to avoid.
+ */
+const SPEAKER_LINE_PATTERN =
+  /^[ \t]*([A-Z0-9][A-Z0-9 .'’#/&-]*(?:\([^)\n]*\))?)[ \t]*:[ \t]*$/u;
+
+/** A row of dashes or asterisks dividing sections. Never spoken. */
+const RULE_LINE_PATTERN = /^[ \t]*(?:[-_*][ \t]*){3,}$/u;
+
+/**
+ * Splits `LABEL: the direction itself` written inside one pair of brackets.
+ *
+ * The second convention this module had to learn. `[VISUAL] a bank vault` puts
+ * the direction after the bracket; `[VISUAL CUE: a bank vault]` puts it inside,
+ * which means the whole run carries lower-case and the label gate above
+ * rejected it. Scripts written this way therefore looked like pure narration,
+ * and a scene plan was held to reproducing stage directions nobody speaks.
+ *
+ * Returns null when the part before the first colon does not read as a label,
+ * so `[see chapter two: the rest]` stays in the narration.
+ */
+function splitLabelledBlock(
+  inner: string,
+): { label: string; text: string } | null {
+  const colon = inner.indexOf(":");
+  if (colon <= 0) return null;
+  const label = inner.slice(0, colon).trim();
+  const text = inner.slice(colon + 1).trim();
+  if (text === "" || !looksLikeMarker(label)) return null;
+  return { label, text };
+}
 
 const TIMECODE_PATTERN =
   /^\s*(\d{1,3}):([0-5]\d)(?::([0-5]\d))?\s*[-–—]\s*(?:(\d{1,3}):([0-5]\d)(?::([0-5]\d))?|end)\s*$/iu;
@@ -219,6 +261,19 @@ interface Region {
   text: string;
 }
 
+/**
+ * Every place a marker can appear, scanned in one pass so document order is
+ * preserved: a bracketed run, a speaker attribution on its own line, or a rule.
+ */
+const REGION_SCANNER = new RegExp(
+  [
+    MARKER_PATTERN.source,
+    SPEAKER_LINE_PATTERN.source,
+    RULE_LINE_PATTERN.source,
+  ].join("|"),
+  "gmu",
+);
+
 /** Splits the document into marked regions without altering any of the text. */
 function readRegions(content: string): Region[] {
   const regions: Region[] = [];
@@ -230,27 +285,91 @@ function readRegions(content: string): Region[] {
     text: "",
   };
 
-  MARKER_PATTERN.lastIndex = 0;
-  for (
-    let match = MARKER_PATTERN.exec(content);
-    match !== null;
-    match = MARKER_PATTERN.exec(content)
-  ) {
-    const label = match[1] ?? "";
-    // A timecode heading is tested first: it carries no letters at all, and
-    // "End" carries lower-case ones, so the label-shape gate below would
-    // reject every heading in a normally written script.
-    const timecode = parseScriptTimecode(label);
-    if (!timecode && !looksLikeMarker(label)) continue;
-    current.text += content.slice(cursor, match.index);
+  const open = (region: Region, matchStart: number, matchEnd: number) => {
+    current.text += content.slice(cursor, matchStart);
     regions.push(current);
-    current = {
-      label,
-      kind: timecode ? "narration" : classifyScriptMarker(label),
-      timecode,
-      text: "",
-    };
-    cursor = match.index + match[0].length;
+    current = region;
+    cursor = matchEnd;
+  };
+
+  REGION_SCANNER.lastIndex = 0;
+  for (
+    let match = REGION_SCANNER.exec(content);
+    match !== null;
+    match = REGION_SCANNER.exec(content)
+  ) {
+    const end = match.index + match[0].length;
+    const bracketed = match[1];
+    const speaker = match[2];
+
+    if (bracketed !== undefined) {
+      // A timecode heading is tested first: it carries no letters at all, and
+      // "End" carries lower-case ones, so the label-shape gate below would
+      // reject every heading in a normally written script.
+      const timecode = parseScriptTimecode(bracketed);
+      if (timecode) {
+        open(
+          { label: bracketed, kind: "narration", timecode, text: "" },
+          match.index,
+          end,
+        );
+        continue;
+      }
+
+      // `[LABEL: the direction]` carries its own text, so the region closes at
+      // the bracket and whatever follows returns to being narration. Checked
+      // before the whole-run gate because such a block always carries
+      // lower-case and would otherwise be read as prose.
+      const labelled = splitLabelledBlock(bracketed);
+      if (labelled) {
+        open(
+          {
+            label: labelled.label,
+            kind: classifyScriptMarker(labelled.label),
+            timecode: null,
+            text: labelled.text,
+          },
+          match.index,
+          end,
+        );
+        open(
+          { label: null, kind: "narration", timecode: null, text: "" },
+          end,
+          end,
+        );
+        continue;
+      }
+
+      if (!looksLikeMarker(bracketed)) continue;
+      open(
+        {
+          label: bracketed,
+          kind: classifyScriptMarker(bracketed),
+          timecode: null,
+          text: "",
+        },
+        match.index,
+        end,
+      );
+      continue;
+    }
+
+    if (speaker !== undefined) {
+      // Always narration, never classified. See SPEAKER_LINE_PATTERN.
+      open(
+        { label: speaker, kind: "narration", timecode: null, text: "" },
+        match.index,
+        end,
+      );
+      continue;
+    }
+
+    // A rule. It divides, it is not spoken, and what follows it is narration.
+    open(
+      { label: null, kind: "narration", timecode: null, text: "" },
+      match.index,
+      end,
+    );
   }
   current.text += content.slice(cursor);
   regions.push(current);
