@@ -40,7 +40,7 @@ import {
   deleteProjectPermanently,
   ProjectDeletionError,
 } from "@/lib/projects/delete-project-permanently";
-import { ProjectAssetPurgeError } from "@/lib/storage/project-asset-storage";
+import { StoragePurgeError } from "@/lib/storage/purge-object-prefix";
 import {
   briefSchema,
   createProjectSchema,
@@ -100,7 +100,7 @@ export async function deleteProjectAction(
         success: false,
       };
     if (
-      error instanceof ProjectAssetPurgeError ||
+      error instanceof StoragePurgeError ||
       error instanceof ProjectDeletionError
     )
       return { error: error.message, success: false };

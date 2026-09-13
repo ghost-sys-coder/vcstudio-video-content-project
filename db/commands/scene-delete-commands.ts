@@ -51,6 +51,36 @@ export interface SceneDeletionResult {
   renumberedFrom: number;
 }
 
+/**
+ * Confirms a scene exists inside the caller's own workspace and project, and
+ * says which number it holds.
+ *
+ * Separate from the delete so a caller can establish the scene is really theirs
+ * *before* doing anything irreversible to its stored files.
+ */
+export async function requireSceneForDeletion(input: {
+  workspaceId: string;
+  projectId: string;
+  sceneId: string;
+}): Promise<{ id: string; sceneNumber: number }> {
+  const [scene] = await getDatabase()
+    .select({
+      id: scenes.id,
+      sceneNumber: scenes.sceneNumber,
+    })
+    .from(scenes)
+    .where(
+      and(
+        eq(scenes.workspaceId, input.workspaceId),
+        eq(scenes.projectId, input.projectId),
+        eq(scenes.id, input.sceneId),
+      ),
+    )
+    .limit(1);
+  if (!scene) throw new SceneNotFoundError();
+  return scene;
+}
+
 export async function deleteSceneAndRenumber(input: {
   workspaceId: string;
   projectId: string;

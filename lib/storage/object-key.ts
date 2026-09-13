@@ -156,6 +156,23 @@ export function createProjectAssetPrefix(input: {
   return `workspaces/${input.workspaceId}/projects/${input.projectId}/`;
 }
 
+/**
+ * Every stored object one scene owns sits under this prefix — its generated
+ * images, its reframed variants, its narration audio and any clip cut from it
+ * (see the scene key builders below, which must all keep starting with this).
+ *
+ * That is what makes deleting a scene able to reclaim its storage without
+ * walking a list of tables that could fall out of date, and without reaching
+ * anything a sibling scene owns.
+ */
+export function createSceneAssetPrefix(input: {
+  workspaceId: string;
+  projectId: string;
+  sceneId: string;
+}): string {
+  return `${createProjectAssetPrefix(input)}scenes/${input.sceneId}/`;
+}
+
 export function createVideoExportObjectKey(input: {
   workspaceId: string;
   projectId: string;

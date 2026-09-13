@@ -65,10 +65,9 @@ import {
 } from "@/lib/domain/errors";
 import { enforceRateLimit } from "@/lib/rate-limit/enforce-rate-limit";
 import { recordAuditEvent } from "@/lib/audit/record-audit-event";
-import {
-  deleteSceneAndRenumber,
-  SceneNotFoundError,
-} from "@/db/commands/scene-delete-commands";
+import { SceneNotFoundError } from "@/db/commands/scene-delete-commands";
+import { deleteScenePermanently } from "@/lib/scenes/delete-scene-permanently";
+import { StoragePurgeError } from "@/lib/storage/purge-object-prefix";
 
 export type SceneActionState = {
   success: boolean;
@@ -599,18 +598,14 @@ export async function deleteSceneAction(
       parsed.data.projectId,
       "editScenes",
     );
-    const result = await deleteSceneAndRenumber({
+    // Cancels in-flight work, purges the scene's stored files, then deletes
+    // the rows and closes the gap in the numbering. Audited in there, where the
+    // counts it records are known.
+    const result = await deleteScenePermanently({
       workspaceId: context.activeMembership.workspaceId,
       projectId: parsed.data.projectId,
       sceneId: parsed.data.sceneId,
-    });
-    await recordAuditEvent({
-      workspaceId: context.activeMembership.workspaceId,
       actorUserId: context.user.id,
-      projectId: parsed.data.projectId,
-      action: "scene_deleted",
-      targetType: "scene",
-      targetId: parsed.data.sceneId,
     });
     // The storyboard, the subtitles and the render all read scene numbers, so
     // every one of them is stale the moment a scene goes.
@@ -622,13 +617,17 @@ export async function deleteSceneAction(
       remainingSceneCount: result.remainingSceneCount,
     };
   } catch (error) {
-    return {
-      success: false,
-      error:
-        error instanceof SceneNotFoundError
-          ? error.message
-          : "The scene could not be deleted.",
-    };
+    if (error instanceof SceneNotFoundError)
+      return { success: false, error: error.message };
+    // A storage failure leaves the scene intact, so say that rather than
+    // letting the creator wonder whether half of it went.
+    if (error instanceof StoragePurgeError)
+      return {
+        success: false,
+        error:
+          "The scene's generated files could not be removed, so nothing was deleted. Try again.",
+      };
+    return { success: false, error: "The scene could not be deleted." };
   }
 }
 

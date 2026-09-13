@@ -17,11 +17,18 @@ export function CopyButton({
   value,
   label,
   className,
+  hideLabel = false,
 }: {
   value: string;
   /** What is being copied, for the accessible name. */
   label: string;
   className?: string;
+  /**
+   * Drops the visible word, leaving the icon alone, for places too tight to
+   * carry it. The accessible name is unaffected — it comes from `aria-label`,
+   * which still says both the action and the field.
+   */
+  hideLabel?: boolean;
 }) {
   const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -71,9 +78,15 @@ export function CopyButton({
       ) : (
         <CopyIcon aria-hidden className="size-3.5" />
       )}
-      <span aria-hidden>
-        {state === "copied" ? "Copied" : state === "failed" ? "Failed" : "Copy"}
-      </span>
+      {hideLabel ? null : (
+        <span aria-hidden>
+          {state === "copied"
+            ? "Copied"
+            : state === "failed"
+              ? "Failed"
+              : "Copy"}
+        </span>
+      )}
     </button>
   );
 }

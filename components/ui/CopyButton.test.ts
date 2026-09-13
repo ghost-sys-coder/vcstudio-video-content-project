@@ -7,6 +7,12 @@ function render(value: string, label = "the title") {
   return renderToStaticMarkup(createElement(CopyButton, { value, label }));
 }
 
+function renderIconOnly(value: string, label = "the title") {
+  return renderToStaticMarkup(
+    createElement(CopyButton, { value, label, hideLabel: true }),
+  );
+}
+
 describe("CopyButton", () => {
   it("names what it copies, so several on a page stay distinguishable", () => {
     expect(render("A title")).toContain('aria-label="Copy the title"');
@@ -27,6 +33,14 @@ describe("CopyButton", () => {
 
   it("explains why it is unavailable rather than just greying out", () => {
     expect(render("")).toContain('title="Nothing to copy yet"');
+  });
+
+  it("keeps its accessible name when the visible word is dropped", () => {
+    // Icon-only in tight places, but a control whose only name is a picture is
+    // unusable with a screen reader, so the aria-label has to survive.
+    const markup = renderIconOnly("A title");
+    expect(markup).toContain('aria-label="Copy the title"');
+    expect(markup).not.toContain(">Copy<");
   });
 
   it("is a button, so it never submits a form it sits inside", () => {

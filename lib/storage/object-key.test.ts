@@ -13,6 +13,9 @@ import {
   createMediaLibraryObjectKey,
   isMediaLibraryObjectKey,
   createProjectAssetPrefix,
+  createSceneAssetPrefix,
+  createSceneAudioObjectKey,
+  createSceneClipObjectKey,
 } from "@/lib/storage/object-key";
 
 const workspaceId = "00000000-0000-4000-8000-000000000001";
@@ -285,5 +288,66 @@ describe("media library object keys", () => {
         objectKey: `workspaces/${workspaceId}/library/../${mediaAssetId}.png`,
       }),
     ).toBe(false);
+  });
+});
+
+describe("scene asset prefix", () => {
+  const scene = {
+    workspaceId,
+    projectId: "00000000-0000-4000-8000-000000000030",
+    sceneId: "00000000-0000-4000-8000-000000000031",
+  };
+  const sceneVersionId = "00000000-0000-4000-8000-000000000032";
+  const generationId = "00000000-0000-4000-8000-000000000033";
+
+  // Deleting a scene reclaims its storage by purging this one prefix, so every
+  // kind of file a scene owns has to sit beneath it. A key builder that drifts
+  // out of the prefix would leak silently: the rows would cascade away and the
+  // objects would bill forever with nothing able to name them.
+  it("covers every kind of file a scene owns", () => {
+    const prefix = createSceneAssetPrefix(scene);
+    expect(
+      createSceneImageObjectKey({
+        ...scene,
+        sceneVersionId,
+        generationId,
+        outputFormat: "webp",
+      }).startsWith(prefix),
+    ).toBe(true);
+    expect(
+      createSceneClipObjectKey({
+        ...scene,
+        sceneVersionId,
+        generationId,
+        extension: "mp4",
+      }).startsWith(prefix),
+    ).toBe(true);
+    expect(
+      createSceneAudioObjectKey({
+        ...scene,
+        generationId,
+        format: "mp3",
+      }).startsWith(prefix),
+    ).toBe(true);
+  });
+
+  it("sits inside its own project, so a scene purge stays within it", () => {
+    expect(
+      createSceneAssetPrefix(scene).startsWith(createProjectAssetPrefix(scene)),
+    ).toBe(true);
+  });
+
+  it("cannot reach a sibling scene's files", () => {
+    const sibling = createSceneAssetPrefix({
+      ...scene,
+      sceneId: "00000000-0000-4000-8000-000000000099",
+    });
+    expect(sibling.startsWith(createSceneAssetPrefix(scene))).toBe(false);
+  });
+
+  // Without the trailing slash, a scene id that is a prefix of another id would
+  // take the other scene's files with it.
+  it("ends at a path boundary", () => {
+    expect(createSceneAssetPrefix(scene).endsWith("/")).toBe(true);
   });
 });

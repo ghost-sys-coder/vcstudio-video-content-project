@@ -61,7 +61,7 @@ export function describeSceneDeletion(
   if (input.hasGeneratedWork)
     lines.push({
       tone: "caution",
-      text: "Everything generated for this scene goes with it: its images, its narration audio and any clip. That work was paid for and cannot be recovered.",
+      text: "Everything generated for this scene goes with it: its images, its narration audio and any clip. The files are deleted from storage as well, so that work was paid for and cannot be recovered.",
     });
 
   if (input.coversApprovedScript)

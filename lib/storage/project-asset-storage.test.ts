@@ -11,10 +11,8 @@ vi.mock("@/lib/storage/r2-client", () => ({
   getR2Client: () => ({ send: mocks.send }),
 }));
 
-import {
-  deleteProjectAssetObjects,
-  ProjectAssetPurgeError,
-} from "@/lib/storage/project-asset-storage";
+import { deleteProjectAssetObjects } from "@/lib/storage/project-asset-storage";
+import { StoragePurgeError } from "@/lib/storage/purge-object-prefix";
 
 const WORKSPACE_ID = "11111111-1111-4111-8111-111111111111";
 const PROJECT_ID = "22222222-2222-4222-8222-222222222222";
@@ -145,7 +143,7 @@ describe("deleteProjectAssetObjects", () => {
         workspaceId: WORKSPACE_ID,
         projectId: PROJECT_ID,
       }),
-    ).rejects.toBeInstanceOf(ProjectAssetPurgeError);
+    ).rejects.toBeInstanceOf(StoragePurgeError);
   });
 
   it("stops rather than paginating forever on an unbounded prefix", async () => {
@@ -164,6 +162,6 @@ describe("deleteProjectAssetObjects", () => {
         workspaceId: WORKSPACE_ID,
         projectId: PROJECT_ID,
       }),
-    ).rejects.toBeInstanceOf(ProjectAssetPurgeError);
+    ).rejects.toBeInstanceOf(StoragePurgeError);
   });
 });
