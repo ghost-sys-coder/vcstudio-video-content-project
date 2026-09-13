@@ -1,14 +1,18 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import type { Scene, SceneVersion } from "@/db/schema";
 import {
   updateSceneAction,
   previewSceneRevisionAction,
 } from "@/app/(authenticated)/app/projects/[projectId]/scenes/actions";
-import { SceneRevisionEstimate } from "@/components/scenes/SceneRevisionEstimate";
+import { SceneRevisionConfirmDialog } from "@/components/scenes/SceneRevisionConfirmDialog";
+import { SceneSaveBar } from "@/components/scenes/SceneSaveBar";
 import type { SceneRevisionEstimateView } from "@/lib/scenes/scene-revision-view";
-import { Button } from "@/components/ui/button";
+import {
+  describeSceneSaveImpact,
+  describeSceneSaveState,
+} from "@/lib/scenes/describe-scene-save";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -34,50 +38,78 @@ export function SceneEditor({
   canEdit: boolean;
   onDirtyChange?: (dirty: boolean) => void;
 }) {
+  const formReference = useRef<HTMLFormElement>(null);
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
   const [changed, setChanged] = useState(false);
   const [succeeded, setSucceeded] = useState(false);
-  const [estimate, setEstimate] = useState<SceneRevisionEstimateView | null>(
-    null,
-  );
+  /** Set only when the edit destroys finished work, which opens the dialog. */
+  const [confirming, setConfirming] =
+    useState<SceneRevisionEstimateView | null>(null);
   const [compatibility, setCompatibility] = useState({
     image: true,
     audio: true,
   });
+
+  async function save(data: FormData) {
+    const result = await updateSceneAction(data);
+    setSucceeded(result.success);
+    setMessage(
+      result.error ??
+        (result.changed
+          ? "Scene saved as a new version. It is in review, not approved."
+          : "No changes to save."),
+    );
+    if (result.success) {
+      setChanged(false);
+      setConfirming(null);
+      onDirtyChange?.(false);
+    }
+  }
+
+  function confirmSave() {
+    const form = formReference.current;
+    if (!form) return;
+    // Read the fields again rather than replaying what was submitted: the form
+    // is uncontrolled, so this is the only copy guaranteed to be current.
+    const data = new FormData(form);
+    startTransition(async () => {
+      try {
+        await save(data);
+      } catch {
+        setSucceeded(false);
+        setConfirming(null);
+        setMessage(
+          "The request could not complete. Your changes are still here; try again.",
+        );
+      }
+    });
+  }
+
   return (
     <form
+      ref={formReference}
       onSubmit={(event) => {
-        // React form actions reset uncontrolled fields after returning. A preview
-        // must preserve the draft, including after a recoverable request failure.
+        // React form actions reset uncontrolled fields after returning, and a
+        // recoverable failure must not cost the creator their draft.
         event.preventDefault();
         const data = new FormData(event.currentTarget);
         startTransition(async () => {
           try {
-            if (!estimate) {
-              const preview = await previewSceneRevisionAction(data);
-              if (preview.success) {
-                setEstimate(preview.estimate);
-                setMessage(null);
-              } else {
-                setSucceeded(false);
-                setMessage(preview.error);
-              }
+            // Asked every time, but it only interrupts when the answer is that
+            // something finished and paid for stops matching this scene.
+            const preview = await previewSceneRevisionAction(data);
+            if (!preview.success) {
+              setSucceeded(false);
+              setMessage(preview.error);
               return;
             }
-            const result = await updateSceneAction(data);
-            setSucceeded(result.success);
-            setMessage(
-              result.error ??
-                (result.changed
-                  ? "Scene saved as a new version."
-                  : "No changes to save."),
-            );
-            if (result.success) {
-              setChanged(false);
-              setEstimate(null);
-              onDirtyChange?.(false);
+            if (describeSceneSaveImpact(preview.estimate).needsConfirmation) {
+              setConfirming(preview.estimate);
+              setMessage(null);
+              return;
             }
+            await save(data);
           } catch {
             setSucceeded(false);
             setMessage(
@@ -88,7 +120,7 @@ export function SceneEditor({
       }}
       className="space-y-4"
       onChange={(event) => {
-        setEstimate(null);
+        setConfirming(null);
         const parsed = parseSceneEditorInput(new FormData(event.currentTarget));
         const dirty =
           !parsed.success || hasSceneContentChanged(version, parsed.data);
@@ -176,25 +208,27 @@ export function SceneEditor({
         />
       </div>
       {canEdit ? (
-        <div className="space-y-2">
-          <p className="text-sm text-muted-foreground" role="status">
-            {changed
-              ? `Saving returns this scene to review. ${compatibility.image ? "Approved images and framing are kept." : "Images and framing need preparation again."} ${compatibility.audio ? "Approved narration and caption edits are kept." : "Narration and captions need preparation again."} Other scenes keep their media. Shorts may need range review. Saving is free; generation costs are confirmed separately.`
-              : "No changes to save. Existing approvals and media will be kept."}
-          </p>
-          <Button
-            disabled={pending || !changed}
-            type="submit"
-            variant="outline"
-          >
-            {pending
-              ? "Working…"
-              : estimate
-                ? "Confirm and save scene"
-                : "Review edit impact"}
-          </Button>
-          {estimate ? <SceneRevisionEstimate estimate={estimate} /> : null}
-        </div>
+        <SceneSaveBar
+          dirty={changed}
+          impact={describeSceneSaveState({
+            dirty: changed,
+            keepsImages: compatibility.image,
+            keepsNarration: compatibility.audio,
+          })}
+          pending={pending}
+        />
+      ) : null}
+      {confirming ? (
+        <SceneRevisionConfirmDialog
+          estimate={confirming}
+          onConfirm={confirmSave}
+          onOpenChange={(open) => {
+            if (!open) setConfirming(null);
+          }}
+          open
+          pending={pending}
+          summary={describeSceneSaveImpact(confirming)}
+        />
       ) : null}
       {message ? (
         <p

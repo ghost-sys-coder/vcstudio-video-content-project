@@ -68,8 +68,12 @@ export async function estimateSceneRevision(input: {
   const lines: string[] = [];
   let estimatedCostCents = 0;
   let unavailableCount = 0;
+  // Counted before any pricing, because whether an approved asset survives the
+  // edit is a different question from whether its replacement can be priced.
+  let affectedMediaCount = 0;
   for (const image of images) {
     if (compatibility.image) continue;
+    affectedMediaCount++;
     const generation = await findSceneImageGeneration({
       ...scope,
       generationId: image.generationId,
@@ -159,6 +163,7 @@ export async function estimateSceneRevision(input: {
     );
   }
   if (!compatibility.audio && audio[0]) {
+    affectedMediaCount++;
     const generation = await findSceneAudioGeneration({
       ...scope,
       generationId: audio[0].generationId,
@@ -203,5 +208,5 @@ export async function estimateSceneRevision(input: {
     lines.push(
       "No approved image or narration needs replacement for this edit.",
     );
-  return { lines, estimatedCostCents, unavailableCount };
+  return { lines, estimatedCostCents, unavailableCount, affectedMediaCount };
 }

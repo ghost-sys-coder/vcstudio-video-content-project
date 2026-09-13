@@ -89,6 +89,9 @@ describe("scene revision planning estimates", () => {
       sceneId: request.revision.sceneId,
     });
     expect(mocks.images).toHaveBeenCalledTimes(3);
+    // The editor saves in one click when this is zero, so a wrong zero here is
+    // an edit that destroys paid work without ever stopping to say so.
+    expect(result.affectedMediaCount).toBe(0);
   });
   it("uses normalized replacement narration length and current rates", async () => {
     const request = input();
@@ -98,6 +101,7 @@ describe("scene revision planning estimates", () => {
     const result = await estimateSceneRevision(request);
     expect(result.estimatedCostCents).toBe(3);
     expect(result.lines[0]).toContain("1999 characters");
+    expect(result.affectedMediaCount).toBe(1);
   });
   it("estimates changed visuals from the current prompt and original quality/style", async () => {
     const request = input();
@@ -179,6 +183,10 @@ describe("scene revision planning estimates", () => {
     const result = await estimateSceneRevision(request);
     expect(result.unavailableCount).toBe(1);
     expect(result.lines[0]).toContain("record or upload");
+    // A recorded voice-over costs nothing to "replace" and is destroyed just
+    // the same, so the count, not the money, is what must stop the save.
+    expect(result.estimatedCostCents).toBe(0);
+    expect(result.affectedMediaCount).toBe(1);
   });
   it("rejects stale versions and missing tenant-scoped scenes before reading assets", async () => {
     const request = input();

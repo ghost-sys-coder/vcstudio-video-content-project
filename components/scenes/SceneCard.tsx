@@ -48,7 +48,11 @@ export function SceneCard({
   coversApprovedScript: boolean;
 }) {
   return (
-    <Card>
+    // `overflow-visible` is load-bearing, not cosmetic: the card clips by
+    // default, and a clipping ancestor makes the editor's sticky save bar stick
+    // to the card instead of to the viewport, which is the same as not sticking
+    // at all. Nothing here is an edge-to-edge image relying on the clip.
+    <Card className="overflow-visible">
       <CardHeader>
         <div className="flex items-center justify-between gap-3">
           <CardTitle>Scene {scene.sceneNumber}</CardTitle>
