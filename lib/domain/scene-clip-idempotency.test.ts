@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createSceneClipIdempotencyKey } from "@/lib/domain/idempotency";
 
-const base = {
+const base: Parameters<typeof createSceneClipIdempotencyKey>[0] = {
   secret: "test-secret",
   workspaceId: "11111111-1111-1111-1111-111111111111",
   projectId: "22222222-2222-2222-2222-222222222222",
@@ -17,7 +17,9 @@ const base = {
   sourceImageGenerationId: "44444444-4444-4444-4444-444444444444",
 };
 
-function key(overrides: Partial<typeof base> = {}) {
+function key(
+  overrides: Partial<Parameters<typeof createSceneClipIdempotencyKey>[0]> = {},
+) {
   return createSceneClipIdempotencyKey({ ...base, ...overrides });
 }
 
