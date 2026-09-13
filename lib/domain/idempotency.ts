@@ -157,6 +157,49 @@ export function createThumbnailGenerationIdempotencyKey(input: {
   ]);
 }
 
+/**
+ * The key that stops one scene clip being paid for twice.
+ *
+ * Everything that changes what the provider would return is in it: the model,
+ * the shape, the length, the resolution, the prompt version and the still being
+ * animated. The generation version is in it too, so asking for a *new* take of
+ * the same scene is deliberately a different key rather than a silent no-op.
+ */
+export function createSceneClipIdempotencyKey(input: {
+  secret: string;
+  workspaceId: string;
+  projectId: string;
+  sceneVersionId: string;
+  promptTemplateVersion: string;
+  generationVersion: number;
+  provider: string;
+  model: string;
+  mode: string;
+  aspectRatio: string;
+  durationSeconds: number;
+  resolutionHeight: number;
+  sourceImageGenerationId: string | null;
+}): string {
+  if (!Number.isInteger(input.generationVersion) || input.generationVersion < 1)
+    throw new RangeError("Generation version must be a positive integer.");
+
+  return hash(input.secret, [
+    input.workspaceId,
+    input.projectId,
+    input.sceneVersionId,
+    "scene-clip-generation",
+    input.promptTemplateVersion,
+    String(input.generationVersion),
+    input.provider,
+    input.model,
+    input.mode,
+    input.aspectRatio,
+    String(input.durationSeconds),
+    String(input.resolutionHeight),
+    input.sourceImageGenerationId ?? "none",
+  ]);
+}
+
 export function createSceneImageIdempotencyKey(input: {
   secret: string;
   workspaceId: string;

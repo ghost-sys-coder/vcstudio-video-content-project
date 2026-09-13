@@ -227,6 +227,25 @@ export function isSceneImageObjectKey(input: {
   );
 }
 
+/**
+ * Where a generated scene clip is stored.
+ *
+ * Keyed by scene version like the stills, not by scene, because a clip is made
+ * from one particular approved image and stops being the right clip the moment
+ * the scene is revised. Putting the version in the path means a revision cannot
+ * silently inherit the previous version's motion.
+ */
+export function createSceneClipObjectKey(input: {
+  workspaceId: string;
+  projectId: string;
+  sceneId: string;
+  sceneVersionId: string;
+  generationId: string;
+  extension: "mp4" | "webm";
+}): string {
+  return `workspaces/${input.workspaceId}/projects/${input.projectId}/scenes/${input.sceneId}/versions/${input.sceneVersionId}/clips/${input.generationId}.${input.extension}`;
+}
+
 export function createSceneAudioObjectKey(input: {
   workspaceId: string;
   projectId: string;
