@@ -281,6 +281,40 @@ export const imageGenerationStatusEnum = pgEnum("image_generation_status", [
   "cancelled",
 ]);
 
+/**
+ * A generated scene clip's lifecycle, mirroring the image one.
+ *
+ * Its own type rather than a reuse of `image_generation_status`, because these
+ * rows are produced by a different kind of provider with its own failure modes,
+ * and a shared enum would make either table's states hard to change alone.
+ */
+export const sceneClipStatusEnum = pgEnum("scene_clip_status", [
+  "pending",
+  "queued",
+  "running",
+  "succeeded",
+  "failed",
+  "cancelled",
+]);
+
+export const sceneClipReviewStatusEnum = pgEnum("scene_clip_review_status", [
+  "pending",
+  "approved",
+  "rejected",
+]);
+
+/**
+ * Whether the clip animates an approved still or invents its own footage.
+ *
+ * Animating a still is the default everywhere in this product: it is what keeps
+ * the workspace's visual style, and it is what separates a few seconds of
+ * deliberate motion from a model inventing a scene.
+ */
+export const sceneClipModeEnum = pgEnum("scene_clip_mode", [
+  "image_to_video",
+  "text_to_video",
+]);
+
 export const imageGenerationPurposeEnum = pgEnum("image_generation_purpose", [
   "scene",
   "variant_outpaint",
@@ -4441,6 +4475,232 @@ export const publicationMetricObservations = pgTable(
   ],
 );
 
+/**
+ * One attempt at turning a scene into a short moving clip.
+ *
+ * **Why this is a sibling of the still rather than a replacement for it.** A
+ * scene always has an approved still; a clip is an enhancement laid over the
+ * same scene. If the clip is rejected, fails, or is never made, the scene
+ * renders its still exactly as it always did. That is what makes the whole
+ * feature safe to switch on: the worst outcome is the video you already had.
+ *
+ * **Why a clip belongs to a shape.** A 16:9 clip cannot serve a 9:16 render,
+ * so `outputVariantId` names the shape it was made for. Null means the
+ * project's own shape, matching how the image table treats its canonical size.
+ * The approved-uniqueness index below is declared `nulls not distinct`, because
+ * Postgres would otherwise consider two null variants different and allow two
+ * rival approved clips for the project's own shape.
+ *
+ * Timing lives here too. `durationSeconds` is what was bought, `loopCount` how
+ * many times it repeats to cover the narration, and `trimmed` whether the tail
+ * is cut. Those are frozen onto the row rather than recomputed at render time,
+ * so a clip keeps playing the way it was approved even after the narration is
+ * re-recorded at a different length.
+ */
+export const sceneVideoGenerations = pgTable(
+  "scene_video_generations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").notNull(),
+    sceneId: uuid("scene_id").notNull(),
+    sceneVersionId: uuid("scene_version_id").notNull(),
+    /** The shape this clip was made for. Null is the project's own shape. */
+    outputVariantId: uuid("output_variant_id"),
+    /** The approved still being animated. Null only for text-to-video. */
+    sourceImageGenerationId: uuid("source_image_generation_id"),
+    mode: sceneClipModeEnum("mode").notNull().default("image_to_video"),
+    provider: text("provider").notNull(),
+    model: text("model").notNull(),
+    aspectRatio: text("aspect_ratio").notNull(),
+    resolutionHeight: integer("resolution_height").notNull(),
+    durationSeconds: integer("duration_seconds").notNull(),
+    loopCount: integer("loop_count").notNull().default(1),
+    trimmed: boolean("trimmed").notNull().default(false),
+    /** The creator's own words for the motion. Empty asks for ambient drift. */
+    motionDescription: text("motion_description").notNull().default(""),
+    promptTemplateVersionId: uuid("prompt_template_version_id").references(
+      () => promptTemplateVersions.id,
+      { onDelete: "restrict" },
+    ),
+    promptTemplateVersion: text("prompt_template_version"),
+    finalPrompt: text("final_prompt"),
+    generationVersion: integer("generation_version").notNull(),
+    requestNonce: uuid("request_nonce").notNull(),
+    status: sceneClipStatusEnum("status").notNull().default("pending"),
+    reviewStatus: sceneClipReviewStatusEnum("review_status")
+      .notNull()
+      .default("pending"),
+    triggerRunId: text("trigger_run_id"),
+    idempotencyKey: text("idempotency_key"),
+    requestFingerprint: text("request_fingerprint"),
+    /** The vendor's handle for the job, so polling survives a lost worker. */
+    providerJobId: text("provider_job_id"),
+    providerRequestId: text("provider_request_id"),
+    estimatedCostCents: integer("estimated_cost_cents").notNull(),
+    actualCostCents: integer("actual_cost_cents"),
+    progressPercent: integer("progress_percent").notNull().default(0),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    assetObjectKey: text("asset_object_key"),
+    assetContentType: text("asset_content_type"),
+    assetSizeBytes: integer("asset_size_bytes"),
+    assetEtag: text("asset_etag"),
+    assetWidth: integer("asset_width"),
+    assetHeight: integer("asset_height"),
+    /** Measured from the delivered file, not from what was ordered. */
+    durationMilliseconds: integer("duration_milliseconds"),
+    errorCategory: text("error_category"),
+    safeErrorMessage: text("safe_error_message"),
+    requestedByUserId: uuid("requested_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    reviewedByUserId: uuid("reviewed_by_user_id").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("scene_video_generations_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    uniqueIndex("scene_video_generations_id_project_workspace_unique").on(
+      table.id,
+      table.projectId,
+      table.workspaceId,
+    ),
+    uniqueIndex("scene_video_generations_idempotency_unique").on(
+      table.idempotencyKey,
+    ),
+    uniqueIndex("scene_video_generations_version_unique").on(
+      table.sceneVersionId,
+      table.generationVersion,
+    ),
+    uniqueIndex("scene_video_generations_workspace_request_nonce_unique").on(
+      table.workspaceId,
+      table.requestNonce,
+    ),
+    // One approved clip per scene version per shape. The coalesce matters: the
+    // project's own shape is stored as a null variant, and Postgres treats two
+    // nulls as different values, which would let two approved clips claim the
+    // same scene. `nulls not distinct` would say this more plainly but cannot
+    // be declared on a partial index in Drizzle, and an index the schema cannot
+    // express is one a later push will try to "correct".
+    uniqueIndex("scene_video_generations_approved_scene_version_variant_unique")
+      .on(
+        table.sceneVersionId,
+        sql`coalesce(${table.outputVariantId}, '00000000-0000-0000-0000-000000000000'::uuid)`,
+      )
+      .where(sql`${table.reviewStatus} = 'approved'`),
+    index("scene_video_generations_workspace_project_scene_index").on(
+      table.workspaceId,
+      table.projectId,
+      table.sceneId,
+      table.createdAt,
+    ),
+    index("scene_video_generations_status_index").on(
+      table.workspaceId,
+      table.status,
+      table.updatedAt,
+    ),
+    check(
+      "scene_video_generations_version_positive",
+      sql`${table.generationVersion} > 0`,
+    ),
+    check(
+      "scene_video_generations_cost_nonnegative",
+      sql`${table.estimatedCostCents} >= 0 and (${table.actualCostCents} is null or ${table.actualCostCents} >= 0)`,
+    ),
+    check(
+      "scene_video_generations_progress_range",
+      sql`${table.progressPercent} between 0 and 100`,
+    ),
+    check(
+      "scene_video_generations_duration_positive",
+      sql`${table.durationSeconds} > 0`,
+    ),
+    check(
+      "scene_video_generations_loop_count_positive",
+      sql`${table.loopCount} > 0`,
+    ),
+    check(
+      "scene_video_generations_resolution_positive",
+      sql`${table.resolutionHeight} > 0`,
+    ),
+    check(
+      "scene_video_generations_aspect_ratio_supported",
+      sql`${table.aspectRatio} in ('16:9', '9:16', '1:1')`,
+    ),
+    check(
+      "scene_video_generations_approved_succeeded",
+      sql`${table.reviewStatus} <> 'approved' or ${table.status} = 'succeeded'`,
+    ),
+    // Animating nothing is not a thing. A row claiming image-to-video without a
+    // still would reach the provider as a bare text prompt and quietly produce
+    // footage in a style nobody approved.
+    check(
+      "scene_video_generations_mode_source_image",
+      sql`(${table.mode} = 'image_to_video' and ${table.sourceImageGenerationId} is not null) or (${table.mode} = 'text_to_video' and ${table.sourceImageGenerationId} is null)`,
+    ),
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [projects.id, projects.workspaceId],
+      name: "scene_video_generations_tenant_project_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.sceneId, table.projectId, table.workspaceId],
+      foreignColumns: [scenes.id, scenes.projectId, scenes.workspaceId],
+      name: "scene_video_generations_tenant_scene_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [
+        table.sceneVersionId,
+        table.sceneId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        sceneVersions.id,
+        sceneVersions.sceneId,
+        sceneVersions.projectId,
+        sceneVersions.workspaceId,
+      ],
+      name: "scene_video_generations_tenant_scene_version_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [
+        table.sourceImageGenerationId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        sceneImageGenerations.id,
+        sceneImageGenerations.projectId,
+        sceneImageGenerations.workspaceId,
+      ],
+      name: "scene_video_generations_tenant_source_image_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.outputVariantId, table.workspaceId],
+      foreignColumns: [
+        projectOutputVariants.id,
+        projectOutputVariants.workspaceId,
+      ],
+      name: "scene_video_generations_tenant_output_variant_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
 export const usageReservations = pgTable(
   "usage_reservations",
   {
@@ -4473,6 +4733,7 @@ export const usageReservations = pgTable(
       () => thumbnailGenerations.id,
       { onDelete: "cascade" },
     ),
+    clipGenerationId: uuid("clip_generation_id"),
     status: usageReservationStatusEnum("status").notNull().default("pending"),
     reservedCostCents: integer("reserved_cost_cents").notNull(),
     actualCostCents: integer("actual_cost_cents"),
@@ -4512,6 +4773,9 @@ export const usageReservations = pgTable(
     uniqueIndex("usage_reservations_thumbnail_generation_unique")
       .on(table.thumbnailGenerationId)
       .where(sql`${table.thumbnailGenerationId} is not null`),
+    uniqueIndex("usage_reservations_clip_generation_unique")
+      .on(table.clipGenerationId)
+      .where(sql`${table.clipGenerationId} is not null`),
     index("usage_reservations_workspace_project_status_index").on(
       table.workspaceId,
       table.projectId,
@@ -4527,7 +4791,7 @@ export const usageReservations = pgTable(
     ),
     check(
       "usage_reservations_single_operation",
-      sql`(${table.operationType}::text = 'scene_analysis' and ${table.analysisRunId} is not null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null) or (${table.operationType}::text = 'scene_image_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is not null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null) or (${table.operationType}::text = 'scene_audio_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is not null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null) or (${table.operationType}::text = 'video_render' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is not null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null) or (${table.operationType}::text = 'script_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is not null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null) or (${table.operationType}::text = 'title_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is not null and ${table.thumbnailGenerationId} is null) or (${table.operationType}::text = 'thumbnail_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is not null)`,
+      sql`(${table.operationType}::text = 'scene_analysis' and ${table.analysisRunId} is not null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is null) or (${table.operationType}::text = 'scene_image_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is not null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is null) or (${table.operationType}::text = 'scene_audio_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is not null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is null) or (${table.operationType}::text = 'video_render' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is not null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is null) or (${table.operationType}::text = 'script_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is not null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is null) or (${table.operationType}::text = 'title_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is not null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is null) or (${table.operationType}::text = 'thumbnail_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is not null and ${table.clipGenerationId} is null) or (${table.operationType}::text = 'scene_video_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is not null)`,
     ),
     foreignKey({
       columns: [table.imageGenerationId, table.projectId, table.workspaceId],
@@ -4555,6 +4819,15 @@ export const usageReservations = pgTable(
         videoRenders.workspaceId,
       ],
       name: "usage_reservations_tenant_video_render_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.clipGenerationId, table.projectId, table.workspaceId],
+      foreignColumns: [
+        sceneVideoGenerations.id,
+        sceneVideoGenerations.projectId,
+        sceneVideoGenerations.workspaceId,
+      ],
+      name: "usage_reservations_tenant_clip_generation_fkey",
     }).onDelete("cascade"),
   ],
 );
@@ -7211,6 +7484,7 @@ export type StylePreset = typeof stylePresets.$inferSelect;
 export type StylePresetVersion = typeof stylePresetVersions.$inferSelect;
 export type PromptTemplateVersion = typeof promptTemplateVersions.$inferSelect;
 export type SceneImageGeneration = typeof sceneImageGenerations.$inferSelect;
+export type SceneVideoGeneration = typeof sceneVideoGenerations.$inferSelect;
 export type ImageGenerationSource =
   (typeof imageGenerationSourceEnum.enumValues)[number];
 export type SceneVariantFraming = typeof sceneVariantFramings.$inferSelect;
