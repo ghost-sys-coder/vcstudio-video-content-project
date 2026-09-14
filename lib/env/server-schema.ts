@@ -309,6 +309,55 @@ export const sceneVideoEnvironmentSchema = z.object({
     .transform((value) => value === "true"),
 });
 
+/**
+ * Which text-to-speech provider narrates, and how to reach it.
+ *
+ * Kept apart from the OpenAI audio settings on purpose. A deployment that
+ * narrates with NVIDIA still needs the OpenAI key for images and script work,
+ * and a deployment that narrates with OpenAI must not be forced to invent
+ * NVIDIA credentials it will never use. The cross-field rule below is what
+ * makes both true at once.
+ */
+export const speechProviderEnvironmentSchema = z
+  .object({
+    SPEECH_PROVIDER: z.enum(["openai", "magpie"]).default("openai"),
+    /**
+     * Where the Magpie endpoint lives. A Speech NIM you run yourself, or an
+     * NVIDIA Cloud Function route. No default: pointing narration at the wrong
+     * host should fail loudly at boot, not silently at the first render.
+     */
+    MAGPIE_BASE_URL: z.string().url().optional(),
+    /** `nvapi-...`. Unused by a NIM inside your own network. */
+    NVIDIA_API_KEY: z.string().min(1).optional(),
+    /** The NVCF function id, when routing through NVIDIA Cloud Functions. */
+    NVIDIA_FUNCTION_ID: z.string().min(1).optional(),
+    MAGPIE_TTS_MODEL: z.string().min(1).default("magpie-tts-zeroshot"),
+    /** NVIDIA documents 1-40, defaulting to 20. Higher clings to the reference. */
+    MAGPIE_PROMPT_QUALITY: z.coerce.number().int().min(1).max(40).default(20),
+    MAGPIE_SAMPLE_RATE_HZ: z.coerce
+      .number()
+      .int()
+      .min(22050)
+      .max(48000)
+      .default(22050),
+    /** BCP-47. The synthesize endpoint requires a language on every request. */
+    MAGPIE_LANGUAGE: z.string().min(2).default("en-US"),
+    MAGPIE_REQUEST_TIMEOUT_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(10)
+      .max(600)
+      .default(180),
+  })
+  .refine(
+    (value) =>
+      value.SPEECH_PROVIDER !== "magpie" || Boolean(value.MAGPIE_BASE_URL),
+    {
+      path: ["MAGPIE_BASE_URL"],
+      message: "MAGPIE_BASE_URL is required when SPEECH_PROVIDER is magpie.",
+    },
+  );
+
 export const sceneAudioEnvironmentSchema = z.object({
   OPENAI_API_KEY: z.string().min(1, "OPENAI_API_KEY is required"),
   OPENAI_TTS_MODEL: z.string().min(1).default("gpt-4o-mini-tts"),
@@ -913,6 +962,9 @@ export type PublishingWebEnvironment = z.infer<
   typeof publishingWebEnvironmentSchema
 >;
 export type SceneVideoEnvironment = z.infer<typeof sceneVideoEnvironmentSchema>;
+export type SpeechProviderEnvironment = z.infer<
+  typeof speechProviderEnvironmentSchema
+>;
 export type SceneAudioEnvironment = z.infer<typeof sceneAudioEnvironmentSchema>;
 export type SubtitleEnvironment = z.infer<typeof subtitleEnvironmentSchema>;
 export type RenderEnvironment = z.infer<typeof renderEnvironmentSchema>;

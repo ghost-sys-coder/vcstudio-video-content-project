@@ -9,6 +9,7 @@ import {
   sceneImageEnvironmentSchema,
   sceneVideoEnvironmentSchema,
   sceneAudioEnvironmentSchema,
+  speechProviderEnvironmentSchema,
   subtitleEnvironmentSchema,
   renderEnvironmentSchema,
   characterEnvironmentSchema,
@@ -27,6 +28,7 @@ import {
   type SceneImageEnvironment,
   type SceneVideoEnvironment,
   type SceneAudioEnvironment,
+  type SpeechProviderEnvironment,
   type SubtitleEnvironment,
   type RenderEnvironment,
   type CharacterEnvironment,
@@ -46,6 +48,7 @@ let projectEnvironment: ProjectEnvironment | null = null;
 let sceneAnalysisEnvironment: SceneAnalysisEnvironment | null = null;
 let sceneImageEnvironment: SceneImageEnvironment | null = null;
 let sceneVideoEnvironment: SceneVideoEnvironment | null = null;
+let speechProviderEnvironment: SpeechProviderEnvironment | null = null;
 let sceneAudioEnvironment: SceneAudioEnvironment | null = null;
 let subtitleEnvironment: SubtitleEnvironment | null = null;
 let renderEnvironment: RenderEnvironment | null = null;
@@ -122,6 +125,13 @@ export function getSceneVideoEnvironment(): SceneVideoEnvironment {
 export function getSceneAudioEnvironment(): SceneAudioEnvironment {
   sceneAudioEnvironment ??= sceneAudioEnvironmentSchema.parse(process.env);
   return sceneAudioEnvironment;
+}
+
+export function getSpeechProviderEnvironment(): SpeechProviderEnvironment {
+  speechProviderEnvironment ??= speechProviderEnvironmentSchema.parse(
+    process.env,
+  );
+  return speechProviderEnvironment;
 }
 
 export function getSubtitleEnvironment(): SubtitleEnvironment {
