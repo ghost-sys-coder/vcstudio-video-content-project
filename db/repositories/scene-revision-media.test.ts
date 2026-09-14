@@ -36,6 +36,34 @@ describe("media selection for revisions", () => {
     const other = { ...reused, id: "new", size: "1024x1536" };
     expect(appendReusedMedia([other], [reused])).toHaveLength(2);
   });
+  // A scene may hold several approved images at one size, distinguished only by
+  // shot. Keyed on size alone, approving a new first shot suppressed the
+  // carried-forward second one and the scene quietly lost a picture.
+  it("does not hide another shot at the same size", () => {
+    const secondShot = { ...reused, id: "old-shot-1", shotIndex: 1 };
+    const firstShot = { ...reused, id: "new-shot-0", shotIndex: 0 };
+    expect(appendReusedMedia([firstShot], [secondShot])).toEqual([
+      firstShot,
+      secondShot,
+    ]);
+  });
+
+  it("still replaces the same shot at the same size", () => {
+    const before = { ...reused, id: "old", shotIndex: 1 };
+    const after = { ...reused, id: "new", shotIndex: 1 };
+    expect(appendReusedMedia([after], [before])).toEqual([after]);
+  });
+
+  // Rows written before shots existed carry no index and must keep behaving as
+  // the first shot rather than becoming a distinct image.
+  it("treats a missing shot index as the first shot", () => {
+    const withoutIndex = { ...reused, id: "new" };
+    const withZero = { ...reused, id: "old", shotIndex: 0 };
+    expect(appendReusedMedia([withoutIndex], [withZero])).toEqual([
+      withoutIndex,
+    ]);
+  });
+
   it("does not prefer an unavailable replacement", () => {
     expect(
       appendReusedMedia(

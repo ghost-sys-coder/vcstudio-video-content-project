@@ -1,6 +1,6 @@
 "use client";
+import { RetryingImage } from "@/components/ui/RetryingImage";
 
-import Image from "next/image";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
@@ -178,9 +178,8 @@ export function SceneFramingEditor({
           ref={imageContainerRef}
           style={{ aspectRatio: `${width} / ${height}`, backgroundColor }}
         >
-          <Image
+          <RetryingImage
             alt={`Scene ${selected.sceneNumber} framing preview`}
-            fill
             sizes="(min-width: 1024px) 50vw, 100vw"
             src={imageUrl}
             style={{
@@ -188,7 +187,6 @@ export function SceneFramingEditor({
               objectPosition: framingObjectPosition(framing),
               transform: `scale(${framingScale(scale)})`,
             }}
-            unoptimized
           />
           <span
             aria-hidden

@@ -28,6 +28,9 @@ export async function listReusedImages(input: Scope) {
         eq(sceneImageGenerations.projectId, sceneRevisionMedia.projectId),
         eq(sceneImageGenerations.sceneId, sceneRevisionMedia.sceneId),
         eq(sceneImageGenerations.size, sceneRevisionMedia.slot),
+        // Shot as well as size, or a binding for one shot would match every
+        // approved image of that size and multiply the scene's pictures.
+        eq(sceneImageGenerations.shotIndex, sceneRevisionMedia.shotIndex),
       ),
     )
     .where(
@@ -82,16 +85,27 @@ export async function listReusedAudio(input: Scope) {
   }));
 }
 
-/** Native approved media wins; pending replacements never hide usable media. */
+/**
+ * Native approved media wins; pending replacements never hide usable media.
+ *
+ * Identity includes the shot, because a scene may hold several images at one
+ * size. Keyed on size alone, a freshly approved first shot would suppress the
+ * carried-forward second one and the scene would quietly lose a picture.
+ */
 export function appendReusedMedia<
   T extends {
     sceneVersionId: string;
     reviewStatus: string;
     size?: string;
+    shotIndex?: number;
     status: string;
     assetObjectKey: string | null;
   },
 >(native: T[], reused: T[]): T[] {
+  const identity = (row: T) =>
+    row.size === undefined
+      ? `${row.sceneVersionId}:audio`
+      : `${row.sceneVersionId}:${row.size}:${row.shotIndex ?? 0}`;
   const approved = new Set(
     native
       .filter(
@@ -100,12 +114,7 @@ export function appendReusedMedia<
           row.status === "succeeded" &&
           row.assetObjectKey !== null,
       )
-      .map((row) => `${row.sceneVersionId}:${row.size ?? "audio"}`),
+      .map(identity),
   );
-  return [
-    ...native,
-    ...reused.filter(
-      (row) => !approved.has(`${row.sceneVersionId}:${row.size ?? "audio"}`),
-    ),
-  ];
+  return [...native, ...reused.filter((row) => !approved.has(identity(row)))];
 }

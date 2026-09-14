@@ -6,6 +6,8 @@ import { findThumbnailGeneration } from "@/db/repositories/thumbnail-generation.
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import { isThumbnailObjectKey } from "@/lib/storage/object-key";
 import { createThumbnailDownloadUrl } from "@/lib/storage/thumbnail-storage";
+import { assetRedirectCacheControl } from "@/lib/images/asset-cache";
+import { getStorageEnvironment } from "@/lib/env/server";
 
 const routeParamsSchema = z.object({
   projectId: z.uuid(),
@@ -64,7 +66,14 @@ export async function GET(
       await createThumbnailDownloadUrl(generation.assetObjectKey),
       307,
     );
-    response.headers.set("Cache-Control", "private, no-store");
+    // Same reasoning as the scene image route: reusable by this viewer alone,
+    // and always for less time than the signature it points at.
+    response.headers.set(
+      "Cache-Control",
+      assetRedirectCacheControl(
+        getStorageEnvironment().R2_SIGNED_DOWNLOAD_EXPIRY_SECONDS,
+      ),
+    );
     return response;
   } catch {
     return new NextResponse(null, { status: 500, headers: noStore });

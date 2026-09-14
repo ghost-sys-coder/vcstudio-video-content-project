@@ -1,10 +1,10 @@
-import Image from "next/image";
 import type {
   SceneImageActionResult,
   SceneImageGenerationView,
 } from "@/lib/scenes/scene-image-view";
 import { formatUsdCents } from "@/lib/format/currency";
 import { ImageGenerationErrorState } from "@/components/scenes/ImageGenerationErrorState";
+import { RetryingImage } from "@/components/ui/RetryingImage";
 import { ImageReviewDialog } from "@/components/scenes/ImageReviewDialog";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -68,13 +68,11 @@ export function GeneratedImageCard({
       <CardContent className="space-y-3">
         {generation.imageUrl ? (
           <div className="relative aspect-video overflow-hidden rounded-xl border bg-muted">
-            <Image
+            <RetryingImage
               alt={`Generated scene image version ${generation.generationVersion}`}
               className="object-contain"
-              fill
               sizes="(max-width: 768px) 100vw, 480px"
               src={generation.imageUrl}
-              unoptimized
             />
           </div>
         ) : generation.status === "failed" ? (

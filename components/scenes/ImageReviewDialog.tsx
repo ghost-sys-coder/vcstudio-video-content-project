@@ -1,6 +1,6 @@
 "use client";
+import { RetryingImage } from "@/components/ui/RetryingImage";
 
-import Image from "next/image";
 import type {
   SceneImageActionResult,
   SceneImageGenerationView,
@@ -54,14 +54,12 @@ export function ImageReviewDialog({
         </DialogHeader>
         {generation.imageUrl ? (
           <div className="relative aspect-video overflow-hidden rounded-xl border bg-muted">
-            <Image
+            <RetryingImage
               alt={`Generated scene image version ${generation.generationVersion}`}
               className="object-contain"
-              fill
               priority
               sizes="(max-width: 768px) 100vw, 896px"
               src={generation.imageUrl}
-              unoptimized
             />
           </div>
         ) : null}

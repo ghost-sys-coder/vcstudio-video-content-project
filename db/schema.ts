@@ -7313,6 +7313,14 @@ export const sceneRevisionMedia = pgTable(
     sceneId: uuid("scene_id").notNull(),
     sceneVersionId: uuid("scene_version_id").notNull(),
     slot: text("slot").notNull(),
+    /**
+     * Which image of the scene this binding is for.
+     *
+     * Approval is keyed on (scene version, size, shot), so a binding that knew
+     * only the size could carry forward one shot and silently dropped the rest
+     * on every revision. Audio has no shots and is pinned to zero by a check.
+     */
+    shotIndex: integer("shot_index").notNull().default(0),
     imageGenerationId: uuid("image_generation_id"),
     audioGenerationId: uuid("audio_generation_id"),
     createdByUserId: uuid("created_by_user_id")
@@ -7323,14 +7331,19 @@ export const sceneRevisionMedia = pgTable(
       .notNull(),
   },
   (table) => [
-    uniqueIndex("scene_revision_media_version_slot_unique").on(
+    uniqueIndex("scene_revision_media_version_slot_shot_unique").on(
       table.sceneVersionId,
       table.slot,
+      table.shotIndex,
     ),
     index("scene_revision_media_scope_index").on(
       table.workspaceId,
       table.projectId,
       table.sceneVersionId,
+    ),
+    check(
+      "scene_revision_media_shot_index_valid",
+      sql`${table.shotIndex} >= 0 and (${table.slot} <> 'audio' or ${table.shotIndex} = 0)`,
     ),
     check(
       "scene_revision_media_slot_valid",

@@ -4,6 +4,8 @@ import { findProject } from "@/db/repositories/projects.repository";
 import { findSceneImageGeneration } from "@/db/repositories/scene-images.repository";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import { sceneImageAssetRouteParamsSchema } from "@/lib/schemas/scene-image-action";
+import { assetRedirectCacheControl } from "@/lib/images/asset-cache";
+import { getStorageEnvironment } from "@/lib/env/server";
 import { isSceneImageObjectKey } from "@/lib/storage/object-key";
 import { createSceneImageDownloadUrl } from "@/lib/storage/scene-image-storage";
 
@@ -74,7 +76,16 @@ export async function GET(
       await createSceneImageDownloadUrl(generation.assetObjectKey),
       307,
     );
-    response.headers.set("Cache-Control", "private, no-store");
+    // Reusable by this viewer's browser alone, and always for less time than
+    // the signature it points at. Without this, every remount of an image
+    // repeats authentication, two lookups and a signing round trip before a
+    // single byte moves — which is what made slow connections give up.
+    response.headers.set(
+      "Cache-Control",
+      assetRedirectCacheControl(
+        getStorageEnvironment().R2_SIGNED_DOWNLOAD_EXPIRY_SECONDS,
+      ),
+    );
     return response;
   } catch {
     return new NextResponse(null, {

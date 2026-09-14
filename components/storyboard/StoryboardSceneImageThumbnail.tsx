@@ -1,5 +1,5 @@
-import Image from "next/image";
 import { ImageIcon, Loader2Icon } from "lucide-react";
+import { RetryingImage } from "@/components/ui/RetryingImage";
 import type { StoryboardSceneImageView } from "@/lib/scenes/storyboard-view";
 import { isActiveImageGenerationStatus } from "@/lib/domain/bulk-scene-image";
 import { getSceneImageSizeLabel } from "@/lib/scenes/scene-image-size-options";
@@ -19,13 +19,11 @@ export function StoryboardSceneImageThumbnail({
   return (
     <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-muted ring-1 ring-inset ring-foreground/10">
       {imageUrl ? (
-        <Image
+        <RetryingImage
           alt={`Scene ${sceneNumber} ${getSceneImageSizeLabel(image.size)} image`}
           className="object-cover"
-          fill
           sizes="(max-width: 768px) 100vw, 240px"
           src={imageUrl}
-          unoptimized
         />
       ) : (
         <div className="flex size-full items-center justify-center text-muted-foreground">

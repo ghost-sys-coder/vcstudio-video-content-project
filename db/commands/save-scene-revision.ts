@@ -64,12 +64,12 @@ export async function saveSceneRevision(
         and cast_row.scene_version_id = ${input.previousVersionId}::uuid
       returning id
     ), image_candidates as (
-      select g.id, g.size, 0 as priority from scene_image_generations g
+      select g.id, g.size, g.shot_index, 0 as priority from scene_image_generations g
       where g.workspace_id = ${input.workspaceId}::uuid and g.project_id = ${input.projectId}::uuid
         and g.scene_version_id = ${input.previousVersionId}::uuid
         and g.purpose = 'scene' and g.status = 'succeeded' and g.review_status = 'approved' and g.asset_object_key is not null
       union all
-      select g.id, g.size, 1 from scene_revision_media b join scene_image_generations g on g.id = b.image_generation_id
+      select g.id, g.size, g.shot_index, 1 from scene_revision_media b join scene_image_generations g on g.id = b.image_generation_id
       where b.workspace_id = ${input.workspaceId}::uuid and b.project_id = ${input.projectId}::uuid
         and b.scene_version_id = ${input.previousVersionId}::uuid
         and g.workspace_id = b.workspace_id and g.project_id = b.project_id and g.scene_id = b.scene_id
@@ -86,9 +86,11 @@ export async function saveSceneRevision(
         and g.workspace_id = b.workspace_id and g.project_id = b.project_id and g.scene_id = b.scene_id
         and g.status = 'succeeded' and g.review_status = 'approved' and g.asset_object_key is not null
     ), reused_images as (
-      insert into scene_revision_media (workspace_id, project_id, scene_id, scene_version_id, slot, image_generation_id, created_by_user_id)
-      select ${input.workspaceId}::uuid, ${input.projectId}::uuid, ${input.sceneId}::uuid, inserted.id, candidate.size, candidate.id, ${input.userId}::uuid
-      from inserted cross join (select distinct on (size) id, size from image_candidates order by size, priority) candidate
+      insert into scene_revision_media (workspace_id, project_id, scene_id, scene_version_id, slot, shot_index, image_generation_id, created_by_user_id)
+      select ${input.workspaceId}::uuid, ${input.projectId}::uuid, ${input.sceneId}::uuid, inserted.id, candidate.size, candidate.shot_index, candidate.id, ${input.userId}::uuid
+      -- Per shot as well as per size: a scene may hold several approved images,
+      -- and keying on size alone carried one forward and dropped the others.
+      from inserted cross join (select distinct on (size, shot_index) id, size, shot_index from image_candidates order by size, shot_index, priority) candidate
       where ${input.compatibility.image} returning id
     ), reused_audio as (
       insert into scene_revision_media (workspace_id, project_id, scene_id, scene_version_id, slot, audio_generation_id, created_by_user_id)

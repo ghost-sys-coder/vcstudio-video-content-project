@@ -121,13 +121,13 @@ export async function mergeScenesAndRenumber(input: {
           and cast_row.scene_version_id = ${input.previousVersionId}::uuid
         returning id
       ), image_candidates as (
-        select g.id, g.size, 0 as priority from scene_image_generations g
+        select g.id, g.size, g.shot_index, 0 as priority from scene_image_generations g
         where g.workspace_id = ${input.workspaceId}::uuid and g.project_id = ${input.projectId}::uuid
           and g.scene_version_id = ${input.previousVersionId}::uuid
           and g.purpose = 'scene' and g.status = 'succeeded'
           and g.review_status = 'approved' and g.asset_object_key is not null
         union all
-        select g.id, g.size, 1 from scene_revision_media b
+        select g.id, g.size, g.shot_index, 1 from scene_revision_media b
         join scene_image_generations g on g.id = b.image_generation_id
         where b.workspace_id = ${input.workspaceId}::uuid and b.project_id = ${input.projectId}::uuid
           and b.scene_version_id = ${input.previousVersionId}::uuid
@@ -140,14 +140,16 @@ export async function mergeScenesAndRenumber(input: {
           and g.review_status = 'approved' and g.asset_object_key is not null
       ), reused_images as (
         insert into scene_revision_media (
-          workspace_id, project_id, scene_id, scene_version_id, slot,
+          workspace_id, project_id, scene_id, scene_version_id, slot, shot_index,
           image_generation_id, created_by_user_id
         )
         select ${input.workspaceId}::uuid, ${input.projectId}::uuid,
-          ${plan.survivor.sceneId}::uuid, inserted.id, candidate.size, candidate.id,
-          ${input.userId}::uuid
+          ${plan.survivor.sceneId}::uuid, inserted.id, candidate.size,
+          candidate.shot_index, candidate.id, ${input.userId}::uuid
+        -- Every shot, not just the first at each size.
         from inserted cross join (
-          select distinct on (size) id, size from image_candidates order by size, priority
+          select distinct on (size, shot_index) id, size, shot_index
+          from image_candidates order by size, shot_index, priority
         ) candidate
         returning id
       ), copied_framing as (
