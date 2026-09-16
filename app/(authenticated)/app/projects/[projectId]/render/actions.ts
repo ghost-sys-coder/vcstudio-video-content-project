@@ -43,6 +43,9 @@ import {
   RateLimitExceededError,
 } from "@/lib/domain/errors";
 import { requireCapability } from "@/lib/policies/workspace-policy";
+import { updateProjectPacingProfile } from "@/db/commands/project-pacing-commands";
+import type { PacingProfileId } from "@/lib/pacing/pacing-profile";
+import { savePacingProfileSchema } from "@/lib/schemas/pacing";
 import { cancelVideoRenderRun } from "@/lib/render/cancel-video-render";
 import { getSceneImageSizeForAspectRatio } from "@/lib/schemas/scene-image";
 import {
@@ -588,6 +591,53 @@ export type RenderEffectsActionState = {
  * workspace by the command, so neither identifier from the browser can reach
  * another workspace's data.
  */
+/**
+ * Chooses how busy this project's finished videos should feel.
+ *
+ * Only the *next* render is affected. Every render already made keeps the
+ * motion and transitions frozen into its own snapshot, so changing the pace
+ * never rewrites a video somebody has already downloaded or published.
+ */
+export async function savePacingProfileAction(
+  formData: FormData,
+): Promise<RenderEffectsActionState> {
+  const parsed = savePacingProfileSchema.safeParse(
+    Object.fromEntries(formData),
+  );
+  if (!parsed.success)
+    return { error: "That pacing profile is not valid.", success: false };
+
+  try {
+    const context = await getAuthenticatedWorkspaceContext();
+    if (!context)
+      return { error: "Workspace context is unavailable.", success: false };
+    requireCapability(context.activeMembership.role, "renderVideo");
+
+    const project = await findProject({
+      workspaceId: context.activeMembership.workspaceId,
+      projectId: parsed.data.projectId,
+    });
+    if (!project)
+      return { error: "That project is unavailable.", success: false };
+
+    const { updated } = await updateProjectPacingProfile({
+      workspaceId: context.activeMembership.workspaceId,
+      projectId: project.id,
+      pacingProfile: parsed.data.pacingProfile as PacingProfileId,
+    });
+    if (!updated)
+      return { error: "That project is unavailable.", success: false };
+
+    // The storyboard reports how each scene stands against the pace, so it is
+    // stale the moment the pace changes.
+    revalidatePath(`/app/projects/${project.id}/render`);
+    revalidatePath(`/app/projects/${project.id}/storyboard`);
+    return { error: null, success: true };
+  } catch {
+    return { error: "The pacing could not be saved.", success: false };
+  }
+}
+
 export async function saveRenderEffectsAction(
   formData: FormData,
 ): Promise<RenderEffectsActionState> {

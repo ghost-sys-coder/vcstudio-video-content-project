@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { WorkspaceViewSwitch } from "@/components/production/WorkspaceViewSwitch";
 import { ReframePanel } from "@/components/render/ReframePanel";
+import { PacingProfilePanel } from "@/components/render/PacingProfilePanel";
 import { RenderEffectsPanel } from "@/components/render/RenderEffectsPanel";
 import { VideoPreviewWorkspace } from "@/components/render/VideoPreviewWorkspace";
 import { findProject } from "@/db/repositories/projects.repository";
@@ -8,6 +9,7 @@ import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import { can } from "@/lib/policies/workspace-policy";
 import { getSubtitleEnvironment } from "@/lib/env/server";
 import { ASSEMBLY_WORKSPACE_VIEWS } from "@/lib/production/workspace-views";
+import { resolvePacingProfile } from "@/lib/pacing/pacing-profile";
 import { loadRenderEffectsView } from "@/lib/render/render-effects-view";
 import { loadReframeTargets } from "@/lib/reframe/reframe-job-view";
 import { loadRenderWorkspace } from "@/lib/render/render-workspace-details";
@@ -49,6 +51,11 @@ export default async function ProjectRenderPage({
         canStart={can(role, "renderVideo") && notArchived}
         projectId={project.id}
         targets={reframeTargets}
+      />
+      <PacingProfilePanel
+        canEdit={can(role, "renderVideo") && notArchived}
+        pacingProfile={resolvePacingProfile(project.pacingProfile).id}
+        projectId={project.id}
       />
       <RenderEffectsPanel
         canEdit={can(role, "renderVideo") && notArchived}

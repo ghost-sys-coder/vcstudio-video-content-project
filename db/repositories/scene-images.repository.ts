@@ -679,6 +679,11 @@ export async function listSceneImageGenerationsForSceneVersions(input: {
       status: sceneImageGenerations.status,
       reviewStatus: sceneImageGenerations.reviewStatus,
       size: sceneImageGenerations.size,
+      // Carried so the storyboard can count how many distinct pictures a scene
+      // shows, which is what pacing advice is measured against. It also lets
+      // `appendReusedMedia` tell two shots apart instead of treating the second
+      // as a replacement for the first.
+      shotIndex: sceneImageGenerations.shotIndex,
       assetObjectKey: sceneImageGenerations.assetObjectKey,
       estimatedCostCents: sceneImageGenerations.estimatedCostCents,
       actualCostCents: sceneImageGenerations.actualCostCents,

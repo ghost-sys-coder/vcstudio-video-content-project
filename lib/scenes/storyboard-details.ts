@@ -35,6 +35,11 @@ import {
 } from "@/lib/schemas/scene-image";
 import { SCENE_IMAGE_PROMPT_VERSION } from "@studio/prompts";
 import { orderStylePresetsForProject } from "@/lib/scenes/order-style-presets";
+import { resolvePacingProfile } from "@/lib/pacing/pacing-profile";
+import {
+  describeScenePacingFit,
+  planTargetShotCount,
+} from "@/lib/pacing/plan-scene-pacing";
 
 function formatCreatedAt(value: Date): string {
   return `${value.toISOString().slice(0, 16).replace("T", " ")} UTC`;
@@ -95,6 +100,11 @@ export async function loadStoryboard(input: {
     });
   }
 
+  // Judged against the estimate rather than the recording: the storyboard
+  // exists before narration does, and advice that only appears after the
+  // audio is made would arrive too late to act on.
+  const pacingProfile = resolvePacingProfile(input.project.pacingProfile);
+
   // Latest and approved generation, per scene, PER SIZE — a scene can have an
   // approved image for each size independently. Rows arrive ordered scene
   // asc / generationVersion desc, so the first row seen for a given
@@ -106,6 +116,11 @@ export async function loadStoryboard(input: {
   const approvedByScene = new Map<
     string,
     Map<SceneImageApiSize, (typeof generations)[number]>
+  >();
+  /** Distinct approved shot indexes, per scene, per size. */
+  const approvedShotsByScene = new Map<
+    string,
+    Map<SceneImageApiSize, Set<number>>
   >();
   const sceneVersionById = new Map(
     currentScenes.map((row) => [row.scene.id, row.version.id] as const),
@@ -131,6 +146,21 @@ export async function loadStoryboard(input: {
         approvedByScene.set(generation.sceneId, approvedSizes);
       }
       if (!approvedSizes.has(size)) approvedSizes.set(size, generation);
+
+      // Shots are counted separately from the representative image above.
+      // A scene changes picture using the shots approved for one size, so the
+      // count is kept per size and the best-covered size stands for the scene.
+      let shotSizes = approvedShotsByScene.get(generation.sceneId);
+      if (!shotSizes) {
+        shotSizes = new Map();
+        approvedShotsByScene.set(generation.sceneId, shotSizes);
+      }
+      let shotIndexes = shotSizes.get(size);
+      if (!shotIndexes) {
+        shotIndexes = new Set();
+        shotSizes.set(size, shotIndexes);
+      }
+      shotIndexes.add(generation.shotIndex);
     }
   }
 
@@ -141,6 +171,16 @@ export async function loadStoryboard(input: {
     ({ scene, version }) => {
       const latestSizes = latestByScene.get(scene.id);
       const approvedSizes = approvedByScene.get(scene.id);
+      const approvedShotCount = Math.max(
+        0,
+        ...[...(approvedShotsByScene.get(scene.id)?.values() ?? [])].map(
+          (indexes) => indexes.size,
+        ),
+      );
+      const targetShotCount = planTargetShotCount(
+        pacingProfile,
+        version.estimatedDurationMilliseconds,
+      );
       const sizes = new Set<SceneImageApiSize>([
         ...(latestSizes?.keys() ?? []),
         ...(approvedSizes?.keys() ?? []),
@@ -179,6 +219,12 @@ export async function loadStoryboard(input: {
         narrationText: version.narrationText,
         characterNames: version.characterNames,
         durationMilliseconds: version.estimatedDurationMilliseconds,
+        approvedShotCount,
+        targetShotCount,
+        pacingFit: describeScenePacingFit({
+          approvedShotCount,
+          targetShotCount,
+        }),
         eligibility: classifySceneBulkEligibility({
           sceneStatus: scene.status,
           hasApprovedImage: Boolean(approvedSizes && approvedSizes.size > 0),

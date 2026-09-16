@@ -58,6 +58,9 @@ const storyboardSceneSchema = z.object({
   narrationText: z.string(),
   characterNames: z.array(z.string()),
   durationMilliseconds: z.number().int().nonnegative(),
+  approvedShotCount: z.number().int().nonnegative(),
+  targetShotCount: z.number().int().positive(),
+  pacingFit: z.enum(["sparse", "on_pace", "dense"]),
   eligibility: z.enum([
     "eligible",
     "hasApprovedImage",

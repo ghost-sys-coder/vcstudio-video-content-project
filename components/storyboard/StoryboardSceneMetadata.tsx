@@ -56,6 +56,19 @@ export function StoryboardSceneMetadata({
           </span>
         ) : null}
       </div>
+      {/*
+        Advice, never an instruction: acting on it generates images, and images
+        cost money. Only a shortfall is mentioned — a scene carrying more
+        pictures than the pace asks for is somebody's deliberate choice, and
+        nagging about it would be the tool second-guessing its user.
+      */}
+      {scene.pacingFit === "sparse" && scene.targetShotCount > 1 ? (
+        <p className="text-[11px] text-muted-foreground">
+          This pace suits {scene.targetShotCount} images over{" "}
+          {formatDuration(scene.durationMilliseconds)}; this scene has{" "}
+          {scene.approvedShotCount}.
+        </p>
+      ) : null}
     </div>
   );
 }
