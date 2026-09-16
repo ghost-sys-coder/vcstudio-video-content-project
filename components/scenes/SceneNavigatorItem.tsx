@@ -58,7 +58,13 @@ export function SceneNavigatorItem({
               <SceneStatusBadge status={row.scene.status} />
             </span>
           </span>
-          <span className="line-clamp-2 block text-xs leading-5 text-muted-foreground">
+          {/*
+            No `block` here. `line-clamp-2` works by setting
+            `display: -webkit-box`, and a `display: block` alongside it wins,
+            which silently disables the clamp — every scene then printed its
+            whole narration and a sixteen-scene list became unscannable.
+          */}
+          <span className="line-clamp-2 text-xs leading-5 text-muted-foreground">
             {row.version.narrationText}
           </span>
         </span>
