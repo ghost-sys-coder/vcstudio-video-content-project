@@ -67,7 +67,10 @@ export function ApplicationShell({
           </div>
           <UserAccountMenu displayName={user.displayName} />
         </header>
-        <main className="w-full min-w-0 max-w-full flex-1 px-5 py-8 sm:px-8 lg:px-10 lg:py-10">
+        {/* Padding cut to 15% of its previous size, as asked: 20px->3px and
+            32px->5px across, 32px->5px and 40px->6px at the larger breakpoints.
+            Arbitrary values because the scale has nothing at 3px or 5px. */}
+        <main className="w-full min-w-0 max-w-full flex-1 px-[3px] py-[5px] sm:px-[5px] lg:px-1.5 lg:py-1.5">
           {children}
         </main>
       </SidebarInset>

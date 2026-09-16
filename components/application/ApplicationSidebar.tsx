@@ -218,7 +218,10 @@ export function ApplicationSidebar({
         ) : null}
       </SidebarContent>
       <SidebarFooter>
-        <SidebarMenu>
+        {/* The shared menu runs flush by default, which reads as one control
+            here: the theme pill and the account row are unrelated and should
+            not look joined. */}
+        <SidebarMenu className="gap-2">
           <ThemeSwitcher initialTheme={initialTheme} />
           <SidebarMenuItem>
             <LogoutConfirmDialog
