@@ -34,7 +34,12 @@ export function FirstValueOnboardingPanel({
   if (dismissed && allRequiredComplete) return null;
   return (
     <section className="space-y-4" aria-labelledby="first-value-heading">
-      <div className="flex items-start justify-between gap-4">
+      {/* Inset to match the cards below, which pad their content by the card
+          spacing token (20px). Without it this header was the only text on the
+          dashboard sitting hard against the container edge, so it read as
+          misaligned with every neighbouring block. The Dismiss button shares
+          the row, so the same padding squares it with the cards' right edge. */}
+      <div className="flex items-start justify-between gap-4 px-5">
         <div>
           <p className="text-sm font-medium text-muted-foreground">
             Getting started
