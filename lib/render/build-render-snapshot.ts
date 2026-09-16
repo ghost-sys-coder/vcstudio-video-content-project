@@ -1,9 +1,11 @@
 import type { CaptionStyleData } from "@/lib/subtitles/caption-style-data";
 import type { VideoTimeline } from "@/lib/timeline/video-timeline";
 import {
-  deriveSceneCameraMotion,
-  deriveSceneTransition,
-} from "@/lib/render/scene-motion";
+  DEFAULT_PACING_PROFILE_ID,
+  PACING_PROFILES,
+  type PacingProfile,
+} from "@/lib/pacing/pacing-profile";
+import { planScenePacing } from "@/lib/pacing/plan-scene-pacing";
 import type {
   RenderBackgroundAudioData,
   RenderLevelMeterPosition,
@@ -23,6 +25,11 @@ import { millisecondsToFrames } from "@/lib/timeline/scene-timeline";
  * assigning each scene its deterministic camera move and transition. Shared by
  * the render dispatcher and the live preview so both show exactly the same
  * motion, timing, and captions.
+ *
+ * Those two choices now come from the project's pacing profile rather than from
+ * the scene's position alone. They are still frozen here, so a snapshot taken
+ * before pacing existed re-renders exactly as it always did: the profile shapes
+ * new snapshots and never reaches an old one.
  */
 export function buildRenderTimelineSnapshot(input: {
   timeline: VideoTimeline;
@@ -43,8 +50,16 @@ export function buildRenderTimelineSnapshot(input: {
     backgroundAudio?: RenderBackgroundAudioData;
     levelMeter?: { position: RenderLevelMeterPosition };
   };
+  /**
+   * Omitted means the default profile, which is byte-for-byte the behaviour
+   * that existed before pacing did — so a caller that has not been taught about
+   * pacing yet produces exactly the snapshot it used to.
+   */
+  pacingProfile?: PacingProfile;
 }): RenderTimelineSnapshot {
   const { timeline } = input;
+  const pacing =
+    input.pacingProfile ?? PACING_PROFILES[DEFAULT_PACING_PROFILE_ID];
   return {
     width: timeline.width,
     height: timeline.height,
@@ -58,6 +73,15 @@ export function buildRenderTimelineSnapshot(input: {
       const characters = input.charactersBySceneVersionId?.get(
         scene.sceneVersionId,
       );
+
+      // Measured narration length, not the analysis estimate: the timeline is
+      // built from the recording, so the pace has to be judged against the same
+      // clock the viewer actually experiences.
+      const scenePacing = planScenePacing({
+        profile: pacing,
+        sceneNumber: scene.sceneNumber,
+        durationMilliseconds: scene.durationMilliseconds,
+      });
 
       // Shots are placed against the scene's caption lines even when captions
       // are not burned in. The lines are the record of where the narrator
@@ -108,8 +132,8 @@ export function buildRenderTimelineSnapshot(input: {
         startFrame: scene.startFrame,
         endFrame: scene.endFrame,
         durationFrames: scene.durationFrames,
-        cameraMotion: deriveSceneCameraMotion(scene.sceneNumber),
-        transition: deriveSceneTransition(scene.sceneNumber),
+        cameraMotion: scenePacing.cameraMotion,
+        transition: scenePacing.transition,
         image: {
           objectKey: scene.image.objectKey,
           width: scene.image.width,

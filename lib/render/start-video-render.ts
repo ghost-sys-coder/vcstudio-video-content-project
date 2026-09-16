@@ -21,6 +21,7 @@ import {
 import { BudgetExceededError } from "@/lib/domain/errors";
 import { getRenderEnvironment } from "@/lib/env/server";
 import { buildRenderTimelineSnapshot } from "@/lib/render/build-render-snapshot";
+import { resolvePacingProfile } from "@/lib/pacing/pacing-profile";
 import { findProjectRenderEffects } from "@/db/repositories/project-render-effects.repository";
 import { resolveRenderEffects } from "@/lib/render/resolve-render-effects";
 import { resolveSceneCharactersBySceneVersion } from "@/lib/render/resolve-scene-characters";
@@ -195,6 +196,7 @@ export async function startVideoRender(input: {
     includeWatermark: input.includeWatermark,
     charactersBySceneVersionId,
     effects: renderEffects,
+    pacingProfile: resolvePacingProfile(input.project.pacingProfile),
   });
 
   const effectiveLimits = await loadEffectiveWorkspaceLimits({

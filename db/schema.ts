@@ -1104,6 +1104,14 @@ export const projects = pgTable(
     framesPerSecond: integer("frames_per_second").notNull(),
     language: text("language").notNull(),
     /**
+     * How busy this project's finished video should feel.
+     *
+     * Camera motion and scene transitions consult this instead of deriving
+     * themselves from the scene's number. Defaulted to the profile that
+     * reproduces the previous behaviour, so no existing project re-cuts itself.
+     */
+    pacingProfile: text("pacing_profile").notNull().default("explainer"),
+    /**
      * Nullable by design: projects created before channel profiles existed have
      * no correct answer, and guessing one would attribute real production
      * history to an arbitrary account.
@@ -1155,6 +1163,10 @@ export const projects = pgTable(
       .notNull(),
   },
   (table) => [
+    check(
+      "projects_pacing_profile_valid",
+      sql`${table.pacingProfile} in ('documentary', 'explainer', 'short')`,
+    ),
     uniqueIndex("projects_id_workspace_unique").on(table.id, table.workspaceId),
     // Orders the production queue by intended release inside one workspace.
     index("projects_workspace_planned_release_index").on(
