@@ -154,7 +154,6 @@ export async function listCurrentScenes(input: {
   projectId: string;
 }) {
   const latestCompletedRun = await findLatestCompletedSceneAnalysisRun(input);
-  if (!latestCompletedRun) return [];
   const rows = await getDatabase()
     .select({ scene: scenes, version: sceneVersions })
     .from(scenes)
@@ -169,7 +168,9 @@ export async function listCurrentScenes(input: {
       and(
         eq(scenes.workspaceId, input.workspaceId),
         eq(scenes.projectId, input.projectId),
-        eq(scenes.analysisRunId, latestCompletedRun.id),
+        latestCompletedRun
+          ? eq(scenes.analysisRunId, latestCompletedRun.id)
+          : isNull(scenes.analysisRunId),
       ),
     )
     .orderBy(asc(scenes.sceneNumber));

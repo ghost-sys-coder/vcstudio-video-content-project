@@ -44,6 +44,7 @@ export function SceneWorkspace({
   availableCharacters,
   canGenerateImages,
   canReviewImages,
+  analysisActive,
   videoKind,
   coversApprovedScript,
 }: {
@@ -61,6 +62,7 @@ export function SceneWorkspace({
   availableCharacters: Character[];
   canGenerateImages: boolean;
   canReviewImages: boolean;
+  analysisActive: boolean;
   videoKind: ProjectVideoKind;
   coversApprovedScript: boolean;
 }) {
@@ -165,6 +167,8 @@ export function SceneWorkspace({
       />
       {children}
       <SceneList
+        analysisActive={analysisActive}
+        projectId={projectId}
         coversApprovedScript={coversApprovedScript}
         availableCharacters={availableCharacters}
         canEdit={canEdit}

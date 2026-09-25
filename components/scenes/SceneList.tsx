@@ -13,6 +13,7 @@ import { SceneCard } from "@/components/scenes/SceneCard";
 import { findSceneMergeNeighbours } from "@/lib/scenes/scene-merge-neighbours";
 import { SceneNavigator } from "@/components/scenes/SceneNavigator";
 import { SceneWorkspaceHeader } from "@/components/scenes/SceneWorkspaceHeader";
+import { CreateSceneDialog } from "@/components/scenes/CreateSceneDialog";
 import {
   filterSceneRows,
   getAdjacentSceneId,
@@ -28,7 +29,9 @@ import {
  */
 export function SceneList({
   rows,
+  projectId,
   canEdit,
+  analysisActive,
   availableCharacters,
   canGenerateImages,
   canReviewImages,
@@ -49,7 +52,9 @@ export function SceneList({
     characterStaging: SceneCharacterStaging[];
     imageIndicator: SceneImageIndicator;
   }>;
+  projectId: string;
   canEdit: boolean;
+  analysisActive: boolean;
   availableCharacters: Character[];
   canGenerateImages: boolean;
   canReviewImages: boolean;
@@ -79,8 +84,14 @@ export function SceneList({
       <div className="rounded-xl border border-dashed p-10 text-center">
         <h2 className="font-semibold">No scenes yet</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Approve a script version, review the cost, and start scene analysis.
+          Start with a scene you write yourself, or approve a script and run AI
+          analysis.
         </p>
+        {canEdit && !analysisActive ? (
+          <div className="mt-5">
+            <CreateSceneDialog firstScene projectId={projectId} />
+          </div>
+        ) : null}
       </div>
     );
 

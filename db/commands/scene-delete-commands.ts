@@ -90,6 +90,7 @@ export async function deleteSceneAndRenumber(input: {
     .select({
       id: scenes.id,
       sceneNumber: scenes.sceneNumber,
+      analysisRunId: scenes.analysisRunId,
     })
     .from(scenes)
     .where(
@@ -111,7 +112,7 @@ export async function deleteSceneAndRenumber(input: {
         where workspace_id = ${input.workspaceId}
           and project_id = ${input.projectId}
           and id = ${input.sceneId}
-        returning scene_number
+        returning scene_number, analysis_run_id
       )
       update scenes s
       set scene_number = s.scene_number + ${PARKING_OFFSET},
@@ -119,6 +120,7 @@ export async function deleteSceneAndRenumber(input: {
       from removed r
       where s.workspace_id = ${input.workspaceId}
         and s.project_id = ${input.projectId}
+        and s.analysis_run_id is not distinct from r.analysis_run_id
         and s.scene_number > r.scene_number
     `,
     // Bring them back one lower than they were, into the gap.
@@ -128,6 +130,7 @@ export async function deleteSceneAndRenumber(input: {
           updated_at = now()
       where workspace_id = ${input.workspaceId}
         and project_id = ${input.projectId}
+        and analysis_run_id is not distinct from ${scene.analysisRunId}::uuid
         and scene_number > ${PARKING_OFFSET}
     `,
   ]);
@@ -139,6 +142,7 @@ export async function deleteSceneAndRenumber(input: {
       and(
         eq(scenes.workspaceId, input.workspaceId),
         eq(scenes.projectId, input.projectId),
+        sql`${scenes.analysisRunId} is not distinct from ${scene.analysisRunId}::uuid`,
       ),
     );
 

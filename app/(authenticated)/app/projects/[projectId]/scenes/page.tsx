@@ -120,8 +120,12 @@ export default async function ProjectScenesPage({
       }).estimatedCostCents
     : 0;
   const scriptCoverage = buildScriptCoverageView({
-    approvedScript: approvedVersion?.content ?? null,
-    scriptVersionNumber: approvedVersion?.versionNumber ?? null,
+    approvedScript: rows.some((row) => row.scene.scriptVersionId !== null)
+      ? (approvedVersion?.content ?? null)
+      : null,
+    scriptVersionNumber: rows.some((row) => row.scene.scriptVersionId !== null)
+      ? (approvedVersion?.versionNumber ?? null)
+      : null,
     sceneNarrations: rows.map((row) => row.version.narrationText),
   });
   return (

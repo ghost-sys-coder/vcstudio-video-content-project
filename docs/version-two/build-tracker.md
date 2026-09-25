@@ -1,6 +1,8 @@
 # Version-two build tracker
 
-Last updated: 2026-09-10.
+Last updated: 2026-09-25.
+
+Manual scene authoring addition (2026-09-25): a creator can draft and append scenes from the Scenes page without a script or AI analysis. The full scene editor fields, Scene detail, Image grid, approvals, audio, and render share the current-scene path. A new migration permits script/run-free scenes, enforces paired origin references, and protects manual scene numbering. AI reanalysis remains a separate current plan; its dialog warns before replacing the active view. The full unit suite passed 4,592 tests (318 skipped) on rerun with a 30-second ceiling for an unrelated PDF timeout; format, lint, TypeScript, and production build passed. Migration deployment and authenticated creator validation remain pending.
 
 Product implementation: **0 of 20 slices verified**, with V2-01 through V2-07 implemented and awaiting browser or live acceptance, and V2-08 partially delivered. V2-01 implements local revisions, compatible media reuse, edit estimates and Short anchors. V2-02 implements autosave/recovery and atomic script approval. V2-03 implements verified script-to-scene fidelity with paid-failure usage recording and a review comparison; authenticated validation remains outstanding for all three. V2-00 has technical fixtures and the Money Made Clear baseline, with a measured creator walkthrough still pending. Five version-two migrations are generated/applied to the configured database; V2-03 required none. V2-01 through V2-07 are pushed to origin/master. The Trigger.dev worker was deployed as 20260910.1 for the V2-03 fidelity gate and the pasted-script fix; no other version-two web/worker deployment has occurred. V2-08's first increment adds `release_packages` and `release_package_revisions`, applied to the configured database as `20260910164608_release_packages` and covered by eight PostgreSQL integration tests that pass live.
 
@@ -278,6 +280,7 @@ Copy this template below for each slice when work begins. Link commits/PRs and r
 | 2026-09-08 | Marketing Studio | No Marketing Studio feature improvements; preserve shared-service compatibility                                    | Video analytics independence remains in scope                          |
 | 2026-09-08 | Delivery         | Start with baseline and revision safety; require evidence before completion                                        | All implementation slices Not started                                  |
 | 2026-09-08 | V2-00            | Creator selected Money Made Clear; weekly 8-12 minute faceless finance with 3-5 clips and mixed/programmatic media | Resolved; measured walkthrough remains pending                         |
+| 2026-09-25 | Voice cloning    | Pause cloning until YouTube income; avoid paid providers                                                           | Use manual narration; reassess license and cost before resuming        |
 | Pending    | V2-12            | Alignment implementation and paid-provider budget                                                                  | Evaluate fixtures before provider selection                            |
 | Pending    | V2-09/10/17      | Account scopes, supported release/analytics capabilities                                                           | Verify official docs and actual account access during implementation   |
 

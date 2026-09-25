@@ -2277,12 +2277,14 @@ export const scenes = pgTable(
     projectId: uuid("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
-    scriptVersionId: uuid("script_version_id")
-      .notNull()
-      .references(() => projectScriptVersions.id, { onDelete: "restrict" }),
-    analysisRunId: uuid("analysis_run_id")
-      .notNull()
-      .references(() => sceneAnalysisRuns.id, { onDelete: "cascade" }),
+    scriptVersionId: uuid("script_version_id").references(
+      () => projectScriptVersions.id,
+      { onDelete: "restrict" },
+    ),
+    analysisRunId: uuid("analysis_run_id").references(
+      () => sceneAnalysisRuns.id,
+      { onDelete: "cascade" },
+    ),
     sceneNumber: integer("scene_number").notNull(),
     status: sceneStatusEnum("status").notNull().default("draft"),
     currentVersion: integer("current_version").notNull().default(1),
@@ -2303,6 +2305,9 @@ export const scenes = pgTable(
       table.analysisRunId,
       table.sceneNumber,
     ),
+    uniqueIndex("scenes_manual_project_number_unique")
+      .on(table.projectId, table.sceneNumber)
+      .where(sql`${table.analysisRunId} is null`),
     index("scenes_workspace_project_number_index").on(
       table.workspaceId,
       table.projectId,
@@ -2310,6 +2315,10 @@ export const scenes = pgTable(
     ),
     check("scenes_number_positive", sql`${table.sceneNumber} > 0`),
     check("scenes_version_positive", sql`${table.currentVersion} > 0`),
+    check(
+      "scenes_origin_pair",
+      sql`(${table.scriptVersionId} is null and ${table.analysisRunId} is null) or (${table.scriptVersionId} is not null and ${table.analysisRunId} is not null)`,
+    ),
   ],
 );
 

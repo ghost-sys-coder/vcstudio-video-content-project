@@ -1,16 +1,24 @@
-import { updateSceneSchema } from "@/lib/schemas/scene";
+import { createSceneSchema, updateSceneSchema } from "@/lib/schemas/scene";
 
-export function parseSceneEditorInput(formData: FormData) {
+function readSceneFields(formData: FormData) {
   const raw = Object.fromEntries(formData);
   const names = (value: unknown) =>
     String(value ?? "")
       .split(",")
       .map((name) => name.trim())
       .filter(Boolean);
-  return updateSceneSchema.safeParse({
+  return {
     ...raw,
     characterNames: names(raw.characterNames),
     propNames: names(raw.propNames),
     estimatedDurationMilliseconds: Number(raw.estimatedDurationMilliseconds),
-  });
+  };
+}
+
+export function parseSceneEditorInput(formData: FormData) {
+  return updateSceneSchema.safeParse(readSceneFields(formData));
+}
+
+export function parseNewSceneInput(formData: FormData) {
+  return createSceneSchema.safeParse(readSceneFields(formData));
 }

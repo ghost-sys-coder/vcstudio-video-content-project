@@ -27,6 +27,8 @@ Confirmed by the creator: 2026-09-08. This is the version-two production baselin
 
 The capability to use generated footage does not select a video-generation provider or authorize a paid call. Initially accept already-generated footage through the same inspected-media path as stock footage. Evaluate direct generation only if required after that path is stable.
 
+**Voice-cloning decision (2026-09-25):** Defer voice cloning and any paid cloning service until a YouTube channel generates income. Use the existing manual narration-recording flow for production trials. This decision concerns voice cloning; other billable generation remains subject to its separate cost confirmation and budget controls. The [OmniVoice voice-cloning model](https://huggingface.co/k2-fsa/OmniVoice) has noncommercially licensed pretrained weights, and the supplied [Omnivoice v4 API](https://api.omnivoice.ai/v4/doc) is a business-phone API rather than a cloning API. Recheck commercial rights, API availability, total operating cost, and voice consent before reopening this work.
+
 ## Visual and editorial rules for this baseline
 
 1. Choose the medium by its explanatory purpose: footage for context, charts for relationships, tables for comparisons, and numerical callouts for arithmetic. Do not generate footage when a still or programmatic graphic explains the point adequately.

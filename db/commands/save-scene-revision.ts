@@ -13,7 +13,7 @@ export async function saveSceneRevision(
     sceneId: string;
     expectedVersion: number;
     previousVersionId: string;
-    analysisRunId: string;
+    analysisRunId: string | null;
     startTimeMilliseconds: number;
     userId: string;
     compatibility: { image: boolean; audio: boolean };
@@ -28,8 +28,8 @@ export async function saveSceneRevision(
         and workspace_id = ${input.workspaceId}::uuid
         and project_id = ${input.projectId}::uuid
         and current_version = ${input.expectedVersion}
-        and analysis_run_id = ${input.analysisRunId}::uuid
-        and analysis_run_id = (
+        and analysis_run_id is not distinct from ${input.analysisRunId}::uuid
+        and analysis_run_id is not distinct from (
           select id from scene_analysis_runs
           where workspace_id = ${input.workspaceId}::uuid
             and project_id = ${input.projectId}::uuid and status = 'completed'

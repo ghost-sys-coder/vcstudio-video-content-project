@@ -19,11 +19,13 @@ export function AnalysisCostDialog({
   projectId,
   scriptVersionId,
   estimatedCostCents,
+  hasScenes,
   disabled,
 }: {
   projectId: string;
   scriptVersionId: string | null;
   estimatedCostCents: number;
+  hasScenes: boolean;
   disabled: boolean;
 }) {
   const [pending, startTransition] = useTransition();
@@ -39,6 +41,9 @@ export function AnalysisCostDialog({
             Estimated OpenAI cost: ${(estimatedCostCents / 100).toFixed(2)}.
             Actual cost is recorded after completion and counts toward the
             project budget.
+            {hasScenes
+              ? " When analysis completes, its scenes become the current plan. Existing scenes remain stored but leave the active workspace."
+              : null}
           </DialogDescription>
         </DialogHeader>
         {error ? (

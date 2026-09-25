@@ -13,14 +13,7 @@ import {
   describeSceneSaveImpact,
   describeSceneSaveState,
 } from "@/lib/scenes/describe-scene-save";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { SceneNarrationField } from "@/components/scenes/SceneNarrationField";
-import { SceneVisualDescriptionField } from "@/components/scenes/SceneVisualDescriptionField";
-import { SceneCameraControls } from "@/components/scenes/SceneCameraControls";
-import { SceneCharacterSelector } from "@/components/scenes/SceneCharacterSelector";
-import { SceneDurationField } from "@/components/scenes/SceneDurationField";
+import { SceneContentFields } from "@/components/scenes/SceneContentFields";
 import {
   hasSceneContentChanged,
   sceneMediaCompatibility,
@@ -141,72 +134,11 @@ export function SceneEditor({
         type="hidden"
         value={scene.currentVersion}
       />
-      <SceneNarrationField
-        defaultValue={version.narrationText}
-        disabled={!canEdit || pending}
-        id={`scene-${scene.id}-narrationText`}
-      />
-      <SceneVisualDescriptionField
-        defaultValue={version.visualDescription}
-        disabled={!canEdit || pending}
-        id={`scene-${scene.id}-visualDescription`}
-      />
-      <div className="grid gap-3 md:grid-cols-2">
-        {[
-          ["locationDescription", "Location", version.locationDescription],
-          ["actionDescription", "Action", version.actionDescription],
-        ].map(([name, label, value]) => (
-          <div className="space-y-2" key={name}>
-            <Label htmlFor={`${name}-${scene.id}`}>{label}</Label>
-            <Textarea
-              defaultValue={value}
-              disabled={!canEdit || pending}
-              id={`${name}-${scene.id}`}
-              name={name}
-              required
-            />
-          </div>
-        ))}
-      </div>
-      <SceneCameraControls
-        angle={version.cameraAngle}
+      <SceneContentFields
+        content={version}
         disabled={!canEdit || pending}
         idPrefix={`scene-${scene.id}`}
-        motion={version.cameraMotion}
-        shot={version.cameraShot}
       />
-      <div className="grid gap-3 md:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor={`tone-${scene.id}`}>Emotional tone</Label>
-          <Input
-            defaultValue={version.emotionalTone}
-            disabled={!canEdit || pending}
-            id={`tone-${scene.id}`}
-            name="emotionalTone"
-            required
-          />
-        </div>
-        <SceneDurationField
-          disabled={!canEdit || pending}
-          id={`scene-${scene.id}-estimatedDurationMilliseconds`}
-          value={version.estimatedDurationMilliseconds}
-        />
-      </div>
-      <SceneCharacterSelector
-        characters={version.characterNames}
-        disabled={!canEdit || pending}
-        idPrefix={`scene-${scene.id}`}
-        props={version.propNames}
-      />
-      <div className="space-y-2">
-        <Label htmlFor={`continuity-${scene.id}`}>Continuity notes</Label>
-        <Textarea
-          defaultValue={version.continuityNotes}
-          disabled={!canEdit || pending}
-          id={`continuity-${scene.id}`}
-          name="continuityNotes"
-        />
-      </div>
       {canEdit ? (
         <SceneSaveBar
           dirty={changed}

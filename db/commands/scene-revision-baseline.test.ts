@@ -70,6 +70,19 @@ describe("scene revision safety (mock database)", () => {
     );
     expect(state.execute).not.toHaveBeenCalled();
   });
+  it("allows a manual scene revision through the same optimistic path", async () => {
+    const { fixture, input } = setup();
+    fixture.rows[1]!.scene.analysisRunId = null;
+    fixture.rows[1]!.scene.scriptVersionId = null;
+    await expect(
+      updateScene({ ...input, narrationText: "Manually revised narration." }),
+    ).resolves.toMatchObject({ changed: true });
+    const query = new PgDialect().sqlToQuery(
+      state.execute.mock.calls[0]![0] as SQL,
+    );
+    expect(query.sql).toContain("analysis_run_id is not distinct from");
+    expect(query.params).toContain(null);
+  });
   it("reports a lost optimistic claim", async () => {
     const { input } = setup();
     state.execute.mockResolvedValue({ rows: [] });

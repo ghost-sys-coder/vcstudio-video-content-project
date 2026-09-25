@@ -1,7 +1,7 @@
 import type { SceneAnalysisSegmentHint } from "@studio/prompts";
 import "server-only";
 
-import { and, eq, ne, sql } from "drizzle-orm";
+import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
 import {
   projectScriptVersions,
@@ -14,10 +14,7 @@ import {
 } from "@/db/schema";
 import type { SceneContent, SceneAnalysisOutput } from "@/lib/schemas/scene";
 import { calculateSceneTimings } from "@/lib/domain/scene-timing";
-import {
-  findLatestCompletedSceneAnalysisRun,
-  listCurrentScenes,
-} from "@/db/repositories/scenes.repository";
+import { listCurrentScenes } from "@/db/repositories/scenes.repository";
 import { findProjectScriptVersion } from "@/db/repositories/projects.repository";
 import { listProjectCast } from "@/db/repositories/project-characters.repository";
 import { matchCharacterNamesToCast } from "@/lib/scenes/character-name-matching";
@@ -515,8 +512,8 @@ export async function approveAllScenes(input: {
   workspaceId: string;
   projectId: string;
 }) {
-  const activeRun = await findLatestCompletedSceneAnalysisRun(input);
-  if (!activeRun) throw new Error("No completed scene plan found.");
+  const currentRows = await listCurrentScenes(input);
+  if (!currentRows.length) throw new Error("No active scenes found.");
   const approved = await getDatabase()
     .update(scenes)
     .set({ status: "approved", updatedAt: new Date() })
@@ -524,7 +521,10 @@ export async function approveAllScenes(input: {
       and(
         eq(scenes.workspaceId, input.workspaceId),
         eq(scenes.projectId, input.projectId),
-        eq(scenes.analysisRunId, activeRun.id),
+        inArray(
+          scenes.id,
+          currentRows.map(({ scene }) => scene.id),
+        ),
       ),
     )
     .returning({ id: scenes.id });

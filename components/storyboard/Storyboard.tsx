@@ -247,7 +247,7 @@ export function Storyboard({
       <div className="space-y-5">
         {viewSwitch}
         {intro}
-        <StoryboardEmptyState />
+        <StoryboardEmptyState projectId={projectId} />
       </div>
     );
 

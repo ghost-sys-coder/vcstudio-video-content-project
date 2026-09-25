@@ -98,6 +98,7 @@ export async function mergeScenesPermanently(input: {
   const result = await mergeScenesAndRenumber({
     ...scope,
     previousVersionId: survivorRow.version.id,
+    analysisRunId: survivorRow.scene.analysisRunId,
     plan: planned.plan,
     userId: input.actorUserId,
   });

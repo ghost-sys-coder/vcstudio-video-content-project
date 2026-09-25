@@ -1,6 +1,9 @@
 "use server";
 
-import { parseSceneEditorInput } from "@/lib/scenes/scene-editor-input";
+import {
+  parseNewSceneInput,
+  parseSceneEditorInput,
+} from "@/lib/scenes/scene-editor-input";
 import { estimateSceneRevision } from "@/lib/scenes/scene-revision-estimate";
 import { revalidatePath } from "next/cache";
 import { tasks } from "@trigger.dev/sdk";
@@ -74,6 +77,10 @@ import {
   SceneMergeRefusedError,
 } from "@/lib/scenes/merge-scenes-permanently";
 import { StoragePurgeError } from "@/lib/storage/purge-object-prefix";
+import {
+  createManualScene,
+  ManualSceneCreationError,
+} from "@/db/commands/create-manual-scene";
 
 export type SceneActionState = {
   success: boolean;
@@ -82,6 +89,39 @@ export type SceneActionState = {
   /** Present after a deletion, so the interface can say what is left. */
   remainingSceneCount?: number;
 };
+
+export async function createManualSceneAction(
+  formData: FormData,
+): Promise<SceneActionState & { sceneNumber?: number }> {
+  const parsed = parseNewSceneInput(formData);
+  if (!parsed.success)
+    return {
+      success: false,
+      error: parsed.error.issues[0]?.message ?? "Complete the scene fields.",
+    };
+  try {
+    const { context } = await requireProjectMutation(
+      parsed.data.projectId,
+      "editScenes",
+    );
+    const created = await createManualScene({
+      ...parsed.data,
+      workspaceId: context.activeMembership.workspaceId,
+      userId: context.user.id,
+    });
+    for (const section of ["scenes", "storyboard", "audio", "render"])
+      revalidatePath(`/app/projects/${parsed.data.projectId}/${section}`);
+    return { success: true, error: null, sceneNumber: created.sceneNumber };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof ManualSceneCreationError
+          ? error.message
+          : "The scene could not be created. Your draft is still here; try again.",
+    };
+  }
+}
 
 async function requireProjectMutation(
   projectId: string,

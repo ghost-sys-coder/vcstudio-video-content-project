@@ -60,15 +60,17 @@ export function ScenePlanner({
   const active = latestRun
     ? ["pending", "queued", "running"].includes(latestRun.status)
     : false;
+  const scriptLinkedScenes = rows.some(
+    (row) => row.scene.scriptVersionId !== null,
+  );
   return (
     <SceneWorkspace
-      // A project whose script version is known is one whose scenes are
-      // covering it, which is what makes a deletion leave a gap worth saying.
-      coversApprovedScript={scriptCoverage.scriptVersionNumber !== null}
+      coversApprovedScript={scriptLinkedScenes}
       availableCharacters={availableCharacters}
       canEdit={canEdit}
       canGenerateImages={canGenerateImages}
       canReviewImages={canReviewImages}
+      analysisActive={active}
       initialState={workspaceState}
       projectId={projectId}
       rows={rows}
@@ -81,6 +83,7 @@ export function ScenePlanner({
         canEdit={canEdit}
         estimatedCostCents={estimatedCostCents}
         hasScenes={rows.length > 0}
+        manualPlan={rows.length > 0 && !scriptLinkedScenes}
         projectId={projectId}
       />
       {latestRun && active ? <AnalysisProgressPanel run={latestRun} /> : null}

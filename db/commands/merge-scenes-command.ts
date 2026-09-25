@@ -53,6 +53,7 @@ export async function mergeScenesAndRenumber(input: {
   projectId: string;
   /** The survivor's current version row, whose brief the merge preserves. */
   previousVersionId: string;
+  analysisRunId: string | null;
   plan: SceneMergePlan;
   userId: string;
 }): Promise<SceneMergeCommandResult> {
@@ -81,7 +82,7 @@ export async function mergeScenesAndRenumber(input: {
               and a.workspace_id = ${input.workspaceId}
               and a.project_id = ${input.projectId}
               and a.current_version = ${plan.absorbed.currentVersion}
-              and a.analysis_run_id = s.analysis_run_id
+              and a.analysis_run_id is not distinct from s.analysis_run_id
               and abs(a.scene_number - s.scene_number) = 1
           )
         returning s.id, s.current_version
@@ -182,7 +183,7 @@ export async function mergeScenesAndRenumber(input: {
               and workspace_id = ${input.workspaceId}
               and project_id = ${input.projectId}
           )
-        returning scene_number
+        returning scene_number, analysis_run_id
       )
       update scenes s
       set scene_number = s.scene_number + ${PARKING_OFFSET},
@@ -190,6 +191,7 @@ export async function mergeScenesAndRenumber(input: {
       from removed r
       where s.workspace_id = ${input.workspaceId}
         and s.project_id = ${input.projectId}
+        and s.analysis_run_id is not distinct from r.analysis_run_id
         and s.scene_number > r.scene_number
     `,
     // 3. Bring them back one lower, into the gap the deletion just made.
@@ -199,6 +201,7 @@ export async function mergeScenesAndRenumber(input: {
           updated_at = now()
       where workspace_id = ${input.workspaceId}
         and project_id = ${input.projectId}
+        and analysis_run_id is not distinct from ${input.analysisRunId}::uuid
         and scene_number > ${PARKING_OFFSET}
     `,
   ]);
@@ -226,6 +229,7 @@ export async function mergeScenesAndRenumber(input: {
       and(
         eq(scenes.workspaceId, input.workspaceId),
         eq(scenes.projectId, input.projectId),
+        sql`${scenes.analysisRunId} is not distinct from ${input.analysisRunId}::uuid`,
       ),
     );
 

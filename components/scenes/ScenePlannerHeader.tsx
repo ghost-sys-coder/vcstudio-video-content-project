@@ -1,5 +1,6 @@
 import { AnalysisCostDialog } from "@/components/scenes/AnalysisCostDialog";
 import { ApproveAllScenesDialog } from "@/components/scenes/ApproveAllScenesDialog";
+import { CreateSceneDialog } from "@/components/scenes/CreateSceneDialog";
 
 export function ScenePlannerHeader({
   projectId,
@@ -8,6 +9,7 @@ export function ScenePlannerHeader({
   estimatedCostCents,
   canEdit,
   hasScenes,
+  manualPlan,
   analysisActive,
 }: {
   projectId: string;
@@ -16,6 +18,7 @@ export function ScenePlannerHeader({
   estimatedCostCents: number;
   canEdit: boolean;
   hasScenes: boolean;
+  manualPlan: boolean;
   analysisActive: boolean;
 }) {
   return (
@@ -23,15 +26,23 @@ export function ScenePlannerHeader({
       <div>
         <h2 className="text-xl font-semibold">Scene planner</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          {approvedVersionNumber
-            ? `Using approved script version ${approvedVersionNumber}.`
-            : "Approve a script version before requesting analysis."}
+          {manualPlan
+            ? approvedVersionNumber
+              ? `These scenes are manually authored. Approved script version ${approvedVersionNumber} is available for AI analysis.`
+              : "These scenes are manually authored; no script is needed."
+            : approvedVersionNumber
+              ? `Using approved script version ${approvedVersionNumber}.`
+              : "Create scenes yourself, or approve a script to use AI analysis."}
         </p>
       </div>
       <div className="flex flex-wrap gap-2">
+        {canEdit && hasScenes && !analysisActive ? (
+          <CreateSceneDialog projectId={projectId} />
+        ) : null}
         <AnalysisCostDialog
           disabled={!canEdit || !approvedVersionId || analysisActive}
           estimatedCostCents={estimatedCostCents}
+          hasScenes={hasScenes}
           projectId={projectId}
           scriptVersionId={approvedVersionId}
         />

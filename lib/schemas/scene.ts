@@ -37,6 +37,10 @@ export const updateSceneSchema = sceneContentSchema.extend({
   expectedVersion: z.coerce.number().int().positive(),
 });
 
+export const createSceneSchema = sceneContentSchema.extend({
+  projectId: z.uuid(),
+});
+
 export const approveSceneSchema = z.object({
   projectId: z.uuid(),
   sceneId: z.uuid(),
