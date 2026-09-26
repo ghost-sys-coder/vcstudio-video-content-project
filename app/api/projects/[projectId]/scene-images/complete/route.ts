@@ -7,6 +7,7 @@ import { findProject } from "@/db/repositories/projects.repository";
 import { findApprovedCurrentSceneVersion } from "@/db/repositories/scene-images.repository";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import {
+  describeSceneImageAspectMismatch,
   isSceneImageUploadAspectRatioAllowed,
   sceneImageOutputFormatForUploadContentType,
 } from "@/lib/domain/scene-image";
@@ -26,6 +27,7 @@ export async function POST(
   context: { params: Promise<{ projectId: string }> },
 ) {
   let uncommittedObjectKey: string | null = null;
+  let aspectMismatch: string | null = null;
   const authentication = await auth();
   if (!authentication.userId)
     return NextResponse.json(
@@ -126,8 +128,17 @@ export async function POST(
         height: inspected.height,
         targetSize: parsed.data.size,
       })
-    )
+    ) {
+      // Carried on the error so the refusal can state the actual numbers. The
+      // dimensions are this creator's own upload, already inspected here, so
+      // there is nothing sensitive in them.
+      aspectMismatch = describeSceneImageAspectMismatch({
+        width: inspected.width,
+        height: inspected.height,
+        targetSize: parsed.data.size,
+      });
       throw new Error("SCENE_IMAGE_UPLOAD_ASPECT_RATIO_MISMATCH");
+    }
 
     const created = await saveUploadedSceneImage({
       workspaceId,
@@ -161,7 +172,8 @@ export async function POST(
     const message =
       error instanceof Error &&
       error.message === "SCENE_IMAGE_UPLOAD_ASPECT_RATIO_MISMATCH"
-        ? "This image's proportions don't match the selected size closely enough."
+        ? (aspectMismatch ??
+          "This image's proportions don't match the selected size closely enough.")
         : "The image could not be saved.";
     return NextResponse.json({ error: message }, { status: 400 });
   }
