@@ -49,3 +49,12 @@ next-env.d.ts
 /.clerk/
 
 google-cloud-credentials.json
+# Playwright CLI output (may contain credentials)
+.playwright-cli/
+
+# Locally installed Claude Code skills: tooling for whoever is working here,
+# not project source. `.claude/settings.json` stays tracked deliberately.
+.claude/skills/
+
+# Scratch file for drafting scene JSON before pasting it in.
+/temporary.json
