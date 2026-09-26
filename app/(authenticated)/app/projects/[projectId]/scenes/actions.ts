@@ -43,6 +43,7 @@ import { requireCapability } from "@/lib/policies/workspace-policy";
 import {
   approveAllScenesSchema,
   deleteSceneSchema,
+  importScenesSchema,
   mergeScenesSchema,
   approveSceneSchema,
   approveScriptVersionSchema,
@@ -69,6 +70,7 @@ import {
 } from "@/lib/domain/errors";
 import { enforceRateLimit } from "@/lib/rate-limit/enforce-rate-limit";
 import { recordAuditEvent } from "@/lib/audit/record-audit-event";
+import { parsePastedScenes } from "@/lib/scenes/parse-pasted-scenes";
 import { SceneNotFoundError } from "@/db/commands/scene-delete-commands";
 import { SceneMergeConflictError } from "@/db/commands/merge-scenes-command";
 import { deleteScenePermanently } from "@/lib/scenes/delete-scene-permanently";
@@ -119,6 +121,75 @@ export async function createManualSceneAction(
         error instanceof ManualSceneCreationError
           ? error.message
           : "The scene could not be created. Your draft is still here; try again.",
+    };
+  }
+}
+
+/**
+ * Adds every scene in a pasted plan.
+ *
+ * **Nothing is created until the whole paste is understood.** The parser
+ * validates all of it first and refuses the lot if any scene is incomplete, so
+ * the common failure — a missing field halfway down a list of twenty — leaves
+ * the project untouched instead of half-populated with the creator left to work
+ * out which half landed.
+ *
+ * Insertion is still one scene at a time, because the numbering command locks
+ * the project and derives the next number per call. So a database failure
+ * partway can still leave the earlier scenes created; that count is reported
+ * rather than glossed, since the honest recovery is to paste the remainder.
+ */
+export async function importScenesAction(
+  formData: FormData,
+): Promise<SceneActionState & { createdCount?: number; issues?: string[] }> {
+  const parsed = importScenesSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success)
+    return { success: false, error: "Paste one scene or a list of scenes." };
+
+  const plan = parsePastedScenes(parsed.data.pasted);
+  if (!plan.ok)
+    return {
+      success: false,
+      error: plan.summary,
+      issues: plan.issues.map(
+        (issue) =>
+          `Scene ${issue.scenePosition} · ${issue.field}: ${issue.message}`,
+      ),
+    };
+
+  let created = 0;
+  try {
+    const { context } = await requireProjectMutation(
+      parsed.data.projectId,
+      "editScenes",
+    );
+    for (const scene of plan.scenes) {
+      await createManualScene({
+        ...scene,
+        projectId: parsed.data.projectId,
+        workspaceId: context.activeMembership.workspaceId,
+        userId: context.user.id,
+      });
+      created += 1;
+    }
+    for (const section of ["scenes", "storyboard", "audio", "render"])
+      revalidatePath(`/app/projects/${parsed.data.projectId}/${section}`);
+    return { success: true, error: null, createdCount: created };
+  } catch (error) {
+    if (created > 0)
+      // Said plainly: the creator needs to know what landed before retrying,
+      // or they will paste the whole list again and duplicate the first half.
+      return {
+        success: false,
+        createdCount: created,
+        error: `${created} of ${plan.scenes.length} scenes were added before this failed. Paste only the remaining scenes.`,
+      };
+    return {
+      success: false,
+      error:
+        error instanceof ManualSceneCreationError
+          ? error.message
+          : "The scenes could not be added. Your paste is still here; try again.",
     };
   }
 }

@@ -41,6 +41,19 @@ export const createSceneSchema = sceneContentSchema.extend({
   projectId: z.uuid(),
 });
 
+/**
+ * A pasted plan, carried as raw text rather than a parsed array.
+ *
+ * The browser sends what the creator pasted and the server decides what it
+ * means. Parsing here would let a client that skipped validation post scenes
+ * the real parser would have refused, and the error messages a person acts on
+ * are worth generating once, on the side that is authoritative.
+ */
+export const importScenesSchema = z.object({
+  projectId: z.uuid(),
+  pasted: z.string().min(1).max(2_000_000),
+});
+
 export const approveSceneSchema = z.object({
   projectId: z.uuid(),
   sceneId: z.uuid(),

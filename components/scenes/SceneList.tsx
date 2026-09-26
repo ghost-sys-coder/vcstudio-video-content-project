@@ -14,6 +14,7 @@ import { findSceneMergeNeighbours } from "@/lib/scenes/scene-merge-neighbours";
 import { SceneNavigator } from "@/components/scenes/SceneNavigator";
 import { SceneWorkspaceHeader } from "@/components/scenes/SceneWorkspaceHeader";
 import { CreateSceneDialog } from "@/components/scenes/CreateSceneDialog";
+import { ImportScenesDialog } from "@/components/scenes/ImportScenesDialog";
 import {
   filterSceneRows,
   getAdjacentSceneId,
@@ -88,8 +89,9 @@ export function SceneList({
           analysis.
         </p>
         {canEdit && !analysisActive ? (
-          <div className="mt-5">
+          <div className="mt-5 flex flex-wrap justify-center gap-2">
             <CreateSceneDialog firstScene projectId={projectId} />
+            <ImportScenesDialog projectId={projectId} />
           </div>
         ) : null}
       </div>

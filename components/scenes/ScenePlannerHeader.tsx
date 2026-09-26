@@ -1,6 +1,7 @@
 import { AnalysisCostDialog } from "@/components/scenes/AnalysisCostDialog";
 import { ApproveAllScenesDialog } from "@/components/scenes/ApproveAllScenesDialog";
 import { CreateSceneDialog } from "@/components/scenes/CreateSceneDialog";
+import { ImportScenesDialog } from "@/components/scenes/ImportScenesDialog";
 
 export function ScenePlannerHeader({
   projectId,
@@ -37,7 +38,10 @@ export function ScenePlannerHeader({
       </div>
       <div className="flex flex-wrap gap-2">
         {canEdit && hasScenes && !analysisActive ? (
-          <CreateSceneDialog projectId={projectId} />
+          <>
+            <CreateSceneDialog projectId={projectId} />
+            <ImportScenesDialog projectId={projectId} />
+          </>
         ) : null}
         <AnalysisCostDialog
           disabled={!canEdit || !approvedVersionId || analysisActive}
