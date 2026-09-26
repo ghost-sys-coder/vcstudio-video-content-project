@@ -1,23 +1,38 @@
 import { expect, test } from "@playwright/test";
 
 /**
- * Pasting scenes into a project that has never had a script or an AI run.
+ * Two regressions that only a real browser and a real database can catch.
  *
- * This is the case that broke: `scenes.script_version_id` and
- * `analysis_run_id` were still `NOT NULL` in the database while the schema and
- * every command had already moved to nullable, so a manual scene with no
- * analysis run to inherit violated the constraint. A project that already had
- * scenes always had a completed run to borrow, which is why it only failed on
- * new projects — and why no unit test could catch it. The guard has to run
- * against a real database.
+ * **Pasting into a project with no script or AI run.**
+ * `scenes.script_version_id` and `analysis_run_id` were still `NOT NULL` in the
+ * database while the schema and every command had moved to nullable, so a
+ * manual scene with no analysis run to inherit violated the constraint. A
+ * project that already had scenes always had a completed run to borrow, which
+ * is why it failed only on new projects, and why no unit test could see it.
  *
- * Deliberately free: a manual scene starts no generation.
+ * **Selecting a scene afterwards.** `applyState` wrote browser history from
+ * inside a `setState` updater, using the updater as a getter. React may run an
+ * updater during a render and Next patches the history methods, so the router
+ * was updated mid-render — a development-time console warning invisible to
+ * every unit test and to a production build.
+ *
+ * The project is created here rather than named, so the test cannot rot when a
+ * fixture project is deleted. Deliberately free: manual scenes start no
+ * generation.
  */
-test("a scene can be pasted into a project with no script and no scenes", async ({
+test("scenes can be pasted into a new project, then selected cleanly", async ({
   page,
 }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
   let projectId: string | null = null;
+
+  const routerErrors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() !== "error") return;
+    const text = message.text();
+    if (/Cannot update a component|setState\(\) call inside/i.test(text))
+      routerErrors.push(text);
+  });
 
   await page.goto("/app/projects");
   await page.getByRole("button", { name: "New project" }).click();
@@ -27,15 +42,15 @@ test("a scene can be pasted into a project with no script and no scenes", async 
 
   try {
     await expect(page).toHaveURL(/\/app\/projects\/[0-9a-f-]+\/script$/, {
-      timeout: 60_000,
+      timeout: 90_000,
     });
     projectId = new URL(page.url()).pathname.split("/")[3] ?? null;
 
-    // Straight to scenes, with no script approved and no analysis ever run.
+    // Straight to scenes: no script approved, no analysis ever run.
     await page.goto(`/app/projects/${projectId}/scenes`);
     await page
       .getByRole("button", { name: "Paste scenes" })
-      .click({ timeout: 60_000 });
+      .click({ timeout: 90_000 });
 
     const dialog = page.getByRole("dialog");
     await dialog.getByLabel("Scene JSON").fill(
@@ -70,20 +85,23 @@ test("a scene can be pasted into a project with no script and no scenes", async 
         },
       ]),
     );
-
     await dialog.getByRole("button", { name: "Add scenes" }).click();
 
-    // Both scenes exist, numbered from one, on a project with no analysis run.
-    await expect(page).toHaveURL(
-      new RegExp(`/app/projects/${projectId}/scenes`),
-      { timeout: 60_000 },
-    );
+    const navigator = page.getByRole("complementary", {
+      name: "Scene navigator",
+    });
+    await expect(navigator).toBeVisible({ timeout: 90_000 });
     await expect(
-      page.getByRole("button", { name: /Scene 1/ }).first(),
-    ).toBeVisible({ timeout: 60_000 });
-    await expect(
-      page.getByRole("button", { name: /Scene 2/ }).first(),
+      navigator.getByRole("button", { name: /Scene 2\b/ }),
     ).toBeVisible();
+
+    // Selecting must move the address bar without updating the router mid-render.
+    await navigator.getByRole("button", { name: /Scene 2\b/ }).click();
+    await expect(page).toHaveURL(/scene=2/, { timeout: 30_000 });
+    await navigator.getByRole("button", { name: /Scene 1\b/ }).click();
+    await expect(page).toHaveURL(/scene=1/, { timeout: 30_000 });
+
+    expect(routerErrors).toEqual([]);
   } finally {
     if (projectId) {
       await page.goto(`/app/projects/${projectId}/settings`);

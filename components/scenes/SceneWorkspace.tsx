@@ -69,6 +69,17 @@ export function SceneWorkspace({
   const [state, setState] = useState<SceneWorkspaceState>(initialState);
   const [dirty, setDirty] = useState(false);
   const allowPageExit = useRef(false);
+  /**
+   * Mirrors the current state for handlers that need to read it.
+   *
+   * Reading state through a `setState` updater looks harmless but uses the
+   * updater as a getter, and React is free to run an updater during a render.
+   * Writing browser history from inside one therefore updated the router while
+   * this component was rendering, which React reports as updating `Router`
+   * while rendering `SceneWorkspace`. Every writer below keeps this in step, so
+   * the history call can happen where it belongs: in the handler.
+   */
+  const stateRef = useRef(initialState);
 
   const selectedSceneId = useMemo(
     () => findInitialSceneId(rows, state.sceneNumber),
@@ -77,13 +88,12 @@ export function SceneWorkspace({
 
   const applyState = useCallback(
     (change: Partial<SceneWorkspaceState>, mode: "push" | "replace") => {
-      setState((current) => {
-        const next = { ...current, ...change };
-        const url = `${window.location.pathname}${sceneWorkspaceSearch(next)}`;
-        if (mode === "push") window.history.pushState({}, "", url);
-        else window.history.replaceState({}, "", url);
-        return next;
-      });
+      const next = { ...stateRef.current, ...change };
+      stateRef.current = next;
+      setState(next);
+      const url = `${window.location.pathname}${sceneWorkspaceSearch(next)}`;
+      if (mode === "push") window.history.pushState({}, "", url);
+      else window.history.replaceState({}, "", url);
     },
     [],
   );
@@ -139,18 +149,18 @@ export function SceneWorkspace({
       if (nextSceneId && nextSceneId !== selectedSceneId && dirty) {
         if (!window.confirm(UNSAVED_PROMPT)) {
           // Put the address bar back where the creator actually is.
-          setState((current) => {
-            window.history.replaceState(
-              {},
-              "",
-              `${window.location.pathname}${sceneWorkspaceSearch(current)}`,
-            );
-            return current;
-          });
+          window.history.replaceState(
+            {},
+            "",
+            `${window.location.pathname}${sceneWorkspaceSearch(stateRef.current)}`,
+          );
           return;
         }
         setDirty(false);
       }
+      // No history write here: the browser has already navigated, and pushing
+      // again would bury the entry the creator just came back from.
+      stateRef.current = next;
       setState(next);
     };
     window.addEventListener("popstate", handlePopState);
