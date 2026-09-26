@@ -61,6 +61,15 @@ const audioSceneSchema = z.object({
     .nullable(),
   inspectionWarnings: z.array(z.string()),
   inspectionError: z.string().nullable(),
+  silence: z
+    .object({
+      leadingMilliseconds: z.number().int().nonnegative(),
+      trailingMilliseconds: z.number().int().nonnegative(),
+      trimmedDurationMilliseconds: z.number().int().nonnegative(),
+      savedMilliseconds: z.number().int().nonnegative(),
+      measured: z.boolean(),
+    })
+    .nullable(),
 });
 
 const timelineSceneSchema = z.object({

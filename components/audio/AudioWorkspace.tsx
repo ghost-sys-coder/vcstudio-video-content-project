@@ -13,6 +13,7 @@ import { ApproveSelectedAudioButton } from "@/components/audio/ApproveSelectedAu
 import { AudioGenerationProgress } from "@/components/audio/AudioGenerationProgress";
 import { BulkGenerateAudioButton } from "@/components/audio/BulkGenerateAudioButton";
 import { SceneAudioList } from "@/components/audio/SceneAudioList";
+import { SilenceAuditPanel } from "@/components/audio/SilenceAuditPanel";
 import { VoicePresetSelector } from "@/components/audio/VoicePresetSelector";
 import { VoicePreviewPanel } from "@/components/audio/VoicePreviewPanel";
 import { CustomVoiceManager } from "@/components/audio/CustomVoiceManager";
@@ -286,6 +287,8 @@ export function AudioWorkspace({
           ) : null}
         </div>
       </div>
+
+      <SilenceAuditPanel scenes={data.scenes} />
 
       <SceneAudioList
         availableBudgetCents={data.availableBudgetCents}

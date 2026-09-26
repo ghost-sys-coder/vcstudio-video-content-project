@@ -1,3 +1,4 @@
+import type { SceneSilence } from "@/lib/audio/scene-silence";
 import type {
   AudioGenerationStatus,
   AudioReviewStatus,
@@ -56,6 +57,11 @@ export interface AudioSceneView {
   inspectionStatus: "pending" | "running" | "succeeded" | "failed" | null;
   inspectionWarnings: string[];
   inspectionError: string | null;
+  /**
+   * Dead air at the ends of the approved narration, measured from the envelope
+   * the clip already carries. Null when there is no approved audio to measure.
+   */
+  silence: SceneSilence | null;
 }
 
 export interface AudioTimelineSceneView {

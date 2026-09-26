@@ -20,6 +20,8 @@ import {
 import { loadEffectiveWorkspaceBudget } from "@/lib/budgets/workspace-budget";
 import { loadEffectiveWorkspaceLimits } from "@/lib/budgets/current-settings";
 import { buildProjectTimeline } from "@/lib/timeline/scene-timeline";
+import { AMPLITUDE_ENVELOPE_SAMPLE_RATE_HZ } from "@/lib/media/amplitude-envelope";
+import { measureSceneSilence } from "@/lib/audio/scene-silence";
 import type {
   AudioProgressCounts,
   AudioSceneView,
@@ -173,6 +175,15 @@ export async function loadAudioWorkspace(input: {
       inspectionStatus: latest?.inspectionStatus ?? null,
       inspectionWarnings: latest?.inspectionWarnings ?? [],
       inspectionError: latest?.inspectionError ?? null,
+      // Measured from the approved take only. Reporting dead air in a clip
+      // nobody has approved would offer a saving on audio that may never ship.
+      silence: approved
+        ? measureSceneSilence({
+            envelope: approved.amplitudeEnvelope,
+            sampleRateHz: AMPLITUDE_ENVELOPE_SAMPLE_RATE_HZ,
+            durationMilliseconds: approved.durationMilliseconds ?? 0,
+          })
+        : null,
     };
   });
 
