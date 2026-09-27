@@ -42,6 +42,22 @@ export const SAMPLE_RECORDING_SPEC: VoiceRecordingSpec = {
   minimumAverageLevel: 0.01,
 };
 
+/**
+ * The voice sample spec for a provider's own duration bounds. Google wants ten
+ * to thirty seconds where OpenAI wants thirty to one hundred and eighty, so a
+ * single fixed spec would block one provider's valid recordings.
+ */
+export function sampleRecordingSpecFor(bounds: {
+  minimumSeconds: number;
+  maximumSeconds: number;
+}): VoiceRecordingSpec {
+  return {
+    ...SAMPLE_RECORDING_SPEC,
+    minimumDurationMilliseconds: bounds.minimumSeconds * 1_000,
+    maximumDurationMilliseconds: bounds.maximumSeconds * 1_000,
+  };
+}
+
 export type VoiceRequirementStatus = "met" | "unmet" | "warning" | "waiting";
 
 export interface VoiceRequirementResult {
@@ -179,10 +195,13 @@ export function voiceRecordingFileName(
   spec: VoiceRecordingSpec,
   mimeType: string,
 ): string {
-  const extension = mimeType.toLowerCase().startsWith("audio/mp4")
-    ? "m4a"
-    : mimeType.toLowerCase().startsWith("audio/ogg")
-      ? "ogg"
-      : "webm";
+  const type = mimeType.toLowerCase();
+  const extension = type.startsWith("audio/wav")
+    ? "wav"
+    : type.startsWith("audio/mp4")
+      ? "m4a"
+      : type.startsWith("audio/ogg")
+        ? "ogg"
+        : "webm";
   return `${spec.id}.${extension}`;
 }

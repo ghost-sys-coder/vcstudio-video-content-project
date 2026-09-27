@@ -6,37 +6,44 @@ import { CustomVoiceEnrollmentDialog } from "@/components/audio/CustomVoiceEnrol
 import { Button } from "@/components/ui/button";
 import type { CustomVoiceAvailability } from "@/lib/audio/custom-voice-availability";
 import { fetchCustomVoiceOverview } from "@/lib/audio/custom-voice-client";
+import type { VoiceEnrollmentDetails } from "@/lib/speech/voice-enrollment-details";
 
 const UNKNOWN_AVAILABILITY: CustomVoiceAvailability = {
   status: "unknown",
   detail: "",
 };
 
+interface EnrollmentState {
+  availability: CustomVoiceAvailability;
+  enrollment: VoiceEnrollmentDetails | null;
+}
+
 /**
- * Opens enrollment, probing provider availability first so the dialog can say
- * up front that cloning is unavailable instead of after two recordings.
+ * Opens enrollment, probing the configured provider first so the dialog can
+ * say up front that cloning is unavailable instead of after two recordings,
+ * and so it asks for that provider's consent sentence and sample length.
  */
 export function CustomVoiceEnrollmentLauncher({
-  availability,
   onCreated,
   size = "sm",
 }: {
-  availability?: CustomVoiceAvailability;
   onCreated: () => Promise<void>;
   size?: "sm" | "default";
 }) {
   const [open, setOpen] = useState(false);
   const [probing, setProbing] = useState(false);
-  const [resolved, setResolved] = useState<CustomVoiceAvailability | null>(
-    availability ?? null,
-  );
+  const [resolved, setResolved] = useState<EnrollmentState | null>(null);
 
   async function openDialog() {
-    if (!resolved) {
+    // A failed probe is not remembered, so the next click asks again.
+    if (!resolved?.enrollment) {
       setProbing(true);
       try {
         const overview = await fetchCustomVoiceOverview();
-        setResolved(overview?.availability ?? UNKNOWN_AVAILABILITY);
+        setResolved({
+          availability: overview?.availability ?? UNKNOWN_AVAILABILITY,
+          enrollment: overview?.enrollment ?? null,
+        });
       } finally {
         setProbing(false);
       }
@@ -56,7 +63,8 @@ export function CustomVoiceEnrollmentLauncher({
         {probing ? "Checking provider…" : "Clone my voice"}
       </Button>
       <CustomVoiceEnrollmentDialog
-        availability={resolved ?? UNKNOWN_AVAILABILITY}
+        availability={resolved?.availability ?? UNKNOWN_AVAILABILITY}
+        enrollment={resolved?.enrollment ?? null}
         onCreated={onCreated}
         onOpenChange={setOpen}
         open={open}

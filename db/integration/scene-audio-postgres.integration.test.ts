@@ -380,6 +380,7 @@ describeDatabase("Phase 7 scene audio invariants", () => {
     const customVoice = await createCustomVoice({
       workspaceId: fixture.workspaceId,
       name: "Owner voice",
+      provider: "openai",
       providerVoiceId: `voice_${randomUUID()}`,
       providerConsentId: `cons_${randomUUID()}`,
       consentLanguage: "en-US",
@@ -423,6 +424,7 @@ describeDatabase("Phase 7 scene audio invariants", () => {
     const customVoice = await createCustomVoice({
       workspaceId: first.workspaceId,
       name: "First owner voice",
+      provider: "openai",
       providerVoiceId: `voice_${randomUUID()}`,
       providerConsentId: `cons_${randomUUID()}`,
       consentLanguage: "en-US",

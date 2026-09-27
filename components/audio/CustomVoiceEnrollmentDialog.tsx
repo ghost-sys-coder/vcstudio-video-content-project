@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { CustomVoiceAvailabilityNotice } from "@/components/audio/CustomVoiceAvailabilityNotice";
 import { VoiceRecordingStepPanel } from "@/components/audio/VoiceRecordingStepPanel";
 import { Button } from "@/components/ui/button";
@@ -18,23 +18,38 @@ import {
   isEnrollmentBlocked,
   type CustomVoiceAvailability,
 } from "@/lib/audio/custom-voice-availability";
+import { convertRecordingToWav } from "@/lib/audio/convert-recording-to-wav";
 import { useVoiceEnrollmentRecorder } from "@/lib/audio/use-voice-enrollment-recorder";
 import {
   CONSENT_RECORDING_SPEC,
-  SAMPLE_RECORDING_SPEC,
   evaluateVoiceRecording,
   isVoiceRecordingAcceptable,
+  sampleRecordingSpecFor,
   voiceRecordingFileName,
 } from "@/lib/audio/voice-enrollment-requirements";
-import { CUSTOM_VOICE_CONSENT_PHRASE } from "@/lib/schemas/scene-audio";
+import type { VoiceEnrollmentDetails } from "@/lib/speech/voice-enrollment-details";
 
+const PROVIDER_NAMES: Record<VoiceEnrollmentDetails["provider"], string> = {
+  gemini: "Google Gemini",
+  openai: "OpenAI",
+};
+
+/**
+ * Collects a consent clip and a voice sample for the configured provider.
+ *
+ * The sentence, the sample length and the file format all come from
+ * `enrollment`, because each provider checks its own: Google verifies the
+ * consent clip recites its sentence word for word and accepts only WAV.
+ */
 export function CustomVoiceEnrollmentDialog({
   availability,
+  enrollment,
   open,
   onOpenChange,
   onCreated,
 }: {
   availability: CustomVoiceAvailability;
+  enrollment: VoiceEnrollmentDetails | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated: () => Promise<void>;
@@ -45,16 +60,21 @@ export function CustomVoiceEnrollmentDialog({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const blocked = isEnrollmentBlocked(availability);
+  const sampleSpec = useMemo(
+    () => (enrollment ? sampleRecordingSpecFor(enrollment.sample) : null),
+    [enrollment],
+  );
+  const blocked = isEnrollmentBlocked(availability) || !enrollment;
   const consentReady =
     consent.recording !== null &&
     isVoiceRecordingAcceptable(
       evaluateVoiceRecording(CONSENT_RECORDING_SPEC, consent.recording.capture),
     );
   const sampleReady =
+    sampleSpec !== null &&
     sample.recording !== null &&
     isVoiceRecordingAcceptable(
-      evaluateVoiceRecording(SAMPLE_RECORDING_SPEC, sample.recording.capture),
+      evaluateVoiceRecording(sampleSpec, sample.recording.capture),
     );
   const canSubmit =
     !blocked &&
@@ -64,28 +84,44 @@ export function CustomVoiceEnrollmentDialog({
     sampleReady;
 
   async function submit() {
-    if (!consent.recording || !sample.recording || !canSubmit) return;
+    if (
+      !consent.recording ||
+      !sample.recording ||
+      !enrollment ||
+      !sampleSpec ||
+      !canSubmit
+    )
+      return;
     setPending(true);
     setError(null);
     try {
+      let consentBlob: Blob = consent.recording.blob;
+      let sampleBlob: Blob = sample.recording.blob;
+      if (enrollment.recordingFormat === "wav") {
+        try {
+          [consentBlob, sampleBlob] = await Promise.all([
+            convertRecordingToWav(consentBlob),
+            convertRecordingToWav(sampleBlob),
+          ]);
+        } catch {
+          setError(
+            "This browser could not convert the recordings to WAV, which the voice provider requires. Try again in Chrome or Edge.",
+          );
+          return;
+        }
+      }
       const formData = new FormData();
       formData.set("name", name.trim());
       formData.set("language", "en-US");
       formData.set(
         "consentRecording",
-        consent.recording.blob,
-        voiceRecordingFileName(
-          CONSENT_RECORDING_SPEC,
-          consent.recording.capture.mimeType,
-        ),
+        consentBlob,
+        voiceRecordingFileName(CONSENT_RECORDING_SPEC, consentBlob.type),
       );
       formData.set(
         "voiceSample",
-        sample.recording.blob,
-        voiceRecordingFileName(
-          SAMPLE_RECORDING_SPEC,
-          sample.recording.capture.mimeType,
-        ),
+        sampleBlob,
+        voiceRecordingFileName(sampleSpec, sampleBlob.type),
       );
       const response = await fetch("/api/workspace/custom-voices", {
         method: "POST",
@@ -118,12 +154,21 @@ export function CustomVoiceEnrollmentDialog({
         <DialogHeader>
           <DialogTitle>Clone your voice</DialogTitle>
           <DialogDescription>
-            Only clone your own voice. Recordings are sent directly to the voice
-            provider and are not stored in VCStudio.
+            Only clone your own voice. Recordings are sent directly to{" "}
+            {enrollment
+              ? PROVIDER_NAMES[enrollment.provider]
+              : "the voice provider"}{" "}
+            and are not stored in VCStudio.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-5">
           <CustomVoiceAvailabilityNotice availability={availability} />
+          {!enrollment && !isEnrollmentBlocked(availability) ? (
+            <p className="text-sm text-destructive" role="alert">
+              The recording requirements could not be loaded, so nothing can be
+              recorded yet. Close this dialog and try again.
+            </p>
+          ) : null}
           <div className="space-y-1.5">
             <Label htmlFor="custom-voice-name">Voice name</Label>
             <Input
@@ -139,7 +184,7 @@ export function CustomVoiceEnrollmentDialog({
               <>
                 <span>Read this sentence aloud, exactly as written:</span>
                 <blockquote className="mt-2 rounded-md bg-muted p-3 text-sm text-foreground">
-                  {CUSTOM_VOICE_CONSENT_PHRASE}
+                  {enrollment?.consentPhrase ?? "…"}
                 </blockquote>
               </>
             }
@@ -147,13 +192,15 @@ export function CustomVoiceEnrollmentDialog({
             spec={CONSENT_RECORDING_SPEC}
             stepNumber={1}
           />
-          <VoiceRecordingStepPanel
-            disabled={blocked || pending}
-            instructions="Speak naturally for at least 30 seconds in a quiet room — read anything you like, at your normal pace and volume."
-            recorder={sample}
-            spec={SAMPLE_RECORDING_SPEC}
-            stepNumber={2}
-          />
+          {enrollment && sampleSpec ? (
+            <VoiceRecordingStepPanel
+              disabled={blocked || pending}
+              instructions={`Speak naturally for ${enrollment.sample.minimumSeconds} to ${enrollment.sample.maximumSeconds} seconds in a quiet room — read anything you like, at your normal pace and volume.`}
+              recorder={sample}
+              spec={sampleSpec}
+              stepNumber={2}
+            />
+          ) : null}
           {error ? (
             <p className="text-sm text-destructive" role="alert">
               {error}

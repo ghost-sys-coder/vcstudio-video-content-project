@@ -3268,7 +3268,11 @@ export const customVoices = pgTable(
     name: text("name").notNull(),
     provider: text("provider").notNull().default("openai"),
     providerVoiceId: text("provider_voice_id").notNull(),
-    providerConsentId: text("provider_consent_id").notNull(),
+    /**
+     * Null for providers that take consent inside voice creation and keep no
+     * separate record of it, which is Google's arrangement.
+     */
+    providerConsentId: text("provider_consent_id"),
     consentLanguage: text("consent_language").notNull(),
     status: customVoiceStatusEnum("status").notNull().default("active"),
     createdByUserId: uuid("created_by_user_id")

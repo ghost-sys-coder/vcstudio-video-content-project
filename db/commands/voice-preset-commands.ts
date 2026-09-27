@@ -59,6 +59,8 @@ export async function createVoicePreset(input: {
   format: AudioFormat;
   isDefault: boolean;
   customVoiceId?: string | null;
+  /** Defaults to OpenAI, which every existing caller means. */
+  provider?: string;
 }) {
   const database = getDatabase();
   const baseSlug = slugifyVoicePresetName(input.name);
@@ -70,7 +72,7 @@ export async function createVoicePreset(input: {
       workspaceId: input.workspaceId,
       name: input.name,
       slug,
-      provider: "openai",
+      provider: input.provider ?? "openai",
       model: input.model,
       voice: input.voice,
       instructions: input.instructions,

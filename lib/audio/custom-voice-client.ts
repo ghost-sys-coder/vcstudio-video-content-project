@@ -1,5 +1,9 @@
 import { z } from "zod";
 import type { CustomVoiceAvailability } from "@/lib/audio/custom-voice-availability";
+import {
+  voiceEnrollmentDetailsSchema,
+  type VoiceEnrollmentDetails,
+} from "@/lib/speech/voice-enrollment-details";
 
 const overviewSchema = z.object({
   availability: z.object({
@@ -12,6 +16,8 @@ const overviewSchema = z.object({
     ]),
     detail: z.string(),
   }),
+  /** Null when this member cannot enrol, or no provider enrols voices. */
+  enrollment: voiceEnrollmentDetailsSchema.nullable(),
   canManage: z.boolean(),
   voices: z.array(
     z.object({
@@ -34,6 +40,7 @@ export interface CustomVoiceSummary {
 
 export interface CustomVoiceOverview {
   availability: CustomVoiceAvailability;
+  enrollment: VoiceEnrollmentDetails | null;
   canManage: boolean;
   voices: CustomVoiceSummary[];
 }

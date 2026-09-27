@@ -4,6 +4,7 @@ import {
   SAMPLE_RECORDING_SPEC,
   evaluateVoiceRecording,
   isVoiceRecordingAcceptable,
+  sampleRecordingSpecFor,
   voiceRecordingFileName,
   type VoiceRecordingCapture,
 } from "@/lib/audio/voice-enrollment-requirements";
@@ -117,5 +118,45 @@ describe("voiceRecordingFileName", () => {
     expect(voiceRecordingFileName(SAMPLE_RECORDING_SPEC, "audio/mp4")).toBe(
       "sample.m4a",
     );
+    expect(voiceRecordingFileName(SAMPLE_RECORDING_SPEC, "audio/wav")).toBe(
+      "sample.wav",
+    );
+  });
+});
+
+describe("sampleRecordingSpecFor", () => {
+  it("holds a sample to the provider's own duration bounds", () => {
+    const gemini = sampleRecordingSpecFor({
+      minimumSeconds: 10,
+      maximumSeconds: 30,
+    });
+    // Twenty seconds is enough for Google, and too short for the OpenAI spec.
+    expect(
+      statusOf(
+        evaluateVoiceRecording(
+          gemini,
+          capture({ durationMilliseconds: 20_000 }),
+        ),
+        "duration",
+      ),
+    ).toBe("met");
+    expect(
+      statusOf(
+        evaluateVoiceRecording(
+          SAMPLE_RECORDING_SPEC,
+          capture({ durationMilliseconds: 20_000 }),
+        ),
+        "duration",
+      ),
+    ).toBe("unmet");
+    expect(
+      statusOf(
+        evaluateVoiceRecording(
+          gemini,
+          capture({ durationMilliseconds: 45_000 }),
+        ),
+        "duration",
+      ),
+    ).toBe("unmet");
   });
 });

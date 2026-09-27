@@ -5,9 +5,8 @@ import { revokeCustomVoice } from "@/db/commands/custom-voice-commands";
 import { findActiveCustomVoice } from "@/db/repositories/custom-voice.repository";
 import { recordAuditEvent } from "@/lib/audit/record-audit-event";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
-import { getSceneAudioEnvironment } from "@/lib/env/server";
-import { OpenAiCustomVoiceProvider } from "@/lib/openai/custom-voice-provider";
 import { requireCapability } from "@/lib/policies/workspace-policy";
+import { createVoiceEnrollmentProvider } from "@/lib/speech/voice-enrollment-provider";
 
 const paramsSchema = z.object({ customVoiceId: z.uuid() });
 
@@ -57,13 +56,20 @@ export async function DELETE(
       { status: 404 },
     );
 
-  // Provider consent is deleted first: local revocation without it would leave
-  // a consent record the workspace can no longer see or remove.
-  await new OpenAiCustomVoiceProvider({
-    apiKey: getSceneAudioEnvironment().OPENAI_API_KEY,
-  })
-    .deleteConsent(customVoice.providerConsentId)
-    .catch(() => undefined);
+  // The provider copy is removed first: local revocation without it would
+  // leave a voice or consent record the workspace can no longer see or remove.
+  // It is removed by the provider that made it, not the one configured now.
+  try {
+    await createVoiceEnrollmentProvider(customVoice.provider)?.revoke({
+      providerVoiceId: customVoice.providerVoiceId,
+      providerConsentId: customVoice.providerConsentId,
+    });
+  } catch (error) {
+    console.error("Custom voice provider revocation failed", {
+      provider: customVoice.provider,
+      message: error instanceof Error ? error.message : "unknown error",
+    });
+  }
 
   await revokeCustomVoice({
     workspaceId,

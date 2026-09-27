@@ -1,5 +1,9 @@
 import OpenAI from "openai";
 import { AudioGenerationProviderResponseError } from "@/lib/openai/scene-audio-provider";
+import {
+  SpeechProviderRequestError,
+  SpeechProviderUnsupportedError,
+} from "@/lib/speech/speech-provider";
 
 export interface AudioGenerationFailure {
   category: string;
@@ -34,6 +38,52 @@ export function classifyAudioGenerationError(
     };
   if (error instanceof OpenAI.APIError) {
     const status = error.status ?? 0;
+    if (status >= 500)
+      return {
+        category: "provider_unavailable",
+        safeMessage: "The audio service is temporarily unavailable.",
+        retriable: true,
+        providerMayHaveBilled: false,
+      };
+    return {
+      category: "provider_rejected",
+      safeMessage: "The narration request was rejected by the audio service.",
+      retriable: false,
+      providerMayHaveBilled: false,
+    };
+  }
+  if (error instanceof SpeechProviderUnsupportedError)
+    return {
+      category: "provider_unsupported_request",
+      // Written for the user by the provider, and free of provider detail.
+      safeMessage: error.message,
+      retriable: false,
+      providerMayHaveBilled: false,
+    };
+  if (error instanceof SpeechProviderRequestError) {
+    const status = error.status ?? 0;
+    if (error.code.endsWith("_EMPTY_AUDIO"))
+      return {
+        category: "provider_empty_response",
+        safeMessage: "The audio provider returned an empty result.",
+        retriable: false,
+        providerMayHaveBilled: true,
+      };
+    if (status === 0)
+      return {
+        category: "provider_timeout",
+        safeMessage:
+          "The narration request did not complete. Please try again.",
+        retriable: true,
+        providerMayHaveBilled: false,
+      };
+    if (status === 429)
+      return {
+        category: "provider_rate_limited",
+        safeMessage: "The audio service is busy. Please try again shortly.",
+        retriable: true,
+        providerMayHaveBilled: false,
+      };
     if (status >= 500)
       return {
         category: "provider_unavailable",

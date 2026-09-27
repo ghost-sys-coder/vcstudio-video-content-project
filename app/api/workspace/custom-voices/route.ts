@@ -15,16 +15,36 @@ import {
 import { isEnrollmentBlocked } from "@/lib/audio/custom-voice-availability";
 import { MAX_VOICE_RECORDING_BYTES } from "@/lib/audio/voice-enrollment-requirements";
 import { RateLimitExceededError } from "@/lib/domain/errors";
-import { getSceneAudioEnvironment } from "@/lib/env/server";
-import { OpenAiCustomVoiceProvider } from "@/lib/openai/custom-voice-provider";
 import { can, requireCapability } from "@/lib/policies/workspace-policy";
 import { enforceRateLimit } from "@/lib/rate-limit/enforce-rate-limit";
 import {
   customVoiceAudioTypeFromMimeType,
   customVoiceEnrollmentSchema,
 } from "@/lib/schemas/scene-audio";
+import {
+  configuredEnrollmentProviderId,
+  createVoiceEnrollmentProvider,
+  type EnrolledVoice,
+  type VoiceEnrollmentProvider,
+} from "@/lib/speech/voice-enrollment-provider";
 
 export const maxDuration = 60;
+
+/**
+ * The provider new voices go to: whatever the deployment narrates with. A
+ * zero-shot provider keeps no voice, so it yields none and enrolment reports
+ * itself unsupported instead of quietly falling back to OpenAI.
+ */
+function enrollmentProvider(): VoiceEnrollmentProvider | null {
+  const id = configuredEnrollmentProviderId();
+  return id ? createVoiceEnrollmentProvider(id) : null;
+}
+
+const UNSUPPORTED_AVAILABILITY = {
+  status: "unsupported" as const,
+  detail:
+    "The configured speech provider does not enrol voices. Set SPEECH_PROVIDER to gemini or openai to clone a voice.",
+};
 
 function validRecording(value: FormDataEntryValue | null): value is File {
   return (
@@ -57,14 +77,16 @@ export async function GET() {
     workspaceId: context.activeMembership.workspaceId,
   });
   const canManage = can(context.activeMembership.role, "manageCustomVoices");
-  const availability = canManage
-    ? await new OpenAiCustomVoiceProvider({
-        apiKey: getSceneAudioEnvironment().OPENAI_API_KEY,
-      }).checkAvailability()
-    : { status: "unknown" as const, detail: "" };
+  const provider = canManage ? enrollmentProvider() : null;
+  const availability = !canManage
+    ? { status: "unknown" as const, detail: "" }
+    : provider
+      ? await provider.checkAvailability()
+      : UNSUPPORTED_AVAILABILITY;
 
   return NextResponse.json({
     availability,
+    enrollment: provider?.details ?? null,
     canManage,
     voices: voices.map((voice) => ({
       id: voice.id,
@@ -153,10 +175,15 @@ export async function POST(request: Request) {
     throw error;
   }
 
-  const environment = getSceneAudioEnvironment();
-  const provider = new OpenAiCustomVoiceProvider({
-    apiKey: environment.OPENAI_API_KEY,
-  });
+  const provider = enrollmentProvider();
+  if (!provider)
+    return NextResponse.json(
+      {
+        availability: UNSUPPORTED_AVAILABILITY,
+        error: `${UNSUPPORTED_AVAILABILITY.detail} Your recordings were fine — nothing was sent to a provider.`,
+      },
+      { status: 503 },
+    );
 
   // Checked before either recording is uploaded: when the provider has no
   // custom-voice endpoints, an enrollment attempt fails in a way that reads as
@@ -171,15 +198,17 @@ export async function POST(request: Request) {
       { status: 503 },
     );
 
-  let consentId: string;
+  let enrolled: EnrolledVoice;
   try {
-    consentId = await provider.createConsent({
-      name: `${name} consent`,
+    enrolled = await provider.enroll({
+      name,
       language,
-      recording: consentRecording,
+      consent: consentRecording,
+      sample: voiceSample,
     });
   } catch (error) {
-    console.error("Custom voice consent failed", {
+    console.error("Custom voice enrollment failed", {
+      provider: provider.details.provider,
       message: error instanceof Error ? error.message : "unknown error",
     });
     return NextResponse.json(
@@ -189,16 +218,12 @@ export async function POST(request: Request) {
   }
 
   try {
-    const providerVoiceId = await provider.createVoice({
-      name,
-      consentId,
-      sample: voiceSample,
-    });
     const customVoice = await createCustomVoice({
       workspaceId,
       name,
-      providerVoiceId,
-      providerConsentId: consentId,
+      provider: provider.details.provider,
+      providerVoiceId: enrolled.providerVoiceId,
+      providerConsentId: enrolled.providerConsentId,
       consentLanguage: language,
       createdByUserId: userId,
     });
@@ -207,11 +232,12 @@ export async function POST(request: Request) {
         workspaceId,
         createdByUserId: userId,
         name,
-        voice: providerVoiceId,
-        model: environment.OPENAI_TTS_MODEL,
+        provider: provider.details.provider,
+        voice: enrolled.providerVoiceId,
+        model: provider.preset.model,
         instructions: "",
         speedScaledPercent: 100,
-        format: environment.OPENAI_TTS_FORMAT,
+        format: provider.preset.format,
         isDefault: false,
         customVoiceId: customVoice.id,
       });
@@ -229,12 +255,16 @@ export async function POST(request: Request) {
       action: "custom_voice_created",
       targetType: "custom_voice",
       targetId: customVoice.id,
-      metadata: { consentLanguage: language },
+      metadata: {
+        consentLanguage: language,
+        provider: provider.details.provider,
+      },
     });
     return NextResponse.json({ success: true, customVoiceId: customVoice.id });
   } catch (error) {
-    await provider.deleteConsent(consentId).catch(() => undefined);
-    console.error("Custom voice enrollment failed", {
+    // The provider holds a voice this workspace cannot see; forget it there.
+    await provider.discard(enrolled).catch(() => undefined);
+    console.error("Custom voice could not be saved", {
       message: error instanceof Error ? error.message : "unknown error",
     });
     return NextResponse.json(

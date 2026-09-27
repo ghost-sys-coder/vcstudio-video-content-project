@@ -7,14 +7,16 @@ import { customVoices, voicePresets } from "@/db/schema";
 export async function createCustomVoice(input: {
   workspaceId: string;
   name: string;
+  /** Who holds the voice, so it is revoked and spoken by the right service. */
+  provider: string;
   providerVoiceId: string;
-  providerConsentId: string;
+  providerConsentId: string | null;
   consentLanguage: string;
   createdByUserId: string;
 }) {
   const [created] = await getDatabase()
     .insert(customVoices)
-    .values({ ...input, provider: "openai" })
+    .values(input)
     .returning();
   if (!created) throw new Error("CUSTOM_VOICE_CREATE_FAILED");
   return created;

@@ -25,6 +25,7 @@ import {
   putSceneAudio,
 } from "@/lib/storage/scene-audio-storage";
 import { createSceneAudioObjectKey } from "@/lib/storage/object-key";
+import { createSpeechProvider } from "@/lib/speech/create-speech-provider";
 
 export const sceneAudioGenerationTaskPayloadSchema = z.object({
   generationId: z.uuid(),
@@ -142,24 +143,50 @@ export const sceneAudioGenerationTask = task({
     if (!claim.claimed && claim.generation.status === "succeeded")
       return { generationId: generation.id, status: "succeeded" as const };
 
-    const provider = new OpenAiSceneAudioProvider({
-      apiKey: environment.OPENAI_API_KEY,
-      timeoutMilliseconds: environment.OPENAI_REQUEST_TIMEOUT_SECONDS * 1_000,
-    });
-
-    let result: Awaited<ReturnType<typeof provider.generate>>;
+    let result: {
+      bytes: Buffer;
+      contentType: string;
+      format: typeof generation.format;
+      requestId: string | null;
+      characterCount: number;
+    };
     try {
-      result = await provider.generate({
-        model: generation.model,
-        text: generation.inputText,
-        voice: generation.isCustomVoice
-          ? { kind: "custom", id: generation.voice }
-          : { kind: "built_in", name: generation.voice },
-        format: generation.format,
-        speedScaledPercent: generation.speedScaledPercent,
-        instructions: generation.instructions,
-        endUserId: generation.requestedByUserId,
-      });
+      // The provider is the one recorded on the generation, which came from the
+      // voice preset: a voice cloned at Google can only be spoken by Google,
+      // whatever the deployment is configured to narrate new voices with.
+      if (generation.provider === "gemini") {
+        const synthesized = await createSpeechProvider("gemini").synthesize({
+          text: generation.inputText,
+          voice: generation.isCustomVoice
+            ? { kind: "enrolled", providerVoiceId: generation.voice }
+            : { kind: "built_in", name: generation.voice },
+          format: generation.format,
+          speedScaledPercent: generation.speedScaledPercent,
+          language: "en-US",
+          instructions: generation.instructions,
+          endUserId: generation.requestedByUserId,
+        });
+        result = {
+          ...synthesized,
+          requestId: synthesized.requestId ?? providerRequestId,
+        };
+      } else {
+        result = await new OpenAiSceneAudioProvider({
+          apiKey: environment.OPENAI_API_KEY,
+          timeoutMilliseconds:
+            environment.OPENAI_REQUEST_TIMEOUT_SECONDS * 1_000,
+        }).generate({
+          model: generation.model,
+          text: generation.inputText,
+          voice: generation.isCustomVoice
+            ? { kind: "custom", id: generation.voice }
+            : { kind: "built_in", name: generation.voice },
+          format: generation.format,
+          speedScaledPercent: generation.speedScaledPercent,
+          instructions: generation.instructions,
+          endUserId: generation.requestedByUserId,
+        });
+      }
     } catch (error) {
       const failure = classifyAudioGenerationError(error);
       if (
