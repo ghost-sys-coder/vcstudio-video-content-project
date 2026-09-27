@@ -7,6 +7,7 @@ import {
   sceneAudioGenerations,
   sceneImageGenerations,
   scriptGenerationRuns,
+  chapterGenerationRuns,
   thumbnailGenerations,
   titleGenerationRuns,
   usageReservations,
@@ -82,6 +83,7 @@ export async function listUsageLedgerEntries(input: {
   const scriptIds: string[] = [];
   const titleIds: string[] = [];
   const thumbnailIds: string[] = [];
+  const chapterIds: string[] = [];
   for (const reservation of reservations) {
     if (reservation.analysisRunId) analysisIds.push(reservation.analysisRunId);
     if (reservation.imageGenerationId)
@@ -95,6 +97,8 @@ export async function listUsageLedgerEntries(input: {
       titleIds.push(reservation.titleGenerationId);
     if (reservation.thumbnailGenerationId)
       thumbnailIds.push(reservation.thumbnailGenerationId);
+    if (reservation.chapterGenerationId)
+      chapterIds.push(reservation.chapterGenerationId);
   }
 
   const enrichment = new Map<string, Enrichment>();
@@ -324,6 +328,39 @@ export async function listUsageLedgerEntries(input: {
                 workflowRunId: row.triggerRunId,
               });
           }),
+    chapterIds.length === 0
+      ? Promise.resolve()
+      : database
+          .select({
+            id: chapterGenerationRuns.id,
+            requestedByUserId: chapterGenerationRuns.requestedByUserId,
+            model: chapterGenerationRuns.model,
+            providerRequestId: chapterGenerationRuns.providerRequestId,
+            triggerRunId: chapterGenerationRuns.triggerRunId,
+            inputTokens: chapterGenerationRuns.inputTokens,
+            outputTokens: chapterGenerationRuns.outputTokens,
+            estimatedCostCents: chapterGenerationRuns.estimatedCostCents,
+          })
+          .from(chapterGenerationRuns)
+          .where(
+            and(
+              eq(chapterGenerationRuns.workspaceId, input.workspaceId),
+              inArray(chapterGenerationRuns.id, chapterIds),
+            ),
+          )
+          .then((rows) => {
+            for (const row of rows)
+              enrichment.set(row.id, {
+                requestedByUserId: row.requestedByUserId,
+                provider: "openai",
+                model: row.model,
+                estimatedCostCents: row.estimatedCostCents,
+                inputUnits: row.inputTokens,
+                outputUnits: row.outputTokens,
+                providerRequestId: row.providerRequestId,
+                workflowRunId: row.triggerRunId,
+              });
+          }),
   ]);
 
   const userIds = [
@@ -350,7 +387,8 @@ export async function listUsageLedgerEntries(input: {
       reservation.videoRenderId ??
       reservation.scriptGenerationId ??
       reservation.titleGenerationId ??
-      reservation.thumbnailGenerationId;
+      reservation.thumbnailGenerationId ??
+      reservation.chapterGenerationId;
     const detail = operationId ? enrichment.get(operationId) : undefined;
     return {
       reservationId: reservation.id,

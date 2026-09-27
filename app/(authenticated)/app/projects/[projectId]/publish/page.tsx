@@ -4,6 +4,8 @@ import { PlatformTitlesPanel } from "@/components/publish/PlatformTitlesPanel";
 import { PublishToPlatformPanel } from "@/components/publish/PublishToPlatformPanel";
 import { ReleasePackagePanel } from "@/components/publish/ReleasePackagePanel";
 import { ShareRenderAsPostPanel } from "@/components/publish/ShareRenderAsPostPanel";
+import { VideoChaptersPanel } from "@/components/publish/VideoChaptersPanel";
+import { loadChaptersView } from "@/lib/chapters/chapters-view";
 import { loadPublishingView } from "@/lib/publishing/publishing-view";
 import { listReleaseSchedules } from "@/db/repositories/release-schedules.repository";
 import { toReleaseScheduleListView } from "@/lib/releases/release-schedule-view";
@@ -43,13 +45,19 @@ export default async function ProjectPublishPage({
     workspaceId: scope.workspaceId,
     projectId,
   });
-  const [titlesView, thumbnailsView, publishingView, releasePackagesView] =
-    await Promise.all([
-      loadTitlesView({ workspaceId: scope.workspaceId, project, brief }),
-      loadThumbnailsView({ workspaceId: scope.workspaceId, project, brief }),
-      loadPublishingView({ workspaceId: scope.workspaceId, project }),
-      loadReleasePackagesView({ workspaceId: scope.workspaceId, project }),
-    ]);
+  const [
+    titlesView,
+    thumbnailsView,
+    publishingView,
+    releasePackagesView,
+    chaptersView,
+  ] = await Promise.all([
+    loadTitlesView({ workspaceId: scope.workspaceId, project, brief }),
+    loadThumbnailsView({ workspaceId: scope.workspaceId, project, brief }),
+    loadPublishingView({ workspaceId: scope.workspaceId, project }),
+    loadReleasePackagesView({ workspaceId: scope.workspaceId, project }),
+    loadChaptersView({ workspaceId: scope.workspaceId, project }),
+  ]);
   return (
     <div className="space-y-6">
       <PlatformTitlesPanel
@@ -68,6 +76,11 @@ export default async function ProjectPublishPage({
         projectId={project.id}
         thumbnails={thumbnailsView}
         titles={titlesView}
+      />
+      <VideoChaptersPanel
+        canEdit={canGenerate}
+        initialData={chaptersView}
+        projectId={project.id}
       />
       <PublishToPlatformPanel
         canManageConnections={canManageWorkspace(context.activeMembership.role)}

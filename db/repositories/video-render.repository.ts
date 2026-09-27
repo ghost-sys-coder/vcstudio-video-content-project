@@ -257,3 +257,35 @@ export async function listExpiredActiveVideoRenders(input: {
     .orderBy(asc(usageReservations.expiresAt), asc(videoRenders.createdAt))
     .limit(Math.min(input.limit ?? 100, MAX_LIST_LIMIT));
 }
+
+/**
+ * Finished renders a person can pick chapters for, newest first, without the
+ * timeline snapshot: the picker needs only enough to label each render.
+ */
+export async function listFinishedRendersForChapters(input: {
+  workspaceId: string;
+  projectId: string;
+  limit?: number;
+}) {
+  return getDatabase()
+    .select({
+      id: videoRenders.id,
+      width: videoRenders.width,
+      height: videoRenders.height,
+      durationMilliseconds: videoRenders.durationMilliseconds,
+      sceneCount: videoRenders.sceneCount,
+      preset: videoRenders.preset,
+      createdAt: videoRenders.createdAt,
+    })
+    .from(videoRenders)
+    .where(
+      and(
+        eq(videoRenders.workspaceId, input.workspaceId),
+        eq(videoRenders.projectId, input.projectId),
+        eq(videoRenders.status, "succeeded"),
+        isNotNull(videoRenders.assetObjectKey),
+      ),
+    )
+    .orderBy(desc(videoRenders.createdAt))
+    .limit(Math.min(input.limit ?? 10, MAX_LIST_LIMIT));
+}

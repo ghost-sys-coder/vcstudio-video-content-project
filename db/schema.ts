@@ -430,6 +430,7 @@ export const usageOperationTypeEnum = pgEnum("usage_operation_type", [
   "title_generation",
   "thumbnail_generation",
   "scene_video_generation",
+  "chapter_generation",
 ]);
 
 export const formatPresetStatusEnum = pgEnum("format_preset_status", [
@@ -3660,6 +3661,148 @@ export const videoRenders = pgTable(
 );
 
 /**
+ * One AI pass that picks YouTube chapters for one render.
+ *
+ * Tied to a render, not to the project: chapter times are read from that
+ * render's frozen timeline, so they are only true of that video. The model's
+ * output is kept here as it came back; what the person edits and publishes
+ * lives in `video_render_chapters`.
+ */
+export const chapterGenerationRuns = pgTable(
+  "chapter_generation_runs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").notNull(),
+    renderId: uuid("render_id").notNull(),
+    requestedByUserId: uuid("requested_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    triggerRunId: text("trigger_run_id"),
+    idempotencyKey: text("idempotency_key").notNull(),
+    requestFingerprint: text("request_fingerprint").notNull(),
+    model: text("model").notNull(),
+    promptVersion: text("prompt_version").notNull(),
+    finalPrompt: text("final_prompt").notNull(),
+    status: sceneAnalysisStatusEnum("status").notNull().default("pending"),
+    progressPercent: integer("progress_percent").notNull().default(0),
+    providerRequestId: text("provider_request_id"),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    inputTokens: integer("input_tokens"),
+    outputTokens: integer("output_tokens"),
+    estimatedCostCents: integer("estimated_cost_cents").notNull(),
+    actualCostCents: integer("actual_cost_cents"),
+    generatedChapters:
+      jsonb("generated_chapters").$type<
+        { startMilliseconds: number; title: string }[]
+      >(),
+    errorCategory: text("error_category"),
+    safeErrorMessage: text("safe_error_message"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("chapter_generation_runs_idempotency_unique").on(
+      table.idempotencyKey,
+    ),
+    index("chapter_generation_runs_workspace_render_index").on(
+      table.workspaceId,
+      table.renderId,
+      table.createdAt,
+    ),
+    check(
+      "chapter_generation_runs_progress_valid",
+      sql`${table.progressPercent} between 0 and 100`,
+    ),
+    check(
+      "chapter_generation_runs_cost_nonnegative",
+      sql`${table.estimatedCostCents} >= 0 and (${table.actualCostCents} is null or ${table.actualCostCents} >= 0)`,
+    ),
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [projects.id, projects.workspaceId],
+      name: "chapter_generation_runs_tenant_project_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.renderId, table.projectId, table.workspaceId],
+      foreignColumns: [
+        videoRenders.id,
+        videoRenders.projectId,
+        videoRenders.workspaceId,
+      ],
+      name: "chapter_generation_runs_tenant_render_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
+/**
+ * The chapters a render will be published with: generated, then possibly
+ * edited. One row per render. `version` rises on every write, so an editor
+ * holding an older version cannot overwrite a newer generation or edit.
+ */
+export const videoRenderChapters = pgTable(
+  "video_render_chapters",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").notNull(),
+    renderId: uuid("render_id").notNull(),
+    chapters: jsonb("chapters")
+      .$type<{ startMilliseconds: number; title: string }[]>()
+      .notNull(),
+    includeInYouTubeDescription: boolean("include_in_youtube_description")
+      .notNull()
+      .default(true),
+    source: text("source").notNull(),
+    chapterGenerationRunId: uuid("chapter_generation_run_id").references(
+      () => chapterGenerationRuns.id,
+      { onDelete: "set null" },
+    ),
+    version: integer("version").notNull().default(1),
+    updatedByUserId: uuid("updated_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("video_render_chapters_render_unique").on(table.renderId),
+    index("video_render_chapters_workspace_project_index").on(
+      table.workspaceId,
+      table.projectId,
+    ),
+    check(
+      "video_render_chapters_source_valid",
+      sql`${table.source} in ('generated', 'edited')`,
+    ),
+    check("video_render_chapters_version_positive", sql`${table.version} > 0`),
+    foreignKey({
+      columns: [table.renderId, table.projectId, table.workspaceId],
+      foreignColumns: [
+        videoRenders.id,
+        videoRenders.projectId,
+        videoRenders.workspaceId,
+      ],
+      name: "video_render_chapters_tenant_render_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
+/**
  * One attempt to publish a finished render to a connected platform account.
  * Uploads cost no money (platforms meter by API quota, not billing), so this
  * deliberately does NOT participate in the `usage_reservations` ledger — adding
@@ -4777,6 +4920,10 @@ export const usageReservations = pgTable(
       { onDelete: "cascade" },
     ),
     clipGenerationId: uuid("clip_generation_id"),
+    chapterGenerationId: uuid("chapter_generation_id").references(
+      () => chapterGenerationRuns.id,
+      { onDelete: "cascade" },
+    ),
     status: usageReservationStatusEnum("status").notNull().default("pending"),
     reservedCostCents: integer("reserved_cost_cents").notNull(),
     actualCostCents: integer("actual_cost_cents"),
@@ -4819,6 +4966,9 @@ export const usageReservations = pgTable(
     uniqueIndex("usage_reservations_clip_generation_unique")
       .on(table.clipGenerationId)
       .where(sql`${table.clipGenerationId} is not null`),
+    uniqueIndex("usage_reservations_chapter_generation_unique")
+      .on(table.chapterGenerationId)
+      .where(sql`${table.chapterGenerationId} is not null`),
     index("usage_reservations_workspace_project_status_index").on(
       table.workspaceId,
       table.projectId,
@@ -4834,7 +4984,7 @@ export const usageReservations = pgTable(
     ),
     check(
       "usage_reservations_single_operation",
-      sql`(${table.operationType}::text = 'scene_analysis' and ${table.analysisRunId} is not null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is null) or (${table.operationType}::text = 'scene_image_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is not null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is null) or (${table.operationType}::text = 'scene_audio_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is not null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is null) or (${table.operationType}::text = 'video_render' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is not null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is null) or (${table.operationType}::text = 'script_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is not null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is null) or (${table.operationType}::text = 'title_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is not null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is null) or (${table.operationType}::text = 'thumbnail_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is not null and ${table.clipGenerationId} is null) or (${table.operationType}::text = 'scene_video_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is not null)`,
+      sql`(${table.operationType}::text = 'scene_analysis' and ${table.analysisRunId} is not null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is null and ${table.chapterGenerationId} is null) or (${table.operationType}::text = 'scene_image_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is not null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is null and ${table.chapterGenerationId} is null) or (${table.operationType}::text = 'scene_audio_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is not null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is null and ${table.chapterGenerationId} is null) or (${table.operationType}::text = 'video_render' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is not null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is null and ${table.chapterGenerationId} is null) or (${table.operationType}::text = 'script_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is not null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is null and ${table.chapterGenerationId} is null) or (${table.operationType}::text = 'title_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is not null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is null and ${table.chapterGenerationId} is null) or (${table.operationType}::text = 'thumbnail_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is not null and ${table.clipGenerationId} is null and ${table.chapterGenerationId} is null) or (${table.operationType}::text = 'scene_video_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is not null and ${table.chapterGenerationId} is null) or (${table.operationType}::text = 'chapter_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is null and ${table.chapterGenerationId} is not null)`,
     ),
     foreignKey({
       columns: [table.imageGenerationId, table.projectId, table.workspaceId],
@@ -7508,6 +7658,8 @@ export type ContentIdeaSource =
   (typeof contentIdeaSourceEnum.enumValues)[number];
 export type ScriptGenerationRun = typeof scriptGenerationRuns.$inferSelect;
 export type TitleGenerationRun = typeof titleGenerationRuns.$inferSelect;
+export type ChapterGenerationRun = typeof chapterGenerationRuns.$inferSelect;
+export type VideoRenderChapters = typeof videoRenderChapters.$inferSelect;
 export type ProjectTitleSuggestion =
   typeof projectTitleSuggestions.$inferSelect;
 export type ThumbnailGeneration = typeof thumbnailGenerations.$inferSelect;

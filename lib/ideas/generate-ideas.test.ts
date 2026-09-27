@@ -55,6 +55,9 @@ function provider(
       throw new Error("unused");
     },
     generateIdeas,
+    generateChapters: async () => {
+      throw new Error("unused");
+    },
     summariseDocument: async () => {
       throw new Error("unused");
     },

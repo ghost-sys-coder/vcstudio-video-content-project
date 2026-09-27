@@ -202,3 +202,35 @@ export async function findCurrentScene(input: {
     .limit(1);
   return result ?? null;
 }
+
+/**
+ * The current narration of specific scenes, for describing a render whose own
+ * caption text was not kept (captions switched off). Bounded by the ids given,
+ * and scoped so another tenant's scene ids return nothing.
+ */
+export async function listCurrentSceneNarrations(input: {
+  workspaceId: string;
+  projectId: string;
+  sceneIds: string[];
+}): Promise<Map<string, string>> {
+  const sceneIds = [...new Set(input.sceneIds)].slice(0, 1_000);
+  if (sceneIds.length === 0) return new Map();
+  const rows = await getDatabase()
+    .select({ sceneId: scenes.id, narration: sceneVersions.narrationText })
+    .from(scenes)
+    .innerJoin(
+      sceneVersions,
+      and(
+        eq(sceneVersions.sceneId, scenes.id),
+        eq(sceneVersions.versionNumber, scenes.currentVersion),
+      ),
+    )
+    .where(
+      and(
+        eq(scenes.workspaceId, input.workspaceId),
+        eq(scenes.projectId, input.projectId),
+        inArray(scenes.id, sceneIds),
+      ),
+    );
+  return new Map(rows.map((row) => [row.sceneId, row.narration]));
+}

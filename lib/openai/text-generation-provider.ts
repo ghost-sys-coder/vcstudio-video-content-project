@@ -3,6 +3,7 @@ import type { MarketingDocumentSummaryOutput } from "@/lib/schemas/marketing-doc
 import type { SceneAnalysisOutput } from "@/lib/schemas/scene";
 import type { ScriptGenerationOutput } from "@/lib/schemas/script-generation";
 import type { TitleGenerationOutput } from "@/lib/schemas/title-generation";
+import type { VideoChaptersOutput } from "@/lib/schemas/video-chapters";
 
 export type SceneAnalysisProviderResult = {
   output: SceneAnalysisOutput;
@@ -20,6 +21,13 @@ export type ScriptGenerationProviderResult = {
 
 export type TitleGenerationProviderResult = {
   output: TitleGenerationOutput;
+  requestId: string;
+  inputTokens: number;
+  outputTokens: number;
+};
+
+export type VideoChaptersProviderResult = {
+  output: VideoChaptersOutput;
   requestId: string;
   inputTokens: number;
   outputTokens: number;
@@ -56,6 +64,10 @@ export interface TextGenerationProvider {
     model: string;
     prompt: string;
   }): Promise<IdeaGenerationProviderResult>;
+  generateChapters(input: {
+    model: string;
+    prompt: string;
+  }): Promise<VideoChaptersProviderResult>;
   summariseDocument(input: {
     model: string;
     prompt: string;

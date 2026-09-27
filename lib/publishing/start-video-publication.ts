@@ -13,6 +13,8 @@ import {
   findVideoPublicationByIdempotencyKey,
 } from "@/db/repositories/publishing.repository";
 import { findVideoRender } from "@/db/repositories/video-render.repository";
+import { findVideoRenderChapters } from "@/db/repositories/chapter-generation.repository";
+import { resolvePublishDescription } from "@/lib/chapters/youtube-chapters";
 import { createVideoPublicationIdempotencyKey } from "@/lib/domain/idempotency";
 import {
   areDisclosuresComplete,
@@ -142,6 +144,29 @@ export async function startVideoPublication(input: {
         .join(" "),
     );
 
+  // YouTube reads chapters from the description. They are added here, on the
+  // server, from the chapters saved against this exact render, so immediate
+  // and scheduled publishing behave the same and the browser cannot inject
+  // timestamps that do not match the uploaded video.
+  let youtubeDescription: string | null = null;
+  if (input.request.platform === "youtube") {
+    const saved = await findVideoRenderChapters({
+      workspaceId: input.workspaceId,
+      projectId: input.project.id,
+      renderId: render.id,
+    });
+    const resolved = resolvePublishDescription({
+      description: input.request.description,
+      chapters: saved?.chapters ?? null,
+      includeInYouTubeDescription: saved?.includeInYouTubeDescription ?? false,
+      videoDurationMilliseconds:
+        render.timelineSnapshot.totalDurationMilliseconds,
+      dimensions: { width: render.width, height: render.height },
+    });
+    if (!resolved.ok) throw new VideoPublicationRequestError(resolved.error);
+    youtubeDescription = resolved.description;
+  }
+
   const connection = await findPlatformConnectionSummary({
     workspaceId: input.workspaceId,
     connectionId: input.request.connectionId,
@@ -196,7 +221,7 @@ export async function startVideoPublication(input: {
       input.request.platform === "instagram" ||
       input.request.platform === "tiktok"
         ? ""
-        : input.request.description,
+        : (youtubeDescription ?? input.request.description),
     tags:
       input.request.platform === "instagram" ||
       input.request.platform === "tiktok"

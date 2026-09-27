@@ -5,6 +5,7 @@ import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import type { PgColumn, PgTable } from "drizzle-orm/pg-core";
 import { getDatabase } from "@/db/drizzle";
 import {
+  chapterGenerationRuns,
   sceneAnalysisRuns,
   sceneAudioGenerations,
   sceneImageGenerations,
@@ -98,6 +99,14 @@ export async function cancelProjectTriggerRuns(input: {
       projectId: titleGenerationRuns.projectId,
       workspaceId: titleGenerationRuns.workspaceId,
       status: titleGenerationRuns.status,
+      statuses: ACTIVE_STATUSES,
+    }),
+    activeRunIds({
+      table: chapterGenerationRuns,
+      triggerRunId: chapterGenerationRuns.triggerRunId,
+      projectId: chapterGenerationRuns.projectId,
+      workspaceId: chapterGenerationRuns.workspaceId,
+      status: chapterGenerationRuns.status,
       statuses: ACTIVE_STATUSES,
     }),
     activeRunIds({

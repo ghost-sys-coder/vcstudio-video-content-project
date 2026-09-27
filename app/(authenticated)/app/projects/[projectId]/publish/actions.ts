@@ -104,6 +104,30 @@ import {
 } from "@/lib/thumbnails/start-thumbnail-generation";
 import { toVideoContentPlatform } from "@/lib/platforms/video-content-platforms";
 import {
+  cancelChapterGeneration,
+  saveVideoRenderChapters,
+} from "@/db/commands/chapter-generation-commands";
+import { findVideoRender } from "@/db/repositories/video-render.repository";
+import {
+  loadChaptersView,
+  type ChapterActionResult,
+  type ChaptersView,
+} from "@/lib/chapters/chapters-view";
+import {
+  ChapterGenerationRequestError,
+  startChapterGeneration,
+} from "@/lib/chapters/start-chapter-generation";
+import {
+  cleanChapterTitle,
+  findChaptersOffSceneStarts,
+  validateChapters,
+} from "@/lib/chapters/youtube-chapters";
+import {
+  cancelVideoChaptersSchema,
+  generateVideoChaptersSchema,
+  saveVideoChaptersSchema,
+} from "@/lib/schemas/video-chapters";
+import {
   loadThumbnailsView,
   type ThumbnailActionResult,
   type ThumbnailsView,
@@ -949,4 +973,170 @@ export async function loadReleaseSchedulesAction(
     projectId,
   });
   return toReleaseScheduleListView(rows);
+}
+
+function budgetMessage(error: BudgetExceededError): string {
+  return error.scope === "project"
+    ? "This would exceed the project budget."
+    : error.scope === "workspace_daily"
+      ? "This would exceed the workspace daily budget."
+      : "This would exceed the workspace monthly budget.";
+}
+
+export async function generateVideoChaptersAction(
+  formData: FormData,
+): Promise<ChapterActionResult> {
+  const parsed = generateVideoChaptersSchema.safeParse({
+    projectId: formData.get("projectId"),
+    renderId: formData.get("renderId"),
+    requestNonce: formData.get("requestNonce"),
+  });
+  if (!parsed.success)
+    return { success: false, error: "The chapters request is invalid." };
+  try {
+    const { context, project } = await requirePublishMutation(
+      parsed.data.projectId,
+    );
+    await startChapterGeneration({
+      workspaceId: context.activeMembership.workspaceId,
+      project,
+      renderId: parsed.data.renderId,
+      requestedByUserId: context.user.id,
+      requestNonce: parsed.data.requestNonce,
+    });
+    revalidatePath(`/app/projects/${parsed.data.projectId}/publish`);
+    return { success: true, error: null };
+  } catch (error) {
+    if (error instanceof ChapterGenerationRequestError)
+      return { success: false, error: error.message };
+    if (error instanceof RateLimitExceededError)
+      return { success: false, error: error.message };
+    if (error instanceof BudgetExceededError)
+      return { success: false, error: budgetMessage(error) };
+    return { success: false, error: "The chapters could not be generated." };
+  }
+}
+
+export async function cancelVideoChaptersAction(
+  formData: FormData,
+): Promise<ChapterActionResult> {
+  const parsed = cancelVideoChaptersSchema.safeParse({
+    projectId: formData.get("projectId"),
+    chapterGenerationRunId: formData.get("chapterGenerationRunId"),
+  });
+  if (!parsed.success)
+    return { success: false, error: "The cancel request is invalid." };
+  try {
+    const { context } = await requirePublishMutation(parsed.data.projectId);
+    const result = await cancelChapterGeneration({
+      workspaceId: context.activeMembership.workspaceId,
+      projectId: parsed.data.projectId,
+      chapterGenerationRunId: parsed.data.chapterGenerationRunId,
+    });
+    if (result.cancelled)
+      await recordAuditEvent({
+        workspaceId: context.activeMembership.workspaceId,
+        actorUserId: context.user.id,
+        projectId: parsed.data.projectId,
+        action: "generation_cancelled",
+        targetType: "chapter_generation",
+        targetId: parsed.data.chapterGenerationRunId,
+      });
+    revalidatePath(`/app/projects/${parsed.data.projectId}/publish`);
+    return { success: true, error: null };
+  } catch {
+    return { success: false, error: "The generation could not be cancelled." };
+  }
+}
+
+/**
+ * Saves edited chapters for one render.
+ *
+ * Re-checked here rather than trusted from the editor: every chapter must
+ * start on one of the render's own scene starts, and when the chapters are to
+ * go into the YouTube description they must satisfy YouTube's rules.
+ */
+export async function saveVideoChaptersAction(
+  formData: FormData,
+): Promise<ChapterActionResult & { version?: number }> {
+  const parsed = saveVideoChaptersSchema.safeParse({
+    projectId: formData.get("projectId"),
+    renderId: formData.get("renderId"),
+    chapters: formData.get("chapters"),
+    includeInYouTubeDescription: formData.get("includeInYouTubeDescription"),
+    expectedVersion: formData.get("expectedVersion"),
+  });
+  if (!parsed.success)
+    return { success: false, error: "The chapters could not be read." };
+  try {
+    const { context } = await requirePublishMutation(parsed.data.projectId);
+    const workspaceId = context.activeMembership.workspaceId;
+    const render = await findVideoRender({
+      workspaceId,
+      projectId: parsed.data.projectId,
+      renderId: parsed.data.renderId,
+    });
+    if (!render)
+      return { success: false, error: "That render no longer exists." };
+
+    const chapters = parsed.data.chapters.map((chapter) => ({
+      startMilliseconds: chapter.startMilliseconds,
+      title: cleanChapterTitle(chapter.title),
+    }));
+    const snapshot = render.timelineSnapshot;
+    if (findChaptersOffSceneStarts(chapters, snapshot.scenes).length > 0)
+      return {
+        success: false,
+        error: "Every chapter must start where a scene starts.",
+      };
+    if (parsed.data.includeInYouTubeDescription) {
+      const issues = validateChapters(
+        chapters,
+        snapshot.totalDurationMilliseconds,
+      );
+      if (issues[0])
+        return {
+          success: false,
+          error: `${issues[0].message} Fix it, or turn off "Add to YouTube description" to save anyway.`,
+        };
+    }
+
+    const result = await saveVideoRenderChapters({
+      workspaceId,
+      projectId: parsed.data.projectId,
+      renderId: render.id,
+      chapters,
+      includeInYouTubeDescription: parsed.data.includeInYouTubeDescription,
+      expectedVersion: parsed.data.expectedVersion,
+      userId: context.user.id,
+    });
+    if (!result.saved)
+      return {
+        success: false,
+        error:
+          "These chapters changed since you opened them, most likely a new generation finished. Reload to see the latest before saving.",
+      };
+    revalidatePath(`/app/projects/${parsed.data.projectId}/publish`);
+    return { success: true, error: null, version: result.version };
+  } catch {
+    return { success: false, error: "The chapters could not be saved." };
+  }
+}
+
+export async function loadChaptersViewAction(
+  projectId: string,
+  renderId: string | null,
+): Promise<ChaptersView | null> {
+  const context = await getAuthenticatedWorkspaceContext();
+  if (!context) return null;
+  const project = await findProject({
+    workspaceId: context.activeMembership.workspaceId,
+    projectId,
+  });
+  if (!project) return null;
+  return loadChaptersView({
+    workspaceId: context.activeMembership.workspaceId,
+    project,
+    renderId,
+  });
 }

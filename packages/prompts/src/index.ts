@@ -18,6 +18,14 @@ export {
 } from "./title-generation";
 export type { TitleGenerationPromptInput } from "./title-generation";
 export {
+  renderVideoChaptersPrompt,
+  VIDEO_CHAPTERS_PROMPT_VERSION,
+} from "./video-chapters";
+export type {
+  VideoChaptersPromptInput,
+  VideoChaptersPromptScene,
+} from "./video-chapters";
+export {
   renderIdeaGenerationPrompt,
   IDEA_GENERATION_PROMPT_VERSION,
 } from "./idea-generation";

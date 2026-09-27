@@ -75,6 +75,27 @@ export function createTitleGenerationIdempotencyKey(input: {
   ]);
 }
 
+export function createChapterGenerationIdempotencyKey(input: {
+  secret: string;
+  workspaceId: string;
+  projectId: string;
+  renderId: string;
+  model: string;
+  promptVersion: string;
+  /** Distinct per intentional "Generate" click so regeneration yields a new run. */
+  requestNonce: string;
+}): string {
+  return hash(input.secret, [
+    input.workspaceId,
+    input.projectId,
+    "chapter-generation",
+    input.renderId,
+    input.model,
+    input.promptVersion,
+    input.requestNonce,
+  ]);
+}
+
 export function createVideoPublicationIdempotencyKey(input: {
   secret: string;
   workspaceId: string;
