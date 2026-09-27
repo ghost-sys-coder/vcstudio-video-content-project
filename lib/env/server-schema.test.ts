@@ -7,6 +7,7 @@ import {
   sceneImageEnvironmentSchema,
   usageEnvironmentSchema,
   publishingEnvironmentSchema,
+  speechProviderEnvironmentSchema,
 } from "@/lib/env/server-schema";
 
 const validEnvironment = {
@@ -164,5 +165,44 @@ describe("publishing environment validation", () => {
 
   it("still requires the token encryption key (needed by every platform)", () => {
     expect(publishingEnvironmentSchema.safeParse({}).success).toBe(false);
+  });
+});
+
+describe("speech provider environment validation", () => {
+  it("defaults to Gemini", () => {
+    expect(speechProviderEnvironmentSchema.parse({}).SPEECH_PROVIDER).toBe(
+      "gemini",
+    );
+    expect(
+      speechProviderEnvironmentSchema.parse({ SPEECH_PROVIDER: "" })
+        .SPEECH_PROVIDER,
+    ).toBe("gemini");
+  });
+
+  it("treats blank unused settings as unset rather than invalid", () => {
+    // The env files list every variable, blank when unused. One blank URL once
+    // failed the whole speech configuration and blocked Gemini voice cloning.
+    const parsed = speechProviderEnvironmentSchema.parse({
+      SPEECH_PROVIDER: "gemini",
+      GOOGLE_GEMINI_API_KEY: "key",
+      MAGPIE_BASE_URL: "",
+      NVIDIA_API_KEY: "",
+      NVIDIA_FUNCTION_ID: "  ",
+    });
+    expect(parsed.MAGPIE_BASE_URL).toBeUndefined();
+    expect(parsed.NVIDIA_API_KEY).toBeUndefined();
+    expect(parsed.NVIDIA_FUNCTION_ID).toBeUndefined();
+    expect(parsed.GOOGLE_GEMINI_API_KEY).toBe("key");
+  });
+
+  it("still rejects a malformed Magpie URL and requires one for Magpie", () => {
+    expect(
+      speechProviderEnvironmentSchema.safeParse({ MAGPIE_BASE_URL: "nope" })
+        .success,
+    ).toBe(false);
+    expect(
+      speechProviderEnvironmentSchema.safeParse({ SPEECH_PROVIDER: "magpie" })
+        .success,
+    ).toBe(false);
   });
 });

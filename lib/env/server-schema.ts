@@ -310,6 +310,22 @@ export const sceneVideoEnvironmentSchema = z.object({
 });
 
 /**
+ * An optional setting where a blank line means "not set".
+ *
+ * The env files keep every variable listed with an empty value when it is
+ * unused. Read literally, `MAGPIE_BASE_URL=` is an invalid URL, and one such
+ * line failed the whole speech configuration — which is what kept voice
+ * cloning from reaching Gemini even though Gemini was configured.
+ */
+function optionalSetting<T extends z.ZodType>(schema: T) {
+  return z.preprocess(
+    (value) =>
+      typeof value === "string" && value.trim() === "" ? undefined : value,
+    schema.optional(),
+  );
+}
+
+/**
  * Which text-to-speech provider narrates, and how to reach it.
  *
  * Kept apart from the OpenAI audio settings on purpose. A deployment that
@@ -320,17 +336,25 @@ export const sceneVideoEnvironmentSchema = z.object({
  */
 export const speechProviderEnvironmentSchema = z
   .object({
-    SPEECH_PROVIDER: z.enum(["openai", "magpie", "gemini"]).default("openai"),
+    /**
+     * Gemini by default: this organisation is not approved for OpenAI custom
+     * voices, and Google's voice replication is self-serve.
+     */
+    SPEECH_PROVIDER: z.preprocess(
+      (value) =>
+        typeof value === "string" && value.trim() === "" ? undefined : value,
+      z.enum(["openai", "magpie", "gemini"]).default("gemini"),
+    ),
     /**
      * Where the Magpie endpoint lives. A Speech NIM you run yourself, or an
      * NVIDIA Cloud Function route. No default: pointing narration at the wrong
      * host should fail loudly at boot, not silently at the first render.
      */
-    MAGPIE_BASE_URL: z.string().url().optional(),
+    MAGPIE_BASE_URL: optionalSetting(z.string().url()),
     /** `nvapi-...`. Unused by a NIM inside your own network. */
-    NVIDIA_API_KEY: z.string().min(1).optional(),
+    NVIDIA_API_KEY: optionalSetting(z.string().min(1)),
     /** The NVCF function id, when routing through NVIDIA Cloud Functions. */
-    NVIDIA_FUNCTION_ID: z.string().min(1).optional(),
+    NVIDIA_FUNCTION_ID: optionalSetting(z.string().min(1)),
     MAGPIE_TTS_MODEL: z.string().min(1).default("magpie-tts-zeroshot"),
     /** NVIDIA documents 1-40, defaulting to 20. Higher clings to the reference. */
     MAGPIE_PROMPT_QUALITY: z.coerce.number().int().min(1).max(40).default(20),
@@ -353,7 +377,7 @@ export const speechProviderEnvironmentSchema = z
      * recording, then names it by identifier, so no audio travels with a
      * synthesis request.
      */
-    GOOGLE_GEMINI_API_KEY: z.string().min(1).optional(),
+    GOOGLE_GEMINI_API_KEY: optionalSetting(z.string().min(1)),
     GEMINI_TTS_MODEL: z.string().min(1).default("gemini-3.8-flash-tts"),
     /** A catalogue voice, used until a replicated one is chosen. */
     GEMINI_TTS_VOICE: z.string().min(1).default("Kore"),
@@ -370,16 +394,6 @@ export const speechProviderEnvironmentSchema = z
     {
       path: ["MAGPIE_BASE_URL"],
       message: "MAGPIE_BASE_URL is required when SPEECH_PROVIDER is magpie.",
-    },
-  )
-  .refine(
-    (value) =>
-      value.SPEECH_PROVIDER !== "gemini" ||
-      Boolean(value.GOOGLE_GEMINI_API_KEY),
-    {
-      path: ["GOOGLE_GEMINI_API_KEY"],
-      message:
-        "GOOGLE_GEMINI_API_KEY is required when SPEECH_PROVIDER is gemini.",
     },
   );
 

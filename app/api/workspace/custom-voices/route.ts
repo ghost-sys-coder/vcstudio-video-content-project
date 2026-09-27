@@ -12,7 +12,10 @@ import {
   customVoiceFailureMessage,
   customVoiceFailureStatus,
 } from "@/lib/audio/custom-voice-failure-message";
-import { isEnrollmentBlocked } from "@/lib/audio/custom-voice-availability";
+import {
+  isEnrollmentBlocked,
+  type CustomVoiceAvailability,
+} from "@/lib/audio/custom-voice-availability";
 import { MAX_VOICE_RECORDING_BYTES } from "@/lib/audio/voice-enrollment-requirements";
 import { RateLimitExceededError } from "@/lib/domain/errors";
 import { can, requireCapability } from "@/lib/policies/workspace-policy";
@@ -35,16 +38,28 @@ export const maxDuration = 60;
  * zero-shot provider keeps no voice, so it yields none and enrolment reports
  * itself unsupported instead of quietly falling back to OpenAI.
  */
-function enrollmentProvider(): VoiceEnrollmentProvider | null {
+function enrollmentProvider():
+  | { provider: VoiceEnrollmentProvider }
+  | { provider: null; availability: CustomVoiceAvailability } {
   const id = configuredEnrollmentProviderId();
-  return id ? createVoiceEnrollmentProvider(id) : null;
+  const provider = id ? createVoiceEnrollmentProvider(id) : null;
+  if (provider) return { provider };
+  return {
+    provider: null,
+    availability:
+      id === "gemini"
+        ? {
+            status: "unauthorized",
+            detail:
+              "GOOGLE_GEMINI_API_KEY is not set for this deployment, so Gemini voice cloning cannot run.",
+          }
+        : {
+            status: "unsupported",
+            detail:
+              "The configured speech provider does not enrol voices. Set SPEECH_PROVIDER to gemini to clone a voice.",
+          },
+  };
 }
-
-const UNSUPPORTED_AVAILABILITY = {
-  status: "unsupported" as const,
-  detail:
-    "The configured speech provider does not enrol voices. Set SPEECH_PROVIDER to gemini or openai to clone a voice.",
-};
 
 function validRecording(value: FormDataEntryValue | null): value is File {
   return (
@@ -77,12 +92,13 @@ export async function GET() {
     workspaceId: context.activeMembership.workspaceId,
   });
   const canManage = can(context.activeMembership.role, "manageCustomVoices");
-  const provider = canManage ? enrollmentProvider() : null;
-  const availability = !canManage
-    ? { status: "unknown" as const, detail: "" }
-    : provider
-      ? await provider.checkAvailability()
-      : UNSUPPORTED_AVAILABILITY;
+  const resolved = canManage ? enrollmentProvider() : null;
+  const provider = resolved?.provider ?? null;
+  const availability: CustomVoiceAvailability = !resolved
+    ? { status: "unknown", detail: "" }
+    : resolved.provider
+      ? await resolved.provider.checkAvailability()
+      : resolved.availability;
 
   return NextResponse.json({
     availability,
@@ -175,15 +191,16 @@ export async function POST(request: Request) {
     throw error;
   }
 
-  const provider = enrollmentProvider();
-  if (!provider)
+  const resolved = enrollmentProvider();
+  if (!resolved.provider)
     return NextResponse.json(
       {
-        availability: UNSUPPORTED_AVAILABILITY,
-        error: `${UNSUPPORTED_AVAILABILITY.detail} Your recordings were fine — nothing was sent to a provider.`,
+        availability: resolved.availability,
+        error: `${resolved.availability.detail} Your recordings were fine — nothing was sent to a provider.`,
       },
       { status: 503 },
     );
+  const provider = resolved.provider;
 
   // Checked before either recording is uploaded: when the provider has no
   // custom-voice endpoints, an enrollment attempt fails in a way that reads as
