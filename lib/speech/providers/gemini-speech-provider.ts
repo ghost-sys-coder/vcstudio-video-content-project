@@ -2,6 +2,11 @@ import "server-only";
 
 import { z } from "zod";
 import {
+  diagnoseGeminiFailure,
+  diagnoseGeminiTransportFailure,
+  geminiRequestError,
+} from "@/lib/speech/providers/gemini-error";
+import {
   SpeechProviderRequestError,
   SpeechProviderUnsupportedError,
   type SpeechProvider,
@@ -172,31 +177,28 @@ export class GeminiSpeechProvider implements SpeechProvider {
         },
       );
     } catch (error) {
-      throw new SpeechProviderRequestError({
-        code:
-          error instanceof Error && error.name === "AbortError"
-            ? "GEMINI_TIMEOUT"
-            : "GEMINI_UNREACHABLE",
-        message:
-          error instanceof Error
-            ? error.message
-            : "The request did not complete.",
-      });
+      throw geminiRequestError(
+        diagnoseGeminiTransportFailure(
+          error,
+          Math.round((this.input.timeoutMilliseconds ?? 180_000) / 1_000),
+        ),
+      );
     } finally {
       clearTimeout(timeout);
     }
 
     const requestId = response.headers.get("x-request-id");
 
-    if (!response.ok) {
-      await response.text().catch(() => "");
-      throw new SpeechProviderRequestError({
-        code: `GEMINI_HTTP_${response.status}`,
-        message: describeStatus(response.status),
+    if (!response.ok)
+      throw geminiRequestError(
+        diagnoseGeminiFailure({
+          httpStatus: response.status,
+          body: await response.text().catch(() => ""),
+          model: this.input.model,
+          operation: "synthesize",
+        }),
         requestId,
-        status: response.status,
-      });
-    }
+      );
 
     const parsed = interactionSchema.parse(await response.json());
     const encoded = parsed.steps
@@ -241,15 +243,4 @@ export class GeminiSpeechProvider implements SpeechProvider {
       },
     };
   }
-}
-
-function describeStatus(status: number): string {
-  if (status === 400)
-    return "Google rejected the request. The voice may have been deleted or expired.";
-  if (status === 401 || status === 403)
-    return "The Google Gemini API key was rejected.";
-  if (status === 404) return "That Gemini voice or model was not found.";
-  if (status === 429) return "Google is rate limiting requests right now.";
-  if (status >= 500) return "Google could not complete the request.";
-  return "Google refused the request.";
 }

@@ -30,10 +30,12 @@ export function CustomVoiceAvailabilityNotice({
       <div>
         <p className="text-sm font-medium">
           {availability.status === "not_enabled"
-            ? "This OpenAI organization is not approved for custom voices"
-            : blocking
-              ? "Voice cloning is unavailable"
-              : "Voice cloning status unconfirmed"}
+            ? "Voice cloning is not enabled for this provider account"
+            : availability.status === "unauthorized"
+              ? "The voice provider rejected this deployment's credentials"
+              : blocking
+                ? "Voice cloning is unavailable"
+                : "Voice cloning status unconfirmed"}
         </p>
         <p className="text-sm text-muted-foreground">{availability.detail}</p>
       </div>

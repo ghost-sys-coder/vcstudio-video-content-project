@@ -30,6 +30,7 @@ import {
   type EnrolledVoice,
   type VoiceEnrollmentProvider,
 } from "@/lib/speech/voice-enrollment-provider";
+import { SpeechProviderRequestError } from "@/lib/speech/speech-provider";
 
 export const maxDuration = 60;
 
@@ -227,6 +228,13 @@ export async function POST(request: Request) {
     console.error("Custom voice enrollment failed", {
       provider: provider.details.provider,
       message: error instanceof Error ? error.message : "unknown error",
+      ...(error instanceof SpeechProviderRequestError
+        ? {
+            reason: error.reason,
+            status: error.status,
+            requestId: error.requestId,
+          }
+        : {}),
     });
     return NextResponse.json(
       { error: customVoiceFailureMessage(error) },

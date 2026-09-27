@@ -2,10 +2,6 @@ import "server-only";
 
 import type { CustomVoiceAvailability } from "@/lib/audio/custom-voice-availability";
 import {
-  CustomVoiceProviderError,
-  type CustomVoiceProviderFailure,
-} from "@/lib/domain/errors";
-import {
   getSceneAudioEnvironment,
   getSpeechProviderEnvironment,
 } from "@/lib/env/server";
@@ -158,33 +154,19 @@ function createGeminiEnrollment(): VoiceEnrollmentProvider | null {
         await client.listVoices();
         return { status: "available", detail: "" };
       } catch (error) {
-        const status =
-          error instanceof SpeechProviderRequestError ? error.status : null;
-        if (status === 401 || status === 403)
-          return {
-            status: "unauthorized",
-            detail:
-              "Google rejected this deployment's Gemini API key, or the project cannot hold custom voices. Check GOOGLE_GEMINI_API_KEY.",
-          };
-        return {
-          status: "unknown",
-          detail:
-            "Google could not confirm voice cloning is available. Try again shortly.",
-        };
+        return availabilityFromError(error);
       }
     },
 
     async enroll(input) {
-      try {
-        const voice = await client.createReplicatedVoice({
-          displayName: input.name,
-          sourceAudio: await recording(input.sample),
-          consentAudio: await recording(input.consent),
-        });
-        return { providerVoiceId: voice.id, providerConsentId: null };
-      } catch (error) {
-        throw asCustomVoiceError(error);
-      }
+      // Failures arrive already diagnosed by the client, with a message
+      // naming the cause, so they are passed through untouched.
+      const voice = await client.createReplicatedVoice({
+        displayName: input.name,
+        sourceAudio: await recording(input.sample),
+        consentAudio: await recording(input.consent),
+      });
+      return { providerVoiceId: voice.id, providerConsentId: null };
     },
     async discard(voice) {
       await client.deleteVoice(voice.providerVoiceId);
@@ -204,26 +186,30 @@ async function recording(file: File) {
 }
 
 /**
- * Carries a Google failure into the categories the enrolment messages already
- * understand, so a refused recording is not reported as a request that never
- * reached the provider.
+ * What the dialog says before anyone records. A cause that settings or billing
+ * must fix blocks enrolment outright, so nobody records two clips only to be
+ * refused; a passing one (rate limit, outage) is shown but does not block.
  */
-function asCustomVoiceError(error: unknown): unknown {
-  if (!(error instanceof SpeechProviderRequestError)) return error;
-  const failure: CustomVoiceProviderFailure =
-    error.status === 400
-      ? "recording_rejected"
-      : error.status === 401 || error.status === 403
-        ? "unauthorized"
-        : error.status === 404
-          ? "provider_unavailable"
-          : error.status === 429
-            ? "rate_limited"
-            : "provider_error";
-  return new CustomVoiceProviderError(
-    failure,
-    error.status,
-    error.message,
-    error.requestId,
-  );
+function availabilityFromError(error: unknown): CustomVoiceAvailability {
+  if (!(error instanceof SpeechProviderRequestError) || !error.reason)
+    return {
+      status: "unknown",
+      detail: "Google could not confirm voice cloning is available.",
+    };
+  const detail = error.providerMessage
+    ? `${error.message} Google said: "${error.providerMessage}"`
+    : error.message;
+  switch (error.reason) {
+    case "api_key_invalid":
+    case "api_not_enabled":
+    case "permission_denied":
+      return { status: "unauthorized", detail };
+    case "credits_depleted":
+    case "billing_required":
+    case "location_unsupported":
+    case "model_unavailable":
+      return { status: "not_enabled", detail };
+    default:
+      return { status: "unknown", detail };
+  }
 }

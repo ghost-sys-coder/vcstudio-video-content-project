@@ -17,7 +17,11 @@ vi.mock("@/lib/env/server", () => ({
   }),
 }));
 
-import { CustomVoiceProviderError } from "@/lib/domain/errors";
+import {
+  customVoiceFailureMessage,
+  customVoiceFailureStatus,
+} from "@/lib/audio/custom-voice-failure-message";
+import { SpeechProviderRequestError } from "@/lib/speech/speech-provider";
 import { GEMINI_CONSENT_PHRASE } from "@/lib/speech/voice-cloning-capability";
 import {
   configuredEnrollmentProviderId,
@@ -102,10 +106,62 @@ describe("Gemini enrolment", () => {
       consent: wav("consent.wav"),
       sample: wav("sample.wav"),
     });
-    await expect(attempt).rejects.toBeInstanceOf(CustomVoiceProviderError);
+    await expect(attempt).rejects.toBeInstanceOf(SpeechProviderRequestError);
     await expect(attempt).rejects.toMatchObject({
-      failure: "recording_rejected",
+      reason: "recording_rejected",
     });
+  });
+
+  it("shows the specific cause, not a generic outage, when Google says why", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        json(
+          {
+            error: {
+              code: 429,
+              status: "RESOURCE_EXHAUSTED",
+              message:
+                "Your prepayment credits are depleted. Please go to AI Studio to manage your project and billing.",
+            },
+          },
+          429,
+        ),
+      ),
+    );
+    const error = await createVoiceEnrollmentProvider("gemini")
+      ?.enroll({
+        name: "Narrator",
+        language: "en-US",
+        consent: wav("consent.wav"),
+        sample: wav("sample.wav"),
+      })
+      .catch((caught: unknown) => caught);
+    expect(customVoiceFailureMessage(error)).toMatch(/credits are used up/);
+    expect(customVoiceFailureMessage(error)).toMatch(/Google said:/);
+    expect(customVoiceFailureStatus(error)).toBe(503);
+  });
+
+  it("blocks enrolment up front when billing is the problem", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        json(
+          {
+            error: {
+              code: 400,
+              status: "FAILED_PRECONDITION",
+              message: "This API method requires billing to be enabled.",
+            },
+          },
+          400,
+        ),
+      ),
+    );
+    const availability =
+      await createVoiceEnrollmentProvider("gemini")?.checkAvailability();
+    expect(availability?.status).toBe("not_enabled");
+    expect(availability?.detail).toMatch(/billing/i);
   });
 
   it("reports a rejected key as unauthorized, and success as available", async () => {

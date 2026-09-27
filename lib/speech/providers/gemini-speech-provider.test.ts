@@ -155,7 +155,7 @@ describe("GeminiSpeechProvider", () => {
     const error = await provider(fetcher as unknown as typeof fetch)
       .synthesize(request())
       .catch((caught: unknown) => caught);
-    expect((error as Error).message).toMatch(/key was rejected/i);
+    expect((error as Error).message).toMatch(/API key/i);
     expect((error as Error).message).not.toContain("sk-secret");
   });
 

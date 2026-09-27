@@ -94,17 +94,32 @@ export class SpeechProviderRequestError extends Error {
   readonly code: string;
   readonly requestId: string | null;
   readonly status: number | null;
+  /**
+   * The diagnosed cause, when the provider's reply was read closely enough to
+   * name one. Its presence means `message` is written for the user.
+   */
+  readonly reason: string | null;
+  /** The provider's own explanation, scrubbed and safe to show. */
+  readonly providerMessage: string | null;
+  /** Set when the cause is known; otherwise callers decide from `status`. */
+  readonly retriable: boolean | null;
 
   constructor(input: {
     code: string;
     message: string;
     requestId?: string | null;
     status?: number | null;
+    reason?: string | null;
+    providerMessage?: string | null;
+    retriable?: boolean | null;
   }) {
     super(input.message);
     this.name = "SpeechProviderRequestError";
     this.code = input.code;
     this.requestId = input.requestId ?? null;
     this.status = input.status ?? null;
+    this.reason = input.reason ?? null;
+    this.providerMessage = input.providerMessage ?? null;
+    this.retriable = input.retriable ?? null;
   }
 }

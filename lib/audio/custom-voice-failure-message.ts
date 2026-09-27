@@ -1,4 +1,5 @@
 import { CustomVoiceProviderError } from "@/lib/domain/errors";
+import { SpeechProviderRequestError } from "@/lib/speech/speech-provider";
 
 /**
  * Maps a provider failure to the message the user actually sees.
@@ -7,8 +8,17 @@ import { CustomVoiceProviderError } from "@/lib/domain/errors";
  * quality") was actively misleading: it was returned even when the provider had
  * no custom-voice endpoints at all, so a correct recording looked like a bad
  * one. Only `recording_rejected` may blame the recording.
+ *
+ * A diagnosed speech-provider failure already carries a message naming its
+ * cause, and the provider's own words beside it; both are shown, because "the
+ * provider is unavailable" hid a consent sentence that simply did not match.
  */
 export function customVoiceFailureMessage(error: unknown): string {
+  if (error instanceof SpeechProviderRequestError && error.reason)
+    return error.providerMessage
+      ? `${error.message} Google said: "${error.providerMessage}"`
+      : error.message;
+
   if (!(error instanceof CustomVoiceProviderError))
     return "The custom voice could not be created. The request failed before it reached the voice provider.";
 
@@ -31,6 +41,8 @@ export function customVoiceFailureMessage(error: unknown): string {
 }
 
 export function customVoiceFailureStatus(error: unknown): number {
+  if (error instanceof SpeechProviderRequestError && error.reason)
+    return speechFailureStatus(error.reason);
   if (!(error instanceof CustomVoiceProviderError)) return 500;
   switch (error.failure) {
     case "recording_rejected":
@@ -42,6 +54,30 @@ export function customVoiceFailureStatus(error: unknown): number {
     case "unauthorized":
       return 503;
     case "provider_error":
+      return 502;
+  }
+}
+
+function speechFailureStatus(reason: string): number {
+  switch (reason) {
+    case "consent_mismatch":
+    case "consent_rejected":
+    case "recording_rejected":
+      return 422;
+    case "quota_exhausted":
+    case "rate_limited":
+      return 429;
+    case "voice_limit":
+      return 409;
+    case "api_key_invalid":
+    case "api_not_enabled":
+    case "permission_denied":
+    case "credits_depleted":
+    case "billing_required":
+    case "location_unsupported":
+    case "model_unavailable":
+      return 503;
+    default:
       return 502;
   }
 }

@@ -60,6 +60,17 @@ export function classifyAudioGenerationError(
       retriable: false,
       providerMayHaveBilled: false,
     };
+  if (error instanceof SpeechProviderRequestError && error.reason)
+    // Diagnosed from the provider's reply: the message already names the
+    // cause in words the user can act on, and retry is decided by the cause.
+    return {
+      category: `provider_${error.reason}`,
+      safeMessage: error.providerMessage
+        ? `${error.message} Google said: "${error.providerMessage}"`
+        : error.message,
+      retriable: error.retriable ?? false,
+      providerMayHaveBilled: false,
+    };
   if (error instanceof SpeechProviderRequestError) {
     const status = error.status ?? 0;
     if (error.code.endsWith("_EMPTY_AUDIO"))

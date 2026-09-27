@@ -1,6 +1,11 @@
 import "server-only";
 
 import { z } from "zod";
+import {
+  diagnoseGeminiFailure,
+  diagnoseGeminiTransportFailure,
+  geminiRequestError,
+} from "@/lib/speech/providers/gemini-error";
 import { SpeechProviderRequestError } from "@/lib/speech/speech-provider";
 
 /**
@@ -88,30 +93,28 @@ export class GeminiVoiceCloningClient {
         signal: controller.signal,
       });
     } catch (error) {
-      throw new SpeechProviderRequestError({
-        code:
-          error instanceof Error && error.name === "AbortError"
-            ? "GEMINI_TIMEOUT"
-            : "GEMINI_UNREACHABLE",
-        message:
-          error instanceof Error
-            ? error.message
-            : "The request did not complete.",
-      });
+      throw geminiRequestError(
+        diagnoseGeminiTransportFailure(
+          error,
+          Math.round((this.input.timeoutMilliseconds ?? 120_000) / 1_000),
+        ),
+      );
     } finally {
       clearTimeout(timeout);
     }
 
-    if (!response.ok) {
-      // The body can echo the submitted audio and account detail, so it is
-      // consumed for the status alone and then discarded.
-      await response.text().catch(() => "");
-      throw new SpeechProviderRequestError({
-        code: `GEMINI_HTTP_${response.status}`,
-        message: describeStatus(response.status),
-        status: response.status,
-      });
-    }
+    if (!response.ok)
+      // The body is read to name the cause; the diagnosis keeps only a
+      // scrubbed, trimmed excerpt of Google's wording, never the raw body.
+      throw geminiRequestError(
+        diagnoseGeminiFailure({
+          httpStatus: response.status,
+          body: await response.text().catch(() => ""),
+          model: this.input.model,
+          operation: init.method === "POST" ? "enroll" : "manage",
+        }),
+        response.headers.get("x-request-id"),
+      );
 
     if (init.method === "DELETE") return null;
     return response.json();
@@ -199,7 +202,10 @@ export class GeminiVoiceCloningClient {
         method: "DELETE",
       });
     } catch (error) {
-      if (error instanceof SpeechProviderRequestError && error.status === 404)
+      if (
+        error instanceof SpeechProviderRequestError &&
+        (error.status === 404 || error.reason === "not_found")
+      )
         return;
       throw error;
     }
@@ -211,16 +217,4 @@ function stripVoiceName(name: string | undefined): string | null {
   if (!name) return null;
   const last = name.split("/").pop();
   return last && last.length > 0 ? last : null;
-}
-
-function describeStatus(status: number): string {
-  if (status === 400)
-    return "Google rejected the recordings. The consent clip must recite the required statement, in the same voice and setting as the sample.";
-  if (status === 401 || status === 403)
-    return "The Google Gemini API key was rejected, or this project cannot create voices.";
-  if (status === 404) return "That voice no longer exists at Google.";
-  if (status === 429)
-    return "Google is rate limiting requests, or this project has reached its voice limit.";
-  if (status >= 500) return "Google could not complete the request.";
-  return "Google refused the request.";
 }
