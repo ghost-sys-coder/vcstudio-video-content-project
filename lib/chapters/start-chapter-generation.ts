@@ -31,6 +31,28 @@ export class ChapterGenerationRequestError extends Error {
   }
 }
 
+const DISPATCH_RETRY_DELAYS_MILLISECONDS = [1_000, 3_000];
+
+/**
+ * Hands the run to Trigger.dev, retrying twice on failure.
+ *
+ * A hand-off from a busy local server has been seen to fail and then succeed
+ * moments later. Retrying is safe because every attempt carries the same
+ * idempotency key: Trigger.dev returns the existing run rather than starting
+ * a second one, so a retry can never bill twice.
+ */
+async function dispatchWithRetry<T>(dispatch: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await dispatch();
+    } catch (error) {
+      const delay = DISPATCH_RETRY_DELAYS_MILLISECONDS[attempt];
+      if (delay === undefined) throw error;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+}
+
 /**
  * Reserve budget for one chapter pass over one render, then queue it.
  *
@@ -144,26 +166,41 @@ export async function startChapterGeneration(input: {
   });
 
   try {
-    const handle = await tasks.trigger<typeof chapterGenerationTask>(
-      "chapter-generation",
-      {
-        chapterGenerationRunId: runId,
-        workspaceId: input.workspaceId,
-        projectId: input.project.id,
-      },
-      { idempotencyKey },
+    const handle = await dispatchWithRetry(() =>
+      tasks.trigger<typeof chapterGenerationTask>(
+        "chapter-generation",
+        {
+          chapterGenerationRunId: runId,
+          workspaceId: input.workspaceId,
+          projectId: input.project.id,
+        },
+        { idempotencyKey },
+      ),
     );
     await attachChapterGenerationTriggerRun({
       chapterGenerationRunId: runId,
       triggerRunId: handle.id,
     });
   } catch (error) {
+    // Kept on the run as well as logged: "could not be queued" alone cannot
+    // tell a rejected key from an unknown task or an unreachable service.
+    const detail =
+      error instanceof Error
+        ? `${error.name}${"status" in error && typeof error.status === "number" ? `:${error.status}` : ""}`
+        : "unknown";
+    console.error("Chapter generation could not be queued", {
+      chapterGenerationRunId: runId,
+      error: detail,
+      message: error instanceof Error ? error.message.slice(0, 500) : null,
+    });
     await failChapterGeneration({
       chapterGenerationRunId: runId,
-      category: "trigger_error",
+      category: `trigger_error:${detail}`.slice(0, 120),
       message: "Chapter generation could not be queued.",
     });
-    throw error;
+    throw new ChapterGenerationRequestError(
+      "Chapter generation could not be queued. Make sure the Trigger.dev worker is running, then try again.",
+    );
   }
 
   return { runId, created: true };

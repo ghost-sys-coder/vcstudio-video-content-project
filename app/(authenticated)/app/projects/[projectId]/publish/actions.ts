@@ -1013,6 +1013,12 @@ export async function generateVideoChaptersAction(
       return { success: false, error: error.message };
     if (error instanceof BudgetExceededError)
       return { success: false, error: budgetMessage(error) };
+    console.error("Chapter generation could not start", {
+      projectId: parsed.data.projectId,
+      renderId: parsed.data.renderId,
+      error: error instanceof Error ? error.name : "unknown",
+      message: error instanceof Error ? error.message.slice(0, 500) : null,
+    });
     return { success: false, error: "The chapters could not be generated." };
   }
 }
