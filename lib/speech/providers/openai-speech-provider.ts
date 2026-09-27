@@ -10,6 +10,7 @@ import {
   type SpeechSynthesisRequest,
   type SpeechSynthesisResult,
 } from "@/lib/speech/speech-provider";
+import { CUSTOM_VOICE_CONSENT_PHRASE } from "@/lib/schemas/scene-audio";
 import type { VoiceCloningCapability } from "@/lib/speech/voice-cloning-capability";
 
 /**
@@ -33,6 +34,10 @@ export class OpenAiSpeechProvider implements SpeechProvider {
   readonly capability: VoiceCloningCapability = {
     kind: "enrolled",
     requiresConsentRecording: true,
+    // The wording the enrolment screen already asks for, now carried by the
+    // provider that needs it rather than fixed in a shared schema constant.
+    consentPhrase: CUSTOM_VOICE_CONSENT_PHRASE,
+    sample: { minimumSeconds: 30, maximumSeconds: 180 },
   };
   readonly maximumCharacters = OPENAI_SPEECH_MAXIMUM_CHARACTERS;
 

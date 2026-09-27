@@ -320,7 +320,7 @@ export const sceneVideoEnvironmentSchema = z.object({
  */
 export const speechProviderEnvironmentSchema = z
   .object({
-    SPEECH_PROVIDER: z.enum(["openai", "magpie"]).default("openai"),
+    SPEECH_PROVIDER: z.enum(["openai", "magpie", "gemini"]).default("openai"),
     /**
      * Where the Magpie endpoint lives. A Speech NIM you run yourself, or an
      * NVIDIA Cloud Function route. No default: pointing narration at the wrong
@@ -348,6 +348,21 @@ export const speechProviderEnvironmentSchema = z
       .min(10)
       .max(600)
       .default(180),
+    /**
+     * Google Gemini. Replicates a voice once from a reference and a consent
+     * recording, then names it by identifier, so no audio travels with a
+     * synthesis request.
+     */
+    GOOGLE_GEMINI_API_KEY: z.string().min(1).optional(),
+    GEMINI_TTS_MODEL: z.string().min(1).default("gemini-3.8-flash-tts"),
+    /** A catalogue voice, used until a replicated one is chosen. */
+    GEMINI_TTS_VOICE: z.string().min(1).default("Kore"),
+    GEMINI_REQUEST_TIMEOUT_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(10)
+      .max(600)
+      .default(180),
   })
   .refine(
     (value) =>
@@ -355,6 +370,16 @@ export const speechProviderEnvironmentSchema = z
     {
       path: ["MAGPIE_BASE_URL"],
       message: "MAGPIE_BASE_URL is required when SPEECH_PROVIDER is magpie.",
+    },
+  )
+  .refine(
+    (value) =>
+      value.SPEECH_PROVIDER !== "gemini" ||
+      Boolean(value.GOOGLE_GEMINI_API_KEY),
+    {
+      path: ["GOOGLE_GEMINI_API_KEY"],
+      message:
+        "GOOGLE_GEMINI_API_KEY is required when SPEECH_PROVIDER is gemini.",
     },
   );
 

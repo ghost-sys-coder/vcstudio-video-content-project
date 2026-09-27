@@ -5,6 +5,8 @@ import {
   getSpeechProviderEnvironment,
 } from "@/lib/env/server";
 import { OpenAiSceneAudioProvider } from "@/lib/openai/scene-audio-provider";
+import { GeminiSpeechProvider } from "@/lib/speech/providers/gemini-speech-provider";
+import { GeminiVoiceCloningClient } from "@/lib/speech/providers/gemini-voice-cloning";
 import { MagpieSpeechProvider } from "@/lib/speech/providers/magpie-speech-provider";
 import { MagpieHttpTransport } from "@/lib/speech/providers/magpie-transport";
 import { OpenAiSpeechProvider } from "@/lib/speech/providers/openai-speech-provider";
@@ -35,6 +37,17 @@ export function createSpeechProvider(id: SpeechProviderId): SpeechProvider {
   }
 
   const speech = getSpeechProviderEnvironment();
+
+  if (id === "gemini") {
+    if (!speech.GOOGLE_GEMINI_API_KEY)
+      throw new Error("GOOGLE_GEMINI_API_KEY is not configured.");
+    return new GeminiSpeechProvider({
+      apiKey: speech.GOOGLE_GEMINI_API_KEY,
+      model: speech.GEMINI_TTS_MODEL,
+      timeoutMilliseconds: speech.GEMINI_REQUEST_TIMEOUT_SECONDS * 1_000,
+    });
+  }
+
   if (!speech.MAGPIE_BASE_URL)
     // Unreachable through configuration, which the schema refuses, but a
     // direct caller could still ask for a provider this deployment cannot
@@ -74,4 +87,23 @@ function magpieHeaders(speech: {
   if (speech.NVIDIA_FUNCTION_ID)
     headers["function-id"] = speech.NVIDIA_FUNCTION_ID;
   return Object.keys(headers).length > 0 ? headers : undefined;
+}
+
+/**
+ * The client that creates replicated voices, when the configured provider
+ * enrols them.
+ *
+ * Separate from `createSpeechProvider` because enrolment and synthesis are
+ * different jobs with different needs: a worker narrating a scene must never
+ * be able to create or delete a voice just by holding a provider.
+ */
+export function createVoiceCloningClient(): GeminiVoiceCloningClient | null {
+  const speech = getSpeechProviderEnvironment();
+  if (speech.SPEECH_PROVIDER !== "gemini") return null;
+  if (!speech.GOOGLE_GEMINI_API_KEY) return null;
+  return new GeminiVoiceCloningClient({
+    apiKey: speech.GOOGLE_GEMINI_API_KEY,
+    model: speech.GEMINI_TTS_MODEL,
+    timeoutMilliseconds: speech.GEMINI_REQUEST_TIMEOUT_SECONDS * 1_000,
+  });
 }

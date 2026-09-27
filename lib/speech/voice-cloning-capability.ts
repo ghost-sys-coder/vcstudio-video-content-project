@@ -15,7 +15,7 @@
  * the habits of whichever provider was configured when it was written.
  */
 
-export type SpeechProviderId = "openai" | "magpie";
+export type SpeechProviderId = "openai" | "magpie" | "gemini";
 
 /** Reference-clip requirements a recorder must satisfy before enrolment. */
 export interface ZeroShotReferenceRequirements {
@@ -35,7 +35,21 @@ export type VoiceCloningCapability =
    * The provider enrols and stores the voice. We keep an identifier, not a
    * recording, and revoking means asking the provider to forget it.
    */
-  | { kind: "enrolled"; requiresConsentRecording: boolean }
+  | {
+      kind: "enrolled";
+      requiresConsentRecording: boolean;
+      /**
+       * The exact words the speaker must say in the consent recording.
+       *
+       * Carried per provider because it names the provider, and at least one
+       * checks it: Gemini refuses a replication whose consent clip does not
+       * recite its own statement. A single hard-coded phrase would silently
+       * fail against every provider but the one it was written for.
+       */
+      consentPhrase: string;
+      /** How long the voice sample should run, in seconds. */
+      sample: { minimumSeconds: number; maximumSeconds: number };
+    }
   /**
    * Nothing is stored provider-side. We hold the reference clip and send it
    * with every request, so deleting our copy is what makes the voice stop
@@ -57,6 +71,25 @@ export const MAGPIE_REFERENCE_REQUIREMENTS: ZeroShotReferenceRequirements = {
   // Zeroshot clones from the audio alone.
   requiresTranscript: false,
 };
+
+/**
+ * Google's mandated wording for a replicated voice.
+ *
+ * Reproduced exactly. The API compares the consent recording against the
+ * reference speaker and against this statement, so paraphrasing it fails the
+ * check rather than merely reading oddly.
+ */
+export const GEMINI_CONSENT_PHRASE =
+  "I am the owner of this voice and I consent to Google using this voice to create a synthetic voice model.";
+
+/**
+ * Google asks for ten to thirty seconds of reference audio, recorded in the
+ * same room and on the same microphone as the consent clip.
+ */
+export const GEMINI_SAMPLE_SECONDS = {
+  minimumSeconds: 10,
+  maximumSeconds: 30,
+} as const;
 
 export function isCloningSupported(
   capability: VoiceCloningCapability,

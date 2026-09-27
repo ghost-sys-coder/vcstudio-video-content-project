@@ -20,6 +20,7 @@ import type { SpeechProviderId } from "@/lib/speech/voice-cloning-capability";
 export const SPEECH_PROVIDER_IDS: readonly SpeechProviderId[] = [
   "openai",
   "magpie",
+  "gemini",
 ] as const;
 
 export function isSpeechProviderId(value: string): value is SpeechProviderId {
