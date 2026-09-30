@@ -29,6 +29,7 @@ export function toSceneAnalysisSegmentHints(
     timecodeLabel: segment.timecode?.raw ?? null,
     narration: segment.narration,
     direction: describeDirection(segment),
+    ...(segment.voice ? { voice: segment.voice } : {}),
   }));
 }
 

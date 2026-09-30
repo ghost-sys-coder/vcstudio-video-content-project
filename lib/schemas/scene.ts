@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { sceneVoiceDirectionSchema } from "@/lib/audio/voice-direction";
 
 export const sceneContentSchema = z.object({
   narrationText: z.string().min(1).max(10000),
@@ -19,6 +20,20 @@ export const sceneAnalysisOutputSchema = z.object({
   scenes: z.array(sceneContentSchema).min(1).max(500),
 });
 
+/**
+ * A scene as a person edits it: its content plus how its narration should be
+ * delivered.
+ *
+ * Kept apart from `sceneContentSchema` on purpose. That schema is also the
+ * structured output the analysis model must fill, and adding delivery fields
+ * there would change what every analysis asks the model for. Direction comes
+ * from the creator — typed in the editor, pasted, or read from their script —
+ * never invented by the model.
+ */
+export const editableSceneContentSchema = sceneContentSchema.extend(
+  sceneVoiceDirectionSchema.shape,
+);
+
 export const approveScriptVersionSchema = z.object({
   projectId: z.uuid(),
   scriptVersionId: z.uuid(),
@@ -31,13 +46,13 @@ export const reconcileSceneAnalysisSchema = z.object({
   analysisRunId: z.uuid(),
 });
 
-export const updateSceneSchema = sceneContentSchema.extend({
+export const updateSceneSchema = editableSceneContentSchema.extend({
   projectId: z.uuid(),
   sceneId: z.uuid(),
   expectedVersion: z.coerce.number().int().positive(),
 });
 
-export const createSceneSchema = sceneContentSchema.extend({
+export const createSceneSchema = editableSceneContentSchema.extend({
   projectId: z.uuid(),
 });
 
@@ -90,4 +105,5 @@ export const mergeScenesSchema = z.object({
 });
 
 export type SceneContent = z.infer<typeof sceneContentSchema>;
+export type EditableSceneContent = z.infer<typeof editableSceneContentSchema>;
 export type SceneAnalysisOutput = z.infer<typeof sceneAnalysisOutputSchema>;

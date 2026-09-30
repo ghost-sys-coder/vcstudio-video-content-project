@@ -5,10 +5,10 @@ export type TimedSceneContent = SceneContent & {
   endTimeMilliseconds: number;
 };
 
-export function calculateSceneTimings(
-  scenes: SceneContent[],
+export function calculateSceneTimings<T extends SceneContent>(
+  scenes: T[],
   limits: { minimum: number; maximum: number },
-): TimedSceneContent[] {
+): (T & { startTimeMilliseconds: number; endTimeMilliseconds: number })[] {
   let cursor = 0;
   return scenes.map((scene) => {
     const duration = Math.min(

@@ -32,6 +32,7 @@ export function SceneNarrationField({
         <CopyButton label="narration" value={value} />
       </div>
       <Textarea
+        aria-describedby={`${id}-hint`}
         defaultValue={defaultValue}
         disabled={disabled}
         id={id}
@@ -39,6 +40,14 @@ export function SceneNarrationField({
         onChange={(event) => setValue(event.target.value)}
         required
       />
+      <p className="text-xs text-muted-foreground" id={`${id}-hint`}>
+        Write <code className="font-mono">[PAUSE: 0.5s]</code> where the
+        narrator should hold a beat: silence that much longer than a normal
+        sentence break. Wrap words in{" "}
+        <code className="font-mono">[RAISE]…[/RAISE]</code> to have the narrator
+        raise their voice on them. Markers are never spoken or shown in
+        captions.
+      </p>
     </div>
   );
 }

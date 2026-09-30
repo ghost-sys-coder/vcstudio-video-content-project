@@ -1,13 +1,16 @@
-import { sceneContentSchema, type SceneContent } from "@/lib/schemas/scene";
+import {
+  editableSceneContentSchema,
+  type EditableSceneContent,
+} from "@/lib/schemas/scene";
 
 /** Compare editorial input only; identity and derived timing are not edits. */
 export function hasSceneContentChanged(
-  before: SceneContent,
-  after: SceneContent,
+  before: EditableSceneContent,
+  after: EditableSceneContent,
 ) {
   return (
-    JSON.stringify(sceneContentSchema.parse(before)) !==
-    JSON.stringify(sceneContentSchema.parse(after))
+    JSON.stringify(editableSceneContentSchema.parse(before)) !==
+    JSON.stringify(editableSceneContentSchema.parse(after))
   );
 }
 
@@ -44,10 +47,14 @@ export class SceneRevisionConflictError extends Error {
   }
 }
 
-/** Speech generation consumes narration; images consume the visual brief. */
+/**
+ * Speech generation consumes narration and its delivery direction; images
+ * consume the visual brief. Changing how a line should be delivered makes the
+ * approved narration stale just as changing the words does.
+ */
 export function sceneMediaCompatibility(
-  before: SceneContent,
-  after: SceneContent,
+  before: EditableSceneContent,
+  after: EditableSceneContent,
 ) {
   const visualFields = [
     "visualDescription",
@@ -62,7 +69,12 @@ export function sceneMediaCompatibility(
     "continuityNotes",
   ] as const;
   return {
-    audio: before.narrationText === after.narrationText,
+    audio:
+      before.narrationText === after.narrationText &&
+      before.voiceTone === after.voiceTone &&
+      before.voicePacing === after.voicePacing &&
+      JSON.stringify(before.voiceEmphasis) ===
+        JSON.stringify(after.voiceEmphasis),
     image: visualFields.every(
       (field) => JSON.stringify(before[field]) === JSON.stringify(after[field]),
     ),

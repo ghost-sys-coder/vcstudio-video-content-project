@@ -1,9 +1,17 @@
 import type { SceneAnalysisSegmentHint } from "@studio/prompts";
+import type { SceneVoiceDirection } from "@/lib/audio/voice-direction";
 import { normalizeNarrationText } from "@/lib/domain/narration-normalization";
-import type { SceneAnalysisOutput } from "@/lib/schemas/scene";
+import type { SceneAnalysisOutput, SceneContent } from "@/lib/schemas/scene";
+
+/**
+ * A planned scene: what the model produced, plus the delivery direction the
+ * creator's script gave it. The model is never asked for direction.
+ */
+export type PlannedScene = SceneContent & Partial<SceneVoiceDirection>;
+export type PlannedSceneOutput = { scenes: PlannedScene[] };
 
 export interface CreatorSceneAssembly {
-  output: SceneAnalysisOutput;
+  output: PlannedSceneOutput;
   /** How many scenes the model had already reproduced exactly. */
   exactFromModel: number;
   /** How many narrations this replaced because the model's drifted. */
@@ -46,7 +54,18 @@ export function assembleScenesFromCreatorSegments(input: {
       normalizeNarrationText(narration)
     )
       exactFromModel += 1;
-    return { ...scene, narrationText: narration };
+    const voice = input.segments[index]?.voice;
+    return {
+      ...scene,
+      narrationText: narration,
+      ...(voice
+        ? {
+            voiceTone: voice.tone,
+            voicePacing: voice.pacing,
+            voiceEmphasis: voice.emphasis,
+          }
+        : {}),
+    };
   });
 
   return {

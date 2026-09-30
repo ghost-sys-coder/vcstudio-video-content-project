@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  normalizeNarration,
   chunkByLength,
   splitIntoSentences,
   wrapCaptionLines,
@@ -53,5 +54,13 @@ describe("chunkByLength", () => {
 describe("wrapCaptionLines", () => {
   it("joins wrapped chunks with newlines", () => {
     expect(wrapCaptionLines("one two three", 7)).toBe("one two\nthree");
+  });
+});
+
+describe("normalizeNarration", () => {
+  it("never shows a pause marker in captions", () => {
+    expect(normalizeNarration("On time.  [PAUSE: 0.5s]\n Yet poorer.")).toBe(
+      "On time. Yet poorer.",
+    );
   });
 });

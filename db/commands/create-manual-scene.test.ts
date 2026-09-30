@@ -26,6 +26,9 @@ const input = {
   propNames: ["chart"],
   continuityNotes: "",
   estimatedDurationMilliseconds: 10000,
+  voiceTone: "Curious, tense",
+  voicePacing: "Deliberate",
+  voiceEmphasis: ["poorer"],
 };
 
 beforeEach(() => state.execute.mockReset());
@@ -48,6 +51,10 @@ describe("manual scene creation command", () => {
     expect(query.params).toContain(input.projectId);
     expect(query.params).toContain(input.userId);
     expect(query.params).toContain(input.narrationText);
+    expect(query.sql).toContain("voice_tone, voice_pacing, voice_emphasis");
+    expect(query.params).toContain(input.voiceTone);
+    expect(query.params).toContain(input.voicePacing);
+    expect(query.params).toContain(JSON.stringify(input.voiceEmphasis));
   });
 
   it("retries a numbering conflict without duplicating a version", async () => {

@@ -19,13 +19,27 @@ import {
   classifyAudioGenerationError,
   shouldRetryAudioGeneration,
 } from "@/lib/openai/audio-generation-error";
-import { OpenAiSceneAudioProvider } from "@/lib/openai/scene-audio-provider";
+import {
+  AUDIO_CONTENT_TYPE_BY_FORMAT,
+  OpenAiSceneAudioProvider,
+} from "@/lib/openai/scene-audio-provider";
 import {
   findStoredSceneAudio,
   putSceneAudio,
 } from "@/lib/storage/scene-audio-storage";
 import { createSceneAudioObjectKey } from "@/lib/storage/object-key";
 import { createSpeechProvider } from "@/lib/speech/create-speech-provider";
+import { parseNarrationParts } from "@/lib/audio/narration-directives";
+import {
+  NarrationSegmentFailure,
+  synthesizeSceneNarration,
+  type SpokenClip,
+} from "@/lib/audio/synthesize-scene-narration";
+import {
+  joinNarrationSegments,
+  NarrationJoinError,
+} from "@/lib/media/join-narration-segments";
+import type { SceneAudioFormat } from "@/lib/schemas/scene-audio";
 
 export const sceneAudioGenerationTaskPayloadSchema = z.object({
   generationId: z.uuid(),
@@ -154,41 +168,75 @@ export const sceneAudioGenerationTask = task({
       // The provider is the one recorded on the generation, which came from the
       // voice preset: a voice cloned at Google can only be spoken by Google,
       // whatever the deployment is configured to narrate new voices with.
-      if (generation.provider === "gemini") {
-        const synthesized = await createSpeechProvider("gemini").synthesize({
-          text: generation.inputText,
-          voice: generation.isCustomVoice
-            ? { kind: "enrolled", providerVoiceId: generation.voice }
-            : { kind: "built_in", name: generation.voice },
-          format: generation.format,
-          speedScaledPercent: generation.speedScaledPercent,
-          language: "en-US",
-          instructions: generation.instructions,
-          endUserId: generation.requestedByUserId,
-        });
-        result = {
-          ...synthesized,
-          requestId: synthesized.requestId ?? providerRequestId,
-        };
-      } else {
-        result = await new OpenAiSceneAudioProvider({
+      const speak = async (
+        text: string,
+        format: SceneAudioFormat,
+      ): Promise<SpokenClip> => {
+        if (generation.provider === "gemini") {
+          const synthesized = await createSpeechProvider("gemini").synthesize({
+            text,
+            voice: generation.isCustomVoice
+              ? { kind: "enrolled", providerVoiceId: generation.voice }
+              : { kind: "built_in", name: generation.voice },
+            format,
+            speedScaledPercent: generation.speedScaledPercent,
+            language: "en-US",
+            instructions: generation.instructions,
+            endUserId: generation.requestedByUserId,
+          });
+          return {
+            ...synthesized,
+            requestId: synthesized.requestId ?? providerRequestId,
+          };
+        }
+        return new OpenAiSceneAudioProvider({
           apiKey: environment.OPENAI_API_KEY,
           timeoutMilliseconds:
             environment.OPENAI_REQUEST_TIMEOUT_SECONDS * 1_000,
         }).generate({
           model: generation.model,
-          text: generation.inputText,
+          text,
           voice: generation.isCustomVoice
             ? { kind: "custom", id: generation.voice }
             : { kind: "built_in", name: generation.voice },
-          format: generation.format,
+          format,
           speedScaledPercent: generation.speedScaledPercent,
           instructions: generation.instructions,
           endUserId: generation.requestedByUserId,
         });
-      }
+      };
+      // Pause markers in the narration become exact silences: each spoken
+      // part is voiced separately and the parts are joined around them.
+      result = await synthesizeSceneNarration({
+        parts: parseNarrationParts(generation.inputText),
+        format: generation.format,
+        speak,
+        join: (parts, format) =>
+          joinNarrationSegments({
+            parts,
+            format,
+            ffmpegPath: environment.FFMPEG_PATH,
+          }),
+        contentTypeFor: (format) => AUDIO_CONTENT_TYPE_BY_FORMAT[format],
+      });
     } catch (error) {
-      const failure = classifyAudioGenerationError(error);
+      // A join failure happens after every part was voiced and paid for; a
+      // segment failure after earlier parts were. Neither may be reported as
+      // free, and a failed join is not worth paying to repeat.
+      const failure =
+        error instanceof NarrationJoinError
+          ? {
+              category: "narration_join_failed",
+              safeMessage: error.message,
+              retriable: false,
+              providerMayHaveBilled: true,
+            }
+          : error instanceof NarrationSegmentFailure
+            ? {
+                ...classifyAudioGenerationError(error.cause),
+                providerMayHaveBilled: true,
+              }
+            : classifyAudioGenerationError(error);
       if (
         shouldRetryAudioGeneration({
           failure,

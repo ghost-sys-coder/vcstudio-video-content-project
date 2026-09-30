@@ -2,12 +2,12 @@ import "server-only";
 
 import { sql } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
-import type { SceneContent } from "@/lib/schemas/scene";
+import type { EditableSceneContent } from "@/lib/schemas/scene";
 import { SceneRevisionConflictError } from "@/lib/domain/scene-revision";
 
 /** One statement: losing the optimistic claim cannot insert an orphan revision. */
 export async function saveSceneRevision(
-  input: SceneContent & {
+  input: EditableSceneContent & {
     workspaceId: string;
     projectId: string;
     sceneId: string;
@@ -41,14 +41,17 @@ export async function saveSceneRevision(
         id, workspace_id, project_id, scene_id, version_number,
         narration_text, visual_description, location_description, action_description,
         camera_shot, camera_angle, camera_motion, emotional_tone,
-        character_names, prop_names, continuity_notes, estimated_duration_milliseconds,
+        character_names, prop_names, continuity_notes,
+        voice_tone, voice_pacing, voice_emphasis, estimated_duration_milliseconds,
         start_time_milliseconds, end_time_milliseconds, created_by_user_id
       ) select ${versionId}::uuid, ${input.workspaceId}::uuid, ${input.projectId}::uuid,
         id, current_version, ${input.narrationText}, ${input.visualDescription},
         ${input.locationDescription}, ${input.actionDescription}, ${input.cameraShot},
         ${input.cameraAngle}, ${input.cameraMotion}, ${input.emotionalTone},
         ${JSON.stringify(input.characterNames)}::jsonb, ${JSON.stringify(input.propNames)}::jsonb,
-        ${input.continuityNotes}, ${input.estimatedDurationMilliseconds},
+        ${input.continuityNotes},
+        ${input.voiceTone}, ${input.voicePacing}, ${JSON.stringify(input.voiceEmphasis)}::jsonb,
+        ${input.estimatedDurationMilliseconds},
         ${input.startTimeMilliseconds},
         ${input.startTimeMilliseconds + input.estimatedDurationMilliseconds}, ${input.userId}::uuid
       from claimed returning id

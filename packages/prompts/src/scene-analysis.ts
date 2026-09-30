@@ -25,6 +25,12 @@ export interface SceneAnalysisSegmentHint {
   narration: string;
   /** The creator's visual, on-screen-text and audio direction, if any. */
   direction: string;
+  /**
+   * How the segment should be voiced, when the script said so. Carried to the
+   * scene that is created, never rendered into this prompt: delivery is the
+   * creator's instruction to the narrator, not material for the storyboard.
+   */
+  voice?: { tone: string; pacing: string; emphasis: string[] };
 }
 
 /**

@@ -1,4 +1,9 @@
-import { sceneContentSchema, type SceneContent } from "@/lib/schemas/scene";
+import { parseEmphasisList } from "@/lib/audio/voice-direction";
+import {
+  editableSceneContentSchema,
+  type EditableSceneContent,
+  type SceneContent,
+} from "@/lib/schemas/scene";
 
 /**
  * Turns pasted JSON into scenes, forgivingly about shape and strict about
@@ -54,6 +59,47 @@ const ALIASES: Readonly<Record<keyof SceneContent, readonly string[]>> = {
   ],
 };
 
+/**
+ * How narration should be delivered. `tone` is deliberately absent: it already
+ * means the scene's emotional tone for the picture, and a paste that uses it
+ * keeps meaning exactly that.
+ */
+const VOICE_ALIASES = {
+  voiceTone: [
+    "voice_tone",
+    "toneDirective",
+    "tone_directive",
+    "deliveryTone",
+    "delivery_tone",
+    "delivery",
+  ],
+  voicePacing: [
+    "voice_pacing",
+    "pacing",
+    "pace",
+    "pacingGuidance",
+    "pacing_guidance",
+  ],
+  voiceEmphasis: [
+    "voice_emphasis",
+    "emphasis",
+    "keyVocalEmphasis",
+    "key_vocal_emphasis",
+    "vocalEmphasis",
+    "vocal_emphasis",
+  ],
+} as const;
+
+function readVoiceField(
+  row: Record<string, unknown>,
+  key: keyof typeof VOICE_ALIASES,
+): unknown {
+  if (row[key] !== undefined) return row[key];
+  for (const alias of VOICE_ALIASES[key])
+    if (row[alias] !== undefined) return row[alias];
+  return undefined;
+}
+
 /** Duration written in seconds, which is how most people think about it. */
 const SECOND_ALIASES = [
   "durationSeconds",
@@ -70,7 +116,7 @@ export interface PastedSceneIssue {
 }
 
 export type ParsePastedScenesResult =
-  | { ok: true; scenes: SceneContent[] }
+  | { ok: true; scenes: EditableSceneContent[] }
   | { ok: false; issues: PastedSceneIssue[]; summary: string };
 
 function failure(summary: string, issues: PastedSceneIssue[] = []) {
@@ -151,6 +197,14 @@ function normalize(row: Record<string, unknown>): Record<string, unknown> {
     propNames: readNameList(readField(row, "propNames")) ?? [],
     continuityNotes: String(readField(row, "continuityNotes") ?? "").trim(),
     estimatedDurationMilliseconds: readDuration(row, narration),
+    voiceTone: String(readVoiceField(row, "voiceTone") ?? "").trim(),
+    voicePacing: String(readVoiceField(row, "voicePacing") ?? "").trim(),
+    voiceEmphasis: (() => {
+      const value = readVoiceField(row, "voiceEmphasis");
+      if (Array.isArray(value))
+        return parseEmphasisList(value.map(String).join(","));
+      return parseEmphasisList(typeof value === "string" ? value : "");
+    })(),
   };
 }
 
@@ -196,11 +250,11 @@ export function parsePastedScenes(input: string): ParsePastedScenesResult {
       `That is ${rows.length} scenes and the limit is ${MAXIMUM_PASTED_SCENES}. Split it into smaller pastes.`,
     );
 
-  const scenes: SceneContent[] = [];
+  const scenes: EditableSceneContent[] = [];
   const issues: PastedSceneIssue[] = [];
 
   for (const [index, row] of rows.entries()) {
-    const result = sceneContentSchema.safeParse(normalize(row));
+    const result = editableSceneContentSchema.safeParse(normalize(row));
     if (result.success) {
       scenes.push(result.data);
       continue;

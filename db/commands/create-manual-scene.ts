@@ -2,7 +2,7 @@ import "server-only";
 
 import { sql } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
-import type { SceneContent } from "@/lib/schemas/scene";
+import type { EditableSceneContent } from "@/lib/schemas/scene";
 
 export class ManualSceneCreationError extends Error {
   constructor() {
@@ -19,7 +19,7 @@ export class ManualSceneCreationError extends Error {
  * analysis retains the existing replacement semantics for the visible plan.
  */
 export async function createManualScene(
-  input: SceneContent & {
+  input: EditableSceneContent & {
     workspaceId: string;
     projectId: string;
     userId: string;
@@ -75,6 +75,7 @@ export async function createManualScene(
         narration_text, visual_description, location_description,
         action_description, camera_shot, camera_angle, camera_motion,
         emotional_tone, character_names, prop_names, continuity_notes,
+        voice_tone, voice_pacing, voice_emphasis,
         estimated_duration_milliseconds, start_time_milliseconds,
         end_time_milliseconds, created_by_user_id
       )
@@ -85,6 +86,8 @@ export async function createManualScene(
         ${input.cameraShot}, ${input.cameraAngle}, ${input.cameraMotion},
         ${input.emotionalTone}, ${JSON.stringify(input.characterNames)}::jsonb,
         ${JSON.stringify(input.propNames)}::jsonb, ${input.continuityNotes},
+        ${input.voiceTone}, ${input.voicePacing},
+        ${JSON.stringify(input.voiceEmphasis)}::jsonb,
         ${input.estimatedDurationMilliseconds}, n.start_time,
         n.start_time + ${input.estimatedDurationMilliseconds}, ${input.userId}::uuid
       from created cross join numbered n returning scene_id

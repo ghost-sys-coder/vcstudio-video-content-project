@@ -2348,6 +2348,17 @@ export const sceneVersions = pgTable(
     characterNames: jsonb("character_names").$type<string[]>().notNull(),
     propNames: jsonb("prop_names").$type<string[]>().notNull(),
     continuityNotes: text("continuity_notes").notNull(),
+    /**
+     * How the narration should be delivered, per scene: tone, pacing, and the
+     * words to stress. Empty for scenes written before direction existed, which
+     * are then voiced exactly as before.
+     */
+    voiceTone: text("voice_tone").notNull().default(""),
+    voicePacing: text("voice_pacing").notNull().default(""),
+    voiceEmphasis: jsonb("voice_emphasis")
+      .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
     estimatedDurationMilliseconds: integer(
       "estimated_duration_milliseconds",
     ).notNull(),

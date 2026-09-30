@@ -15,9 +15,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import type { SceneContent } from "@/lib/schemas/scene";
+import type { EditableSceneContent } from "@/lib/schemas/scene";
 
-const EMPTY_SCENE: SceneContent = {
+const EMPTY_SCENE: EditableSceneContent = {
   narrationText: "",
   visualDescription: "",
   locationDescription: "",
@@ -30,6 +30,9 @@ const EMPTY_SCENE: SceneContent = {
   propNames: [],
   continuityNotes: "",
   estimatedDurationMilliseconds: 10000,
+  voiceTone: "",
+  voicePacing: "",
+  voiceEmphasis: [],
 };
 
 export function CreateSceneDialog({
