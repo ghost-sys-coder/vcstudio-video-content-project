@@ -2,14 +2,16 @@ import {
   renderSceneAnalysisRepairPrompt,
   type SceneAnalysisSegmentHint,
 } from "@studio/prompts";
-import { assembleScenesFromCreatorSegments } from "@/lib/scenes/assemble-creator-scenes";
+import {
+  assembleScenesFromCreatorSegments,
+  type PlannedSceneOutput,
+} from "@/lib/scenes/assemble-creator-scenes";
 import {
   checkNarrationCoverage,
   MAX_SCENE_ANALYSIS_REPAIR_ATTEMPTS,
   type NarrationCoverageResult,
 } from "@/lib/domain/narration-coverage";
 import type { SceneAnalysisProviderResult } from "@/lib/openai/text-generation-provider";
-import type { SceneAnalysisOutput } from "@/lib/schemas/scene";
 
 /** The single provider capability this needs, so tests can supply a fake. */
 export interface SceneAnalysisGenerator {
@@ -28,7 +30,7 @@ export interface SceneAnalysisUsage {
 }
 
 export type ValidatedScenePlanResult =
-  | { ok: true; output: SceneAnalysisOutput; usage: SceneAnalysisUsage }
+  | { ok: true; output: PlannedSceneOutput; usage: SceneAnalysisUsage }
   | {
       ok: false;
       reason: "narration_fidelity";
@@ -101,7 +103,7 @@ export async function generateValidatedScenePlan(input: {
           segments: input.segments,
         })
       : null;
-    const output = assembled?.output ?? result.output;
+    const output: PlannedSceneOutput = assembled?.output ?? result.output;
 
     const coverage = checkNarrationCoverage({
       approvedScript: input.approvedScript,

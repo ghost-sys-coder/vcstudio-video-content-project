@@ -1,4 +1,4 @@
-import type { SceneContent } from "@/lib/schemas/scene";
+import type { EditableSceneContent } from "@/lib/schemas/scene";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -7,13 +7,14 @@ import { SceneVisualDescriptionField } from "@/components/scenes/SceneVisualDesc
 import { SceneCameraControls } from "@/components/scenes/SceneCameraControls";
 import { SceneCharacterSelector } from "@/components/scenes/SceneCharacterSelector";
 import { SceneDurationField } from "@/components/scenes/SceneDurationField";
+import { SceneVoiceDirectionFields } from "@/components/scenes/SceneVoiceDirectionFields";
 
 export function SceneContentFields({
   content,
   disabled,
   idPrefix,
 }: {
-  content: SceneContent;
+  content: EditableSceneContent;
   disabled: boolean;
   idPrefix: string;
 }) {
@@ -23,6 +24,13 @@ export function SceneContentFields({
         defaultValue={content.narrationText}
         disabled={disabled}
         id={`${idPrefix}-narrationText`}
+      />
+      <SceneVoiceDirectionFields
+        disabled={disabled}
+        emphasis={content.voiceEmphasis}
+        idPrefix={idPrefix}
+        pacing={content.voicePacing}
+        tone={content.voiceTone}
       />
       <SceneVisualDescriptionField
         defaultValue={content.visualDescription}

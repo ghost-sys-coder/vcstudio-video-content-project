@@ -12,7 +12,8 @@ import {
   sceneVersionCharacters,
   usageReservations,
 } from "@/db/schema";
-import type { SceneContent, SceneAnalysisOutput } from "@/lib/schemas/scene";
+import type { EditableSceneContent } from "@/lib/schemas/scene";
+import type { PlannedSceneOutput } from "@/lib/scenes/assemble-creator-scenes";
 import { calculateSceneTimings } from "@/lib/domain/scene-timing";
 import { listCurrentScenes } from "@/db/repositories/scenes.repository";
 import { findProjectScriptVersion } from "@/db/repositories/projects.repository";
@@ -283,7 +284,7 @@ export async function completeSceneAnalysis(input: {
   projectId: string;
   scriptVersionId: string;
   userId: string;
-  output: SceneAnalysisOutput;
+  output: PlannedSceneOutput;
   inputTokens: number;
   outputTokens: number;
   actualCostCents: number;
@@ -310,6 +311,11 @@ export async function completeSceneAnalysis(input: {
     sceneId: sceneRows[index]!.id,
     versionNumber: 1,
     ...scene,
+    // Stated explicitly rather than trusted to the spread: a scene from a
+    // script with no delivery direction still needs its empty defaults.
+    voiceTone: scene.voiceTone ?? "",
+    voicePacing: scene.voicePacing ?? "",
+    voiceEmphasis: scene.voiceEmphasis ?? [],
     createdByUserId: input.userId,
   }));
   await getDatabase().batch([
@@ -462,7 +468,7 @@ export async function failSceneAnalysisWithUsage(input: {
 }
 
 export async function updateScene(
-  input: SceneContent & {
+  input: EditableSceneContent & {
     workspaceId: string;
     projectId: string;
     sceneId: string;

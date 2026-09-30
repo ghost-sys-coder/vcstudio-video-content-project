@@ -96,7 +96,8 @@ export async function mergeScenesAndRenumber(input: {
           id, workspace_id, project_id, scene_id, version_number,
           narration_text, visual_description, location_description, action_description,
           camera_shot, camera_angle, camera_motion, emotional_tone,
-          character_names, prop_names, continuity_notes, estimated_duration_milliseconds,
+          character_names, prop_names, continuity_notes,
+          voice_tone, voice_pacing, voice_emphasis, estimated_duration_milliseconds,
           start_time_milliseconds, end_time_milliseconds, created_by_user_id
         )
         select ${versionId}::uuid, ${input.workspaceId}::uuid, ${input.projectId}::uuid,
@@ -105,6 +106,7 @@ export async function mergeScenesAndRenumber(input: {
           previous.visual_description, previous.location_description, previous.action_description,
           previous.camera_shot, previous.camera_angle, previous.camera_motion, previous.emotional_tone,
           previous.character_names, previous.prop_names, previous.continuity_notes,
+          previous.voice_tone, previous.voice_pacing, previous.voice_emphasis,
           ${plan.mergedDurationMilliseconds},
           ${plan.startTimeMilliseconds}, ${endTimeMilliseconds}, ${input.userId}::uuid
         from claimed join previous on previous.scene_id = claimed.id

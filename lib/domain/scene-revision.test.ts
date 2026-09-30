@@ -5,7 +5,7 @@ import {
   sceneMediaCompatibility,
 } from "./scene-revision";
 import { createProductionBaselineFixture } from "@/lib/test-utils/version-two-production-fixture";
-import { sceneContentSchema } from "@/lib/schemas/scene";
+import { editableSceneContentSchema } from "@/lib/schemas/scene";
 import { parseSceneEditorInput } from "@/lib/scenes/scene-editor-input";
 
 describe("scene revision content and timing", () => {
@@ -55,8 +55,8 @@ describe("scene revision content and timing", () => {
   });
   it("compares every editorial field, including array order and empty notes", () => {
     const version = createProductionBaselineFixture().rows[0]!.version;
-    for (const field of Object.keys(sceneContentSchema.shape)) {
-      const record = sceneContentSchema.parse(version);
+    for (const field of Object.keys(editableSceneContentSchema.shape)) {
+      const record = editableSceneContentSchema.parse(version);
       const changed = Object.fromEntries(
         Object.entries(record).map(([key, value]) => [
           key,
@@ -70,7 +70,10 @@ describe("scene revision content and timing", () => {
         ]),
       );
       expect(
-        hasSceneContentChanged(record, sceneContentSchema.parse(changed)),
+        hasSceneContentChanged(
+          record,
+          editableSceneContentSchema.parse(changed),
+        ),
         field,
       ).toBe(true);
     }
@@ -92,7 +95,11 @@ describe("scene revision content and timing", () => {
     const target = rows[0]!;
     const form = new FormData();
     for (const [key, value] of Object.entries(
-      sceneContentSchema.parse(target.version),
+      editableSceneContentSchema.parse({
+        ...target.version,
+        voiceTone: "Curious, tense",
+        voiceEmphasis: ["poorer", "missing piece"],
+      }),
     ))
       form.set(key, Array.isArray(value) ? value.join(", ") : String(value));
     form.set("projectId", target.scene.projectId);
@@ -101,6 +108,26 @@ describe("scene revision content and timing", () => {
     const parsed = parseSceneEditorInput(form);
     expect(parsed.success).toBe(true);
     if (parsed.success)
-      expect(hasSceneContentChanged(target.version, parsed.data)).toBe(false);
+      expect(
+        hasSceneContentChanged(
+          {
+            ...target.version,
+            voiceTone: "Curious, tense",
+            voiceEmphasis: ["poorer", "missing piece"],
+          },
+          parsed.data,
+        ),
+      ).toBe(false);
+  });
+  it("treats a change of delivery direction as making approved narration stale", () => {
+    const version = createProductionBaselineFixture().rows[0]!.version;
+    const before = editableSceneContentSchema.parse(version);
+    expect(
+      sceneMediaCompatibility(before, { ...before, voicePacing: "Staccato" }),
+    ).toEqual({ audio: false, image: true });
+    expect(
+      sceneMediaCompatibility(before, { ...before, voiceEmphasis: ["poorer"] })
+        .audio,
+    ).toBe(false);
   });
 });

@@ -1,4 +1,5 @@
 import type { VideoChaptersPromptScene } from "@studio/prompts";
+import { stripNarrationDirectives } from "@/lib/audio/narration-directives";
 import {
   formatChapterTimestamp,
   type ChapterSceneTiming,
@@ -40,7 +41,9 @@ export function describeRenderForChapters(
       .join(" ");
     let narration = captioned;
     if (narration === "") {
-      narration = currentNarrationBySceneId.get(scene.sceneId) ?? "";
+      narration = stripNarrationDirectives(
+        currentNarrationBySceneId.get(scene.sceneId) ?? "",
+      );
       if (narration !== "") scenesFromCurrentNarration += 1;
     }
     return {

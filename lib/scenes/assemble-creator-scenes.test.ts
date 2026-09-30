@@ -141,3 +141,35 @@ describe("the production failure can no longer happen", () => {
     expect(result.ok).toBe(false);
   });
 });
+
+describe("delivery direction from the creator's script", () => {
+  it("is attached to each scene, never asked of the model", () => {
+    const assembled = assembleScenesFromCreatorSegments({
+      output: { scenes: [scene("drifted"), scene("also drifted")] },
+      segments: [
+        {
+          number: 1,
+          title: "Hook",
+          timecodeLabel: null,
+          narration: "First. [PAUSE: 0.5s] Line.",
+          direction: "",
+          voice: { tone: "Tense", pacing: "Slow", emphasis: ["First"] },
+        },
+        {
+          number: 2,
+          title: "Close",
+          timecodeLabel: null,
+          narration: "Second.",
+          direction: "",
+        },
+      ],
+    });
+    expect(assembled?.output.scenes[0]).toMatchObject({
+      narrationText: "First. [PAUSE: 0.5s] Line.",
+      voiceTone: "Tense",
+      voicePacing: "Slow",
+      voiceEmphasis: ["First"],
+    });
+    expect(assembled?.output.scenes[1]?.voiceTone).toBeUndefined();
+  });
+});

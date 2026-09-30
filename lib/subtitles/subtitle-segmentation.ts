@@ -1,3 +1,5 @@
+import { stripNarrationDirectives } from "@/lib/audio/narration-directives";
+
 /**
  * Deterministic subtitle text segmentation.
  *
@@ -6,8 +8,12 @@
  * duration across the produced text chunks (see `subtitle-track.ts`).
  */
 
+/**
+ * The narration as captions show it: whitespace collapsed, and timing markers
+ * such as `[PAUSE: 0.5s]` removed. A pause is heard as silence, never read.
+ */
 export function normalizeNarration(text: string): string {
-  return text.replace(/\s+/g, " ").trim();
+  return stripNarrationDirectives(text);
 }
 
 /**

@@ -252,3 +252,35 @@ describe("the published template", () => {
       );
   });
 });
+
+describe("voice direction", () => {
+  it("reads delivery direction under the names people write", () => {
+    const result = parsePastedScenes(
+      JSON.stringify({
+        ...complete,
+        tone_directive: "Curious, tense",
+        pacing: "Deliberate",
+        key_vocal_emphasis: "poorer, missing piece",
+      }),
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok)
+      expect(result.scenes[0]).toMatchObject({
+        voiceTone: "Curious, tense",
+        voicePacing: "Deliberate",
+        voiceEmphasis: ["poorer", "missing piece"],
+        // "tone" keeps meaning the picture's emotional tone.
+        emotionalTone: "Sober",
+      });
+  });
+
+  it("defaults to no direction when a paste gives none", () => {
+    const result = parsePastedScenes(JSON.stringify(complete));
+    if (result.ok)
+      expect(result.scenes[0]).toMatchObject({
+        voiceTone: "",
+        voicePacing: "",
+        voiceEmphasis: [],
+      });
+  });
+});

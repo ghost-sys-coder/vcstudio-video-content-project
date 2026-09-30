@@ -1,4 +1,4 @@
-import type { SceneContent } from "@/lib/schemas/scene";
+import type { EditableSceneContent } from "@/lib/schemas/scene";
 
 /**
  * The shape of a scene, as something a creator can hold in their hands.
@@ -12,7 +12,7 @@ import type { SceneContent } from "@/lib/schemas/scene";
  * narrates the template's placeholder text is worse than an empty one: it looks
  * finished.
  */
-export const SCENE_TEMPLATE: SceneContent = {
+export const SCENE_TEMPLATE: EditableSceneContent = {
   narrationText: "",
   visualDescription: "",
   locationDescription: "",
@@ -27,18 +27,22 @@ export const SCENE_TEMPLATE: SceneContent = {
   // Only a starting point. Left out entirely, it is estimated from the
   // narration; either way the finished video is timed by the recording.
   estimatedDurationMilliseconds: 10_000,
+  voiceTone: "",
+  voicePacing: "",
+  voiceEmphasis: [],
 };
 
 /** What each field is for, shown beside the template rather than guessed at. */
 export const SCENE_FIELD_GUIDE: ReadonlyArray<{
-  field: keyof SceneContent;
+  field: keyof EditableSceneContent;
   required: boolean;
   description: string;
 }> = [
   {
     field: "narrationText",
     required: true,
-    description: "The words spoken aloud in this scene.",
+    description:
+      "The words spoken aloud in this scene. Write [PAUSE: 0.5s] for an exact pause.",
   },
   {
     field: "visualDescription",
@@ -96,6 +100,23 @@ export const SCENE_FIELD_GUIDE: ReadonlyArray<{
     required: false,
     description:
       "A planning estimate. Omit it and it is worked out from the narration.",
+  },
+  {
+    field: "voiceTone",
+    required: false,
+    description:
+      "How the narrator should sound, such as curious, tense, intriguing.",
+  },
+  {
+    field: "voicePacing",
+    required: false,
+    description: "How fast and how evenly, such as deliberate, building.",
+  },
+  {
+    field: "voiceEmphasis",
+    required: false,
+    description:
+      "Words or phrases to stress. A list, or a comma-separated line.",
   },
 ];
 

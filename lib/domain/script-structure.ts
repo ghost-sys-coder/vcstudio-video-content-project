@@ -24,6 +24,9 @@
  * pasted script behaves the way it always has.
  */
 
+import { isNarrationDeliveryMarker } from "@/lib/audio/narration-directives";
+import { parseLabelledSceneScript } from "@/lib/domain/labelled-scene-script";
+
 /** What a bracketed marker means for the narration track. */
 export type ScriptDirectiveKind =
   /** Spoken aloud. The only kind that reaches narration. */
@@ -63,6 +66,11 @@ export interface ScriptSegment {
   narration: string;
   /** Everything not spoken, kept so it can be shown and used downstream. */
   directives: ScriptDirective[];
+  /**
+   * How this segment should be voiced, when the script said so. Only scripts
+   * written as labelled scenes carry it; see `parseLabelledSceneScript`.
+   */
+  voice?: { tone: string; pacing: string; emphasis: string[] };
 }
 
 export interface ScriptStructure {
@@ -303,6 +311,13 @@ function readRegions(content: string): Region[] {
     const speaker = match[2];
 
     if (bracketed !== undefined) {
+      // A pause or a raised-voice span is delivery inside the spoken line, not
+      // direction beside it. It stays in the narration exactly as written and
+      // the narration step resolves it; excluding it here silently lost every
+      // pause, and a "[RAISE]" read as an unknown marker would have cut the
+      // rest of the line out of the narration.
+      if (isNarrationDeliveryMarker(bracketed)) continue;
+
       // A timecode heading is tested first: it carries no letters at all, and
       // "End" carries lower-case ones, so the label-shape gate below would
       // reject every heading in a normally written script.
@@ -385,6 +400,9 @@ function join(parts: string[]): string {
 }
 
 export function parseScriptStructure(content: string): ScriptStructure {
+  const labelled = parseLabelledSceneScript(content, parseScriptTimecode);
+  if (labelled) return labelled;
+
   const regions = readRegions(content);
   const marked = regions.filter((region) => region.label !== null);
 

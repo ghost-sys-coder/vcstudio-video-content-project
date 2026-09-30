@@ -62,6 +62,9 @@ export function createProductionBaselineFixture(
     };
     const version: SceneVersion = {
       ...content,
+      voiceTone: "",
+      voicePacing: "",
+      voiceEmphasis: [],
       id: versionId,
       workspaceId: BASELINE_SCOPE.workspaceId,
       projectId: BASELINE_SCOPE.projectId,

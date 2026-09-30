@@ -32,6 +32,31 @@ describe("buildSceneNarrationInput", () => {
     ).toThrow(NarrationInputError);
   });
 
+  it("keeps pause markers in the text but neither speaks nor bills them", () => {
+    const result = buildSceneNarrationInput({
+      narrationText: "On time. [PAUSE: 0.5s] Yet poorer.",
+      maximumCharacters: 100,
+    });
+    expect(result.text).toBe("On time. [PAUSE: 0.5s] Yet poorer.");
+    expect(result.characterCount).toBe(
+      "On time.".length + "Yet poorer.".length,
+    );
+    expect(result.parts).toEqual([
+      { kind: "speech", text: "On time." },
+      { kind: "pause", milliseconds: 500 },
+      { kind: "speech", text: "Yet poorer." },
+    ]);
+  });
+
+  it("rejects narration that is only pauses", () => {
+    expect(() =>
+      buildSceneNarrationInput({
+        narrationText: "[PAUSE: 1s]",
+        maximumCharacters: 100,
+      }),
+    ).toThrow(NarrationInputError);
+  });
+
   it("rejects an invalid maximum", () => {
     expect(() =>
       buildSceneNarrationInput({ narrationText: "hi", maximumCharacters: 0 }),

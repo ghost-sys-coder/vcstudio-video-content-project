@@ -1,3 +1,4 @@
+import { parseEmphasisList } from "@/lib/audio/voice-direction";
 import { createSceneSchema, updateSceneSchema } from "@/lib/schemas/scene";
 
 function readSceneFields(formData: FormData) {
@@ -11,6 +12,7 @@ function readSceneFields(formData: FormData) {
     ...raw,
     characterNames: names(raw.characterNames),
     propNames: names(raw.propNames),
+    voiceEmphasis: parseEmphasisList(String(raw.voiceEmphasis ?? "")),
     estimatedDurationMilliseconds: Number(raw.estimatedDurationMilliseconds),
   };
 }

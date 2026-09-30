@@ -25,6 +25,8 @@ import {
   buildSceneNarrationInput,
   NarrationInputError,
 } from "@/lib/audio/narration-input";
+import { composeVoiceInstructions } from "@/lib/audio/voice-direction";
+import { extractRaisedPhrases } from "@/lib/audio/narration-directives";
 import {
   calculateAvailableSceneImageBudgetCents,
   getUtcBudgetWindowStarts,
@@ -139,6 +141,8 @@ export async function startSceneAudioGeneration(input: {
     text: string;
     characterCount: number;
     estimatedCostCents: number;
+    /** The preset's instructions plus this scene's own delivery direction. */
+    instructions: string;
   }> = [];
   for (const sceneId of requestedSceneIds) {
     const row = sceneById.get(sceneId);
@@ -160,6 +164,11 @@ export async function startSceneAudioGeneration(input: {
       row,
       text: narration.text,
       characterCount: narration.characterCount,
+      instructions: composeVoiceInstructions({
+        presetInstructions: voicePreset.instructions,
+        direction: row.version,
+        raisedPhrases: extractRaisedPhrases(row.version.narrationText),
+      }),
       estimatedCostCents: estimateSceneAudioCostCents({
         characterCount: narration.characterCount,
         rates: {
@@ -220,7 +229,6 @@ export async function startSceneAudioGeneration(input: {
     voicePreset.voice,
     voicePreset.format,
     String(voicePreset.speedScaledPercent),
-    voicePreset.instructions,
   ].join("");
 
   for (const plan of plans) {
@@ -254,7 +262,9 @@ export async function startSceneAudioGeneration(input: {
       });
       const requestFingerprint = createRequestFingerprint(
         environment.REQUEST_FINGERPRINT_SECRET,
-        `${plan.text}${voiceFingerprintSuffix}`,
+        // The scene's combined instructions, not only the preset's: the same
+        // words delivered differently are a different request.
+        `${plan.text}${voiceFingerprintSuffix}${plan.instructions}`,
       );
       try {
         const reservation = await createSceneAudioGenerationReservation({
@@ -275,7 +285,7 @@ export async function startSceneAudioGeneration(input: {
           isCustomVoice: voicePreset.customVoiceId !== null,
           format: voicePreset.format,
           speedScaledPercent: voicePreset.speedScaledPercent,
-          instructions: voicePreset.instructions,
+          instructions: plan.instructions,
           sampleRate: voicePreset.sampleRate,
           inputText: plan.text,
           inputCharacterCount: plan.characterCount,
