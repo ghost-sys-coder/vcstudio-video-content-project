@@ -17,21 +17,14 @@ import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import { getMarketingEnvironment } from "@/lib/env/server";
 import { isMarketingStudioEnabledForWorkspace } from "@/lib/marketing/marketing-access";
 import { can, canManageWorkspace } from "@/lib/policies/workspace-policy";
-import { loadWorkspaceChannelsView } from "@/lib/publishing/workspace-connections-view";
+import { getLegacyConnectionsRedirect } from "@/lib/publishing/connections-navigation";
 import { createWorkspaceLogoDownloadUrl } from "@/lib/storage/workspace-logo-storage";
 import { buildStylePresetSettingsView } from "@/lib/styles/style-preset-view";
 
 export default async function WorkspaceSettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{
-    facebook?: string;
-    instagram?: string;
-    linkedin?: string;
-    tiktok?: string;
-    x?: string;
-    youtube?: string;
-  }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const context = await getAuthenticatedWorkspaceContext();
   if (!context) redirect("/onboarding");
@@ -39,10 +32,11 @@ export default async function WorkspaceSettingsPage({
     redirect("/app/access-denied");
   }
 
+  const connectionsRedirect = getLegacyConnectionsRedirect(await searchParams);
+  if (connectionsRedirect) redirect(connectionsRedirect);
+
   const [
-    { facebook, instagram, linkedin, tiktok, x, youtube },
     logo,
-    channelsView,
     members,
     pendingInvitations,
     marketingStudioEnabled,
@@ -52,11 +46,7 @@ export default async function WorkspaceSettingsPage({
     projectCountsByChannel,
     stylePresetRows,
   ] = await Promise.all([
-    searchParams,
     findWorkspaceLogo(context.activeMembership.workspaceId),
-    loadWorkspaceChannelsView({
-      workspaceId: context.activeMembership.workspaceId,
-    }),
     listWorkspaceMembers(context.activeMembership.workspaceId),
     listPendingWorkspaceInvitations(context.activeMembership.workspaceId),
     isMarketingStudioEnabledForWorkspace({
@@ -103,7 +93,6 @@ export default async function WorkspaceSettingsPage({
         context.activeMembership.role,
         "manageStylePresets",
       )}
-      channelsView={channelsView}
       currentUserId={context.user.id}
       customVoices={customVoices.map((voice) => ({
         id: voice.id,
@@ -118,14 +107,6 @@ export default async function WorkspaceSettingsPage({
       }
       marketingStudioEnabled={marketingStudioEnabled}
       members={members}
-      oauthStatus={{
-        facebook: facebook ?? null,
-        instagram: instagram ?? null,
-        linkedin: linkedin ?? null,
-        tiktok: tiktok ?? null,
-        x: x ?? null,
-        youtube: youtube ?? null,
-      }}
       pendingInvitations={pendingInvitations}
       stylePresets={stylePresetRows.map(buildStylePresetSettingsView)}
       workspaceId={context.activeMembership.workspaceId}

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { WORKSPACE_CONNECTIONS_PATH } from "@/lib/publishing/connections-navigation";
 import { upsertPlatformConnection } from "@/db/commands/platform-connection-commands";
 import { recordAuditEvent } from "@/lib/audit/record-audit-event";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
@@ -20,7 +21,7 @@ const noStore = { "Cache-Control": "private, no-store" };
  * into a URL, where it would land in browser history and server logs.
  */
 function redirectWithStatus(baseUrl: string, status: string): NextResponse {
-  const target = new URL("/app/settings/workspace", baseUrl);
+  const target = new URL(WORKSPACE_CONNECTIONS_PATH, baseUrl);
   target.searchParams.set("linkedin", status);
   const response = NextResponse.redirect(target.toString(), 307);
   response.headers.set("Cache-Control", "private, no-store");

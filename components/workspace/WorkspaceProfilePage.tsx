@@ -3,7 +3,7 @@ import { WorkspaceChannelProfilesSection } from "@/components/workspace/Workspac
 import { WorkspaceCustomVoicesSection } from "@/components/workspace/WorkspaceCustomVoicesSection";
 import { WorkspaceProfileForm } from "@/components/workspace/WorkspaceProfileForm";
 import { WorkspaceStylePresetsSection } from "@/components/workspace/WorkspaceStylePresetsSection";
-import { WorkspaceChannelsSection } from "@/components/workspace/WorkspaceChannelsSection";
+import { WorkspaceConnectionsLink } from "@/components/workspace/WorkspaceConnectionsLink";
 import { WorkspaceMembersSection } from "@/components/workspace/WorkspaceMembersSection";
 import type {
   WorkspaceInvitationView,
@@ -11,7 +11,6 @@ import type {
 } from "@/db/repositories/workspaces.repository";
 import type { CustomVoiceSummary } from "@/lib/audio/custom-voice-client";
 import type { ChannelProfileView } from "@/lib/channels/channel-profile-view";
-import type { WorkspaceChannelsView } from "@/lib/publishing/workspace-connections-view";
 import type { StylePresetSettingsView } from "@/lib/styles/style-preset-view";
 
 export function WorkspaceProfilePage({
@@ -20,14 +19,12 @@ export function WorkspaceProfilePage({
   canManageStylePresets,
   channelProfiles,
   unassignedProjectCount,
-  channelsView,
   currentUserId,
   customVoices,
   logoUrl,
   marketingDeploymentEnabled,
   marketingStudioEnabled,
   members,
-  oauthStatus,
   pendingInvitations,
   stylePresets,
   workspaceId,
@@ -38,21 +35,12 @@ export function WorkspaceProfilePage({
   canManageStylePresets: boolean;
   channelProfiles: ChannelProfileView[];
   unassignedProjectCount: number;
-  channelsView: WorkspaceChannelsView;
   currentUserId: string;
   customVoices: CustomVoiceSummary[];
   logoUrl: string | null;
   marketingDeploymentEnabled: boolean;
   marketingStudioEnabled: boolean;
   members: WorkspaceMemberView[];
-  oauthStatus: {
-    facebook: string | null;
-    instagram: string | null;
-    linkedin: string | null;
-    tiktok: string | null;
-    x: string | null;
-    youtube: string | null;
-  };
   pendingInvitations: WorkspaceInvitationView[];
   stylePresets: StylePresetSettingsView[];
   workspaceId: string;
@@ -85,10 +73,7 @@ export function WorkspaceProfilePage({
         />
       </div>
       <div className="mt-6">
-        <WorkspaceChannelsSection
-          initialData={channelsView}
-          oauthStatus={oauthStatus}
-        />
+        <WorkspaceConnectionsLink />
       </div>
       <div className="mt-6">
         <WorkspaceChannelProfilesSection

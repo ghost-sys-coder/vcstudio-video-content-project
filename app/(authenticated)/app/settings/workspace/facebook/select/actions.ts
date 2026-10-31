@@ -24,14 +24,14 @@ export async function connectFacebookPageAction(
   formData: FormData,
 ): Promise<void> {
   const parsed = selectionSchema.safeParse({ pageId: formData.get("pageId") });
-  if (!parsed.success) redirect("/app/settings/workspace?facebook=invalid");
+  if (!parsed.success) redirect("/app/social/accounts?facebook=invalid");
   const context = await getAuthenticatedWorkspaceContext();
-  if (!context) redirect("/app/settings/workspace?facebook=forbidden");
+  if (!context) redirect("/app/social/accounts?facebook=forbidden");
   requireCapability(context.activeMembership.role, "manageSettings");
   const environment = getPublishingEnvironment();
   const cookieStore = await cookies();
   const sealed = cookieStore.get(FACEBOOK_OAUTH_SESSION_COOKIE)?.value;
-  if (!sealed) redirect("/app/settings/workspace?facebook=expired");
+  if (!sealed) redirect("/app/social/accounts?facebook=expired");
   let session: FacebookOAuthSession;
   let pages: FacebookPage[];
   try {
@@ -44,17 +44,17 @@ export async function connectFacebookPageAction(
     });
     pages = await provider.listPages(session.userAccessToken);
   } catch {
-    redirect("/app/settings/workspace?facebook=failed");
+    redirect("/app/social/accounts?facebook=failed");
   }
   if (
     session.workspaceId !== context.activeMembership.workspaceId ||
     session.userId !== context.user.id
   )
-    redirect("/app/settings/workspace?facebook=forbidden");
+    redirect("/app/social/accounts?facebook=forbidden");
   const page = pages.find(
     (item) => item.externalAccountId === parsed.data.pageId,
   );
-  if (!page) redirect("/app/settings/workspace?facebook=invalid");
+  if (!page) redirect("/app/social/accounts?facebook=invalid");
   try {
     const connection = await upsertPlatformConnection({
       workspaceId: session.workspaceId,
@@ -77,7 +77,7 @@ export async function connectFacebookPageAction(
     });
     cookieStore.delete(FACEBOOK_OAUTH_SESSION_COOKIE);
   } catch {
-    redirect("/app/settings/workspace?facebook=failed");
+    redirect("/app/social/accounts?facebook=failed");
   }
-  redirect("/app/settings/workspace?facebook=connected");
+  redirect("/app/social/accounts?facebook=connected");
 }

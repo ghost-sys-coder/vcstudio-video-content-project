@@ -19,10 +19,12 @@ const STATUS_LABELS: Record<WorkspaceChannelView["status"], string> = {
 
 export function WorkspaceChannelCard({
   busy,
+  canManageConnections,
   channel,
   onDisconnect,
 }: {
   busy: boolean;
+  canManageConnections: boolean;
   channel: WorkspaceChannelView;
   onDisconnect: (connectionId: string) => void;
 }) {
@@ -59,6 +61,9 @@ export function WorkspaceChannelCard({
             <p className="mt-1 text-sm text-muted-foreground">
               {channel.platformLabel} channel · Updated {channel.updatedAtLabel}
             </p>
+            <p className="mt-2 max-w-xl text-xs text-muted-foreground">
+              {channel.postingRequirement}
+            </p>
             {channel.lastError ? (
               <p className="mt-1 text-sm text-amber-700 dark:text-amber-300">
                 {channel.lastError}
@@ -78,7 +83,7 @@ export function WorkspaceChannelCard({
           </div>
         </div>
 
-        {channel.status !== "revoked" ? (
+        {canManageConnections && channel.status !== "revoked" ? (
           <Button
             disabled={busy}
             onClick={() => onDisconnect(channel.id)}

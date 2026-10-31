@@ -17,11 +17,11 @@ import { connectFacebookPageAction } from "./actions";
 
 export default async function FacebookPageSelectionPage() {
   const context = await getAuthenticatedWorkspaceContext();
-  if (!context) redirect("/app/settings/workspace?facebook=forbidden");
+  if (!context) redirect("/app/social/accounts?facebook=forbidden");
   requireCapability(context.activeMembership.role, "manageSettings");
   const environment = getPublishingEnvironment();
   const sealed = (await cookies()).get(FACEBOOK_OAUTH_SESSION_COOKIE)?.value;
-  if (!sealed) redirect("/app/settings/workspace?facebook=expired");
+  if (!sealed) redirect("/app/social/accounts?facebook=expired");
   let session: FacebookOAuthSession;
   let pages: FacebookPage[];
   try {
@@ -34,13 +34,13 @@ export default async function FacebookPageSelectionPage() {
     });
     pages = await provider.listPages(session.userAccessToken);
   } catch {
-    redirect("/app/settings/workspace?facebook=failed");
+    redirect("/app/social/accounts?facebook=failed");
   }
   if (
     session.workspaceId !== context.activeMembership.workspaceId ||
     session.userId !== context.user.id
   )
-    redirect("/app/settings/workspace?facebook=forbidden");
+    redirect("/app/social/accounts?facebook=forbidden");
   return (
     <FacebookPageSelector action={connectFacebookPageAction} pages={pages} />
   );

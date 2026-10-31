@@ -12,6 +12,7 @@ import { ConnectXButton } from "@/components/publish/ConnectXButton";
 import { FutureChannelPlatformCard } from "@/components/workspace/FutureChannelPlatformCard";
 import { WorkspaceChannelCard } from "@/components/workspace/WorkspaceChannelCard";
 import type { WorkspaceChannelsView } from "@/lib/publishing/workspace-connections-view";
+import type { ConnectionOAuthStatus } from "@/lib/schemas/connection-oauth";
 
 const YOUTUBE_OAUTH_MESSAGES: Record<string, string> = {
   connected: "The YouTube channel is now connected to this workspace.",
@@ -63,18 +64,13 @@ const TIKTOK_OAUTH_MESSAGES: Record<string, string> = {
 };
 
 export function WorkspaceChannelsSection({
+  canManageConnections,
   initialData,
   oauthStatus,
 }: {
+  canManageConnections: boolean;
   initialData: WorkspaceChannelsView;
-  oauthStatus: {
-    facebook: string | null;
-    instagram: string | null;
-    linkedin: string | null;
-    tiktok: string | null;
-    x: string | null;
-    youtube: string | null;
-  };
+  oauthStatus: ConnectionOAuthStatus;
 }) {
   const router = useRouter();
   const [pendingConnectionId, setPendingConnectionId] = useState<string | null>(
@@ -123,12 +119,12 @@ export function WorkspaceChannelsSection({
           <p className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
             Publishing
           </p>
-          <h2
+          <h1
             className="mt-2 text-xl font-semibold tracking-tight"
             id="workspace-channels-heading"
           >
-            Connected channels
-          </h2>
+            Accounts &amp; connections
+          </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             Manage the destinations this workspace can publish finished videos
             and social posts to. Credentials remain encrypted and
@@ -136,7 +132,7 @@ export function WorkspaceChannelsSection({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {initialData.enabled ? (
+          {canManageConnections && initialData.enabled ? (
             <>
               <ConnectYouTubeButton
                 label={activeCount > 0 ? "Add YouTube" : "Connect YouTube"}
@@ -157,7 +153,7 @@ export function WorkspaceChannelsSection({
             rendered-video path — so they follow the posting flag rather than the
             video one.
           */}
-          {initialData.socialPostingEnabled ? (
+          {canManageConnections && initialData.socialPostingEnabled ? (
             <>
               <ConnectLinkedInButton
                 label={activeCount > 0 ? "Add LinkedIn" : "Connect LinkedIn"}
@@ -167,6 +163,13 @@ export function WorkspaceChannelsSection({
           ) : null}
         </div>
       </div>
+
+      {!canManageConnections ? (
+        <p className="mt-4 text-sm text-muted-foreground">
+          Only workspace owners can connect or disconnect accounts. You can
+          review account status and posting requirements here.
+        </p>
+      ) : null}
 
       {oauthMessages.map((message) => (
         <p
@@ -197,6 +200,7 @@ export function WorkspaceChannelsSection({
             {initialData.channels.map((channel) => (
               <WorkspaceChannelCard
                 busy={isPending && pendingConnectionId === channel.id}
+                canManageConnections={canManageConnections}
                 channel={channel}
                 key={channel.id}
                 onDisconnect={disconnect}
@@ -207,24 +211,27 @@ export function WorkspaceChannelsSection({
           <div className="rounded-xl border border-dashed p-6 text-center">
             <p className="text-sm font-medium">No channels connected</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Connect YouTube, a Facebook Page, Instagram, or TikTok to deliver
-              completed videos from VCStudio.
+              {canManageConnections
+                ? "Connect a publishing account to make it available for videos or social posts."
+                : "Ask a workspace owner to connect a publishing account."}
             </p>
           </div>
         )}
       </div>
 
-      <div className="mt-8 border-t pt-6">
-        <h3 className="text-sm font-semibold">More platforms</h3>
-        <ul className="mt-3 grid gap-3 sm:grid-cols-3">
-          {futurePlatforms.map((platform) => (
-            <FutureChannelPlatformCard
-              key={platform.platform}
-              label={platform.label}
-            />
-          ))}
-        </ul>
-      </div>
+      {futurePlatforms.length > 0 ? (
+        <div className="mt-8 border-t pt-6">
+          <h3 className="text-sm font-semibold">More platforms</h3>
+          <ul className="mt-3 grid gap-3 sm:grid-cols-3">
+            {futurePlatforms.map((platform) => (
+              <FutureChannelPlatformCard
+                key={platform.platform}
+                label={platform.label}
+              />
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </section>
   );
 }

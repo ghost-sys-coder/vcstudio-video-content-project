@@ -1,29 +1,32 @@
 import { redirect } from "next/navigation";
-import { ConnectedAccountsPanel } from "@/components/social/ConnectedAccountsPanel";
-import { listPlatformConnections } from "@/db/repositories/publishing.repository";
+import { WorkspaceChannelsSection } from "@/components/workspace/WorkspaceChannelsSection";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
-import { CONTENT_PLATFORM_LABELS } from "@/lib/platforms/platform-labels";
-import { can } from "@/lib/policies/workspace-policy";
+import { can, canManageWorkspace } from "@/lib/policies/workspace-policy";
+import { loadWorkspaceChannelsView } from "@/lib/publishing/workspace-connections-view";
+import { connectionOAuthQuerySchema } from "@/lib/schemas/connection-oauth";
 
-export default async function SocialAccountsPage() {
+export default async function SocialAccountsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const context = await getAuthenticatedWorkspaceContext();
   if (!context) redirect("/onboarding");
   if (!can(context.activeMembership.role, "composePosts"))
     redirect("/app/access-denied");
 
-  const connections = await listPlatformConnections({
-    workspaceId: context.activeMembership.workspaceId,
-  });
+  const [channelsView, query] = await Promise.all([
+    loadWorkspaceChannelsView({
+      workspaceId: context.activeMembership.workspaceId,
+    }),
+    searchParams,
+  ]);
 
   return (
-    <ConnectedAccountsPanel
-      connections={connections.map((connection) => ({
-        id: connection.id,
-        platform: connection.platform,
-        platformLabel: CONTENT_PLATFORM_LABELS[connection.platform],
-        accountName: connection.externalAccountName,
-        status: connection.status,
-      }))}
+    <WorkspaceChannelsSection
+      canManageConnections={canManageWorkspace(context.activeMembership.role)}
+      initialData={channelsView}
+      oauthStatus={connectionOAuthQuerySchema.parse(query)}
     />
   );
 }

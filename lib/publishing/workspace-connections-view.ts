@@ -7,6 +7,10 @@ import {
 } from "@/db/repositories/publishing.repository";
 import { getPublishingEnvironment } from "@/lib/env/server";
 import { CONTENT_PLATFORM_LABELS } from "@/lib/titles/title-view";
+import {
+  getPlatformPostCapability,
+  isSocialPostPlatform,
+} from "@/lib/social/platform-post-capabilities";
 
 export type WorkspaceChannelView = {
   id: string;
@@ -17,6 +21,7 @@ export type WorkspaceChannelView = {
   status: "active" | "expired" | "revoked";
   lastError: string | null;
   updatedAtLabel: string;
+  postingRequirement: string;
 };
 
 export type WorkspaceChannelPlatformView = {
@@ -66,6 +71,9 @@ export function buildWorkspaceChannelsView(input: {
         status: connection.status,
         lastError: connection.lastError,
         updatedAtLabel: formatUtc(connection.updatedAt),
+        postingRequirement: isSocialPostPlatform(connection.platform)
+          ? getPlatformPostCapability(connection.platform).mediaRequirement
+          : "This account is used for video publishing only.",
       })),
     platforms: PLATFORM_ORDER.map((platform) => ({
       platform,

@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { WORKSPACE_CONNECTIONS_PATH } from "@/lib/publishing/connections-navigation";
 import {
   Collapsible,
   CollapsiblePanel,
@@ -37,7 +38,11 @@ const SOCIAL_ROUTES = [
   { href: "/app/social/posts", label: "Posts", icon: PenLine },
   { href: "/app/social/calendar", label: "Schedule", icon: CalendarDays },
   { href: "/app/social/library", label: "Media library", icon: Images },
-  { href: "/app/social/accounts", label: "Accounts", icon: Plug },
+  {
+    href: WORKSPACE_CONNECTIONS_PATH,
+    label: "Accounts & connections",
+    icon: Plug,
+  },
 ] as const;
 
 export function SocialNavigationGroup() {
@@ -85,7 +90,7 @@ export function SocialNavigationGroup() {
                         render={<Link href={route.href} />}
                       >
                         <route.icon />
-                        <span>{route.label}</span>
+                        <span className="truncate">{route.label}</span>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
                   ))}

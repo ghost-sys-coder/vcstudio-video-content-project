@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { WORKSPACE_CONNECTIONS_PATH } from "@/lib/publishing/connections-navigation";
 import { upsertPlatformConnection } from "@/db/commands/platform-connection-commands";
 import { recordAuditEvent } from "@/lib/audit/record-audit-event";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
@@ -16,7 +17,7 @@ import {
 const noStore = { "Cache-Control": "private, no-store" };
 
 function redirectWithStatus(baseUrl: string, status: string): NextResponse {
-  const target = new URL("/app/settings/workspace", baseUrl);
+  const target = new URL(WORKSPACE_CONNECTIONS_PATH, baseUrl);
   target.searchParams.set("tiktok", status);
   return NextResponse.redirect(target, { status: 307, headers: noStore });
 }

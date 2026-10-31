@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { WORKSPACE_CONNECTIONS_PATH } from "@/lib/publishing/connections-navigation";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import {
   getPublishingEnvironment,
@@ -16,7 +17,7 @@ import { FacebookVideoPublishProvider } from "@/lib/publishing/providers/faceboo
 const noStore = { "Cache-Control": "private, no-store" };
 
 function settingsRedirect(baseUrl: string, status: string): NextResponse {
-  const url = new URL("/app/settings/workspace", baseUrl);
+  const url = new URL(WORKSPACE_CONNECTIONS_PATH, baseUrl);
   url.searchParams.set("facebook", status);
   return NextResponse.redirect(url, { status: 307, headers: noStore });
 }

@@ -53,3 +53,22 @@ Last updated: 2026-07-17 (Africa/Kampala)
 - Whether to select a dated GPT Image 2 snapshot for production after the initial smoke test.
 - Batch scene-image generation and a workspace style-preset editor remain deferred.
 - Remotion crop/fit to final video dimensions remains part of the rendering phase.
+
+## Session addendum - 2026-10-31
+
+The Phase 5 notes above are a historical handoff. Current repository instructions and the operating constraints below take precedence over its deployment suggestions.
+
+### Deferred VCStudio MCP integration
+
+- The user wants to retain the idea of a custom VCStudio MCP integration for Claude and ChatGPT on desktop and web, subject to each client's supported connections and permissions. This is a future feature, explicitly deferred; do not implement it until separately requested.
+- The intended scope is broad application access through deliberate tools for projects, scripts, scenes, characters, assets, generation, review, rendering, publishing, schedules, and usage. Reuse existing application services and authorization policies rather than granting direct database access.
+- Resolve the connected user and workspace membership on the server. Preserve owner/editor/viewer permissions, scoped access, confirmations for costly or destructive actions, budget reservations, idempotency, rate limits, and audit records. Long-running work should return a durable job identifier and expose status.
+- MCP access must respect deployment and workspace feature flags. Marketing Studio remains paused under `AGENTS.md`; this idea does not authorize enabling marketing, reactivating schedules, starting workers, or spending provider credits.
+
+### Social and Workspace navigation review
+
+- The initial review was read-only. The user subsequently authorized implementing the shared Accounts & connections page.
+- Confirmed overlap: Social Accounts (`/app/social/accounts`) and Workspace settings' Connected channels section both present the workspace's platform connections. Social adds posting requirements; settings provides connection management. A possible future consolidation is one Accounts & connections page with owner-only management and editor read access, linked from settings.
+- Implemented consolidation at `/app/social/accounts`: owners manage connections, editors view account status and posting requirements, and Workspace settings links to this page instead of loading a duplicate list. The editor link to owner-only settings is removed. OAuth returns and disconnect revalidation target the shared page; Facebook's page-selection endpoint and cookie scope remain unchanged. Recognized legacy settings OAuth status links forward safely.
+- No other direct duplicate was found between these two menu groups. Social scheduling concerns posts; the Workspace production queue concerns video projects. Posts and Schedule share post data but serve list/composition and date-based browsing respectively.
+- Consolidation verification: 64 focused unit and mocked integration tests passed, including owner/editor permissions, server-scoped disconnects, all six OAuth returns, Facebook selection completion/expiry/workspace isolation, legacy status forwarding, and the marketing pause. Formatting, TypeScript, production build, and lint passed (one pre-existing prompts warning). Isolated Chrome checks passed with zero console errors or backend requests. Real provider consent was not exercised. No migrations, dependencies, environment changes, worker starts, deployments, or schedule changes were made.

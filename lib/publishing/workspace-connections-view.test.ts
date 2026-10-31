@@ -36,6 +36,7 @@ describe("workspace channels view", () => {
         status: "active",
         lastError: null,
         updatedAtLabel: "2026-07-22 UTC",
+        postingRequirement: "Needs one video.",
       },
     ]);
     expect(view.channels[0]).not.toHaveProperty("accessTokenSealed");

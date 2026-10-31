@@ -22,6 +22,7 @@ import {
 import { getMarketingEnvironment } from "@/lib/env/server";
 import { requireCapability } from "@/lib/policies/workspace-policy";
 import { disconnectPlatformAuthorization } from "@/lib/publishing/disconnect-platform-connection";
+import { WORKSPACE_CONNECTIONS_PATH } from "@/lib/publishing/connections-navigation";
 import {
   marketingStudioAccessSchema,
   readMarketingStudioAccessForm,
@@ -77,7 +78,7 @@ export async function disconnectWorkspaceChannelAction(
       targetType: "platform_connection",
       targetId: parsed.data.connectionId,
     });
-    revalidatePath("/app/settings/workspace");
+    revalidatePath(WORKSPACE_CONNECTIONS_PATH);
     return { error: null, success: true };
   } catch {
     return {

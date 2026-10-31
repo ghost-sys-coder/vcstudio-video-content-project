@@ -6,20 +6,20 @@ import {
   isSocialPostPlatform,
 } from "@/lib/social/platform-post-capabilities";
 import type { PostConnectionView } from "@/lib/social/social-post-view";
+import { WORKSPACE_CONNECTIONS_PATH } from "@/lib/publishing/connections-navigation";
 
 /**
  * Read-only view of the accounts this workspace can post to, with each
  * platform's rules stated next to it.
  *
- * Connecting and disconnecting stay in workspace settings — this is a
- * workspace-level home for the same information, since the composer's
- * destination list is otherwise the only place a post author sees it.
+ * Embedded summary for Marketing integrations. Connection management lives on
+ * the shared Social Accounts & connections page.
  */
 export function ConnectedAccountsPanel({
-  canManageConnections = true,
+  canManageConnections,
   connections,
 }: {
-  canManageConnections?: boolean;
+  canManageConnections: boolean;
   connections: PostConnectionView[];
 }) {
   return (
@@ -34,7 +34,7 @@ export function ConnectedAccountsPanel({
         {canManageConnections ? (
           <Button
             nativeButton={false}
-            render={<Link href="/app/settings/workspace" />}
+            render={<Link href={WORKSPACE_CONNECTIONS_PATH} />}
             size="sm"
             variant="outline"
           >
@@ -45,8 +45,8 @@ export function ConnectedAccountsPanel({
 
       {connections.length === 0 ? (
         <p className="rounded-xl border border-dashed bg-muted/30 p-10 text-center text-sm text-muted-foreground">
-          No accounts are connected yet. Connect one in workspace settings, then
-          it becomes selectable in the composer.
+          No accounts are connected yet. A workspace owner can connect one in
+          Social → Accounts &amp; connections.
         </p>
       ) : (
         <ul className="space-y-2">
