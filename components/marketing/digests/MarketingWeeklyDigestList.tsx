@@ -13,14 +13,16 @@ export function MarketingWeeklyDigestList({
   }[];
 }) {
   return (
-    <main className="mx-auto w-full max-w-6xl p-6">
-      <p className="text-sm font-medium text-primary">Marketing Studio</p>
-      <h1 className="mt-1 text-2xl font-semibold">Weekly digests</h1>
-      <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-        A factual weekly record of content quality, spend controls, scheduler
-        outcomes, integration health, and work requiring human attention.
-      </p>
-      <div className="mt-6 space-y-4">
+    <div className="app-page">
+      <header className="app-heading">
+        <p className="text-sm font-medium text-primary">Marketing Studio</p>
+        <h1 className="text-2xl font-semibold">Weekly digests</h1>
+        <p className="max-w-3xl text-sm text-muted-foreground">
+          A factual weekly record of content quality, spend controls, scheduler
+          outcomes, integration health, and work requiring human attention.
+        </p>
+      </header>
+      <div className="app-section">
         {digests.length ? (
           digests.map((digest) => (
             <MarketingWeeklyDigestCard key={digest.id} {...digest} />
@@ -31,6 +33,6 @@ export function MarketingWeeklyDigestList({
           </div>
         )}
       </div>
-    </main>
+    </div>
   );
 }

@@ -27,10 +27,10 @@ export function ScheduleCalendar({
     );
 
   return (
-    <div className="space-y-6">
+    <div className="app-page">
       {days.map((day) => (
         <section key={day.date}>
-          <h2 className="mb-2 px-0.5 text-sm font-medium">
+          <h2 className="mb-4 text-sm font-medium">
             <time dateTime={day.date}>
               {new Date(`${day.date}T00:00:00`).toLocaleDateString(undefined, {
                 weekday: "long",
@@ -39,7 +39,7 @@ export function ScheduleCalendar({
               })}
             </time>
           </h2>
-          <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))] gap-4">
+          <ul className="app-grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))]">
             {day.posts.map((post) => (
               <SocialPostRow key={post.id} post={post} />
             ))}

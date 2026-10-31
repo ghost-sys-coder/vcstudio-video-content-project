@@ -4,7 +4,7 @@ import { PRODUCT_AREAS } from "@/lib/landing/landing-content";
 export function LandingProductSection() {
   return (
     <section className="border-b py-24 sm:py-28" id="studio">
-      <div className="mx-auto max-w-7xl px-6 lg:px-8">
+      <div className="app-public-container">
         <div className="grid gap-8 lg:grid-cols-12 lg:items-end">
           <div className="lg:col-span-7">
             <p className="font-mono text-xs uppercase tracking-[0.22em] text-muted-foreground">

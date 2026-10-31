@@ -14,8 +14,8 @@ export default async function MarketingSettingsPage() {
   });
 
   return (
-    <div className="max-w-2xl space-y-6">
-      <header className="space-y-1">
+    <div className="app-page app-form-page">
+      <header className="app-heading">
         <Button
           className="px-0"
           nativeButton={false}

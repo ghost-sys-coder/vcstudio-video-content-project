@@ -24,8 +24,8 @@ export function ConnectedAccountsPanel({
 }) {
   return (
     <div className="space-y-4">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+      <header className="app-page-header">
+        <div className="app-heading">
           <h1 className="text-xl font-semibold">Accounts</h1>
           <p className="text-sm text-muted-foreground">
             Where this workspace can post, and what each destination accepts.

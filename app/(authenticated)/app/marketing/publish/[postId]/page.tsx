@@ -26,7 +26,7 @@ export default async function MarketingPublishPostPage({
   if (!view) notFound();
 
   return (
-    <div className="p-6">
+    <div className="min-w-0">
       <PostComposer
         canPublish={can(context.activeMembership.role, "publishPosts")}
         canUpload={can(context.activeMembership.role, "manageMediaLibrary")}

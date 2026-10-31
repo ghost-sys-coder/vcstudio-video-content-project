@@ -41,9 +41,9 @@ export function MarketingMetricsDashboard({
         ? AlertTriangle
         : Info;
   return (
-    <main className="mx-auto w-full max-w-7xl space-y-8 p-4 md:p-8">
-      <header className="space-y-3">
-        <div>
+    <div className="app-page">
+      <header className="app-page-header">
+        <div className="app-heading">
           <p className="text-sm font-medium text-primary">
             Marketing Studio quality
           </p>
@@ -182,6 +182,6 @@ export function MarketingMetricsDashboard({
         />
       </section>
       <PerformanceFeedbackPanel dashboard={performance} />
-    </main>
+    </div>
   );
 }

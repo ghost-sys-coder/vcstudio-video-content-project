@@ -10,11 +10,11 @@ import { Button } from "@/components/ui/button";
  */
 export function ApplicationErrorState({ reset }: { reset: () => void }) {
   return (
-    <div className="mx-auto flex min-h-[50vh] max-w-md flex-col items-center justify-center gap-4 text-center">
+    <div className="app-panel mx-auto flex min-h-[50dvh] max-w-md flex-col items-center justify-center gap-4 text-center">
       <span className="flex size-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
         <AlertTriangleIcon aria-hidden />
       </span>
-      <div className="space-y-1">
+      <div className="app-heading">
         <h1 className="text-lg font-semibold">Something went wrong</h1>
         <p className="text-sm text-muted-foreground">
           This view could not be loaded. You can try again, or return to the

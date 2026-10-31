@@ -17,11 +17,11 @@ export function NotFoundState({
   homeLabel?: string;
 }) {
   return (
-    <div className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center gap-4 px-6 text-center">
+    <div className="app-panel mx-auto flex min-h-[60dvh] max-w-md flex-col items-center justify-center gap-4 text-center">
       <span className="flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
         <CompassIcon aria-hidden />
       </span>
-      <div className="space-y-1">
+      <div className="app-heading">
         <p className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
           404
         </p>

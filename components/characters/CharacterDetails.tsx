@@ -23,14 +23,16 @@ export function CharacterDetails({
 }) {
   const editable = canManage && character.status !== "archived";
   return (
-    <div className="space-y-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-semibold">{character.name}</h1>
+    <div className="app-page">
+      <div className="app-page-header">
+        <div className="app-heading">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-semibold [overflow-wrap:anywhere]">
+              {character.name}
+            </h1>
             <CharacterStatusBadge status={character.status} />
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Workspace character identity and consistency profile.
           </p>
         </div>

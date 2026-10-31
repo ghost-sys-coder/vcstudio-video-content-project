@@ -5,7 +5,7 @@ export function LandingFooter() {
   const year = new Date().getFullYear();
   return (
     <footer className="overflow-hidden border-t">
-      <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-6 px-6 py-10 sm:flex-row lg:px-8">
+      <div className="app-public-container flex flex-col items-center justify-between gap-6 py-10 sm:flex-row">
         <Link aria-label="VCStudio home" href="/">
           <BrandLogo />
         </Link>

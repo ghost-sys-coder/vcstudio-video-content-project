@@ -110,19 +110,19 @@ export function WorkspaceChannelsSection({
   ].filter((message): message is string => Boolean(message));
 
   return (
-    <section aria-labelledby="workspace-channels-heading" className="min-w-0">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="px-0.5">
+    <section aria-labelledby="workspace-channels-heading" className="app-page">
+      <div className="app-page-header">
+        <div className="app-heading">
           <p className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
             Publishing
           </p>
           <h1
-            className="mt-2 text-xl font-semibold tracking-tight"
+            className="text-xl font-semibold tracking-tight"
             id="workspace-channels-heading"
           >
             Accounts &amp; connections
           </h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+          <p className="max-w-2xl text-sm text-muted-foreground">
             Manage the destinations this workspace can publish finished videos
             and social posts to. Credentials remain encrypted and
             workspace-scoped.
@@ -162,7 +162,7 @@ export function WorkspaceChannelsSection({
       </div>
 
       {!canManageConnections ? (
-        <p className="mt-4 text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Only workspace owners can connect or disconnect accounts. You can
           review account status and posting requirements here.
         </p>
@@ -170,7 +170,7 @@ export function WorkspaceChannelsSection({
 
       {oauthMessages.map((message) => (
         <p
-          className="mt-4 rounded-lg border bg-muted/40 px-3 py-2 text-sm"
+          className="rounded-lg border bg-muted/40 px-3 py-2 text-sm"
           key={message}
           role="status"
         >
@@ -179,21 +179,21 @@ export function WorkspaceChannelsSection({
       ))}
       {error ? (
         <p
-          className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+          className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
           role="alert"
         >
           {error}
         </p>
       ) : null}
       {!initialData.enabled ? (
-        <p className="mt-4 rounded-lg border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+        <p className="rounded-lg border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
           Video publishing is currently disabled for this deployment.
         </p>
       ) : null}
 
-      <div className="mt-6">
+      <div>
         {initialData.channels.length > 0 ? (
-          <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))] gap-4">
+          <ul className="app-grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))]">
             {initialData.channels.map((channel) => (
               <WorkspaceChannelCard
                 busy={isPending && pendingConnectionId === channel.id}
@@ -217,7 +217,7 @@ export function WorkspaceChannelsSection({
       </div>
 
       {futurePlatforms.length > 0 ? (
-        <div className="mt-8 border-t pt-6">
+        <div className="border-t pt-6">
           <h3 className="text-sm font-semibold">More platforms</h3>
           <ul className="mt-3 grid gap-3 sm:grid-cols-3">
             {futurePlatforms.map((platform) => (

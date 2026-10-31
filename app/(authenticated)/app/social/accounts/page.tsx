@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { WorkspaceChannelsSection } from "@/components/workspace/WorkspaceChannelsSection";
-import { SocialPageFrame } from "@/components/social/SocialPageFrame";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import { can, canManageWorkspace } from "@/lib/policies/workspace-policy";
 import { loadWorkspaceChannelsView } from "@/lib/publishing/workspace-connections-view";
@@ -24,12 +23,10 @@ export default async function SocialAccountsPage({
   ]);
 
   return (
-    <SocialPageFrame>
-      <WorkspaceChannelsSection
-        canManageConnections={canManageWorkspace(context.activeMembership.role)}
-        initialData={channelsView}
-        oauthStatus={connectionOAuthQuerySchema.parse(query)}
-      />
-    </SocialPageFrame>
+    <WorkspaceChannelsSection
+      canManageConnections={canManageWorkspace(context.activeMembership.role)}
+      initialData={channelsView}
+      oauthStatus={connectionOAuthQuerySchema.parse(query)}
+    />
   );
 }

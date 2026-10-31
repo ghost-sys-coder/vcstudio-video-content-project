@@ -21,7 +21,7 @@ export function DashboardUnavailableState({
   return (
     <section
       aria-labelledby="dashboard-unavailable-heading"
-      className="mx-auto flex min-h-[60vh] max-w-2xl items-center px-4 py-12"
+      className="mx-auto flex min-h-[60dvh] max-w-2xl items-center py-8"
     >
       <div className="w-full overflow-hidden rounded-3xl border bg-card shadow-xl shadow-foreground/5">
         <div className="border-b bg-amber-500/8 px-6 py-7 sm:px-8">

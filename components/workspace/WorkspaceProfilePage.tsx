@@ -47,54 +47,54 @@ export function WorkspaceProfilePage({
   workspaceName: string;
 }) {
   return (
-    <section className="mx-auto max-w-4xl">
-      <div className="mb-8">
+    <section className="app-page app-form-page">
+      <div className="app-heading">
         <p className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
           Workspace settings
         </p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight">
+        <h1 className="text-3xl font-semibold tracking-tight">
           Workspace profile
         </h1>
-        <p className="mt-2 text-muted-foreground">
+        <p className="text-muted-foreground">
           Update the name and visual identity shown across VCStudio.
         </p>
       </div>
-      <div className="rounded-2xl border bg-background p-6 shadow-sm sm:p-8">
+      <div className="app-panel rounded-2xl border bg-background shadow-sm">
         <WorkspaceProfileForm
           logoUrl={logoUrl}
           workspaceId={workspaceId}
           workspaceName={workspaceName}
         />
       </div>
-      <div className="mt-6">
+      <div>
         <MarketingStudioSection
           deploymentEnabled={marketingDeploymentEnabled}
           enabled={marketingStudioEnabled}
         />
       </div>
-      <div className="mt-6">
+      <div>
         <WorkspaceConnectionsLink />
       </div>
-      <div className="mt-6">
+      <div>
         <WorkspaceChannelProfilesSection
           canManage={canManageChannelProfiles}
           channels={channelProfiles}
           unassignedProjectCount={unassignedProjectCount}
         />
       </div>
-      <div className="mt-6">
+      <div>
         <WorkspaceStylePresetsSection
           canManage={canManageStylePresets}
           presets={stylePresets}
         />
       </div>
-      <div className="mt-6">
+      <div>
         <WorkspaceCustomVoicesSection
           canManage={canManageCustomVoices}
           initialVoices={customVoices}
         />
       </div>
-      <div className="mt-6">
+      <div>
         <WorkspaceMembersSection
           currentUserId={currentUserId}
           members={members}

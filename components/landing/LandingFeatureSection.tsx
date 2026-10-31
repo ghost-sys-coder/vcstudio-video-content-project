@@ -6,7 +6,7 @@ import { LandingSectionHeading } from "@/components/landing/LandingSectionHeadin
 export function LandingFeatureSection() {
   return (
     <section className="bg-[#0b0e13] py-24" id="features">
-      <div className="mx-auto max-w-7xl px-6 lg:px-8">
+      <div className="app-public-container">
         <LandingSectionHeading
           description="AI drafts the work. Your team decides what actually ships — and every generation is priced, versioned, and traceable."
           eyebrow="Built for accountable production"

@@ -6,7 +6,7 @@ This repository is the foundation for an internal production tool that converts 
 
 ## Current capabilities
 
-- Social Accounts, Posts, and Schedule use responsive card grids. These three pages share the navbar's horizontal inset, with 2px of additional horizontal padding on page and date headings; Schedule retains local-day headings and existing post actions and countdowns.
+- A shared [application spacing system](docs/ui-spacing.md) aligns the navbar and page content, with responsive 16/24/32px gutters, consistent page/section/grid gaps, and shared shadcn/custom panel padding. Workspace, project, Social, settings, Marketing layouts, loading/error, public, and onboarding surfaces follow the same 4px scale. Social retains its responsive card grids, local-day schedule headings, and existing actions.
 
 - **Shared accounts and connections** (`/app/social/accounts`) is the single management page for publishing destinations. Owners can connect and disconnect accounts; editors can view status and per-platform posting requirements. Workspace settings links to this page without loading a second connection list. OAuth results return here, including completion of Facebook Page selection; recognized legacy settings status links forward here safely. Marketing Studio remains paused under the existing deployment and workspace controls.
 
@@ -577,6 +577,8 @@ The [version-two YouTube production plan](docs/version-two/README.md) defines th
 Phases 1–12 are implemented through authenticated workspaces, project/script versioning, durable AI scene planning, workspace character consistency references, cost-controlled media generation, deterministic subtitles, Remotion rendering, operational hardening, inspectable knowledge ingestion, and normalized publication-performance feedback. Marketing Studio includes Slice 13 orchestration: `social_media_manager` creates bounded, review-only weekly draft sets through the existing shared budget and capability controls, and the persisted weekly digest makes generation, human review, spend/refusal, scheduler, integration, Google Business sync, and acknowledgement outcomes measurable even in a zero-activity week. Slice 14 evidence-gated autonomous approval remains intentionally unbuilt.
 
 ## Recent major changes
+
+- 2026-10-31: Standardized application spacing in `app/spacing.css`. The shell now owns responsive gutters and the common navbar/content container; page stacks, heading groups, card grids, panels, form/reading widths, and bounded workbenches use named shared rules. Removed Social-only margin compensation and heading nudges, nested page padding, and conflicting page-width constraints. Applied the system across workspace/project/Social/settings and dormant Marketing layouts, plus public/auth/onboarding/error/loading surfaces. Documented the rules in `docs/ui-spacing.md` and `AGENTS.md`. No dependency, database, environment, deployment, worker, feature-flag, or schedule changes.
 
 - 2026-10-31: Converted Social connection and post lists to responsive shadcn card grids, including scheduled posts grouped by local day. Added a shared frame for `/app/social/accounts`, `/app/social/posts`, and `/app/social/calendar` so their content edges match the navbar. Existing permissions, connection actions, draft deletion, and scheduling behavior are preserved. No schema, migration, environment, dependency, worker, or schedule changes.
 

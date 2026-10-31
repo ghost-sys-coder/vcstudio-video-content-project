@@ -17,8 +17,8 @@ export default async function MarketingContentPage() {
     contentItemIds: items.map((item) => item.id),
   });
   return (
-    <div className="space-y-6 p-6">
-      <header>
+    <div className="app-page">
+      <header className="app-heading">
         <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
           Marketing Studio
         </p>

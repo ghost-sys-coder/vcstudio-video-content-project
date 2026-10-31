@@ -503,6 +503,12 @@ Do not build a complex universal provider framework. Use interfaces that make te
 
 ## User interface rules
 
+### Application spacing system
+
+Use the shared spacing system in `app/spacing.css`; see `docs/ui-spacing.md` for its values and examples. `ApplicationShell` owns the outer gutters, shared navbar/content width, and page top/bottom padding. Page components must not add another outer `p-*`/`px-*`, compensate with negative margins, or introduce pixel nudges for headings.
+
+Use `app-page` for page stacks, `app-page-header` for heading/action rows, `app-heading` for title/description groups, `app-section` for related content, `app-grid` for standard card grids, and `app-panel` for custom bordered panels. Existing shadcn cards inherit the same panel padding. Form and reading width constraints are intentional; data and production workspaces use the shared full width. Preserve denser spacing inside tables, toolbars, timelines, media grids, and canvas controls when it serves the workflow.
+
 1. Build accessible interfaces.
 2. Use semantic HTML.
 3. Support keyboard navigation.

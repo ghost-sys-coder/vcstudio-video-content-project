@@ -9,20 +9,20 @@ export function FacebookPageSelector({
   pages: FacebookPage[];
 }) {
   return (
-    <section className="mx-auto max-w-2xl">
-      <p className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
-        Facebook publishing
-      </p>
-      <h1 className="mt-3 text-3xl font-semibold tracking-tight">
-        Choose a Page
-      </h1>
-      <p className="mt-2 text-muted-foreground">
-        Select the Facebook Page this workspace may publish videos to.
-      </p>
-      <ul className="mt-6 space-y-3">
+    <section className="app-page app-form-page">
+      <header className="app-heading">
+        <p className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
+          Facebook publishing
+        </p>
+        <h1 className="text-3xl font-semibold tracking-tight">Choose a Page</h1>
+        <p className="text-muted-foreground">
+          Select the Facebook Page this workspace may publish videos to.
+        </p>
+      </header>
+      <ul className="app-section">
         {pages.map((page) => (
           <li
-            className="flex items-center justify-between gap-4 rounded-xl border bg-card p-4"
+            className="app-panel flex flex-wrap items-center justify-between gap-4 rounded-xl border bg-card"
             key={page.externalAccountId}
           >
             <div className="min-w-0">
@@ -41,7 +41,7 @@ export function FacebookPageSelector({
         ))}
       </ul>
       {pages.length === 0 ? (
-        <p className="mt-6 rounded-xl border border-dashed p-6 text-sm text-muted-foreground">
+        <p className="app-panel rounded-xl border border-dashed text-sm text-muted-foreground">
           No manageable Facebook Pages were found. Confirm your Page role and
           grant all requested permissions.
         </p>

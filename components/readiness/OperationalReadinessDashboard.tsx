@@ -7,18 +7,18 @@ export function OperationalReadinessDashboard({
   view: ReadinessView;
 }) {
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <div>
+    <div className="app-page">
+      <div className="app-heading">
         <p className="text-sm font-medium text-muted-foreground">
           Workspace operations
         </p>
         <h1 className="text-2xl font-semibold">Operational readiness</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Configuration and authorization states are shown without credential
           values. Checked {view.checkedAt.toLocaleString()}.
         </p>
       </div>
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="app-grid xl:grid-cols-2">
         <ReadinessSection
           title="Deployment"
           description="Configuration, schema, storage, and worker health for this environment."

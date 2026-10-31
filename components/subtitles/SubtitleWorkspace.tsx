@@ -95,7 +95,7 @@ export function SubtitleWorkspace({
   const previewText = data.segments[0]?.text ?? "";
 
   return (
-    <div className="space-y-5">
+    <div className="app-page">
       <section className="rounded-xl border border-dashed bg-muted/30 p-4">
         <h2 className="text-sm font-semibold">Subtitles &amp; timeline</h2>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
@@ -136,7 +136,7 @@ export function SubtitleWorkspace({
         </div>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="app-grid lg:grid-cols-2">
         <div className="space-y-4">
           <SubtitlePreview
             captionStyle={data.captionStyle}

@@ -21,9 +21,9 @@ export function MarketingHome({
   steps: SetupStep[];
 }) {
   return (
-    <div className="space-y-6">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-1">
+    <div className="app-page">
+      <header className="app-page-header">
+        <div className="app-heading">
           <h1 className="text-xl font-semibold">Marketing Studio</h1>
           <p className="max-w-2xl text-sm text-muted-foreground">
             An AI marketing team for this workspace. It learns the business,

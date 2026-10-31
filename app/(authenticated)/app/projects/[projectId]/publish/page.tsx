@@ -59,7 +59,7 @@ export default async function ProjectPublishPage({
     loadChaptersView({ workspaceId: scope.workspaceId, project }),
   ]);
   return (
-    <div className="space-y-6">
+    <div className="app-page">
       <PlatformTitlesPanel
         canGenerate={canGenerate}
         initialData={titlesView}

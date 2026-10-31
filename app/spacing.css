@@ -1,0 +1,149 @@
+/* Application geometry is independent of the Light/Dark colour palettes. */
+@layer base {
+  :root {
+    --app-page-gutter: 1rem;
+    --app-section-gap: 1.5rem;
+    --app-panel-padding: 1rem;
+    --app-grid-gap: 1rem;
+    --app-page-bottom: 2rem;
+    --app-page-max-width: 100rem;
+    --app-form-max-width: 64rem;
+    --app-reading-max-width: 48rem;
+    --app-navbar-height: 3.5rem;
+    --app-navbar-offset: 1rem;
+    --app-shell-margin: 0.75rem;
+    --app-shell-inset: 0rem;
+  }
+
+  @media (min-width: 40rem) {
+    :root {
+      --app-page-gutter: 1.5rem;
+      --app-panel-padding: 1.5rem;
+    }
+  }
+
+  @media (min-width: 48rem) {
+    :root {
+      --app-shell-inset: calc(var(--app-shell-margin) * 2);
+    }
+  }
+
+  @media (min-width: 64rem) {
+    :root {
+      --app-page-gutter: 2rem;
+      --app-section-gap: 2rem;
+      --app-grid-gap: 1.5rem;
+      --app-page-bottom: 3rem;
+    }
+  }
+}
+
+@layer utilities {
+  .app-container {
+    width: min(
+      calc(100% - var(--app-page-gutter) * 2),
+      var(--app-page-max-width)
+    );
+    min-width: 0;
+    margin-inline: auto;
+  }
+
+  .app-topbar {
+    height: var(--app-navbar-height);
+    margin-top: var(--app-navbar-offset);
+    padding-inline: var(--app-panel-padding);
+  }
+
+  .app-main {
+    padding-block: var(--app-section-gap) var(--app-page-bottom);
+  }
+
+  .app-page {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: var(--app-section-gap);
+  }
+
+  .app-page-header {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .app-heading {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .app-heading > :is(h1, h2, p) {
+    margin-block: 0;
+  }
+
+  .app-section {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .app-panel {
+    padding: var(--app-panel-padding);
+  }
+
+  .app-grid {
+    display: grid;
+    min-width: 0;
+    gap: var(--app-grid-gap);
+  }
+
+  .app-form-page {
+    width: 100%;
+    max-width: var(--app-form-max-width);
+  }
+
+  .app-reading-page {
+    width: 100%;
+    max-width: var(--app-reading-max-width);
+  }
+
+  .app-public-container {
+    width: min(calc(100% - var(--app-page-gutter) * 2), 80rem);
+    min-width: 0;
+    margin-inline: auto;
+  }
+
+  .app-legal-container {
+    width: min(
+      calc(100% - var(--app-page-gutter) * 2),
+      var(--app-reading-max-width)
+    );
+    min-width: 0;
+    margin-inline: auto;
+  }
+
+  .app-standalone {
+    display: flex;
+    min-height: 100dvh;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem var(--app-page-gutter);
+  }
+
+  .app-workbench {
+    height: max(
+      28rem,
+      calc(
+        100dvh - var(--app-navbar-height) - var(--app-navbar-offset) -
+          var(--app-section-gap) - var(--app-page-bottom) -
+          var(--app-shell-inset) - 2px
+      )
+    );
+    min-height: 0;
+  }
+}

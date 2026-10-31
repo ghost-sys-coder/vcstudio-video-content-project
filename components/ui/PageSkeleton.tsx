@@ -24,7 +24,7 @@ export function PageSkeleton({
       // Announced once, politely. Screen readers get a single "Loading" rather
       // than a description of every grey box.
       aria-label="Loading"
-      className="min-w-0 max-w-full space-y-5"
+      className="app-page max-w-full"
       role="status"
     >
       {showToolbar ? (
@@ -41,7 +41,7 @@ export function PageSkeleton({
       </div>
 
       {Array.from({ length: rowCount }, (_, index) => (
-        <div className="rounded-2xl border bg-background p-6" key={index}>
+        <div className="app-panel rounded-2xl border bg-background" key={index}>
           <Skeleton className="h-5 w-40" />
           <Skeleton className="mt-3 h-4 w-full max-w-lg" />
           <div className="mt-4 space-y-2">

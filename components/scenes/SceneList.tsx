@@ -118,7 +118,7 @@ export function SceneList({
   const nextSceneId = getAdjacentSceneId(rows, selectedRow.scene.id, "next");
 
   return (
-    <div className="grid items-start gap-5 lg:grid-cols-[20rem_minmax(0,1fr)]">
+    <div className="app-grid items-start lg:grid-cols-[20rem_minmax(0,1fr)]">
       <SceneNavigator
         approvedCount={approvedCount}
         onQueryChange={onQueryChange}

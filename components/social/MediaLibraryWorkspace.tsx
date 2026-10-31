@@ -37,9 +37,9 @@ export function MediaLibraryWorkspace({
   const hiddenCount = Math.max(view.total - assets.length, 0);
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+    <div className="app-page">
+      <header className="app-page-header">
+        <div className="app-heading">
           <h1 className="text-xl font-semibold">Media library</h1>
           <p className="text-sm text-muted-foreground">
             Images and videos kept at workspace level, ready to attach to a

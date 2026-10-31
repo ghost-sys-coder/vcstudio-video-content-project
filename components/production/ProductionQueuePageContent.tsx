@@ -27,12 +27,12 @@ export function ProductionQueuePageContent({
     attention !== "all" || release !== "all" || channelProfileId !== null;
 
   return (
-    <section aria-labelledby="queue-heading" className="space-y-6">
-      <div>
+    <section aria-labelledby="queue-heading" className="app-page">
+      <div className="app-heading">
         <h1 className="font-display text-3xl tracking-tight" id="queue-heading">
           Production queue
         </h1>
-        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+        <p className="max-w-2xl text-sm text-muted-foreground">
           Every video by channel and intended release, with what is blocking it
           and the next thing to do. Progress here is read from actual scripts,
           scenes, assets, renders and publications, never from a status set by

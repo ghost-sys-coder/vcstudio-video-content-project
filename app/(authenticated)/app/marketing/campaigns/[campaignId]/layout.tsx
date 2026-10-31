@@ -19,8 +19,8 @@ export default async function MarketingCampaignLayout({
   });
   if (!campaign) notFound();
   return (
-    <div className="space-y-5 p-6">
-      <header>
+    <div className="app-page">
+      <header className="app-heading">
         <p className="text-sm text-muted-foreground">
           {campaign.objective} · {campaign.trafficType}
         </p>

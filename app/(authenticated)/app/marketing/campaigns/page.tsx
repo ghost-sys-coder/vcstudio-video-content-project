@@ -19,8 +19,8 @@ export default async function MarketingCampaignsPage() {
     ],
   );
   return (
-    <div className="space-y-8 p-6">
-      <header>
+    <div className="app-page">
+      <header className="app-heading">
         <h1 className="text-2xl font-semibold">Campaigns</h1>
         <p className="text-sm text-muted-foreground">
           Plan coordinated organic content for the exact social accounts that

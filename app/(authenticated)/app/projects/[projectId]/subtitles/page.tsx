@@ -24,7 +24,7 @@ export default async function ProjectSubtitlesPage({
   const role = context.activeMembership.role;
 
   return (
-    <div className="min-w-0 max-w-full space-y-5">
+    <div className="app-page max-w-full">
       <WorkspaceViewSwitch
         activeViewId="captions"
         projectId={project.id}

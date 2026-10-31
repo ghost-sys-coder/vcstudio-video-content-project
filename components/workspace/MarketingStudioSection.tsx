@@ -39,7 +39,7 @@ export function MarketingStudioSection({
   }
 
   return (
-    <section className="rounded-2xl border bg-background p-6 shadow-sm sm:p-8">
+    <section className="app-panel rounded-2xl border bg-background shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <h2 className="flex items-center gap-2 text-lg font-semibold">

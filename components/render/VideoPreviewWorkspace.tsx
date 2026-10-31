@@ -132,7 +132,7 @@ export function VideoPreviewWorkspace({
   const timelineReady = data.timeline.status === "ready";
 
   return (
-    <div className="min-w-0 max-w-full space-y-5 overflow-x-clip">
+    <div className="app-page max-w-full overflow-x-clip">
       <section className="rounded-xl border border-dashed bg-muted/30 p-4">
         <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
           <div className="min-w-0">
@@ -155,7 +155,7 @@ export function VideoPreviewWorkspace({
         </div>
       </section>
 
-      <div className="grid min-w-0 items-start gap-5 lg:grid-cols-2">
+      <div className="app-grid items-start lg:grid-cols-2">
         <div className="min-w-0 space-y-4">
           <VideoPreviewPlayer
             outputVariantId={

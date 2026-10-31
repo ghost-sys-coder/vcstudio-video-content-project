@@ -36,7 +36,7 @@ export default async function MarketingContentDetailPage({
   ]);
   if (!item) notFound();
   return (
-    <div className="grid gap-6 p-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+    <div className="app-grid xl:grid-cols-[minmax(0,1fr)_22rem]">
       <main className="space-y-5">
         <Link
           className="text-sm text-muted-foreground"

@@ -244,7 +244,7 @@ export function Storyboard({
 
   if (data.scenes.length === 0)
     return (
-      <div className="space-y-5">
+      <div className="app-page">
         {viewSwitch}
         {intro}
         <StoryboardEmptyState projectId={projectId} />
@@ -260,7 +260,7 @@ export function Storyboard({
   );
 
   return (
-    <div className="space-y-5">
+    <div className="app-page">
       {viewSwitch}
       {intro}
 

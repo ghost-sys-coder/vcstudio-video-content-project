@@ -19,8 +19,8 @@ export default async function MarketingSkillsPage({
   ]);
   const editing = skills.find((skill) => skill.id === query.edit);
   return (
-    <div className="space-y-8 p-6">
-      <header className="space-y-1">
+    <div className="app-page">
+      <header className="app-heading">
         <h1 className="text-2xl font-semibold">Custom skills</h1>
         <p className="max-w-3xl text-sm text-muted-foreground">
           Turn repeatable writing briefs into slash commands. Custom skills use

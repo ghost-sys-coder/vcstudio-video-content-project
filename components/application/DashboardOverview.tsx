@@ -21,7 +21,7 @@ export function DashboardOverview({
   recentProjects: ProjectListItem[];
 }) {
   return (
-    <section aria-labelledby="dashboard-heading" className="space-y-8">
+    <section aria-labelledby="dashboard-heading" className="app-page">
       <div className="relative overflow-hidden rounded-3xl bg-[oklch(0.25_0.06_174)] px-6 py-7 text-[oklch(0.97_0.02_105)] shadow-xl sm:px-8 sm:py-9">
         <span
           aria-hidden
@@ -43,7 +43,7 @@ export function DashboardOverview({
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="app-grid sm:grid-cols-2 xl:grid-cols-4">
         <DashboardStatCard
           detail={
             statistics.projects.active > 0

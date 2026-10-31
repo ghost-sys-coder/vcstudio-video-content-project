@@ -11,13 +11,13 @@ export function MarketingIntegrationsPage({
   view: MarketingIntegrationsView;
 }) {
   return (
-    <div className="space-y-8 p-6">
-      <header>
+    <div className="app-page">
+      <header className="app-heading">
         <p className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
           Marketing Studio
         </p>
-        <h1 className="mt-2 text-2xl font-semibold">Integrations</h1>
-        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+        <h1 className="text-2xl font-semibold">Integrations</h1>
+        <p className="max-w-2xl text-sm text-muted-foreground">
           Monitor publishing destinations and the server-side providers that
           power Marketing Studio. Credentials remain server-only.
         </p>

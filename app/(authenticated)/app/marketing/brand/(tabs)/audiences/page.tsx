@@ -13,7 +13,7 @@ export default async function BrandAudiencesPage() {
   });
 
   return (
-    <div className="space-y-4 pt-4">
+    <div className="app-section pt-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">
           The primary audience is the one the studio writes for unless told

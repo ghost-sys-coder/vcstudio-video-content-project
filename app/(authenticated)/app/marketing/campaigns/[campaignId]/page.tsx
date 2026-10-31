@@ -23,7 +23,7 @@ export default async function CampaignBriefPage({
   ]);
   if (!campaign) notFound();
   return (
-    <article className="max-w-3xl space-y-4">
+    <article className="app-section app-reading-page">
       <CampaignAutomationStatus
         campaign={campaign}
         contentCount={content.length}

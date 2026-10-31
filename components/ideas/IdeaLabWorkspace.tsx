@@ -70,13 +70,13 @@ export function IdeaLabWorkspace({
   }
 
   return (
-    <section className="space-y-8">
-      <div>
+    <section className="app-page">
+      <div className="app-heading">
         <p className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
           Ideation
         </p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight">Idea Lab</h1>
-        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+        <h1 className="text-3xl font-semibold tracking-tight">Idea Lab</h1>
+        <p className="max-w-2xl text-sm text-muted-foreground">
           Brainstorm video ideas for any niche, save the best, and turn them
           into projects. Each saved idea fills in a project brief on the script
           screen.

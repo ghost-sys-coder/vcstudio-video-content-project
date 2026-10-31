@@ -31,8 +31,8 @@ export default async function MarketingSchedulesPage({
     "manageMarketingSchedules",
   );
   return (
-    <div className="space-y-8 p-6">
-      <header>
+    <div className="app-page">
+      <header className="app-heading">
         <h1 className="text-2xl font-semibold">Recurring schedules</h1>
         <p className="max-w-3xl text-sm text-muted-foreground">
           Generate current, research-aware drafts on a cadence. Rules stop

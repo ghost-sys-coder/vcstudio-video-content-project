@@ -36,7 +36,7 @@ const REVIEW_POINTS: {
 export function LandingReviewSection() {
   return (
     <section className="border-b py-24">
-      <div className="mx-auto max-w-7xl px-6 lg:px-8">
+      <div className="app-public-container">
         <LandingSectionHeading
           description="A finished generation is not the same as an approved one. Marketing content and production assets both wait for an accountable decision."
           eyebrow="Nothing ships without a look"

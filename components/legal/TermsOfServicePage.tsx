@@ -4,9 +4,9 @@ import { LandingFooter } from "@/components/landing/LandingFooter";
 
 export function TermsOfServicePage() {
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-dvh bg-background text-foreground">
       <header className="border-b">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-5">
+        <div className="app-legal-container flex flex-wrap items-center justify-between gap-4 py-4">
           <Link aria-label="VCStudio home" href="/">
             <BrandLogo />
           </Link>
@@ -19,7 +19,7 @@ export function TermsOfServicePage() {
         </div>
       </header>
       <main>
-        <article className="mx-auto max-w-4xl space-y-10 px-6 py-16 leading-7 text-muted-foreground">
+        <article className="app-legal-container app-page py-12 leading-7 text-muted-foreground">
           <header className="border-b pb-10">
             <p className="font-mono text-xs font-semibold tracking-[0.18em] text-[#607f94] uppercase">
               Legal

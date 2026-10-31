@@ -24,8 +24,8 @@ export function UsageDashboard({
   const { summary, settings, limitDefaults, ledger, audit, marketing } = view;
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-8">
-      <header className="space-y-1">
+    <div className="app-page">
+      <header className="app-heading">
         <p className="font-mono text-xs uppercase tracking-[0.16em] text-muted-foreground">
           Workspace
         </p>
@@ -43,7 +43,7 @@ export function UsageDashboard({
         totalReconciledCents={summary.totalReconciledCents}
       />
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="app-grid lg:grid-cols-2">
         <BudgetProgress
           dayToDateCents={summary.dayToDateCents}
           dailyBudgetCents={settings.dailyBudgetCents}
@@ -57,7 +57,7 @@ export function UsageDashboard({
 
       {marketing && <MarketingUsageSection view={marketing} />}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="app-grid lg:grid-cols-2">
         <BudgetSettingsForm
           workspaceId={workspaceId}
           dailyBudgetCents={settings.dailyBudgetCents}

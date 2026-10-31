@@ -5,7 +5,7 @@ import { LandingWorkflowStep } from "@/components/landing/LandingWorkflowStep";
 export function LandingWorkflowSection() {
   return (
     <section className="border-b py-24" id="workflow">
-      <div className="mx-auto max-w-7xl px-6 lg:px-8">
+      <div className="app-public-container">
         <LandingSectionHeading
           description="Every step produces something you can inspect and approve before the next one runs — no stage is a black box."
           eyebrow="Inside video production"

@@ -47,7 +47,7 @@ export function WorkspaceChannelProfilesSection({
   return (
     <section
       aria-labelledby="workspace-channel-profiles-heading"
-      className="rounded-2xl border bg-background p-6 shadow-sm sm:p-8"
+      className="app-panel rounded-2xl border bg-background shadow-sm"
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>

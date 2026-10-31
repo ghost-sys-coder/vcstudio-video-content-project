@@ -20,7 +20,7 @@ export function WorkspaceMembersSection({
   const ownerCount = members.filter((member) => member.role === "owner").length;
 
   return (
-    <div className="rounded-2xl border bg-background p-6 shadow-sm sm:p-8">
+    <div className="app-panel rounded-2xl border bg-background shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Members</h2>

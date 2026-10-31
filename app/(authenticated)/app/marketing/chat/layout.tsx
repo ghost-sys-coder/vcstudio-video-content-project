@@ -25,9 +25,9 @@ export default async function MarketingChatLayout({
   });
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] min-h-0">
+    <div className="app-workbench flex min-w-0 flex-col overflow-hidden rounded-2xl border bg-card md:flex-row">
       <ChatThreadSidebar threads={threads} />
-      <div className="min-w-0 flex-1">{children}</div>
+      <div className="min-h-0 min-w-0 flex-1">{children}</div>
     </div>
   );
 }

@@ -21,7 +21,7 @@ export function ChatThreadSidebar({
   threads: ChatThreadRowData[];
 }) {
   return (
-    <aside className="flex w-64 shrink-0 flex-col gap-3 border-r border-border p-3">
+    <aside className="flex max-h-48 w-full shrink-0 flex-col gap-3 border-b border-border p-4 md:max-h-none md:w-64 md:border-r md:border-b-0">
       <form action={startChatThreadAction}>
         <Button className="w-full" size="sm" type="submit" variant="outline">
           <Plus aria-hidden="true" />

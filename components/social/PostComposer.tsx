@@ -143,9 +143,9 @@ export function PostComposer({
   }
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-1">
+    <div className="app-page">
+      <header className="app-page-header">
+        <div className="app-heading">
           <Button
             className="px-0"
             nativeButton={false}

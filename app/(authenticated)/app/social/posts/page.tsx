@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { SocialPostsWorkspace } from "@/components/social/SocialPostsWorkspace";
-import { SocialPageFrame } from "@/components/social/SocialPageFrame";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import { loadSocialPostsView } from "@/lib/social/load-social-posts";
 import { can } from "@/lib/policies/workspace-policy";
@@ -16,11 +15,9 @@ export default async function SocialPostsPage() {
   });
 
   return (
-    <SocialPageFrame>
-      <SocialPostsWorkspace
-        canCompose={can(context.activeMembership.role, "composePosts")}
-        posts={posts}
-      />
-    </SocialPageFrame>
+    <SocialPostsWorkspace
+      canCompose={can(context.activeMembership.role, "composePosts")}
+      posts={posts}
+    />
   );
 }

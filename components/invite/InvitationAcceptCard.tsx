@@ -102,8 +102,8 @@ export function InvitationAcceptCard({
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-muted/30 px-6 py-16">
-      <section className="w-full max-w-md space-y-4 rounded-2xl border bg-background p-8 text-center shadow-sm">
+    <main className="app-standalone bg-muted/30">
+      <section className="app-panel w-full max-w-md space-y-4 rounded-2xl border bg-background text-center shadow-sm">
         {content}
       </section>
     </main>

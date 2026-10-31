@@ -57,7 +57,7 @@ export default async function MarketingCalendarPage() {
       })),
   ];
   return (
-    <div className="space-y-3 p-6">
+    <div className="app-page">
       <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
         Marketing publishing calendar
       </p>

@@ -7,7 +7,7 @@ import { LandingDotGrid } from "@/components/landing/LandingDotGrid";
 export function LandingCtaSection() {
   return (
     <section className="py-24">
-      <div className="mx-auto max-w-7xl px-6 lg:px-8">
+      <div className="app-public-container">
         <div className="relative overflow-hidden rounded-3xl border bg-muted/30 px-8 py-16 text-center sm:px-16">
           <LandingDotGrid />
           <div

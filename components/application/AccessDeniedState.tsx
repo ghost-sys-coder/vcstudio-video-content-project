@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 
 export function AccessDeniedState() {
   return (
-    <section className="mx-auto max-w-lg rounded-2xl border bg-background p-8 text-center">
+    <section className="app-panel mx-auto max-w-lg rounded-2xl border bg-background text-center">
       <p className="font-mono text-xs uppercase tracking-[0.18em] text-destructive">
         Access denied
       </p>

@@ -21,8 +21,8 @@ export function AssetsHeader({ children }: { children: React.ReactNode }) {
     )?.value ?? "brand";
 
   return (
-    <div className="space-y-6">
-      <header className="space-y-1">
+    <div className="app-page">
+      <header className="app-heading">
         <Button
           className="px-0"
           nativeButton={false}

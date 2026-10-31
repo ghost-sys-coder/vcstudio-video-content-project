@@ -16,7 +16,7 @@ export default function MarketingChatPage() {
         aria-hidden="true"
         className="size-8 text-muted-foreground"
       />
-      <div className="space-y-1">
+      <div className="app-heading">
         <h1 className="text-base font-medium">Marketing chat</h1>
         <p className="max-w-md text-sm text-muted-foreground">
           Ask for copy, a plan, or a fact about the business. The studio answers

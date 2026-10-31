@@ -30,9 +30,9 @@ export default async function MarketingResearchPage({
     ["pending", "running"].includes(snapshot.status),
   );
   return (
-    <div className="space-y-8 p-6">
+    <div className="app-page">
       {queued || active ? <ResearchRequestPoller /> : null}
-      <header>
+      <header className="app-heading">
         <h1 className="text-2xl font-semibold">Research</h1>
         <p className="text-sm text-muted-foreground">
           Current, cited competitor and trend evidence used before campaign

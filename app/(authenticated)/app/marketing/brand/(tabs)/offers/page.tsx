@@ -17,7 +17,7 @@ export default async function BrandOffersPage() {
   );
 
   return (
-    <div className="space-y-4 pt-4">
+    <div className="app-section pt-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">
           What you sell. The studio will not invent a product that is not listed

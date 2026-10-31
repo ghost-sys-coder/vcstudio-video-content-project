@@ -3,7 +3,7 @@ import { BrandLogo } from "@/components/brand/BrandLogo";
 
 export function AuthPageFrame({ children }: { children: React.ReactNode }) {
   return (
-    <main className="grid min-h-screen bg-background lg:grid-cols-[1.05fr_0.95fr]">
+    <main className="grid min-h-dvh bg-background lg:grid-cols-[1.05fr_0.95fr]">
       <section className="hidden border-r bg-foreground p-12 text-background lg:flex lg:flex-col lg:justify-between">
         <Link aria-label="VCStudio home" href="/">
           <BrandLogo />
@@ -24,7 +24,7 @@ export function AuthPageFrame({ children }: { children: React.ReactNode }) {
           Internal production release
         </p>
       </section>
-      <section className="flex min-h-screen items-center justify-center p-6 sm:p-10">
+      <section className="app-standalone">
         <div className="w-full max-w-md">{children}</div>
       </section>
     </main>

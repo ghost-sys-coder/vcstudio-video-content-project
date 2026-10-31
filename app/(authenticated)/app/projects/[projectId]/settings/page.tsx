@@ -29,7 +29,7 @@ export default async function ProjectSettingsPage({
     workspaceId: context.activeMembership.workspaceId,
   });
   return (
-    <div className="space-y-8">
+    <div className="app-page app-form-page">
       <ProjectSettingsForm
         allowedStatuses={[
           project.status,

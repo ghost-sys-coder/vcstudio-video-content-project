@@ -35,7 +35,7 @@ export default async function ProjectRenderPage({
   const role = context.activeMembership.role;
 
   return (
-    <div className="min-w-0 max-w-full space-y-5">
+    <div className="app-page max-w-full">
       <WorkspaceViewSwitch
         activeViewId="preview"
         projectId={project.id}

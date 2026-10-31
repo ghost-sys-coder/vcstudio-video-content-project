@@ -10,7 +10,7 @@ export function LandingHero() {
   return (
     <section className="relative overflow-hidden border-b pb-24 pt-20 sm:pt-28">
       <LandingDotGrid />
-      <div className="mx-auto max-w-3xl px-6 text-center lg:px-8">
+      <div className="app-public-container max-w-3xl text-center">
         <p className="font-mono text-xs uppercase tracking-[0.22em] text-muted-foreground">
           Plan · create · publish
         </p>

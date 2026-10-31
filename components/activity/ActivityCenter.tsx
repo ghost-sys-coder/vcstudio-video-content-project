@@ -28,13 +28,13 @@ export function ActivityCenter({
     return query ? `/app/activity?${query}` : "/app/activity";
   };
   return (
-    <main className="mx-auto w-full max-w-5xl space-y-6 p-4 md:p-8">
-      <header>
+    <div className="app-page">
+      <header className="app-heading">
         <p className="text-sm font-medium text-primary">
           Workspace attention inbox
         </p>
         <h1 className="text-3xl font-bold tracking-tight">Activity</h1>
-        <p className="mt-2 text-muted-foreground">
+        <p className="max-w-3xl text-muted-foreground">
           Review completions, failures, skipped schedules, and integration
           issues without changing their workflow state.
         </p>
@@ -88,6 +88,6 @@ export function ActivityCenter({
           Next
         </Button>
       </nav>
-    </main>
+    </div>
   );
 }

@@ -12,7 +12,7 @@ export default async function BrandProfilePage() {
   });
 
   return (
-    <div className="space-y-4 pt-4">
+    <div className="app-section pt-4">
       {view.profile.onboardingStatus !== "complete" ? (
         <p className="rounded-lg border border-notice-info-edge bg-notice-info px-2.5 py-2 text-sm text-notice-info-foreground">
           The interview is not finished — {view.completeness.requiredRemaining}{" "}

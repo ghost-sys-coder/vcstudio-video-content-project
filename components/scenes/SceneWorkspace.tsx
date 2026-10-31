@@ -168,7 +168,7 @@ export function SceneWorkspace({
   }, [dirty, rows, selectedSceneId]);
 
   return (
-    <div className="space-y-6">
+    <div className="app-page">
       <WorkspaceViewSwitch
         activeViewId="detail"
         projectId={projectId}

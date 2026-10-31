@@ -15,7 +15,7 @@ export default async function MarketingPublishPage() {
   });
 
   return (
-    <div className="p-6">
+    <div className="min-w-0">
       <SocialPostsWorkspace
         canCompose={can(context.activeMembership.role, "composePosts")}
         composerBasePath="/app/marketing/publish"

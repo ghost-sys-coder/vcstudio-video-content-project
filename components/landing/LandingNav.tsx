@@ -5,9 +5,9 @@ import { Button } from "@/components/ui/button";
 
 export function LandingNav() {
   return (
-    <header className="sticky top-0 z-20 px-4 pt-4">
-      <nav className="mx-auto flex h-14 max-w-4xl items-center rounded-full border bg-background/80 px-3 shadow-sm backdrop-blur">
-        <Link className="mr-auto pl-2" href="/" aria-label="VCStudio home">
+    <header className="sticky top-0 z-20 pt-4">
+      <nav className="app-public-container flex min-h-14 flex-wrap items-center gap-y-2 rounded-full border bg-background/80 px-4 py-2 shadow-sm backdrop-blur sm:px-6">
+        <Link className="mr-auto" href="/" aria-label="VCStudio home">
           <BrandLogo />
         </Link>
         <div className="hidden items-center gap-6 md:flex">

@@ -38,7 +38,7 @@ export default async function DashboardPage() {
   });
 
   return (
-    <div className="space-y-8">
+    <div className="app-page">
       <FirstValueOnboardingPanel tracks={tracks} />
       <DashboardOverview
         membership={context.activeMembership}

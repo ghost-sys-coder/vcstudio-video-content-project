@@ -11,9 +11,9 @@ const linkClassName =
 
 export function PrivacyPolicyPage() {
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-dvh bg-background text-foreground">
       <header className="border-b bg-background/95 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5 lg:px-8">
+        <div className="app-legal-container flex flex-wrap items-center justify-between gap-4 py-4">
           <Link aria-label="VCStudio home" href="/">
             <BrandLogo />
           </Link>
@@ -24,7 +24,7 @@ export function PrivacyPolicyPage() {
       </header>
 
       <main>
-        <article className="mx-auto max-w-5xl px-6 py-16 lg:px-8 lg:py-24">
+        <article className="app-legal-container py-12">
           <header className="max-w-3xl border-b pb-12">
             <p className="font-mono text-xs font-semibold tracking-[0.18em] text-[#607f94] uppercase">
               Legal

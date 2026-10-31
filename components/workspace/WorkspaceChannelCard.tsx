@@ -33,8 +33,8 @@ export function WorkspaceChannelCard({
 
   return (
     <li className="min-w-0">
-      <Card className="h-full gap-4 px-5 py-5 shadow-sm">
-        <CardContent className="flex-1 px-0">
+      <Card className="h-full gap-4 shadow-sm">
+        <CardContent className="flex-1">
           <div className="flex min-w-0 items-start gap-3">
             <div
               className={`flex size-10 shrink-0 items-center justify-center rounded-lg text-white ${PLATFORM_BRAND_BACKGROUND_CLASS[channel.platform]}`}
@@ -93,7 +93,7 @@ export function WorkspaceChannelCard({
         </CardContent>
 
         {canManageConnections && channel.status !== "revoked" ? (
-          <CardFooter className="mt-auto justify-end bg-transparent px-0 py-4">
+          <CardFooter className="mt-auto justify-end bg-transparent">
             <Button
               disabled={busy}
               onClick={() => onDisconnect(channel.id)}

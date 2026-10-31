@@ -2,8 +2,8 @@ import { WorkspaceOnboardingForm } from "@/components/onboarding/WorkspaceOnboar
 
 export function WorkspaceOnboarding({ displayName }: { displayName: string }) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-muted/30 px-6 py-16">
-      <section className="w-full max-w-xl rounded-2xl border bg-background p-8 shadow-sm sm:p-10">
+    <main className="app-standalone bg-muted/30">
+      <section className="app-panel w-full max-w-xl rounded-2xl border bg-background shadow-sm">
         <p className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
           Workspace setup
         </p>

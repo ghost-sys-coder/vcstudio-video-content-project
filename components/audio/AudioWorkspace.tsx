@@ -225,7 +225,7 @@ export function AudioWorkspace({
     );
 
   return (
-    <div className="space-y-5">
+    <div className="app-page">
       <AudioGenerationProgress
         progress={data.progress}
         timeline={data.timeline}

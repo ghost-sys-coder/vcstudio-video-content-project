@@ -22,7 +22,7 @@ export function ProjectOverviewPageContent({
     readiness.blockers.length > 0 || readiness.reviews.length > 0;
 
   return (
-    <section aria-labelledby="project-overview-heading" className="space-y-6">
+    <section aria-labelledby="project-overview-heading" className="app-page">
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="text-lg font-semibold" id="project-overview-heading">
           Overview

@@ -32,7 +32,7 @@ export default async function CampaignContentPage({
     contentItemIds: items.map((item) => item.id),
   });
   return (
-    <div className="space-y-5">
+    <div className="app-page">
       <CampaignApproveAllButton
         campaignId={campaign.id}
         count={items.filter((item) => item.status === "needs_review").length}

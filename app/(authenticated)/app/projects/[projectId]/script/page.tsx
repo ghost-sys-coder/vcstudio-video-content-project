@@ -48,7 +48,7 @@ export default async function ProjectScriptPage({
   ]);
   const claimCandidates = findClaimCandidates(draft.content);
   return (
-    <div className="space-y-6">
+    <div className="app-page">
       <BriefForm brief={brief} canEdit={canEdit} projectId={project.id} />
       <GenerateScriptPanel
         canEdit={canEdit}

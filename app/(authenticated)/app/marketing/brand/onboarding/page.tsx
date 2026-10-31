@@ -17,8 +17,8 @@ export default async function BrandOnboardingPage() {
   });
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <header className="space-y-1">
+    <div className="app-page app-form-page">
+      <header className="app-heading">
         <Button
           className="px-0"
           nativeButton={false}

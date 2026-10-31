@@ -7,7 +7,7 @@ export function CharacterGrid({
   characters: CharacterListItem[];
 }) {
   return (
-    <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+    <div className="app-grid sm:grid-cols-2 xl:grid-cols-3">
       {characters.map((character) => (
         <CharacterCard character={character} key={character.id} />
       ))}

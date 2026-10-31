@@ -22,7 +22,7 @@ export function SocialPostRow({
     <li className="min-w-0">
       <Card className="h-full gap-0 py-0 shadow-sm transition-colors hover:bg-accent focus-within:ring-2 focus-within:ring-ring">
         <Link
-          className="flex min-w-0 flex-1 flex-col rounded-2xl p-5 focus-visible:outline-none"
+          className="flex min-w-0 flex-1 flex-col rounded-2xl p-[var(--app-panel-padding)] focus-visible:outline-none"
           href={`${composerBasePath}/${post.id}`}
         >
           <div className="flex flex-1 flex-col gap-4">
