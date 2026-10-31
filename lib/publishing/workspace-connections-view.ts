@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { ContentPlatform } from "@/db/schema";
+import { platformConnectionLabel } from "@/lib/publishing/connection-label";
 import {
   listPlatformConnections,
   type PlatformConnectionSummary,
@@ -65,7 +66,7 @@ export function buildWorkspaceChannelsView(input: {
       .map((connection) => ({
         id: connection.id,
         platform: connection.platform,
-        platformLabel: CONTENT_PLATFORM_LABELS[connection.platform],
+        platformLabel: platformConnectionLabel(connection),
         accountName: connection.externalAccountName,
         accountUrl: connection.externalAccountUrl,
         status: connection.status,

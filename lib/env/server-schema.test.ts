@@ -166,6 +166,16 @@ describe("publishing environment validation", () => {
   it("still requires the token encryption key (needed by every platform)", () => {
     expect(publishingEnvironmentSchema.safeParse({}).success).toBe(false);
   });
+
+  it("accepts dedicated Pages credentials independently of the personal app", () => {
+    const result = publishingEnvironmentSchema.parse({
+      ...base,
+      LINKEDIN_PAGES_CLIENT_ID: "pages-id",
+      LINKEDIN_PAGES_CLIENT_SECRET: "pages-secret",
+    });
+    expect(result.LINKEDIN_PAGES_CLIENT_ID).toBe("pages-id");
+    expect(result.LINKEDIN_CLIENT_ID).toBeUndefined();
+  });
 });
 
 describe("speech provider environment validation", () => {

@@ -21,7 +21,7 @@ vi.mock("@/lib/env/server", () => ({
   getPublishingEnvironment: () => ({ PLATFORM_TOKEN_ENCRYPTION_KEY: "key" }),
 }));
 vi.mock("@/lib/publishing/social-post-registry", () => ({
-  createPlatformOAuthProvider: mocks.createProvider,
+  createConnectionOAuthProvider: mocks.createProvider,
 }));
 
 import { disconnectPlatformAuthorization } from "@/lib/publishing/disconnect-platform-connection";
@@ -79,7 +79,9 @@ describe("disconnectPlatformAuthorization", () => {
       disconnected: true,
       providerRevoked: false,
     });
-    expect(mocks.createProvider).toHaveBeenCalledExactlyOnceWith("linkedin");
+    expect(mocks.createProvider).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ platform: "linkedin" }),
+    );
     expect(mocks.openSecret).not.toHaveBeenCalled();
     expect(mocks.disconnect).toHaveBeenCalledExactlyOnceWith(input);
   });

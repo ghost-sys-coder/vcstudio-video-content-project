@@ -6,6 +6,7 @@ import { ConnectYouTubeButton } from "@/components/publish/ConnectYouTubeButton"
 import { ConnectFacebookButton } from "@/components/publish/ConnectFacebookButton";
 import { ConnectInstagramButton } from "@/components/publish/ConnectInstagramButton";
 import { ConnectLinkedInButton } from "@/components/publish/ConnectLinkedInButton";
+import { ConnectLinkedInPageButton } from "@/components/publish/ConnectLinkedInPageButton";
 import { ConnectTikTokButton } from "@/components/publish/ConnectTikTokButton";
 import { ConnectXButton } from "@/components/publish/ConnectXButton";
 import { FutureChannelPlatformCard } from "@/components/workspace/FutureChannelPlatformCard";
@@ -44,6 +45,16 @@ const LINKEDIN_OAUTH_MESSAGES: Record<string, string> = {
   failed: "The LinkedIn account could not be connected. Please try again.",
   forbidden: "You do not have permission to connect that account.",
   invalid: "The LinkedIn authorization response was invalid or expired.",
+};
+
+const LINKEDIN_PAGES_OAUTH_MESSAGES: Record<string, string> = {
+  connected: "The LinkedIn Page is now connected to this workspace.",
+  cancelled: "LinkedIn Page connection was cancelled.",
+  expired: "LinkedIn Page selection expired. Connect again.",
+  forbidden: "You do not have permission to connect that LinkedIn Page.",
+  invalid: "The LinkedIn Page authorization was invalid or expired.",
+  failed:
+    "The LinkedIn Page could not be connected. Check the Pages app's Community Management access and your Page role, then try again.",
 };
 
 const X_OAUTH_MESSAGES: Record<string, string> = {
@@ -95,6 +106,9 @@ export function WorkspaceChannelsSection({
       : null,
     oauthStatus.tiktok ? TIKTOK_OAUTH_MESSAGES[oauthStatus.tiktok] : null,
     oauthStatus.linkedin ? LINKEDIN_OAUTH_MESSAGES[oauthStatus.linkedin] : null,
+    oauthStatus.linkedinPages
+      ? LINKEDIN_PAGES_OAUTH_MESSAGES[oauthStatus.linkedinPages]
+      : null,
     oauthStatus.x ? X_OAUTH_MESSAGES[oauthStatus.x] : null,
   ].filter((message): message is string => Boolean(message));
 
@@ -141,9 +155,8 @@ export function WorkspaceChannelsSection({
           */}
           {canManageConnections && initialData.socialPostingEnabled ? (
             <>
-              <ConnectLinkedInButton
-                label={activeCount > 0 ? "Add LinkedIn" : "Connect LinkedIn"}
-              />
+              <ConnectLinkedInButton label="Connect LinkedIn profile" />
+              <ConnectLinkedInPageButton />
               <ConnectXButton label={activeCount > 0 ? "Add X" : "Connect X"} />
             </>
           ) : null}

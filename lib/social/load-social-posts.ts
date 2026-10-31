@@ -23,6 +23,7 @@ import {
   type SocialPostTargetView,
 } from "@/lib/social/social-post-view";
 import { CONTENT_PLATFORM_LABELS } from "@/lib/titles/title-view";
+import { platformConnectionLabel } from "@/lib/publishing/connection-label";
 import { toVisualMediaKind } from "@/lib/media/visual-media-kind";
 
 async function loadConnectionsByIdAndList(workspaceId: string): Promise<{
@@ -36,7 +37,7 @@ async function loadConnectionsByIdAndList(workspaceId: string): Promise<{
     const view: PostConnectionView = {
       id: connection.id,
       platform: connection.platform,
-      platformLabel: CONTENT_PLATFORM_LABELS[connection.platform],
+      platformLabel: platformConnectionLabel(connection),
       accountName: connection.externalAccountName,
       status: connection.status,
     };
@@ -59,7 +60,9 @@ function toTargetViews(
   return targets.map((target) =>
     toSocialPostTargetView({
       target,
-      platformLabel: CONTENT_PLATFORM_LABELS[target.platform],
+      platformLabel:
+        connectionsById.get(target.connectionId)?.platformLabel ??
+        CONTENT_PLATFORM_LABELS[target.platform],
       accountName:
         connectionsById.get(target.connectionId)?.accountName ??
         // A disconnected account keeps its history; the row survives because

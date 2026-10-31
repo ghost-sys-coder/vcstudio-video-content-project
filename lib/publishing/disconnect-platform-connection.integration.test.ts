@@ -13,6 +13,9 @@ const mocks = vi.hoisted(() => ({
     TIKTOK_API_CLIENT_SECRET: "tiktok-secret",
     LINKEDIN_CLIENT_ID: "linkedin-client",
     LINKEDIN_CLIENT_SECRET: "linkedin-secret",
+    LINKEDIN_PAGES_CLIENT_ID: "pages-client",
+    LINKEDIN_PAGES_CLIENT_SECRET: "pages-secret",
+    LINKEDIN_API_VERSION: "202607",
     TWITTER_CLIENT_ID: "twitter-client",
     TWITTER_CLIENT_SECRET: "twitter-secret",
     PLATFORM_TOKEN_ENCRYPTION_KEY: "test-key",
@@ -44,6 +47,19 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("disconnect with the real platform OAuth registry", () => {
+  it("disconnects a LinkedIn Page locally without revoking other Page/profile grants", async () => {
+    mocks.findConnection.mockResolvedValue({
+      platform: "linkedin",
+      externalAccountId: "urn:li:organization:42",
+      accessTokenSealed: "sealed-token",
+    });
+    await expect(disconnectPlatformAuthorization(input)).resolves.toEqual({
+      disconnected: true,
+      providerRevoked: false,
+    });
+    expect(mocks.disconnect).toHaveBeenCalledExactlyOnceWith(input);
+    expect(mocks.fetch).not.toHaveBeenCalled();
+  });
   it.each([
     "linkedin",
     "twitter",
@@ -54,6 +70,7 @@ describe("disconnect with the real platform OAuth registry", () => {
   ] as const)("clears the workspace's %s credentials", async (platform) => {
     mocks.findConnection.mockResolvedValue({
       platform,
+      externalAccountId: "member-id",
       accessTokenSealed: "sealed-token",
     });
     await expect(disconnectPlatformAuthorization(input)).resolves.toMatchObject(

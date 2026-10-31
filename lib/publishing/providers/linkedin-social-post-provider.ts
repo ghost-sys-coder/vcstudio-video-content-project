@@ -1,6 +1,8 @@
 import "server-only";
 
 import { z } from "zod";
+import { resolveLinkedInAccount } from "@/lib/publishing/linkedin-account";
+import { uploadLinkedInVideo } from "@/lib/publishing/providers/linkedin-video-upload";
 import type { ContentPlatform } from "@/db/schema";
 import { isNeverSentNetworkError } from "@/lib/publishing/network-failure";
 import type {
@@ -81,7 +83,7 @@ function failureForResponse(
         ? "transport_ambiguous"
         : "provider_server_error",
       safeMessage: mayHavePublished
-        ? "LinkedIn may have created the post but did not confirm it. Check the profile before retrying."
+        ? "LinkedIn may have created the post but did not confirm it. Check the LinkedIn destination before retrying."
         : "LinkedIn had a server error. Try again shortly.",
       retriable: !mayHavePublished,
       mayHavePublished,
@@ -89,7 +91,7 @@ function failureForResponse(
   return {
     category: mayHavePublished ? "transport_ambiguous" : "provider_error",
     safeMessage: mayHavePublished
-      ? "LinkedIn did not confirm the post. Check the profile before retrying."
+      ? "LinkedIn did not confirm the post. Check the LinkedIn destination before retrying."
       : "The LinkedIn post could not be created.",
     retriable: false,
     mayHavePublished,
@@ -97,13 +99,13 @@ function failureForResponse(
 }
 
 /**
- * Posts to a connected LinkedIn member profile via the versioned `/rest/posts`
- * API.
+ * Posts to a connected LinkedIn member profile or organization Page through
+ * the versioned `/rest/posts` API.
  *
  * Media is uploaded first and referenced by URN, which is why this is a
- * three-step flow rather than one request: initialize an upload, `PUT` the bytes
- * straight from the signed R2 URL, then create the post referencing the returned
- * URN. Alt text is carried through — LinkedIn is one of the platforms that
+ * staged flow: initialize an upload, transfer signed R2 bytes, finalize/process
+ * video when needed, then create the post referencing the returned URN.
+ * Alt text is carried through — LinkedIn is one of the platforms that
  * accepts it, and it is the only accessibility control available once a post is
  * live.
  */
@@ -124,19 +126,22 @@ export class LinkedInSocialPostProvider implements SocialPostProvider {
     accessToken: string;
     owner: string;
     item: SocialPostMediaItem;
+    waitForProcessing?: (milliseconds: number) => Promise<void>;
   }): Promise<string> {
-    const isVideo = input.item.kind === "video";
-    const endpoint = `${REST_BASE}/${isVideo ? "videos" : "images"}?action=initializeUpload`;
-    const body = isVideo
-      ? {
-          initializeUploadRequest: {
-            owner: input.owner,
-            fileSizeBytes: input.item.sizeBytes,
-            uploadCaptions: false,
-            uploadThumbnail: false,
-          },
-        }
-      : { initializeUploadRequest: { owner: input.owner } };
+    if (input.item.kind === "video")
+      return uploadLinkedInVideo({
+        ...input,
+        apiVersion: this.input.apiVersion,
+      });
+    if (input.item.kind !== "image")
+      fail({
+        category: "invalid_metadata",
+        safeMessage: "LinkedIn accepts images or one video for this post.",
+        retriable: false,
+        mayHavePublished: false,
+      });
+    const endpoint = `${REST_BASE}/images?action=initializeUpload`;
+    const body = { initializeUploadRequest: { owner: input.owner } };
 
     const initialize = await fetch(endpoint, {
       method: "POST",
@@ -151,7 +156,7 @@ export class LinkedInSocialPostProvider implements SocialPostProvider {
     );
     if (!initialize.ok || !parsed.success) fail(failureForResponse(initialize));
 
-    const urn = isVideo ? parsed.data.value.video : parsed.data.value.image;
+    const urn = parsed.data.value.image;
     if (!urn)
       fail({
         category: "provider_error",
@@ -183,7 +188,20 @@ export class LinkedInSocialPostProvider implements SocialPostProvider {
   }
 
   async publishPost(request: PublishPostRequest): Promise<PublishPostResult> {
-    const owner = `urn:li:person:${request.account.externalAccountId}`;
+    let owner: string;
+    try {
+      owner = resolveLinkedInAccount(
+        request.account.externalAccountId,
+      ).authorUrn;
+    } catch {
+      fail({
+        category: "invalid_metadata",
+        safeMessage:
+          "The LinkedIn account identity is invalid. Reconnect the account.",
+        retriable: false,
+        mayHavePublished: false,
+      });
+    }
 
     const uploaded: { urn: string; item: SocialPostMediaItem }[] = [];
     for (const [index, item] of request.media.entries()) {
@@ -192,6 +210,7 @@ export class LinkedInSocialPostProvider implements SocialPostProvider {
           accessToken: request.tokens.accessToken,
           owner,
           item,
+          waitForProcessing: request.waitForProcessing,
         }),
         item,
       });
@@ -258,12 +277,13 @@ export class LinkedInSocialPostProvider implements SocialPostProvider {
       fail({
         category: "transport_ambiguous",
         safeMessage:
-          "LinkedIn may have created the post but did not confirm it. Check the profile before retrying.",
+          "LinkedIn may have created the post but did not confirm it. Check the LinkedIn destination before retrying.",
         retriable: false,
         mayHavePublished: true,
       });
     }
-    if (!response.ok) fail(failureForResponse(response));
+    if (!response.ok)
+      fail(failureForResponse(response, response.status >= 500));
 
     const postUrn =
       response.headers.get("x-restli-id") ??
@@ -272,7 +292,7 @@ export class LinkedInSocialPostProvider implements SocialPostProvider {
       fail({
         category: "transport_ambiguous",
         safeMessage:
-          "LinkedIn accepted the post but returned no identifier. Check the profile before retrying.",
+          "LinkedIn accepted the post but returned no identifier. Check the LinkedIn destination before retrying.",
         retriable: false,
         mayHavePublished: true,
       });

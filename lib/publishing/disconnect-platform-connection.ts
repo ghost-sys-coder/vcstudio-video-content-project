@@ -4,7 +4,7 @@ import { disconnectPlatformConnection } from "@/db/commands/platform-connection-
 import { findPlatformConnectionWithTokens } from "@/db/repositories/publishing.repository";
 import { openSecret } from "@/lib/crypto/secret-box";
 import { getPublishingEnvironment } from "@/lib/env/server";
-import { createPlatformOAuthProvider } from "@/lib/publishing/social-post-registry";
+import { createConnectionOAuthProvider } from "@/lib/publishing/social-post-registry";
 
 export async function disconnectPlatformAuthorization(input: {
   connectionId: string;
@@ -16,7 +16,7 @@ export async function disconnectPlatformAuthorization(input: {
   let providerRevoked = false;
   if (connection.accessTokenSealed) {
     try {
-      const provider = createPlatformOAuthProvider(connection.platform);
+      const provider = createConnectionOAuthProvider(connection);
       if (provider.revokeAuthorization) {
         await provider.revokeAuthorization({
           accessToken: openSecret({

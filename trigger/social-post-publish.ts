@@ -25,7 +25,7 @@ import {
 } from "@/lib/publishing/video-publish-provider";
 import { PlatformNotConfiguredError } from "@/lib/publishing/provider-registry";
 import {
-  createPlatformOAuthProvider,
+  createConnectionOAuthProvider,
   createSocialPostProvider,
 } from "@/lib/publishing/social-post-registry";
 import { createMediaAssetDownloadUrl } from "@/lib/storage/media-asset-storage";
@@ -137,8 +137,8 @@ export const socialPostPublishTask = task({
               retriable: false,
               mayHavePublished: false,
             });
-          const refreshed = await createPlatformOAuthProvider(
-            target.platform,
+          const refreshed = await createConnectionOAuthProvider(
+            connection,
           ).refreshTokens({
             refreshToken: openSecret({
               sealed: connection.refreshTokenSealed,

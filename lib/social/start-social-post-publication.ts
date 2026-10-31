@@ -148,7 +148,7 @@ export async function startSocialPostPublication(input: {
       );
     // Fail fast with a clear message rather than dispatching a job that would
     // crash in the worker for a missing server credential.
-    if (!isSocialPostPlatformConfigured(connection.platform))
+    if (!isSocialPostPlatformConfigured(connection.platform, connection))
       throw new SocialPostPublicationError(
         "That platform isn't configured on the server yet. Contact an administrator.",
       );

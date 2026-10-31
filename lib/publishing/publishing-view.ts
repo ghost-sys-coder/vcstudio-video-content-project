@@ -44,6 +44,7 @@ import {
   type VideoContentPlatform,
 } from "@/lib/platforms/video-content-platforms";
 import { CONTENT_PLATFORM_LABELS } from "@/lib/titles/title-view";
+import { platformConnectionLabel } from "@/lib/publishing/connection-label";
 import { isSocialPostPlatform } from "@/lib/social/platform-post-capabilities";
 import type { PostConnectionView } from "@/lib/social/social-post-view";
 
@@ -226,7 +227,7 @@ export async function loadPublishingView(input: {
       .map((connection) => ({
         id: connection.id,
         platform: connection.platform,
-        platformLabel: CONTENT_PLATFORM_LABELS[connection.platform],
+        platformLabel: platformConnectionLabel(connection),
         accountName: connection.externalAccountName,
         status: connection.status,
       })),
@@ -264,7 +265,7 @@ export async function loadPublishingView(input: {
       .map((connection) => ({
         id: connection.id,
         platform: connection.platform,
-        platformLabel: CONTENT_PLATFORM_LABELS[connection.platform],
+        platformLabel: platformConnectionLabel(connection),
         accountName: connection.externalAccountName,
         accountUrl: connection.externalAccountUrl,
         status: connection.status,

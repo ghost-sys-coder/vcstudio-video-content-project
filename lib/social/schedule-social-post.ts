@@ -127,7 +127,7 @@ export async function scheduleSocialPostPublication(input: {
       throw new SocialPostScheduleError(
         "Posting to that platform is not available yet.",
       );
-    if (!isSocialPostPlatformConfigured(connection.platform))
+    if (!isSocialPostPlatformConfigured(connection.platform, connection))
       throw new SocialPostScheduleError(
         "That platform isn't configured on the server yet. Contact an administrator.",
       );

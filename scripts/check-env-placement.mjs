@@ -18,6 +18,18 @@ const keysByFile = new Map(
 );
 
 const rules = {
+  LINKEDIN_API_VERSION: {
+    required: [".env.example", ".env", ".env.vercel", ".env.trigger"],
+    forbidden: [],
+  },
+  LINKEDIN_PAGES_CLIENT_ID: {
+    required: [".env.example", ".env", ".env.vercel", ".env.trigger"],
+    forbidden: [],
+  },
+  LINKEDIN_PAGES_CLIENT_SECRET: {
+    required: [".env.example", ".env", ".env.vercel", ".env.trigger"],
+    forbidden: [],
+  },
   STORAGE_RECONCILIATION_DRY_RUN: {
     required: [".env.example", ".env", ".env.trigger"],
     forbidden: [".env.vercel"],

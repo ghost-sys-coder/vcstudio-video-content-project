@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -44,8 +45,13 @@ export function DisconnectChannelDialog({
     startTransition(async () => {
       try {
         const result = await onDisconnect(connectionId);
-        if (result.success) setOpen(false);
-        else setError(result.error ?? "The channel could not be disconnected.");
+        if (result.success) {
+          setOpen(false);
+          toast.success(`${platformLabel} account disconnected`, {
+            description: accountName,
+          });
+        } else
+          setError(result.error ?? "The channel could not be disconnected.");
       } catch {
         setError("The channel could not be disconnected. Please try again.");
       } finally {

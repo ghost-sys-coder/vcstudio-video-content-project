@@ -655,6 +655,9 @@ export const publishingEnvironmentSchema = z.object({
    */
   LINKEDIN_CLIENT_ID: z.string().optional(),
   LINKEDIN_CLIENT_SECRET: z.string().optional(),
+  /** Dedicated Community Management app, shared by web OAuth and token refresh. */
+  LINKEDIN_PAGES_CLIENT_ID: z.string().optional(),
+  LINKEDIN_PAGES_CLIENT_SECRET: z.string().optional(),
   /**
    * Versioned REST API date, e.g. `202607`. LinkedIn requires this header.
    *

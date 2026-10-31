@@ -10,6 +10,14 @@ be copied to another runtime merely for convenience.
 | `.env.trigger` | Trigger.dev                     | Background tasks and scheduled workers. Synchronized during deployment. Never committed. |
 | `.env.example` | Repository                      | Key catalogue and safe defaults only; contains no real credentials.                      |
 
+## LinkedIn Page credentials
+
+`LINKEDIN_PAGES_CLIENT_ID` and `LINKEDIN_PAGES_CLIENT_SECRET` identify the separate Community Management-only application. They belong in `.env`, `.env.vercel`, and `.env.trigger`: web routes authorize/connect Pages, and the worker refreshes their tokens using the same application. Preserve `LINKEDIN_CLIENT_ID`/`LINKEDIN_CLIENT_SECRET` for personal profiles. `LINKEDIN_API_VERSION` now belongs in both deployed runtimes because Page discovery and publishing share the versioned REST API.
+
+Local deployment files are credential sources, not proof of remote configuration. Vercel settings must receive the web values, and the existing Trigger.dev env synchronization supplies worker values when a deployment is separately authorized. Never start/deploy workers merely to verify this UI. `.env.example` is a credential-free key catalogue; optional blank values that would fail validation are commented. `E2E_CLERK_USER_EMAIL` stays local and is excluded from both deployment files.
+
+On 2026-10-31, at the user's request, the Pages client pair and API version were saved in Vercel's `vcstudio` Production environment and Trigger.dev project `proj_fyzoywswfqeczmuwiacz`'s `prod` environment. The client pair is stored as secrets in both services; write acknowledgements and remote metadata confirmed presence without exposing credentials. Trigger.dev's readable API version matches the local value. Its Marketing flag was found set to `true` and restored to `false`; Vercel's existing Production/Preview Marketing variable was also explicitly saved as `false`, preserving its target scope. Other Trigger.dev values were verified unchanged. No deployment, worker start, task execution, or schedule change accompanied these writes. Vercel deployments must be redeployed to receive changed project variables, and the Page implementation still requires deployment of the web app and updated worker.
+
 ## Marketing Studio pause on free tiers
 
 Keep `ENABLE_MARKETING_STUDIO=false` in `.env`, `.env.vercel`, and

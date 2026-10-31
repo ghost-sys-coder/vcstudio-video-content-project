@@ -10,6 +10,7 @@ export const connectionOAuthQuerySchema = z.object({
   facebook: connectionOAuthStatusSchema,
   instagram: connectionOAuthStatusSchema,
   linkedin: connectionOAuthStatusSchema,
+  linkedinPages: connectionOAuthStatusSchema.optional(),
   tiktok: connectionOAuthStatusSchema,
   x: connectionOAuthStatusSchema,
   youtube: connectionOAuthStatusSchema,

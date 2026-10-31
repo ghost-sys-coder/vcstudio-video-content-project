@@ -11,6 +11,8 @@ import {
 import { FacebookSocialPostProvider } from "@/lib/publishing/providers/facebook-social-post-provider";
 import { InstagramSocialPostProvider } from "@/lib/publishing/providers/instagram-social-post-provider";
 import { LinkedInOAuthProvider } from "@/lib/publishing/providers/linkedin-oauth-provider";
+import { LinkedInPagesProvider } from "@/lib/publishing/providers/linkedin-pages-provider";
+import { resolveLinkedInAccount } from "@/lib/publishing/linkedin-account";
 import { LinkedInSocialPostProvider } from "@/lib/publishing/providers/linkedin-social-post-provider";
 import { SimulatedSocialPostProvider } from "@/lib/publishing/providers/simulated-social-post-provider";
 import { TikTokSocialPostProvider } from "@/lib/publishing/providers/tiktok-social-post-provider";
@@ -42,13 +44,24 @@ function requireCredential(
  */
 export function isSocialPostPlatformConfigured(
   platform: ContentPlatform,
+  account?: { externalAccountId: string },
 ): boolean {
   const environment = getPublishingEnvironment();
   if (environment.ENABLE_SOCIAL_POST_SIMULATION) return true;
+  if (platform === "linkedin" && account) {
+    const kind = resolveLinkedInAccount(account.externalAccountId).kind;
+    return kind === "page"
+      ? Boolean(environment.LINKEDIN_PAGES_CLIENT_ID?.trim()) &&
+          Boolean(environment.LINKEDIN_PAGES_CLIENT_SECRET?.trim())
+      : Boolean(environment.LINKEDIN_CLIENT_ID?.trim()) &&
+          Boolean(environment.LINKEDIN_CLIENT_SECRET?.trim());
+  }
   if (platform === "linkedin")
     return (
-      Boolean(environment.LINKEDIN_CLIENT_ID?.trim()) &&
-      Boolean(environment.LINKEDIN_CLIENT_SECRET?.trim())
+      (Boolean(environment.LINKEDIN_CLIENT_ID?.trim()) &&
+        Boolean(environment.LINKEDIN_CLIENT_SECRET?.trim())) ||
+      (Boolean(environment.LINKEDIN_PAGES_CLIENT_ID?.trim()) &&
+        Boolean(environment.LINKEDIN_PAGES_CLIENT_SECRET?.trim()))
     );
   if (platform === "twitter")
     return (
@@ -89,6 +102,34 @@ export function createPlatformOAuthProvider(
     });
   }
   return createVideoPublishProvider(platform);
+}
+
+export function createLinkedInPagesProvider(): LinkedInPagesProvider {
+  const environment = getPublishingEnvironment();
+  return new LinkedInPagesProvider({
+    clientId: requireCredential(
+      environment.LINKEDIN_PAGES_CLIENT_ID,
+      "linkedin",
+    ),
+    clientSecret: requireCredential(
+      environment.LINKEDIN_PAGES_CLIENT_SECRET,
+      "linkedin",
+    ),
+    apiVersion: environment.LINKEDIN_API_VERSION,
+  });
+}
+
+/** Select credentials from the server-loaded identity, never from browser input. */
+export function createConnectionOAuthProvider(connection: {
+  platform: ContentPlatform;
+  externalAccountId: string;
+}): Pick<PlatformOAuthProvider, "refreshTokens" | "revokeAuthorization"> {
+  if (
+    connection.platform === "linkedin" &&
+    resolveLinkedInAccount(connection.externalAccountId).kind === "page"
+  )
+    return createLinkedInPagesProvider();
+  return createPlatformOAuthProvider(connection.platform);
 }
 
 export function createSocialPostProvider(
