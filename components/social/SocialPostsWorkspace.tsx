@@ -15,7 +15,7 @@ export function SocialPostsWorkspace({
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+        <div className="px-0.5">
           <h1 className="text-xl font-semibold">Posts</h1>
           <p className="text-sm text-muted-foreground">
             Write once, send to several connected accounts.
@@ -29,7 +29,7 @@ export function SocialPostsWorkspace({
       {posts.length === 0 ? (
         <EmptyPostsState />
       ) : (
-        <ul className="space-y-2">
+        <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))] gap-4">
           {posts.map((post) => (
             <SocialPostRow
               canDeleteDraft={canCompose}

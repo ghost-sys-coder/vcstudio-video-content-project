@@ -110,12 +110,9 @@ export function WorkspaceChannelsSection({
   ].filter((message): message is string => Boolean(message));
 
   return (
-    <section
-      aria-labelledby="workspace-channels-heading"
-      className="rounded-2xl border bg-card p-6 shadow-sm sm:p-8"
-    >
+    <section aria-labelledby="workspace-channels-heading" className="min-w-0">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
+        <div className="px-0.5">
           <p className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
             Publishing
           </p>
@@ -196,7 +193,7 @@ export function WorkspaceChannelsSection({
 
       <div className="mt-6">
         {initialData.channels.length > 0 ? (
-          <ul className="space-y-3">
+          <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))] gap-4">
             {initialData.channels.map((channel) => (
               <WorkspaceChannelCard
                 busy={isPending && pendingConnectionId === channel.id}

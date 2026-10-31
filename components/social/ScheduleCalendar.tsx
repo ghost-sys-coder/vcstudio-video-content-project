@@ -6,11 +6,7 @@ import { groupPostsByDay } from "@/lib/social/schedule-calendar";
 import type { SocialPostSummaryView } from "@/lib/social/social-post-view";
 
 /**
- * An agenda of what is going out and what already has, grouped by local day.
- *
- * Deliberately an agenda list rather than a month grid: a workspace posting a
- * few times a week gets a mostly-empty grid, and the useful question — "what is
- * queued next, and did anything fail?" — reads better as a list.
+ * Post cards in responsive grids, grouped by the viewer's local calendar day.
  *
  * Grouping runs in the browser because the day boundaries are the **viewer's**,
  * and the server has no reliable way to know their timezone.
@@ -34,7 +30,7 @@ export function ScheduleCalendar({
     <div className="space-y-6">
       {days.map((day) => (
         <section key={day.date}>
-          <h2 className="mb-2 text-sm font-medium">
+          <h2 className="mb-2 px-0.5 text-sm font-medium">
             <time dateTime={day.date}>
               {new Date(`${day.date}T00:00:00`).toLocaleDateString(undefined, {
                 weekday: "long",
@@ -43,7 +39,7 @@ export function ScheduleCalendar({
               })}
             </time>
           </h2>
-          <ul className="space-y-2">
+          <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))] gap-4">
             {day.posts.map((post) => (
               <SocialPostRow key={post.id} post={post} />
             ))}
