@@ -1,3 +1,5 @@
+import { FormSelect } from "@/components/ui/FormSelect";
+import { SelectItem } from "@/components/ui/select";
 import { selectWorkspaceAction } from "@/app/(authenticated)/app/actions";
 import { Button } from "@/components/ui/button";
 import type { WorkspaceMembershipView } from "@/db/repositories/workspaces.repository";
@@ -14,18 +16,20 @@ export function WorkspaceSelector({
       <label className="sr-only" htmlFor="workspace-selector">
         Active workspace
       </label>
-      <select
-        className="h-8 w-full rounded-lg border border-input bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      <FormSelect
         defaultValue={activeWorkspaceId}
         id="workspace-selector"
         name="workspaceId"
       >
         {memberships.map((membership) => (
-          <option key={membership.workspaceId} value={membership.workspaceId}>
+          <SelectItem
+            key={membership.workspaceId}
+            value={String(membership.workspaceId)}
+          >
             {membership.workspaceName} · {membership.role}
-          </option>
+          </SelectItem>
         ))}
-      </select>
+      </FormSelect>
       <Button className="w-full" size="sm" type="submit" variant="outline">
         Switch
       </Button>

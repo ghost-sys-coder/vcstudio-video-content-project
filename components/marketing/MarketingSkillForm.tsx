@@ -1,5 +1,8 @@
 "use client";
 
+import { FormSelect } from "@/components/ui/FormSelect";
+import { SelectItem } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Loader2Icon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -102,8 +105,8 @@ export function MarketingSkillForm({ skill }: { skill?: MarketingSkill }) {
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="grid min-w-0 gap-1 text-sm font-medium">
           Skill name
-          <input
-            className="h-10 min-w-0 rounded-lg border bg-background px-3"
+          <Input
+            className="min-w-0"
             defaultValue={skill?.name ?? "Local business insight"}
             name="name"
             required
@@ -111,10 +114,15 @@ export function MarketingSkillForm({ skill }: { skill?: MarketingSkill }) {
         </label>
         <label className="grid min-w-0 gap-1 text-sm font-medium">
           Slash command
-          <span className="flex h-10 min-w-0 items-center rounded-lg border bg-background px-3 focus-within:ring-2 focus-within:ring-ring/40">
-            <span className="text-muted-foreground">/</span>
-            <input
-              className="min-w-0 flex-1 bg-transparent outline-none"
+          <span className="relative block min-w-0">
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-y-0 left-3.5 z-10 flex items-center text-muted-foreground"
+            >
+              /
+            </span>
+            <Input
+              className="pl-7"
               defaultValue={skill?.slug ?? "local-business-insight"}
               name="slug"
               required
@@ -124,8 +132,7 @@ export function MarketingSkillForm({ skill }: { skill?: MarketingSkill }) {
       </div>
       <label className="grid gap-1 text-sm font-medium">
         Description
-        <input
-          className="h-10 rounded-lg border bg-background px-3"
+        <Input
           defaultValue={
             skill?.description ??
             "Create a useful, conversion-focused insight for local business owners."
@@ -137,32 +144,32 @@ export function MarketingSkillForm({ skill }: { skill?: MarketingSkill }) {
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="grid gap-1 text-sm font-medium">
           Writing format
-          <select
-            className="h-10 w-full min-w-0 rounded-lg border bg-background px-3"
+          <FormSelect
+            className="min-w-0"
             defaultValue={skill?.baseSkillKey ?? "create_social_post"}
             name="baseSkillKey"
           >
             {BASE_SKILLS.map(([value, label]) => (
-              <option key={value} value={value}>
+              <SelectItem key={value} value={String(value)}>
                 {label}
-              </option>
+              </SelectItem>
             ))}
-          </select>
+          </FormSelect>
         </label>
         <label className="grid gap-1 text-sm font-medium">
           Default platform (optional)
-          <select
-            className="h-10 w-full min-w-0 rounded-lg border bg-background px-3"
+          <FormSelect
+            className="min-w-0"
             defaultValue={skill?.defaultPlatform ?? ""}
             name="defaultPlatform"
           >
-            <option value="">Ask when used</option>
+            <SelectItem value="">Ask when used</SelectItem>
             {SOCIAL_POST_PLATFORMS.map((platform) => (
-              <option key={platform} value={platform}>
+              <SelectItem key={platform} value={String(platform)}>
                 {platform}
-              </option>
+              </SelectItem>
             ))}
-          </select>
+          </FormSelect>
         </label>
       </div>
       <label className="grid gap-1 text-sm font-medium">
@@ -214,8 +221,8 @@ export function MarketingSkillForm({ skill }: { skill?: MarketingSkill }) {
               <div className="grid gap-3 sm:grid-cols-[1fr_1.25fr_0.8fr_auto]">
                 <label className="grid min-w-0 gap-1 text-xs font-medium">
                   Key
-                  <input
-                    className="h-9 min-w-0 rounded-lg border bg-background px-2"
+                  <Input
+                    className="min-w-0"
                     onChange={(event) =>
                       setFields((current) =>
                         current.map((item, itemIndex) =>
@@ -230,8 +237,8 @@ export function MarketingSkillForm({ skill }: { skill?: MarketingSkill }) {
                 </label>
                 <label className="grid min-w-0 gap-1 text-xs font-medium">
                   Label
-                  <input
-                    className="h-9 min-w-0 rounded-lg border bg-background px-2"
+                  <Input
+                    className="min-w-0"
                     onChange={(event) =>
                       setFields((current) =>
                         current.map((item, itemIndex) =>
@@ -246,10 +253,10 @@ export function MarketingSkillForm({ skill }: { skill?: MarketingSkill }) {
                 </label>
                 <label className="grid min-w-0 gap-1 text-xs font-medium">
                   Type
-                  <select
-                    className="h-9 min-w-0 rounded-lg border bg-background px-2"
-                    onChange={(event) => {
-                      const type = event.target.value as EditorField["type"];
+                  <FormSelect
+                    className="min-w-0"
+                    onValueChange={(selectedValue) => {
+                      const type = selectedValue as EditorField["type"];
                       setFields((current) =>
                         current.map((item, itemIndex) =>
                           itemIndex === index
@@ -277,12 +284,12 @@ export function MarketingSkillForm({ skill }: { skill?: MarketingSkill }) {
                     }}
                     value={field.type}
                   >
-                    <option value="text">Short text</option>
-                    <option value="longtext">Long text</option>
-                    <option value="select">Select</option>
-                    <option value="number">Number</option>
-                    <option value="platform">Platform</option>
-                  </select>
+                    <SelectItem value="text">Short text</SelectItem>
+                    <SelectItem value="longtext">Long text</SelectItem>
+                    <SelectItem value="select">Select</SelectItem>
+                    <SelectItem value="number">Number</SelectItem>
+                    <SelectItem value="platform">Platform</SelectItem>
+                  </FormSelect>
                 </label>
                 <Button
                   aria-label={`Remove ${field.label}`}
@@ -302,8 +309,8 @@ export function MarketingSkillForm({ skill }: { skill?: MarketingSkill }) {
               <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
                 <label className="grid min-w-0 gap-1 text-xs font-medium">
                   Usable starting value
-                  <input
-                    className="h-9 min-w-0 rounded-lg border bg-background px-2"
+                  <Input
+                    className="min-w-0"
                     onChange={(event) =>
                       setFields((current) =>
                         current.map((item, itemIndex) =>
@@ -336,8 +343,7 @@ export function MarketingSkillForm({ skill }: { skill?: MarketingSkill }) {
               {field.type === "select" ? (
                 <label className="grid gap-1 text-xs font-medium">
                   Options (comma separated)
-                  <input
-                    className="h-9 rounded-lg border bg-background px-2"
+                  <Input
                     onChange={(event) =>
                       setFields((current) =>
                         current.map((item, itemIndex) =>

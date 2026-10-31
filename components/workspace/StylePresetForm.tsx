@@ -1,5 +1,8 @@
 "use client";
 
+import { FormSelect } from "@/components/ui/FormSelect";
+import { SelectItem } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import type { StylePresetActionState } from "@/app/(authenticated)/app/settings/workspace/style-actions";
@@ -70,8 +73,7 @@ export function StylePresetForm({
           >
             Name
           </label>
-          <input
-            className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm"
+          <Input
             defaultValue={preset?.name ?? ""}
             id={`${fieldPrefix}-name`}
             maxLength={80}
@@ -87,18 +89,17 @@ export function StylePresetForm({
           >
             Default aspect ratio
           </label>
-          <select
-            className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm"
+          <FormSelect
             defaultValue={preset?.defaultAspectRatio ?? "16:9"}
             id={`${fieldPrefix}-aspect`}
             name="defaultAspectRatio"
           >
             {ASPECT_RATIOS.map((ratio) => (
-              <option key={ratio.value} value={ratio.value}>
+              <SelectItem key={ratio.value} value={String(ratio.value)}>
                 {ratio.label}
-              </option>
+              </SelectItem>
             ))}
-          </select>
+          </FormSelect>
         </div>
       </div>
 
@@ -109,8 +110,7 @@ export function StylePresetForm({
         >
           Description
         </label>
-        <input
-          className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm"
+        <Input
           defaultValue={preset?.description ?? ""}
           id={`${fieldPrefix}-description`}
           maxLength={600}

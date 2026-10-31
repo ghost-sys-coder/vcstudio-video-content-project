@@ -1,7 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { PostComposer } from "@/components/social/PostComposer";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
-import { loadMediaLibrary } from "@/lib/media/load-media-library";
 import { getMediaLibraryEnvironment } from "@/lib/env/server";
 import { loadSocialPostComposerView } from "@/lib/social/load-social-posts";
 import { can } from "@/lib/policies/workspace-policy";
@@ -21,9 +20,8 @@ export default async function SocialPostPage({
   const workspaceId = context.activeMembership.workspaceId;
   const limits = getMediaLibraryEnvironment();
 
-  const [view, library, campaignConnectionId] = await Promise.all([
+  const [view, campaignConnectionId] = await Promise.all([
     loadSocialPostComposerView({ workspaceId, postId }),
-    loadMediaLibrary({ workspaceId }),
     findCampaignConnectionForSocialPost({ workspaceId, socialPostId: postId }),
   ]);
   // Null covers both "does not exist" and "belongs to another workspace" — the
@@ -43,7 +41,6 @@ export default async function SocialPostPage({
     <PostComposer
       canPublish={can(context.activeMembership.role, "publishPosts")}
       canUpload={can(context.activeMembership.role, "manageMediaLibrary")}
-      library={library.assets}
       maxImageBytes={limits.MAX_MEDIA_IMAGE_BYTES}
       maxVideoBytes={limits.MAX_MEDIA_VIDEO_BYTES}
       view={campaignView}

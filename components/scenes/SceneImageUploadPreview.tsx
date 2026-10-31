@@ -55,6 +55,8 @@ export function SceneImageUploadPreview({
             would need a remote pattern for a URL that changes every time. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
+          loading="lazy"
+          decoding="async"
           alt={
             fileName ? `Preview of ${fileName}` : "Preview of the chosen image"
           }

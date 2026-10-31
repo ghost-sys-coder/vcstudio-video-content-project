@@ -1,5 +1,7 @@
 "use client";
 
+import { FormSelect } from "@/components/ui/FormSelect";
+import { SelectItem } from "@/components/ui/select";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -77,33 +79,31 @@ export function VoicePresetForm({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="voice-preset-voice">Voice</Label>
-              <select
-                className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm"
+              <FormSelect
                 id="voice-preset-voice"
-                onChange={(event) => setVoice(event.target.value)}
+                onValueChange={(selectedValue) => setVoice(selectedValue)}
                 value={voice}
               >
                 {OPENAI_VOICES.map((option) => (
-                  <option key={option} value={option}>
+                  <SelectItem key={option} value={String(option)}>
                     {option}
-                  </option>
+                  </SelectItem>
                 ))}
-              </select>
+              </FormSelect>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="voice-preset-format">Format</Label>
-              <select
-                className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm"
+              <FormSelect
                 id="voice-preset-format"
-                onChange={(event) => setFormat(event.target.value)}
+                onValueChange={(selectedValue) => setFormat(selectedValue)}
                 value={format}
               >
                 {AUDIO_FORMATS.map((option) => (
-                  <option key={option} value={option}>
+                  <SelectItem key={option} value={String(option)}>
                     {option}
-                  </option>
+                  </SelectItem>
                 ))}
-              </select>
+              </FormSelect>
             </div>
           </div>
           <div className="space-y-1.5">

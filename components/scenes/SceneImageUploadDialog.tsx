@@ -1,5 +1,7 @@
 "use client";
 
+import { FormSelect } from "@/components/ui/FormSelect";
+import { SelectItem } from "@/components/ui/select";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { UploadIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -133,24 +135,23 @@ export function SceneImageUploadDialog({
 
           <div className="space-y-2">
             <Label htmlFor="scene-image-upload-size">Size</Label>
-            <select
-              className="h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm"
+            <FormSelect
               disabled={pending}
               id="scene-image-upload-size"
-              onChange={(event) => {
+              onValueChange={(selectedValue) => {
                 const option = SCENE_IMAGE_SIZE_OPTIONS.find(
-                  (candidate) => candidate.value === event.target.value,
+                  (candidate) => candidate.value === selectedValue,
                 );
                 if (option) setSize(option.value);
               }}
               value={size}
             >
               {SCENE_IMAGE_SIZE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
+                <SelectItem key={option.value} value={String(option.value)}>
                   {option.label} ({option.description})
-                </option>
+                </SelectItem>
               ))}
-            </select>
+            </FormSelect>
           </div>
 
           <div className="space-y-2">

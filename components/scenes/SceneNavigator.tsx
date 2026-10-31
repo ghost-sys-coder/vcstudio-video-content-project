@@ -1,3 +1,5 @@
+import { FormSelect } from "@/components/ui/FormSelect";
+import { SelectItem } from "@/components/ui/select";
 import type {
   SceneNavigationRow,
   SceneStatusFilter,
@@ -64,23 +66,22 @@ export function SceneNavigator({
           <Label className="sr-only" htmlFor="scene-status-filter">
             Filter scenes by status
           </Label>
-          <select
-            className="h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+          <FormSelect
             id="scene-status-filter"
-            onChange={(event) => {
+            onValueChange={(selectedValue) => {
               const selectedStatus = statusOptions.find(
-                (option) => option.value === event.target.value,
+                (option) => option.value === selectedValue,
               );
               onStatusChange(selectedStatus?.value ?? "all");
             }}
             value={status}
           >
             {statusOptions.map((option) => (
-              <option key={option.value} value={option.value}>
+              <SelectItem key={option.value} value={String(option.value)}>
                 {option.label}
-              </option>
+              </SelectItem>
             ))}
-          </select>
+          </FormSelect>
         </div>
         <p aria-live="polite" className="text-xs text-muted-foreground">
           Showing {rows.length} of {totalCount}

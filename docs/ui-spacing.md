@@ -44,6 +44,10 @@ The navbar and main content share `app-container`, capped at 1600px and centered
 
 Keep navigation, labels, counters, tables, editing controls, timeline geometry, and dense thumbnail grids at appropriate 4/8/12/16px spacing. Media aspect ratios and renderer coordinates are functional geometry and do not inherit page spacing. Avoid changing those values during a general page-spacing update.
 
+## Form controls
+
+Use the existing shadcn `Select` primitives, with `FormSelect` for a named form field or a simple controlled choice. `FormSelect` supplies labels before the popup opens and preserves uncontrolled form reset behavior. Every `SelectItem` must have an explicit string value, including `value=""` for an empty choice. Use `Input` for neighboring text, number, date, time, and color fields. Both `SelectTrigger` and `Input` are 40px tall by default; keep that height consistent across a row. A multiline textarea, checkbox, radio, or range slider retains its appropriate geometry.
+
 ## Other surfaces
 
 The public site uses `app-public-container` with the same responsive gutters and a 1280px cap. Its hero, graphic mockups, and promotional sections retain their larger composition spacing. Legal headers and articles share `app-legal-container`, capped at the 768px reading width. Authentication, onboarding, and invitations use `app-standalone` for viewport-safe centering and the same responsive gutters. Dialogs and sheets retain the existing shadcn spacing and viewport clearances.

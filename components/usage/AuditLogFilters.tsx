@@ -1,5 +1,7 @@
 "use client";
 
+import { FormSelect } from "@/components/ui/FormSelect";
+import { SelectItem } from "@/components/ui/select";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Label } from "@/components/ui/label";
 import { AUDIT_ACTION_LABELS } from "@/lib/audit/audit-actions";
@@ -25,19 +27,19 @@ export function AuditLogFilters({ action }: { action: string | null }) {
       <Label className="text-sm" htmlFor="audit-action-filter">
         Filter
       </Label>
-      <select
-        className="rounded-md border bg-background px-2 py-1 text-sm"
+      <FormSelect
+        className="w-auto"
         id="audit-action-filter"
-        onChange={(event) => onChange(event.currentTarget.value)}
+        onValueChange={(selectedValue) => onChange(selectedValue)}
         value={action ?? ""}
       >
-        <option value="">All actions</option>
+        <SelectItem value="">All actions</SelectItem>
         {ACTIONS.map(([value, label]) => (
-          <option key={value} value={value}>
+          <SelectItem key={value} value={String(value)}>
             {label}
-          </option>
+          </SelectItem>
         ))}
-      </select>
+      </FormSelect>
     </div>
   );
 }

@@ -1,5 +1,11 @@
 "use client";
 
+import { FormSelect } from "@/components/ui/FormSelect";
+import {
+  SelectItem,
+  SelectGroup,
+  SelectGroupLabel,
+} from "@/components/ui/select";
 import { AlertTriangleIcon, LinkIcon, Trash2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type {
@@ -176,30 +182,30 @@ export function EditorialClaimCard({
           <label className="sr-only" htmlFor={`cite-${claim.id}`}>
             Cite a source for this claim
           </label>
-          <select
-            className="h-8 rounded-lg border border-input bg-background px-2 text-xs"
-            defaultValue=""
+          <FormSelect
+            className="w-auto max-w-full"
+            value=""
             disabled={busy}
             id={`cite-${claim.id}`}
-            onChange={(event) => {
-              const [sourceId, stance] = event.target.value.split("|");
+            onValueChange={(selectedValue) => {
+              const [sourceId, stance] = selectedValue.split("|");
               if (sourceId && (stance === "supports" || stance === "disputes"))
                 onCite(claim.id, sourceId, stance);
-              event.target.value = "";
             }}
           >
-            <option value="">Cite a source…</option>
+            <SelectItem value="">Cite a source…</SelectItem>
             {uncited.map((source) => (
-              <optgroup key={source.id} label={source.title}>
-                <option value={`${source.id}|supports`}>
+              <SelectGroup key={source.id}>
+                <SelectGroupLabel>{source.title}</SelectGroupLabel>
+                <SelectItem value={String(`${source.id}|supports`)}>
                   Supports this claim
-                </option>
-                <option value={`${source.id}|disputes`}>
+                </SelectItem>
+                <SelectItem value={String(`${source.id}|disputes`)}>
                   Disputes this claim
-                </option>
-              </optgroup>
+                </SelectItem>
+              </SelectGroup>
             ))}
-          </select>
+          </FormSelect>
         </div>
       ) : null}
     </li>

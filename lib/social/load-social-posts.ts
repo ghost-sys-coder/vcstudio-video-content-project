@@ -4,6 +4,7 @@ import type { SocialPostTarget } from "@/db/schema";
 import { listPlatformConnections } from "@/db/repositories/publishing.repository";
 import {
   listSocialPostMedia,
+  listSocialPostMediaSummaries,
   listSocialPostTargets,
   listSocialPostTargetsForPosts,
   listSocialPosts,
@@ -71,15 +72,21 @@ function toTargetViews(
 
 export async function loadSocialPostsView(input: {
   workspaceId: string;
+  includePreviews?: boolean;
 }): Promise<SocialPostSummaryView[]> {
   const posts = await listSocialPosts({ workspaceId: input.workspaceId });
   if (posts.length === 0) return [];
 
-  const [{ byId }, targets] = await Promise.all([
+  const [{ byId }, targets, mediaByPost] = await Promise.all([
     loadConnectionsByIdAndList(input.workspaceId),
     listSocialPostTargetsForPosts({
       workspaceId: input.workspaceId,
       postIds: posts.map((post) => post.id),
+    }),
+    listSocialPostMediaSummaries({
+      workspaceId: input.workspaceId,
+      postIds: posts.map((post) => post.id),
+      includePreviews: input.includePreviews,
     }),
   ]);
 
@@ -90,34 +97,23 @@ export async function loadSocialPostsView(input: {
     else targetsByPost.set(target.postId, [target]);
   }
 
-  // Attachment counts come from the per-post media lookup rather than a join,
-  // because the list only needs a count and the page size is bounded.
-  const mediaByPost = await Promise.all(
-    posts.map(
-      async (post) =>
-        await listSocialPostMedia({
-          workspaceId: input.workspaceId,
-          postId: post.id,
-        }),
-    ),
-  );
-
   return Promise.all(
-    posts.map(async (post, index) => {
-      const media = mediaByPost[index] ?? [];
-      const first = media.find(
-        (attachment) => !attachment.unavailable && attachment.objectKey !== "",
-      );
+    posts.map(async (post) => {
+      const media = mediaByPost.get(post.id);
       return toSocialPostSummaryView({
         post,
         targets: toTargetViews(targetsByPost.get(post.id) ?? [], byId),
-        mediaCount: media.length,
-        mediaPreviewUrl: first
-          ? await createMediaAssetDownloadUrl(first.objectKey)
-          : null,
+        mediaCount: media?.mediaCount ?? 0,
+        mediaPreviewUrl:
+          input.includePreviews && media?.previewObjectKey
+            ? await createMediaAssetDownloadUrl(media.previewObjectKey)
+            : null,
         // Null for a sound file rather than a guess: the preview tile shows
         // an image or a video, and audio is not attachable to a post.
-        mediaKind: first ? toVisualMediaKind(first.kind) : null,
+        mediaKind:
+          input.includePreviews && media?.previewKind
+            ? toVisualMediaKind(media.previewKind)
+            : null,
       });
     }),
   );

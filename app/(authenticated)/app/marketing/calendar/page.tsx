@@ -13,7 +13,7 @@ export default async function MarketingCalendarPage() {
   const workspaceId = context.activeMembership.workspaceId;
   const [items, posts] = await Promise.all([
     listMarketingCalendarItems({ workspaceId }),
-    loadSocialPostsView({ workspaceId }),
+    loadSocialPostsView({ workspaceId, includePreviews: true }),
   ]);
   const entries: MarketingCalendarEntry[] = [
     ...posts

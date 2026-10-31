@@ -1,5 +1,8 @@
 "use client";
 
+import { FormSelect } from "@/components/ui/FormSelect";
+import { SelectItem } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import Link from "next/link";
 import { saveMarketingCampaignAction } from "@/app/(authenticated)/app/marketing/campaigns/actions";
@@ -90,8 +93,7 @@ export function MarketingCampaignForm({
       </fieldset>
       <label className="grid gap-1 text-sm font-medium">
         Campaign name
-        <input
-          className="h-10 rounded-lg border bg-background px-3"
+        <Input
           defaultValue={campaign?.name ?? NEW_MARKETING_CAMPAIGN_DEFAULTS.name}
           name="name"
           required
@@ -100,8 +102,7 @@ export function MarketingCampaignForm({
       <div className="grid gap-4 sm:grid-cols-3">
         <label className="grid gap-1 text-sm font-medium">
           Objective
-          <select
-            className="h-10 rounded-lg border bg-background px-3"
+          <FormSelect
             defaultValue={
               campaign?.objective ?? NEW_MARKETING_CAMPAIGN_DEFAULTS.objective
             }
@@ -117,16 +118,15 @@ export function MarketingCampaignForm({
                 "hiring",
               ] as const
             ).map((value) => (
-              <option key={value} value={value}>
+              <SelectItem key={value} value={String(value)}>
                 {value}
-              </option>
+              </SelectItem>
             ))}
-          </select>
+          </FormSelect>
         </label>
         <label className="grid gap-1 text-sm font-medium">
           Start date
-          <input
-            className="h-10 rounded-lg border bg-background px-3"
+          <Input
             defaultValue={
               campaign?.startDate ?? new Date().toISOString().slice(0, 10)
             }
@@ -137,8 +137,7 @@ export function MarketingCampaignForm({
         </label>
         <label className="grid gap-1 text-sm font-medium">
           End date
-          <input
-            className="h-10 rounded-lg border bg-background px-3"
+          <Input
             defaultValue={campaign?.endDate ?? ""}
             name="endDate"
             type="date"

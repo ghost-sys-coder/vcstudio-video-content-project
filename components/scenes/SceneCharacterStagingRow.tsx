@@ -1,5 +1,7 @@
 "use client";
 
+import { FormSelect } from "@/components/ui/FormSelect";
+import { SelectItem } from "@/components/ui/select";
 import { useState, useTransition } from "react";
 import { setSceneCharacterStagingAction } from "@/app/(authenticated)/app/projects/[projectId]/scenes/actions";
 import type { Character, SceneCharacterStageSlot } from "@/db/schema";
@@ -63,22 +65,22 @@ export function SceneCharacterStagingRow({
       <label className="text-xs text-muted-foreground" htmlFor={slotFieldId}>
         Position
       </label>
-      <select
-        className="h-8 rounded-lg border bg-background px-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+      <FormSelect
+        className="w-auto min-w-24"
         disabled={!canEdit || pending}
         id={slotFieldId}
-        onChange={(event) =>
+        onValueChange={(selectedValue) =>
           save({
-            stageSlot: event.target.value as SceneCharacterStageSlot,
+            stageSlot: selectedValue as SceneCharacterStageSlot,
             speaks: isSpeaker,
           })
         }
         value={stageSlot}
       >
-        <option value="left">Left</option>
-        <option value="center">Center</option>
-        <option value="right">Right</option>
-      </select>
+        <SelectItem value="left">Left</SelectItem>
+        <SelectItem value="center">Center</SelectItem>
+        <SelectItem value="right">Right</SelectItem>
+      </FormSelect>
 
       <label
         className="flex items-center gap-1.5 text-xs"

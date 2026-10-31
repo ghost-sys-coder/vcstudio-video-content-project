@@ -1,5 +1,7 @@
 "use client";
 
+import { FormSelect } from "@/components/ui/FormSelect";
+import { SelectItem } from "@/components/ui/select";
 import { type FormEvent, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -91,35 +93,33 @@ export function IdeaGeneratorForm({
         </div>
         <div className="space-y-2">
           <Label htmlFor="idea-platform">Platform</Label>
-          <select
-            className="h-8 w-full rounded-lg border bg-background px-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+          <FormSelect
             defaultValue=""
             disabled={!canEdit}
             id="idea-platform"
             name="platform"
           >
-            <option value="">Any platform (best fit per idea)</option>
-            <option value="youtube">YouTube</option>
-            <option value="tiktok">TikTok</option>
-            <option value="facebook">Facebook</option>
-            <option value="instagram">Instagram</option>
-          </select>
+            <SelectItem value="">Any platform (best fit per idea)</SelectItem>
+            <SelectItem value="youtube">YouTube</SelectItem>
+            <SelectItem value="tiktok">TikTok</SelectItem>
+            <SelectItem value="facebook">Facebook</SelectItem>
+            <SelectItem value="instagram">Instagram</SelectItem>
+          </FormSelect>
         </div>
         <div className="space-y-2">
           <Label htmlFor="idea-count">How many</Label>
-          <select
-            className="h-8 w-full rounded-lg border bg-background px-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+          <FormSelect
             defaultValue={String(safeDefault)}
             disabled={!canEdit}
             id="idea-count"
             name="count"
           >
             {counts.map((count) => (
-              <option key={count} value={count}>
+              <SelectItem key={count} value={String(count)}>
                 {count} ideas
-              </option>
+              </SelectItem>
             ))}
-          </select>
+          </FormSelect>
         </div>
         <div className="space-y-2 sm:col-span-2">
           <Label htmlFor="idea-tone">Tone / style (optional)</Label>

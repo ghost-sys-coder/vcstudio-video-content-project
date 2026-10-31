@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { Clock3Icon } from "lucide-react";
 import type { MarketingCalendarEntry } from "@/lib/marketing/calendar/marketing-calendar-grid";
@@ -30,13 +31,14 @@ export function MarketingCalendarPostCard({
       className="group relative block min-h-24 overflow-hidden rounded-xl bg-[#0b1f25] text-white shadow-sm ring-1 ring-black/10 transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       href={href}
     >
-      {entry.mediaPreviewUrl ? (
-        <div
+      {entry.mediaPreviewUrl && entry.mediaKind === "image" ? (
+        <img
           aria-hidden
-          className="absolute inset-0 bg-cover bg-center opacity-75 transition group-hover:scale-[1.03]"
-          style={{
-            backgroundImage: `url(${JSON.stringify(entry.mediaPreviewUrl).slice(1, -1)})`,
-          }}
+          alt=""
+          className="absolute inset-0 size-full object-cover opacity-75 transition group-hover:scale-[1.03]"
+          decoding="async"
+          loading="lazy"
+          src={entry.mediaPreviewUrl}
         />
       ) : (
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(198,255,45,0.28),transparent_55%)]" />

@@ -30,6 +30,8 @@ export function ThumbnailUploadPreview({
     >
       {/* eslint-disable-next-line @next/next/no-img-element -- a local object URL for a file that has not been uploaded yet */}
       <img
+        loading="lazy"
+        decoding="async"
         alt={`Preview of the ${platformLabel} thumbnail to upload`}
         className="absolute inset-0 h-full w-full object-contain"
         onError={onUnreadable}

@@ -77,6 +77,8 @@ export function ReleaseThumbnailChooser({
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- an authenticated redirect route, not a static asset */}
             <img
+              loading="lazy"
+              decoding="async"
               alt=""
               className="h-full w-auto object-cover"
               src={`/api/projects/${projectId}/thumbnails/${thumbnail.id}/asset`}

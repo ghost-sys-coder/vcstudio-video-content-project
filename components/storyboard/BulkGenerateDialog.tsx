@@ -1,5 +1,7 @@
 "use client";
 
+import { FormSelect } from "@/components/ui/FormSelect";
+import { SelectItem } from "@/components/ui/select";
 import { useMemo, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -107,19 +109,23 @@ export function BulkGenerateDialog({
             <label className="text-sm font-medium" htmlFor="bulk-style-preset">
               Style preset
             </label>
-            <select
-              className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm"
+            <FormSelect
               id="bulk-style-preset"
-              onChange={(event) => setStylePresetVersionId(event.target.value)}
+              onValueChange={(selectedValue) =>
+                setStylePresetVersionId(selectedValue)
+              }
               value={stylePresetVersionId}
             >
               {stylePresets.map((preset) => (
-                <option key={preset.versionId} value={preset.versionId}>
+                <SelectItem
+                  key={preset.versionId}
+                  value={String(preset.versionId)}
+                >
                   {preset.name} v{preset.version}
                   {preset.isDefault ? " (default)" : ""}
-                </option>
+                </SelectItem>
               ))}
-            </select>
+            </FormSelect>
           </div>
 
           <fieldset className="space-y-2">

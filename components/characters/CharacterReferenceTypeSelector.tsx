@@ -1,3 +1,5 @@
+import { FormSelect } from "@/components/ui/FormSelect";
+import { SelectItem } from "@/components/ui/select";
 import type { CharacterReferenceType } from "@/db/schema";
 import { Label } from "@/components/ui/label";
 
@@ -46,24 +48,23 @@ export function CharacterReferenceTypeSelector({
   return (
     <div className="space-y-2">
       <Label htmlFor="character-reference-type">Reference type</Label>
-      <select
-        className="h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm"
+      <FormSelect
         disabled={disabled}
         id="character-reference-type"
-        onChange={(event) => {
+        onValueChange={(selectedValue) => {
           const type = characterReferenceTypes.find(
-            (item) => item === event.target.value,
+            (item) => item === selectedValue,
           );
           if (type) onChange(type);
         }}
         value={value}
       >
         {Object.entries(characterReferenceTypeLabels).map(([type, label]) => (
-          <option key={type} value={type}>
+          <SelectItem key={type} value={String(type)}>
             {label}
-          </option>
+          </SelectItem>
         ))}
-      </select>
+      </FormSelect>
     </div>
   );
 }

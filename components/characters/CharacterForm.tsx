@@ -1,5 +1,7 @@
 "use client";
 
+import { FormSelect } from "@/components/ui/FormSelect";
+import { SelectItem } from "@/components/ui/select";
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Character } from "@/db/schema";
@@ -101,19 +103,18 @@ export function CharacterForm({
         </div>
         <div className="space-y-2">
           <Label htmlFor="character-status">Status</Label>
-          <select
-            className="h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm"
+          <FormSelect
             defaultValue={character?.status ?? "draft"}
             disabled={readOnly}
             id="character-status"
             name="status"
           >
-            <option value="draft">Draft</option>
-            <option value="active">Active</option>
+            <SelectItem value="draft">Draft</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
             {character?.status === "archived" ? (
-              <option value="archived">Archived</option>
+              <SelectItem value="archived">Archived</SelectItem>
             ) : null}
-          </select>
+          </FormSelect>
         </div>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">

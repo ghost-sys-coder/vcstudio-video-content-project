@@ -1,5 +1,7 @@
 "use client";
 
+import { FormSelect } from "@/components/ui/FormSelect";
+import { SelectItem } from "@/components/ui/select";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { saveRenderEffectsAction } from "@/app/(authenticated)/app/projects/[projectId]/render/actions";
@@ -76,20 +78,19 @@ export function RenderEffectsPanel({
           <label className="text-sm font-medium" htmlFor="effects-background">
             Background sound
           </label>
-          <select
-            className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm"
+          <FormSelect
             defaultValue={effects.backgroundMediaAssetId ?? ""}
             disabled={!canEdit}
             id="effects-background"
             name="backgroundMediaAssetId"
           >
-            <option value="">No background sound</option>
+            <SelectItem value="">No background sound</SelectItem>
             {effects.availableAudio.map((asset) => (
-              <option key={asset.id} value={asset.id}>
+              <SelectItem key={asset.id} value={String(asset.id)}>
                 {asset.title}
-              </option>
+              </SelectItem>
             ))}
-          </select>
+          </FormSelect>
           {effects.availableAudio.length === 0 ? (
             <p className="text-xs text-muted-foreground">
               No audio in the media library yet. Upload a track there and it
@@ -154,19 +155,19 @@ export function RenderEffectsPanel({
             <label className="text-sm font-medium" htmlFor="effects-position">
               Meter position
             </label>
-            <select
-              className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm sm:w-64"
+            <FormSelect
+              className="sm:w-64"
               defaultValue={effects.levelMeterPosition}
               disabled={!canEdit || !meterEnabled}
               id="effects-position"
               name="levelMeterPosition"
             >
               {METER_POSITIONS.map((position) => (
-                <option key={position.value} value={position.value}>
+                <SelectItem key={position.value} value={String(position.value)}>
                   {position.label}
-                </option>
+                </SelectItem>
               ))}
-            </select>
+            </FormSelect>
           </div>
         </div>
 

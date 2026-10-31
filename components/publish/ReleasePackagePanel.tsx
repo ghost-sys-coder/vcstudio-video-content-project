@@ -1,5 +1,7 @@
 "use client";
 
+import { FormSelect } from "@/components/ui/FormSelect";
+import { SelectItem } from "@/components/ui/select";
 import { useCallback, useMemo, useState } from "react";
 import { PackageIcon } from "lucide-react";
 import { loadReleasePackagesAction } from "@/app/(authenticated)/app/projects/[projectId]/publish/actions";
@@ -75,18 +77,18 @@ export function ReleasePackagePanel({
         <Label className="text-xs" htmlFor="release-destination">
           Destination
         </Label>
-        <select
-          className="mt-1 h-9 w-full max-w-md rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+        <FormSelect
+          className="mt-1 max-w-md"
           id="release-destination"
-          onChange={(event) => setActiveKey(event.target.value)}
+          onValueChange={(selectedValue) => setActiveKey(selectedValue)}
           value={activeKey}
         >
           {data.packages.map((entry) => (
-            <option key={entry.key} value={entry.key}>
+            <SelectItem key={entry.key} value={String(entry.key)}>
               {entry.outputLabel} → {entry.destinationLabel}
-            </option>
+            </SelectItem>
           ))}
-        </select>
+        </FormSelect>
       </div>
 
       <ReleasePackageEditor

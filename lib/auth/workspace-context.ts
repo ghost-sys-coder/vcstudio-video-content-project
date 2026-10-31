@@ -36,10 +36,10 @@ export const getAuthenticatedWorkspaceContext = cache(
       workspaceId: requestedWorkspaceId,
     });
     const activeMembership = parsedWorkspaceId.success
-      ? await findWorkspaceMembership({
-          userId: user.id,
-          workspaceId: parsedWorkspaceId.data.workspaceId,
-        })
+      ? memberships.find(
+          (membership) =>
+            membership.workspaceId === parsedWorkspaceId.data.workspaceId,
+        )
       : memberships[0];
 
     return {

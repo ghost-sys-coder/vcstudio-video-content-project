@@ -1,5 +1,7 @@
 "use client";
 
+import { FormSelect } from "@/components/ui/FormSelect";
+import { SelectItem } from "@/components/ui/select";
 import { useState, useTransition } from "react";
 import type { Project, ProjectStatus } from "@/db/schema";
 import { updateProjectAction } from "@/app/(authenticated)/app/projects/actions";
@@ -56,17 +58,16 @@ export function ProjectSettingsForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="settings-ratio">Aspect ratio</Label>
-          <select
-            className="h-8 w-full rounded-lg border bg-background px-2 text-sm"
+          <FormSelect
             defaultValue={project.aspectRatio}
             disabled={!canEdit || pending}
             id="settings-ratio"
             name="aspectRatio"
           >
-            <option>16:9</option>
-            <option>9:16</option>
-            <option>1:1</option>
-          </select>
+            <SelectItem value="16:9">16:9</SelectItem>
+            <SelectItem value="9:16">9:16</SelectItem>
+            <SelectItem value="1:1">1:1</SelectItem>
+          </FormSelect>
         </div>
         <VideoKindSelect
           defaultValue={project.videoKind}
@@ -108,20 +109,23 @@ export function ProjectSettingsForm({
         </div>
         <div className="space-y-2">
           <Label htmlFor="settings-status">Status</Label>
-          <select
-            className="h-8 w-full rounded-lg border bg-background px-2 text-sm"
+          <FormSelect
             defaultValue={project.status}
             disabled={!canEdit || pending}
             id="settings-status"
             name="status"
           >
-            <option value={project.status}>{project.status}</option>
+            <SelectItem value={String(project.status)}>
+              {project.status}
+            </SelectItem>
             {allowedStatuses
               .filter((status) => status !== project.status)
               .map((status) => (
-                <option key={status}>{status}</option>
+                <SelectItem key={status} value={String(status)}>
+                  {status}
+                </SelectItem>
               ))}
-          </select>
+          </FormSelect>
         </div>
       </div>
       {error ? (

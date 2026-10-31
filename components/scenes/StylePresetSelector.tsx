@@ -1,5 +1,7 @@
 "use client";
 
+import { FormSelect } from "@/components/ui/FormSelect";
+import { SelectItem } from "@/components/ui/select";
 import type { SceneImageStylePresetView } from "@/lib/scenes/scene-image-view";
 import { Label } from "@/components/ui/label";
 
@@ -21,23 +23,22 @@ export function StylePresetSelector({
   return (
     <div className="space-y-2">
       <Label htmlFor={id}>Visual style</Label>
-      <select
-        className="h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+      <FormSelect
         disabled={disabled || presets.length === 0}
         id={id}
-        onChange={(event) => onChange(event.target.value)}
+        onValueChange={(selectedValue) => onChange(selectedValue)}
         value={value}
       >
         {presets.length === 0 ? (
-          <option value="">No style presets available</option>
+          <SelectItem value="">No style presets available</SelectItem>
         ) : null}
         {presets.map((preset) => (
-          <option key={preset.versionId} value={preset.versionId}>
+          <SelectItem key={preset.versionId} value={String(preset.versionId)}>
             {preset.name} / v{preset.version}
             {preset.isDefault ? " / Default" : ""}
-          </option>
+          </SelectItem>
         ))}
-      </select>
+      </FormSelect>
       <p className="min-h-8 text-xs text-muted-foreground">
         {selectedPreset?.description ??
           "A versioned style preset is required before generation."}

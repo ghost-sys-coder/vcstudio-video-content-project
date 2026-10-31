@@ -1,5 +1,7 @@
 "use client";
 
+import { FormSelect } from "@/components/ui/FormSelect";
+import { SelectItem } from "@/components/ui/select";
 import { useTransition } from "react";
 import { Label } from "@/components/ui/label";
 import type { SubtitleGranularity } from "@/lib/subtitles/caption-style-data";
@@ -38,23 +40,23 @@ export function SubtitleTrackSelector({
       <Label className="text-xs" htmlFor="subtitle-granularity">
         Caption track
       </Label>
-      <select
-        className="h-9 min-w-48 rounded-lg border border-input bg-background px-3 text-sm disabled:opacity-50"
+      <FormSelect
+        className="min-w-48"
         disabled={disabled || pending}
         id="subtitle-granularity"
-        onChange={(event) =>
+        onValueChange={(selectedValue) =>
           startTransition(async () =>
-            onChange(event.target.value as SubtitleGranularity),
+            onChange(selectedValue as SubtitleGranularity),
           )
         }
         value={granularity}
       >
         {OPTIONS.map((option) => (
-          <option key={option.value} value={option.value}>
+          <SelectItem key={option.value} value={String(option.value)}>
             {option.label} — {option.hint}
-          </option>
+          </SelectItem>
         ))}
-      </select>
+      </FormSelect>
     </div>
   );
 }

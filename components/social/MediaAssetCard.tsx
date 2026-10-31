@@ -1,6 +1,6 @@
 "use client";
 
-import { FilmIcon, ImageIcon } from "lucide-react";
+import { FilmIcon, ImageIcon, Music2Icon } from "lucide-react";
 import { MediaAssetPreview } from "@/components/social/MediaAssetPreview";
 import { Badge } from "@/components/ui/badge";
 import { formatBytes } from "@/lib/format/bytes";
@@ -14,7 +14,12 @@ export function MediaAssetCard({
   asset: MediaAssetView;
   onSelect: (asset: MediaAssetView) => void;
 }) {
-  const KindIcon = asset.kind === "video" ? FilmIcon : ImageIcon;
+  const KindIcon =
+    asset.kind === "video"
+      ? FilmIcon
+      : asset.kind === "audio"
+        ? Music2Icon
+        : ImageIcon;
   const dimensions =
     asset.width && asset.height ? `${asset.width}×${asset.height}` : null;
   const duration =
@@ -29,7 +34,7 @@ export function MediaAssetCard({
         onClick={() => onSelect(asset)}
         type="button"
       >
-        <MediaAssetPreview asset={asset} />
+        <MediaAssetPreview asset={asset} controls={false} />
         <div className="space-y-1 px-1 pb-1">
           <p className="truncate text-sm font-medium" title={asset.title}>
             {asset.title}
@@ -37,7 +42,11 @@ export function MediaAssetCard({
           <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
             <Badge variant="outline">
               <KindIcon aria-hidden />
-              {asset.kind === "video" ? "Video" : "Image"}
+              {asset.kind === "video"
+                ? "Video"
+                : asset.kind === "audio"
+                  ? "Audio"
+                  : "Image"}
             </Badge>
             <span>{formatBytes(asset.sizeBytes)}</span>
             {dimensions ? <span>{dimensions}</span> : null}

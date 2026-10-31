@@ -39,7 +39,6 @@ export function PostComposer({
   canPublish,
   canUpload,
   composerBasePath = "/app/social/posts",
-  library,
   maxImageBytes,
   maxVideoBytes,
   view,
@@ -48,7 +47,6 @@ export function PostComposer({
   canPublish: boolean;
   canUpload: boolean;
   composerBasePath?: string;
-  library: MediaAssetView[];
   maxImageBytes: number;
   maxVideoBytes: number;
   view: SocialPostComposerView;
@@ -59,7 +57,7 @@ export function PostComposer({
   const [attachments, setAttachments] = useState<PostAttachmentView[]>(
     view.attachments,
   );
-  const [libraryAssets, setLibraryAssets] = useState(library);
+  const [libraryAssets, setLibraryAssets] = useState<MediaAssetView[]>([]);
   const [version, setVersion] = useState(view.version);
   const [savedSnapshot, setSavedSnapshot] = useState(() => ({
     plainText: view.bodyPlainText,
@@ -147,7 +145,7 @@ export function PostComposer({
       <header className="app-page-header">
         <div className="app-heading">
           <Button
-            className="px-0"
+            className="self-start justify-start px-0"
             nativeButton={false}
             render={<Link href={composerBasePath} />}
             size="sm"
@@ -240,7 +238,7 @@ export function PostComposer({
                   attachedIds={attachments
                     .filter((attachment) => attachment.source === "library")
                     .map((attachment) => attachment.asset.id)}
-                  library={libraryAssets}
+                  recentAssets={libraryAssets}
                   onConfirm={(assets) =>
                     setAttachments((current) => [
                       ...current,

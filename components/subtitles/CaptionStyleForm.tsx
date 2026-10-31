@@ -1,5 +1,7 @@
 "use client";
 
+import { FormSelect } from "@/components/ui/FormSelect";
+import { SelectItem } from "@/components/ui/select";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -95,8 +97,7 @@ export function CaptionStyleForm({
       <Label className="text-xs" htmlFor={`caption-${key}`}>
         {label}
       </Label>
-      <input
-        className="h-8 w-full cursor-pointer rounded-lg border border-input bg-transparent disabled:cursor-not-allowed disabled:opacity-50"
+      <Input
         disabled={!canManage}
         id={`caption-${key}`}
         onChange={(event) =>
@@ -135,69 +136,63 @@ export function CaptionStyleForm({
           <Label className="text-xs" htmlFor="caption-position">
             Vertical position
           </Label>
-          <select
-            className="h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm disabled:opacity-50"
+          <FormSelect
             disabled={!canManage}
             id="caption-position"
-            onChange={(event) =>
-              update("position", event.target.value as SubtitlePosition)
+            onValueChange={(selectedValue) =>
+              update("position", selectedValue as SubtitlePosition)
             }
             value={style.position}
           >
             {POSITIONS.map((position) => (
-              <option key={position} value={position}>
+              <SelectItem key={position} value={String(position)}>
                 {position}
-              </option>
+              </SelectItem>
             ))}
-          </select>
+          </FormSelect>
         </div>
 
         <div className="space-y-1.5">
           <Label className="text-xs" htmlFor="caption-horizontal-position">
             Horizontal position
           </Label>
-          <select
-            className="h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm disabled:opacity-50"
+          <FormSelect
             disabled={!canManage}
             id="caption-horizontal-position"
-            onChange={(event) =>
+            onValueChange={(selectedValue) =>
               update(
                 "horizontalPosition",
-                event.target.value as SubtitleHorizontalPosition,
+                selectedValue as SubtitleHorizontalPosition,
               )
             }
             value={style.horizontalPosition}
           >
             {HORIZONTAL_POSITIONS.map((position) => (
-              <option key={position} value={position}>
+              <SelectItem key={position} value={String(position)}>
                 {position}
-              </option>
+              </SelectItem>
             ))}
-          </select>
+          </FormSelect>
         </div>
 
         <div className="space-y-1.5">
           <Label className="text-xs" htmlFor="caption-entrance-effect">
             Entrance
           </Label>
-          <select
-            className="h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm disabled:opacity-50"
+          <FormSelect
             disabled={!canManage}
             id="caption-entrance-effect"
-            onChange={(event) =>
-              update(
-                "entranceEffect",
-                event.target.value as CaptionEntranceEffect,
-              )
+            onValueChange={(selectedValue) =>
+              update("entranceEffect", selectedValue as CaptionEntranceEffect)
             }
             value={style.entranceEffect}
           >
             {ENTRANCE_EFFECTS.map((effect) => (
-              <option key={effect.value} value={effect.value}>
+              <SelectItem key={effect.value} value={String(effect.value)}>
                 {effect.label}
-              </option>
+              </SelectItem>
             ))}
-          </select>
+          </FormSelect>
         </div>
 
         {style.entranceEffect === "slide-fade" ? (
@@ -205,24 +200,26 @@ export function CaptionStyleForm({
             <Label className="text-xs" htmlFor="caption-entrance-direction">
               Slide from
             </Label>
-            <select
-              className="h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm disabled:opacity-50"
+            <FormSelect
               disabled={!canManage}
               id="caption-entrance-direction"
-              onChange={(event) =>
+              onValueChange={(selectedValue) =>
                 update(
                   "entranceDirection",
-                  event.target.value as CaptionEntranceDirection,
+                  selectedValue as CaptionEntranceDirection,
                 )
               }
               value={style.entranceDirection}
             >
               {ENTRANCE_DIRECTIONS.map((direction) => (
-                <option key={direction.value} value={direction.value}>
+                <SelectItem
+                  key={direction.value}
+                  value={String(direction.value)}
+                >
                   {direction.label}
-                </option>
+                </SelectItem>
               ))}
-            </select>
+            </FormSelect>
           </div>
         ) : null}
 

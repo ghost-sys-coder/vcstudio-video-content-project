@@ -130,6 +130,8 @@ export function WorkspaceProfileForm({
             // Blob previews are local and intentionally bypass image optimization.
             // eslint-disable-next-line @next/next/no-img-element
             <img
+              loading="lazy"
+              decoding="async"
               alt="New workspace logo preview"
               className="size-24 rounded-lg border bg-background object-contain p-1"
               src={previewUrl}

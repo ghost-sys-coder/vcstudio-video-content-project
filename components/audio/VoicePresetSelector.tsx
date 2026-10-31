@@ -1,5 +1,7 @@
 "use client";
 
+import { FormSelect } from "@/components/ui/FormSelect";
+import { SelectItem } from "@/components/ui/select";
 import { useState } from "react";
 import { PlusIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -33,19 +35,19 @@ export function VoicePresetSelector({
         <Label className="text-xs" htmlFor="audio-voice-preset">
           Voice preset
         </Label>
-        <select
-          className="h-9 min-w-52 rounded-lg border border-input bg-background px-3 text-sm"
+        <FormSelect
+          className="min-w-52"
           id="audio-voice-preset"
-          onChange={(event) => onSelect(event.target.value)}
+          onValueChange={(selectedValue) => onSelect(selectedValue)}
           value={selectedVoicePresetId}
         >
           {voicePresets.map((preset) => (
-            <option key={preset.id} value={preset.id}>
+            <SelectItem key={preset.id} value={String(preset.id)}>
               {preset.name} · {preset.isCustom ? "custom voice" : preset.voice}
               {preset.isDefault ? " (default)" : ""}
-            </option>
+            </SelectItem>
           ))}
-        </select>
+        </FormSelect>
       </div>
       {canManage ? (
         <>

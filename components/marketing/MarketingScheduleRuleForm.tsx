@@ -1,5 +1,8 @@
 "use client";
 
+import { FormSelect } from "@/components/ui/FormSelect";
+import { SelectItem } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2Icon } from "lucide-react";
@@ -50,8 +53,7 @@ export function MarketingScheduleRuleForm({
       {rule ? <input name="ruleId" type="hidden" value={rule.id} /> : null}
       <label className="grid gap-1 text-sm font-medium">
         Rule name
-        <input
-          className="h-10 rounded-lg border bg-background px-3"
+        <Input
           defaultValue={rule?.name ?? "Weekly local business growth insight"}
           name="name"
           required
@@ -60,41 +62,43 @@ export function MarketingScheduleRuleForm({
       <div className="grid min-w-0 gap-4 sm:grid-cols-3">
         <label className="grid min-w-0 gap-1 text-sm font-medium">
           Skill
-          <select
-            className="h-10 w-full min-w-0 max-w-full rounded-lg border bg-background px-3"
+          <FormSelect
+            className="min-w-0 max-w-full"
             defaultValue={rule?.skillKey ?? "create_social_post"}
             name="skillKey"
           >
-            <option value="create_social_post">Social post</option>
-            <option value="create_social_graphic">Social graphic</option>
-          </select>
+            <SelectItem value="create_social_post">Social post</SelectItem>
+            <SelectItem value="create_social_graphic">
+              Social graphic
+            </SelectItem>
+          </FormSelect>
         </label>
         <label className="grid min-w-0 gap-1 text-sm font-medium">
           Traffic
-          <select
-            className="h-10 w-full min-w-0 max-w-full rounded-lg border bg-background px-3"
+          <FormSelect
+            className="min-w-0 max-w-full"
             defaultValue={rule?.trafficType ?? "organic"}
             name="trafficType"
           >
-            <option value="organic">Organic</option>
-            <option value="paid">Paid</option>
-            <option value="both">Both</option>
-          </select>
+            <SelectItem value="organic">Organic</SelectItem>
+            <SelectItem value="paid">Paid</SelectItem>
+            <SelectItem value="both">Both</SelectItem>
+          </FormSelect>
         </label>
         <label className="grid min-w-0 gap-1 text-sm font-medium">
           Campaign (optional)
-          <select
-            className="h-10 w-full min-w-0 max-w-full truncate rounded-lg border bg-background px-3"
+          <FormSelect
+            className="min-w-0 max-w-full"
             defaultValue={rule?.campaignId ?? ""}
             name="campaignId"
           >
-            <option value="">No campaign</option>
+            <SelectItem value="">No campaign</SelectItem>
             {campaigns.map((campaign) => (
-              <option key={campaign.id} value={campaign.id}>
+              <SelectItem key={campaign.id} value={String(campaign.id)}>
                 {campaign.name}
-              </option>
+              </SelectItem>
             ))}
-          </select>
+          </FormSelect>
         </label>
       </div>
       <fieldset className="space-y-2">
@@ -132,20 +136,18 @@ export function MarketingScheduleRuleForm({
       <div className="grid gap-4 sm:grid-cols-3">
         <label className="grid gap-1 text-sm font-medium">
           Frequency
-          <select
-            className="h-10 rounded-lg border bg-background px-3"
+          <FormSelect
             defaultValue={rule?.frequency ?? "weekly"}
             name="frequency"
           >
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly</option>
-          </select>
+            <SelectItem value="daily">Daily</SelectItem>
+            <SelectItem value="weekly">Weekly</SelectItem>
+            <SelectItem value="monthly">Monthly</SelectItem>
+          </FormSelect>
         </label>
         <label className="grid gap-1 text-sm font-medium">
           Publication time
-          <input
-            className="h-10 rounded-lg border bg-background px-3"
+          <Input
             defaultValue={minutesToTime(rule?.timeOfDayMinutes ?? 9 * 60)}
             name="timeOfDay"
             required
@@ -154,8 +156,7 @@ export function MarketingScheduleRuleForm({
         </label>
         <label className="grid gap-1 text-sm font-medium">
           Timezone
-          <input
-            className="h-10 rounded-lg border bg-background px-3"
+          <Input
             defaultValue={rule?.timezone ?? defaultTimezone}
             name="timezone"
             required
@@ -186,8 +187,7 @@ export function MarketingScheduleRuleForm({
       <div className="grid gap-4 sm:grid-cols-4">
         <label className="grid gap-1 text-sm font-medium">
           Monthly day
-          <input
-            className="h-10 rounded-lg border bg-background px-3"
+          <Input
             defaultValue={rule?.byMonthDay ?? 1}
             max={28}
             min={1}
@@ -197,8 +197,7 @@ export function MarketingScheduleRuleForm({
         </label>
         <label className="grid gap-1 text-sm font-medium">
           Generate ahead (minutes)
-          <input
-            className="h-10 rounded-lg border bg-background px-3"
+          <Input
             defaultValue={rule?.leadTimeMinutes ?? 1440}
             max={43200}
             min={0}
@@ -209,8 +208,7 @@ export function MarketingScheduleRuleForm({
         </label>
         <label className="grid gap-1 text-sm font-medium">
           Items per run
-          <input
-            className="h-10 rounded-lg border bg-background px-3"
+          <Input
             defaultValue={rule?.maxItemsPerRun ?? 1}
             max={10}
             min={1}
@@ -221,8 +219,7 @@ export function MarketingScheduleRuleForm({
         </label>
         <label className="grid gap-1 text-sm font-medium">
           Monthly cap (cents)
-          <input
-            className="h-10 rounded-lg border bg-background px-3"
+          <Input
             defaultValue={rule?.monthlyBudgetCents ?? 500}
             min={0}
             name="monthlyBudgetCents"

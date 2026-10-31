@@ -1,5 +1,7 @@
 "use client";
 
+import { FormSelect } from "@/components/ui/FormSelect";
+import { SelectItem } from "@/components/ui/select";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2Icon, PlusIcon } from "lucide-react";
@@ -108,19 +110,18 @@ export function BrandOfferDialog({
               posted as FormData, and the native element needs no hidden-input
               bridge to be submitted.
             */}
-            <select
-              className="h-9 w-full rounded-lg border bg-transparent px-3 text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            <FormSelect
               defaultValue={offer?.audienceId ?? ""}
               id="offer-audience"
               name="audienceId"
             >
-              <option value="">Not audience-specific</option>
+              <SelectItem value="">Not audience-specific</SelectItem>
               {audiences.map((audience) => (
-                <option key={audience.id} value={audience.id}>
+                <SelectItem key={audience.id} value={String(audience.id)}>
                   {audience.name}
-                </option>
+                </SelectItem>
               ))}
-            </select>
+            </FormSelect>
           </div>
 
           <div className="space-y-2">

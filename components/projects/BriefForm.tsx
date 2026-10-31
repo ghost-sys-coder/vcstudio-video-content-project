@@ -1,5 +1,7 @@
 "use client";
 
+import { FormSelect } from "@/components/ui/FormSelect";
+import { SelectItem } from "@/components/ui/select";
 import { useState, useTransition } from "react";
 import type { ProjectBrief } from "@/db/schema";
 import { saveProjectBriefAction } from "@/app/(authenticated)/app/projects/actions";
@@ -93,18 +95,17 @@ export function BriefForm({
         </div>
         <div className="space-y-2">
           <Label htmlFor="brief-platform">Primary platform</Label>
-          <select
-            className="h-8 w-full rounded-lg border bg-background px-2 text-sm"
+          <FormSelect
             defaultValue={brief?.primaryPlatform ?? "youtube"}
             disabled={!canEdit}
             id="brief-platform"
             name="primaryPlatform"
           >
-            <option value="youtube">YouTube</option>
-            <option value="tiktok">TikTok</option>
-            <option value="facebook">Facebook</option>
-            <option value="instagram">Instagram</option>
-          </select>
+            <SelectItem value="youtube">YouTube</SelectItem>
+            <SelectItem value="tiktok">TikTok</SelectItem>
+            <SelectItem value="facebook">Facebook</SelectItem>
+            <SelectItem value="instagram">Instagram</SelectItem>
+          </FormSelect>
         </div>
         <div className="space-y-2">
           <Label htmlFor="brief-duration">Target duration (seconds)</Label>

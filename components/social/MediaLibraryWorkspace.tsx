@@ -5,6 +5,7 @@ import { EmptyMediaLibraryState } from "@/components/social/EmptyMediaLibrarySta
 import { MediaAssetDetailSheet } from "@/components/social/MediaAssetDetailSheet";
 import { MediaKindFilter } from "@/components/social/MediaKindFilter";
 import { MediaLibraryGrid } from "@/components/social/MediaLibraryGrid";
+import { MediaLibraryPagination } from "@/components/social/MediaLibraryPagination";
 import { MediaUploadDropzone } from "@/components/social/MediaUploadDropzone";
 import type { MediaAssetView } from "@/lib/media/media-asset-view";
 import type { MediaLibraryView } from "@/lib/media/load-media-library";
@@ -77,11 +78,17 @@ export function MediaLibraryWorkspace({
           />
           {hiddenCount > 0 ? (
             <p className="text-xs text-muted-foreground">
-              Showing the {assets.length} most recent of {view.total}.
+              Showing {assets.length} assets from {view.total} in the library.
             </p>
           ) : null}
         </>
       )}
+
+      <MediaLibraryPagination
+        kind={view.kind}
+        nextCursor={view.nextCursor}
+        previousCursor={view.previousCursor}
+      />
 
       {/*
         Keyed on the asset so opening a different one remounts the form with its

@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { LibraryLensGrid } from "@/components/marketing/LibraryLensGrid";
 import { EmptyMediaLibraryState } from "@/components/social/EmptyMediaLibraryState";
+import { MediaLibraryPagination } from "@/components/social/MediaLibraryPagination";
 import { Button } from "@/components/ui/button";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import { loadMediaLibrary } from "@/lib/media/load-media-library";
+import { mediaLibraryQuerySchema } from "@/lib/schemas/media-library";
 
 /**
  * A read-only lens onto the existing workspace media library.
@@ -13,12 +15,21 @@ import { loadMediaLibrary } from "@/lib/media/load-media-library";
  * for the limits to disagree. This exists so somebody tagging brand assets can
  * see what is available without leaving the segment.
  */
-export default async function MarketingLibraryLensPage() {
+export default async function MarketingLibraryLensPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    cursor?: string | string[];
+    kind?: string | string[];
+  }>;
+}) {
   const context = await getAuthenticatedWorkspaceContext();
   if (!context) return null;
 
+  const parsed = mediaLibraryQuerySchema.safeParse(await searchParams);
   const library = await loadMediaLibrary({
     workspaceId: context.activeMembership.workspaceId,
+    ...(parsed.success ? parsed.data : {}),
   });
 
   return (
@@ -42,6 +53,12 @@ export default async function MarketingLibraryLensPage() {
       ) : (
         <LibraryLensGrid assets={library.assets} />
       )}
+      <MediaLibraryPagination
+        basePath="/app/marketing/assets/library"
+        kind={library.kind}
+        nextCursor={library.nextCursor}
+        previousCursor={library.previousCursor}
+      />
     </div>
   );
 }

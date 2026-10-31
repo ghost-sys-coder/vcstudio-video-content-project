@@ -1,5 +1,7 @@
 "use client";
 
+import { FormSelect } from "@/components/ui/FormSelect";
+import { SelectItem } from "@/components/ui/select";
 import type { SceneImageStylePresetView } from "@/lib/scenes/scene-image-view";
 
 /**
@@ -37,20 +39,19 @@ export function ProjectStyleField({
       <label className="text-sm font-medium" htmlFor="project-style-preset">
         Visual style
       </label>
-      <select
-        className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm"
+      <FormSelect
         id="project-style-preset"
         name="stylePresetId"
-        onChange={(event) => onChange(event.target.value)}
+        onValueChange={(selectedValue) => onChange(selectedValue)}
         value={selected?.id ?? ""}
       >
         {styles.map((style) => (
-          <option key={style.id} value={style.id}>
+          <SelectItem key={style.id} value={String(style.id)}>
             {style.name}
             {style.isDefault ? " (workspace default)" : ""}
-          </option>
+          </SelectItem>
         ))}
-      </select>
+      </FormSelect>
       {selected ? (
         <div className="rounded-lg border bg-muted/30 p-3">
           {selected.description ? (

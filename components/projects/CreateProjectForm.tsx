@@ -1,5 +1,11 @@
 "use client";
 
+import { FormSelect } from "@/components/ui/FormSelect";
+import {
+  SelectItem,
+  SelectGroup,
+  SelectGroupLabel,
+} from "@/components/ui/select";
 import { useMemo, useState, useTransition } from "react";
 import { createProjectAction } from "@/app/(authenticated)/app/projects/actions";
 import { Button } from "@/components/ui/button";
@@ -125,19 +131,18 @@ export function CreateProjectForm({
       {formats.length ? (
         <div className="space-y-2">
           <Label htmlFor="project-format">Format</Label>
-          <select
-            className="h-8 w-full rounded-lg border bg-background px-2 text-sm"
+          <FormSelect
             id="project-format"
-            onChange={(event) => applyFormat(event.target.value)}
+            onValueChange={(selectedValue) => applyFormat(selectedValue)}
             value={formatPresetId}
           >
-            <option value="">No format</option>
+            <SelectItem value="">No format</SelectItem>
             {formats.map((format) => (
-              <option key={format.id} value={format.id}>
+              <SelectItem key={format.id} value={String(format.id)}>
                 {format.name} (v{format.versionNumber})
-              </option>
+              </SelectItem>
             ))}
-          </select>
+          </FormSelect>
         </div>
       ) : null}
       <ProjectStyleField
@@ -148,23 +153,23 @@ export function CreateProjectForm({
       {ideaGroups.length ? (
         <div className="space-y-2">
           <Label htmlFor="project-idea">Start from a saved idea</Label>
-          <select
-            className="h-8 w-full rounded-lg border bg-background px-2 text-sm"
+          <FormSelect
             id="project-idea"
-            onChange={(event) => applyIdea(event.target.value)}
+            onValueChange={(selectedValue) => applyIdea(selectedValue)}
             value={ideaId}
           >
-            <option value="">Blank project</option>
+            <SelectItem value="">Blank project</SelectItem>
             {ideaGroups.map((group) => (
-              <optgroup key={group.niche} label={group.niche}>
+              <SelectGroup key={group.niche}>
+                <SelectGroupLabel>{group.niche}</SelectGroupLabel>
                 {group.ideas.map((idea) => (
-                  <option key={idea.id} value={idea.id}>
+                  <SelectItem key={idea.id} value={String(idea.id)}>
                     {idea.topic || "(untitled idea)"}
-                  </option>
+                  </SelectItem>
                 ))}
-              </optgroup>
+              </SelectGroup>
             ))}
-          </select>
+          </FormSelect>
           <p className="text-xs text-muted-foreground">
             Prefills the project name, aspect ratio, and brief from the idea —
             everything below stays editable.
@@ -194,34 +199,32 @@ export function CreateProjectForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="project-ratio">Aspect ratio</Label>
-          <select
-            className="h-8 w-full rounded-lg border bg-background px-2 text-sm"
+          <FormSelect
             id="project-ratio"
             name="aspectRatio"
-            onChange={(event) =>
-              setAspectRatio(event.target.value as ProjectAspectRatio)
+            onValueChange={(selectedValue) =>
+              setAspectRatio(selectedValue as ProjectAspectRatio)
             }
             value={aspectRatio}
           >
-            <option value="16:9">16:9</option>
-            <option value="9:16">9:16</option>
-            <option value="1:1">1:1</option>
-          </select>
+            <SelectItem value="16:9">16:9</SelectItem>
+            <SelectItem value="9:16">9:16</SelectItem>
+            <SelectItem value="1:1">1:1</SelectItem>
+          </FormSelect>
         </div>
         <div className="space-y-2">
           <Label htmlFor="project-fps">Frame rate</Label>
-          <select
-            className="h-8 w-full rounded-lg border bg-background px-2 text-sm"
+          <FormSelect
             id="project-fps"
             name="framesPerSecond"
-            onChange={(event) => setFramesPerSecond(event.target.value)}
+            onValueChange={(selectedValue) => setFramesPerSecond(selectedValue)}
             value={framesPerSecond}
           >
-            <option>24</option>
-            <option>25</option>
-            <option>30</option>
-            <option>60</option>
-          </select>
+            <SelectItem value="24">24</SelectItem>
+            <SelectItem value="25">25</SelectItem>
+            <SelectItem value="30">30</SelectItem>
+            <SelectItem value="60">60</SelectItem>
+          </FormSelect>
         </div>
         <div className="space-y-2">
           <Label htmlFor="project-language">Language</Label>

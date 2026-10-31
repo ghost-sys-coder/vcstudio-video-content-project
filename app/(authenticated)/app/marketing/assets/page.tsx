@@ -3,17 +3,13 @@ import { BrandAssetCard } from "@/components/marketing/BrandAssetCard";
 import { EmptyBrandListState } from "@/components/marketing/EmptyBrandListState";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
 import { loadMarketingAssetsView } from "@/lib/marketing/documents/documents-view";
-import { loadMediaLibrary } from "@/lib/media/load-media-library";
 
 export default async function MarketingBrandAssetsPage() {
   const context = await getAuthenticatedWorkspaceContext();
   if (!context) return null;
 
   const { workspaceId } = context.activeMembership;
-  const [view, library] = await Promise.all([
-    loadMarketingAssetsView({ workspaceId }),
-    loadMediaLibrary({ workspaceId, kind: "image" }),
-  ]);
+  const view = await loadMarketingAssetsView({ workspaceId });
 
   return (
     <div className="app-section pt-4">
@@ -22,7 +18,7 @@ export default async function MarketingBrandAssetsPage() {
           Files from the media library, tagged with what they are, so generated
           graphics use the right logo.
         </p>
-        <AssignBrandAssetDialog library={library.assets} />
+        <AssignBrandAssetDialog />
       </div>
 
       {view.brandAssets.length === 0 ? (

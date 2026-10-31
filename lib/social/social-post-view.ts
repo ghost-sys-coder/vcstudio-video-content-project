@@ -45,6 +45,18 @@ export type SocialPostSummaryView = {
   calendarAt: string;
 };
 
+/** List screens need the excerpt source, not the rich-text document or edit state. */
+export type SocialPostSummarySource = Pick<
+  SocialPost,
+  | "id"
+  | "name"
+  | "status"
+  | "bodyPlainText"
+  | "scheduledAt"
+  | "scheduledTimezone"
+  | "createdAt"
+>;
+
 export type SocialPostComposerView = {
   id: string;
   name: string;
@@ -140,7 +152,7 @@ export function toSocialPostTargetView(input: {
 }
 
 export function toSocialPostSummaryView(input: {
-  post: SocialPost;
+  post: SocialPostSummarySource;
   targets: SocialPostTargetView[];
   mediaCount: number;
   mediaPreviewUrl: string | null;

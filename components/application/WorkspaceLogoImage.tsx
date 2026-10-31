@@ -14,6 +14,8 @@ export function WorkspaceLogoImage({
       // Signed private R2 URLs are short-lived and intentionally bypass image optimization.
       // eslint-disable-next-line @next/next/no-img-element
       <img
+        loading="eager"
+        decoding="async"
         alt={`${name} logo`}
         className={`${dimensions} rounded-lg border bg-background object-contain p-1`}
         src={logoUrl}

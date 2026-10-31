@@ -1,5 +1,7 @@
 "use client";
 
+import { FormSelect } from "@/components/ui/FormSelect";
+import { SelectItem } from "@/components/ui/select";
 import { MAX_SHOTS_PER_SCENE } from "@/lib/scenes/shot-timing";
 
 /**
@@ -39,20 +41,19 @@ export function SceneShotSelector({
       <label className="text-sm font-medium" htmlFor={id}>
         Image in this scene
       </label>
-      <select
-        className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm"
+      <FormSelect
         disabled={disabled}
         id={id}
-        onChange={(event) => onChange(Number(event.target.value))}
+        onValueChange={(selectedValue) => onChange(Number(selectedValue))}
         value={value}
       >
         {options.map((index) => (
-          <option key={index} value={index}>
+          <SelectItem key={index} value={String(index)}>
             {index === 0 ? "First image" : `Image ${index + 1}`}
             {index >= approvedShotCount ? " (new)" : ""}
-          </option>
+          </SelectItem>
         ))}
-      </select>
+      </FormSelect>
       <p className="text-xs text-muted-foreground">
         {value === 0
           ? "The scene's main image. Approving a second image makes the scene change picture partway through."

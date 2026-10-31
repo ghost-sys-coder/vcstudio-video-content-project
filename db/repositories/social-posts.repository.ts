@@ -8,6 +8,7 @@ import {
   socialPostTargets,
   socialPosts,
   videoRenders,
+  type MediaAssetKind,
   type SocialPost,
   type SocialPostStatus,
   type SocialPostTarget,
@@ -17,6 +18,7 @@ import {
   toRenderAttachment,
   type SocialPostAttachment,
 } from "@/lib/social/post-attachment";
+import type { SocialPostSummarySource } from "@/lib/social/social-post-view";
 
 export const SOCIAL_POST_PAGE_SIZE = 50;
 
@@ -24,11 +26,19 @@ export async function listSocialPosts(input: {
   workspaceId: string;
   status?: SocialPostStatus;
   limit?: number;
-}): Promise<SocialPost[]> {
+}): Promise<SocialPostSummarySource[]> {
   const conditions = [eq(socialPosts.workspaceId, input.workspaceId)];
   if (input.status) conditions.push(eq(socialPosts.status, input.status));
   return getDatabase()
-    .select()
+    .select({
+      id: socialPosts.id,
+      name: socialPosts.name,
+      status: socialPosts.status,
+      bodyPlainText: socialPosts.bodyPlainText,
+      scheduledAt: socialPosts.scheduledAt,
+      scheduledTimezone: socialPosts.scheduledTimezone,
+      createdAt: socialPosts.createdAt,
+    })
     .from(socialPosts)
     .where(and(...conditions))
     .orderBy(desc(socialPosts.createdAt))
@@ -73,7 +83,36 @@ export async function listSocialPostMedia(input: {
   postId: string;
 }): Promise<SocialPostAttachment[]> {
   const rows = await getDatabase()
-    .select({ link: socialPostMedia, asset: mediaAssets, render: videoRenders })
+    .select({
+      link: { id: socialPostMedia.id, position: socialPostMedia.position },
+      asset: {
+        id: mediaAssets.id,
+        kind: mediaAssets.kind,
+        objectKey: mediaAssets.objectKey,
+        contentType: mediaAssets.contentType,
+        sizeBytes: mediaAssets.sizeBytes,
+        width: mediaAssets.width,
+        height: mediaAssets.height,
+        durationMilliseconds: mediaAssets.durationMilliseconds,
+        title: mediaAssets.title,
+        altText: mediaAssets.altText,
+        originalFileName: mediaAssets.originalFileName,
+        createdAt: mediaAssets.createdAt,
+        deletedAt: mediaAssets.deletedAt,
+      },
+      render: {
+        id: videoRenders.id,
+        status: videoRenders.status,
+        assetObjectKey: videoRenders.assetObjectKey,
+        assetContentType: videoRenders.assetContentType,
+        assetSizeBytes: videoRenders.assetSizeBytes,
+        width: videoRenders.width,
+        height: videoRenders.height,
+        durationMilliseconds: videoRenders.durationMilliseconds,
+        outputDurationMilliseconds: videoRenders.outputDurationMilliseconds,
+        createdAt: videoRenders.createdAt,
+      },
+    })
     .from(socialPostMedia)
     .leftJoin(
       mediaAssets,
@@ -120,6 +159,86 @@ export async function listSocialPostMedia(input: {
     // are the cross-workspace guard.
   }
   return attachments;
+}
+
+export type SocialPostMediaSummary = {
+  mediaCount: number;
+  previewObjectKey: string | null;
+  previewKind: MediaAssetKind | null;
+};
+
+/** One narrow read for a bounded post list, without render snapshots or per-post queries. */
+export async function listSocialPostMediaSummaries(input: {
+  workspaceId: string;
+  postIds: string[];
+  includePreviews?: boolean;
+}): Promise<Map<string, SocialPostMediaSummary>> {
+  const summaries = new Map<string, SocialPostMediaSummary>();
+  if (input.postIds.length === 0) return summaries;
+  const rows = await getDatabase()
+    .select({
+      postId: socialPostMedia.postId,
+      assetId: mediaAssets.id,
+      assetKind: mediaAssets.kind,
+      assetDeletedAt: mediaAssets.deletedAt,
+      assetObjectKey: input.includePreviews
+        ? mediaAssets.objectKey
+        : sql<null>`null`,
+      renderId: videoRenders.id,
+      renderStatus: videoRenders.status,
+      renderSizeBytes: videoRenders.assetSizeBytes,
+      renderObjectKey: input.includePreviews
+        ? videoRenders.assetObjectKey
+        : sql<null>`null`,
+    })
+    .from(socialPostMedia)
+    .leftJoin(
+      mediaAssets,
+      and(
+        eq(mediaAssets.id, socialPostMedia.mediaAssetId),
+        eq(mediaAssets.workspaceId, socialPostMedia.workspaceId),
+      ),
+    )
+    .leftJoin(
+      videoRenders,
+      and(
+        eq(videoRenders.id, socialPostMedia.renderId),
+        eq(videoRenders.workspaceId, socialPostMedia.workspaceId),
+      ),
+    )
+    .where(
+      and(
+        eq(socialPostMedia.workspaceId, input.workspaceId),
+        inArray(socialPostMedia.postId, input.postIds),
+      ),
+    )
+    .orderBy(asc(socialPostMedia.postId), asc(socialPostMedia.position));
+
+  for (const row of rows) {
+    if (!row.assetId && !row.renderId) continue;
+    const summary = summaries.get(row.postId) ?? {
+      mediaCount: 0,
+      previewObjectKey: null,
+      previewKind: null,
+    };
+    summary.mediaCount++;
+    if (input.includePreviews && !summary.previewObjectKey) {
+      if (row.assetId && row.assetDeletedAt === null && row.assetObjectKey) {
+        summary.previewObjectKey = row.assetObjectKey;
+        summary.previewKind = row.assetKind;
+      } else if (
+        !row.assetId &&
+        row.renderStatus === "succeeded" &&
+        row.renderSizeBytes !== null &&
+        row.renderObjectKey
+      ) {
+        summary.previewObjectKey = row.renderObjectKey;
+        summary.previewKind = "video";
+      }
+    }
+    summaries.set(row.postId, summary);
+  }
+  return summaries;
 }
 
 export async function listSocialPostTargets(input: {

@@ -1,3 +1,5 @@
+import { FormSelect } from "@/components/ui/FormSelect";
+import { SelectItem } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,19 +24,18 @@ export function SkillInputField({
           value={value}
         />
       ) : field.options ? (
-        <select
-          className="h-9 w-full rounded-lg border bg-background px-3 text-sm"
+        <FormSelect
           id={`skill-${field.key}`}
-          onChange={(event) => onChange(event.target.value)}
+          onValueChange={(selectedValue) => onChange(selectedValue)}
           value={value}
         >
-          <option value="">Select…</option>
+          <SelectItem value="">Select…</SelectItem>
           {field.options.map((option) => (
-            <option key={option} value={option}>
+            <SelectItem key={option} value={String(option)}>
               {option}
-            </option>
+            </SelectItem>
           ))}
-        </select>
+        </FormSelect>
       ) : (
         <Input
           id={`skill-${field.key}`}

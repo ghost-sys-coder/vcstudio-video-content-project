@@ -1,5 +1,7 @@
 "use client";
 
+import { FormSelect } from "@/components/ui/FormSelect";
+import { SelectItem } from "@/components/ui/select";
 import { useState } from "react";
 import { createChannelProfileAction } from "@/app/(authenticated)/app/settings/workspace/channel-actions";
 import { Button } from "@/components/ui/button";
@@ -65,18 +67,17 @@ export function ChannelProfileForm({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="channel-platform">Platform</Label>
-              <select
-                className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
+              <FormSelect
                 defaultValue="youtube"
                 id="channel-platform"
                 name="platform"
               >
                 {CHANNEL_PROFILE_PLATFORMS.map((platform) => (
-                  <option key={platform} value={platform}>
+                  <SelectItem key={platform} value={String(platform)}>
                     {platform}
-                  </option>
+                  </SelectItem>
                 ))}
-              </select>
+              </FormSelect>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="channel-language">Language</Label>
@@ -92,18 +93,17 @@ export function ChannelProfileForm({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="channel-cadence">Release cadence</Label>
-              <select
-                className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
+              <FormSelect
                 defaultValue="weekly"
                 id="channel-cadence"
                 name="cadence"
               >
                 {CHANNEL_CADENCES.map((cadence) => (
-                  <option key={cadence} value={cadence}>
+                  <SelectItem key={cadence} value={String(cadence)}>
                     {cadence}
-                  </option>
+                  </SelectItem>
                 ))}
-              </select>
+              </FormSelect>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="channel-timezone">Time zone</Label>

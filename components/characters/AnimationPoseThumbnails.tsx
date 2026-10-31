@@ -38,6 +38,8 @@ export function AnimationPoseThumbnails({
           >
             {pose.previewUrl ? (
               <img
+                loading="lazy"
+                decoding="async"
                 alt={`${ANIMATION_POSE_LABELS[pose.pose]} pose`}
                 className="size-full object-contain"
                 src={pose.previewUrl}

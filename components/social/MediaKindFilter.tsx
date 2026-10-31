@@ -6,6 +6,7 @@ const OPTIONS = [
   { kind: null, label: "All" },
   { kind: "image", label: "Images" },
   { kind: "video", label: "Videos" },
+  { kind: "audio", label: "Audio" },
 ] as const satisfies readonly { kind: MediaAssetKind | null; label: string }[];
 
 /**
@@ -15,13 +16,14 @@ const OPTIONS = [
  */
 export function MediaKindFilter({ active }: { active: MediaAssetKind | null }) {
   return (
-    <nav aria-label="Filter media by kind" className="flex gap-1">
+    <nav aria-label="Filter media by kind" className="flex flex-wrap gap-1">
       {OPTIONS.map((option) => (
         <Button
           key={option.label}
           nativeButton={false}
           render={
             <Link
+              prefetch={false}
               href={
                 option.kind
                   ? `/app/social/library?kind=${option.kind}`

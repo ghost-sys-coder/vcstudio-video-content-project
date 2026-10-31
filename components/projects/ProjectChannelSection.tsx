@@ -1,5 +1,7 @@
 "use client";
 
+import { FormSelect } from "@/components/ui/FormSelect";
+import { SelectItem } from "@/components/ui/select";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { assignProjectChannelAction } from "@/app/(authenticated)/app/settings/workspace/channel-actions";
@@ -75,23 +77,22 @@ export function ProjectChannelSection({
           <Label className="text-xs" htmlFor="project-channel-select">
             Channel
           </Label>
-          <select
-            className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm disabled:opacity-50"
+          <FormSelect
             disabled={!canEdit || isPending}
             id="project-channel-select"
-            onChange={(event) => {
-              setValue(event.target.value);
+            onValueChange={(selectedValue) => {
+              setValue(selectedValue);
               setSaved(false);
             }}
             value={value}
           >
-            <option value="">No channel</option>
+            <SelectItem value="">No channel</SelectItem>
             {channels.map((channel) => (
-              <option key={channel.id} value={channel.id}>
+              <SelectItem key={channel.id} value={String(channel.id)}>
                 {channel.name} · {channel.platform}
-              </option>
+              </SelectItem>
             ))}
-          </select>
+          </FormSelect>
         </div>
         {canEdit ? (
           <Button

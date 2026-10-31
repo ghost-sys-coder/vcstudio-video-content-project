@@ -36,6 +36,8 @@ export function BrandAssetCard({ asset }: { asset: BrandAssetView }) {
           // request. A plain img is the honest choice here.
           // eslint-disable-next-line @next/next/no-img-element
           <img
+            loading="lazy"
+            decoding="async"
             alt={asset.title}
             className="max-h-full max-w-full object-contain"
             src={asset.previewUrl}

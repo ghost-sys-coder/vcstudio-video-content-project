@@ -47,6 +47,8 @@ export function ThumbnailGenerationCard({
         {thumbnail.status === "succeeded" && thumbnail.hasAsset ? (
           // eslint-disable-next-line @next/next/no-img-element -- signed R2 redirect, not an optimizable static asset
           <img
+            loading="lazy"
+            decoding="async"
             alt={
               thumbnail.headlineText
                 ? `Thumbnail with headline: ${thumbnail.headlineText}`

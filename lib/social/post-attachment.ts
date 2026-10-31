@@ -1,5 +1,35 @@
 import type { MediaAsset, MediaAssetKind, VideoRender } from "@/db/schema";
 
+type LibraryAttachmentAsset = Pick<
+  MediaAsset,
+  | "id"
+  | "kind"
+  | "objectKey"
+  | "contentType"
+  | "sizeBytes"
+  | "width"
+  | "height"
+  | "durationMilliseconds"
+  | "title"
+  | "altText"
+  | "originalFileName"
+  | "createdAt"
+  | "deletedAt"
+>;
+type RenderAttachmentAsset = Pick<
+  VideoRender,
+  | "id"
+  | "status"
+  | "assetObjectKey"
+  | "assetContentType"
+  | "assetSizeBytes"
+  | "width"
+  | "height"
+  | "durationMilliseconds"
+  | "outputDurationMilliseconds"
+  | "createdAt"
+>;
+
 /**
  * One attachment on a post, flattened to the fields publishing actually needs.
  *
@@ -55,7 +85,7 @@ export function toAttachmentRef(
 }
 
 /** A render's stored file name, derived rather than stored. */
-function renderFileName(render: VideoRender): string {
+function renderFileName(render: RenderAttachmentAsset): string {
   const extension = render.assetContentType?.includes("webm") ? "webm" : "mp4";
   return `render-${render.id}.${extension}`;
 }
@@ -67,7 +97,12 @@ function renderFileName(render: VideoRender): string {
  * dimensions and runtime — the two things that decide which platforms will
  * accept it — stand in.
  */
-export function buildRenderAttachmentTitle(render: VideoRender): string {
+export function buildRenderAttachmentTitle(
+  render: Pick<
+    RenderAttachmentAsset,
+    "width" | "height" | "durationMilliseconds" | "outputDurationMilliseconds"
+  >,
+): string {
   const milliseconds =
     render.outputDurationMilliseconds ?? render.durationMilliseconds;
   const totalSeconds = Math.max(0, Math.round(milliseconds / 1000));
@@ -79,7 +114,7 @@ export function buildRenderAttachmentTitle(render: VideoRender): string {
 export function toLibraryAttachment(input: {
   linkId: string;
   position: number;
-  asset: MediaAsset;
+  asset: LibraryAttachmentAsset;
 }): SocialPostAttachment {
   return {
     linkId: input.linkId,
@@ -107,7 +142,7 @@ export function toLibraryAttachment(input: {
 export function toRenderAttachment(input: {
   linkId: string;
   position: number;
-  render: VideoRender;
+  render: RenderAttachmentAsset;
 }): SocialPostAttachment {
   const usable =
     input.render.status === "succeeded" &&

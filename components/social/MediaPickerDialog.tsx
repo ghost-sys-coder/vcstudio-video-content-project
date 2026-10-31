@@ -15,6 +15,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import type { MediaAssetView } from "@/lib/media/media-asset-view";
+import { useMediaLibraryPages } from "@/hooks/useMediaLibraryPages";
+import { mergeMediaAssets } from "@/lib/media/merge-media-assets";
 
 /**
  * Picks library media to attach to a post.
@@ -25,14 +27,17 @@ import type { MediaAssetView } from "@/lib/media/media-asset-view";
  */
 export function MediaPickerDialog({
   attachedIds,
-  library,
+  recentAssets,
   onConfirm,
 }: {
   attachedIds: string[];
-  library: MediaAssetView[];
+  recentAssets: MediaAssetView[];
   onConfirm: (assets: MediaAssetView[]) => void;
 }) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [open, setOpen] = useState(false);
+  const pages = useMediaLibraryPages();
+  const library = mergeMediaAssets(recentAssets, pages.assets);
   const available = library.filter((asset) => !attachedIds.includes(asset.id));
 
   function toggle(assetId: string) {
@@ -44,12 +49,21 @@ export function MediaPickerDialog({
   }
 
   return (
-    <Dialog onOpenChange={(open) => (open ? setSelectedIds([]) : undefined)}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (nextOpen) {
+          setSelectedIds([]);
+          void pages.loadFirst();
+        } else pages.cancel();
+      }}
+    >
       <DialogTrigger render={<Button size="sm" variant="outline" />}>
         <ImagePlusIcon />
         Attach media
       </DialogTrigger>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Attach from the media library</DialogTitle>
           <DialogDescription>
@@ -58,7 +72,24 @@ export function MediaPickerDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {available.length === 0 ? (
+        {pages.loading && !pages.loaded ? (
+          <p role="status">Loading media…</p>
+        ) : null}
+        {pages.error ? (
+          <div role="alert" className="space-y-2">
+            <p>{pages.error}</p>
+            <Button
+              onClick={() => {
+                void (pages.loaded ? pages.loadMore() : pages.loadFirst());
+              }}
+              type="button"
+              variant="outline"
+            >
+              Try again
+            </Button>
+          </div>
+        ) : null}
+        {!pages.loaded ? null : available.length === 0 ? (
           <p className="rounded-xl border border-dashed bg-muted/30 p-6 text-center text-sm text-muted-foreground">
             Nothing left to attach. Upload more in the media library.
           </p>
@@ -78,7 +109,7 @@ export function MediaPickerDialog({
                     onClick={() => toggle(asset.id)}
                     type="button"
                   >
-                    <MediaAssetPreview asset={asset} />
+                    <MediaAssetPreview asset={asset} controls={false} />
                     <p className="truncate text-xs">{asset.title}</p>
                     {order >= 0 ? (
                       <span className="absolute top-2 right-2 flex size-5 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
@@ -91,6 +122,19 @@ export function MediaPickerDialog({
             })}
           </ul>
         )}
+
+        {pages.nextCursor ? (
+          <Button
+            disabled={pages.loading}
+            onClick={() => {
+              void pages.loadMore();
+            }}
+            type="button"
+            variant="outline"
+          >
+            {pages.loading ? "Loading…" : "Load more media"}
+          </Button>
+        ) : null}
 
         <DialogFooter>
           <DialogClose render={<Button variant="outline" />}>
