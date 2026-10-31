@@ -580,6 +580,8 @@ Phases 1–12 are implemented through authenticated workspaces, project/script v
 
 ## Recent major changes
 
+- 2026-10-31: Application sidebar links now dismiss the mobile drawer when navigation is accepted, including nested Publishing links, keyboard activation, and links to the current page. A shared `SidebarLink` preserves cancelled navigation, modified/new-tab clicks, and desktop sidebar preferences. Group buttons and the paused Marketing dialog remain open for interaction. Marketing remains paused; no dependencies, database, migrations, environment variables, workers, or schedules changed.
+
 - 2026-10-31: Fixed project cards overflowing the Projects page. The grid has an explicit single-column base and adds columns according to available content width, including sidebar changes. Cards can shrink, long descriptions wrap, title/status rows adapt, budget/date details wrap, and pagination fits narrow screens. Project destinations, creation permissions, and data loading are preserved. No dependencies, database, migration, environment, worker, or schedule changes.
 
 - 2026-10-31: Fixed overflow in Scenes → Images by sizing the style/shot, image-size, quality, and reference controls to their available panel width. Fieldsets can shrink inside narrow editor columns, choice grids use container queries, and long descriptions wrap. Shared shadcn select values truncate without squeezing their arrows; option popups stay within their trigger/viewport width and wrap long labels. Preserved 40px controls, selection guards, reference limits, generation cost confirmations, and all provider/workflow behavior. No dependencies, database, migration, environment, worker, or schedule changes.

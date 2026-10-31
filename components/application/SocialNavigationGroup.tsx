@@ -8,7 +8,7 @@ import {
   PenLine,
   Plug,
 } from "lucide-react";
-import Link from "next/link";
+import { SidebarLink } from "@/components/application/SidebarLink";
 import { usePathname } from "next/navigation";
 import { WORKSPACE_CONNECTIONS_PATH } from "@/lib/publishing/connections-navigation";
 import {
@@ -87,7 +87,7 @@ export function SocialNavigationGroup() {
                     <SidebarMenuSubItem key={route.href}>
                       <SidebarMenuSubButton
                         isActive={pathname.startsWith(route.href)}
-                        render={<Link href={route.href} />}
+                        render={<SidebarLink href={route.href} />}
                       >
                         <route.icon />
                         <span className="truncate">{route.label}</span>

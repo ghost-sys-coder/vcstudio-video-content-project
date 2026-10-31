@@ -20,6 +20,8 @@ Navigation controls reserve their own space instead of shrinking out of view. Th
 
 Sidebar tooltips are disabled while expanded and on mobile, where labels are already visible. Hiding their popup alone leaves an invisible tooltip able to consume Escape before the mobile drawer can close.
 
+Use `SidebarLink` for application sidebar destinations, including submenu links. It closes the mobile drawer when Next.js accepts navigation, including keyboard activation and the current page. Cancelled navigation and modified/new-tab clicks keep the drawer open. Group expanders and dialogs stay interactive without dismissing the drawer. Desktop expanded/collapsed preferences remain independent of mobile navigation.
+
 ## Page composition
 
 ```tsx

@@ -15,7 +15,7 @@ import {
   Sparkles,
   Target,
 } from "lucide-react";
-import Link from "next/link";
+import { SidebarLink } from "@/components/application/SidebarLink";
 import { usePathname } from "next/navigation";
 import {
   Collapsible,
@@ -102,7 +102,7 @@ export function MarketingNavigationGroup() {
                   <SidebarMenuSubItem>
                     <SidebarMenuSubButton
                       isActive={pathname === "/app/marketing"}
-                      render={<Link href="/app/marketing" />}
+                      render={<SidebarLink href="/app/marketing" />}
                     >
                       <Sparkles />
                       <span>Home</span>
@@ -112,7 +112,7 @@ export function MarketingNavigationGroup() {
                     <SidebarMenuSubItem key={route.href}>
                       <SidebarMenuSubButton
                         isActive={pathname.startsWith(route.href)}
-                        render={<Link href={route.href} />}
+                        render={<SidebarLink href={route.href} />}
                       >
                         <route.icon />
                         <span>{route.label}</span>

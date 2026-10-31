@@ -11,7 +11,7 @@ import {
   Settings,
   UsersIcon,
 } from "lucide-react";
-import Link from "next/link";
+import { SidebarLink } from "@/components/application/SidebarLink";
 import { usePathname } from "next/navigation";
 import type { WorkspaceMembershipView } from "@/db/repositories/workspaces.repository";
 import type { ThemePreference } from "@/lib/schemas/user";
@@ -75,7 +75,7 @@ export function ApplicationSidebar({
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
-              render={<Link href="/app" />}
+              render={<SidebarLink href="/app" />}
               size="lg"
               tooltip={activeMembership.workspaceName}
             >
@@ -109,7 +109,7 @@ export function ApplicationSidebar({
               <SidebarMenuItem>
                 <SidebarMenuButton
                   isActive={pathname === "/app"}
-                  render={<Link href="/app" />}
+                  render={<SidebarLink href="/app" />}
                   tooltip="Dashboard"
                 >
                   <LayoutDashboard />
@@ -119,7 +119,7 @@ export function ApplicationSidebar({
               <SidebarMenuItem>
                 <SidebarMenuButton
                   isActive={pathname.startsWith("/app/activity")}
-                  render={<Link href="/app/activity" />}
+                  render={<SidebarLink href="/app/activity" />}
                   tooltip="Activity"
                 >
                   <Bell />
@@ -129,7 +129,7 @@ export function ApplicationSidebar({
               <SidebarMenuItem>
                 <SidebarMenuButton
                   isActive={pathname.startsWith("/app/queue")}
-                  render={<Link href="/app/queue" />}
+                  render={<SidebarLink href="/app/queue" />}
                   tooltip="Production queue"
                 >
                   <ListChecks />
@@ -139,7 +139,7 @@ export function ApplicationSidebar({
               <SidebarMenuItem>
                 <SidebarMenuButton
                   isActive={pathname.startsWith("/app/ideas")}
-                  render={<Link href="/app/ideas" />}
+                  render={<SidebarLink href="/app/ideas" />}
                   tooltip="Idea Lab"
                 >
                   <Lightbulb />
@@ -149,7 +149,7 @@ export function ApplicationSidebar({
               <SidebarMenuItem>
                 <SidebarMenuButton
                   isActive={pathname.startsWith("/app/characters")}
-                  render={<Link href="/app/characters" />}
+                  render={<SidebarLink href="/app/characters" />}
                   tooltip="Characters"
                 >
                   <UsersIcon />
@@ -159,7 +159,7 @@ export function ApplicationSidebar({
               <SidebarMenuItem>
                 <SidebarMenuButton
                   isActive={pathname.startsWith("/app/projects")}
-                  render={<Link href="/app/projects" />}
+                  render={<SidebarLink href="/app/projects" />}
                   tooltip="Projects"
                 >
                   <FolderKanban />
@@ -170,7 +170,7 @@ export function ApplicationSidebar({
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     isActive={pathname.startsWith("/app/usage")}
-                    render={<Link href="/app/usage" />}
+                    render={<SidebarLink href="/app/usage" />}
                     tooltip="Usage & budgets"
                   >
                     <ReceiptText />
@@ -182,7 +182,7 @@ export function ApplicationSidebar({
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     isActive={pathname.startsWith("/app/readiness")}
-                    render={<Link href="/app/readiness" />}
+                    render={<SidebarLink href="/app/readiness" />}
                     tooltip="Operational readiness"
                   >
                     <Activity />
@@ -194,7 +194,7 @@ export function ApplicationSidebar({
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     isActive={pathname.startsWith("/app/settings/workspace")}
-                    render={<Link href="/app/settings/workspace" />}
+                    render={<SidebarLink href="/app/settings/workspace" />}
                     tooltip="Workspace settings"
                   >
                     <Settings />

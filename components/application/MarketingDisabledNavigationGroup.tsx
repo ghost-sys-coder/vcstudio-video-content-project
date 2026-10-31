@@ -1,7 +1,7 @@
 "use client";
 
 import { Lock, Sparkles } from "lucide-react";
-import Link from "next/link";
+import { SidebarLink } from "@/components/application/SidebarLink";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -90,7 +90,9 @@ export function MarketingDisabledNavigationGroup({
                       render={
                         <Button
                           nativeButton={false}
-                          render={<Link href="/app/settings/workspace" />}
+                          render={
+                            <SidebarLink href="/app/settings/workspace" />
+                          }
                         />
                       }
                     >
