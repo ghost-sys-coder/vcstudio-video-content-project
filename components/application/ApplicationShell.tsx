@@ -62,10 +62,13 @@ export function ApplicationShell({
         userEmail={user.email}
       />
       <SidebarInset className="min-w-0 overflow-x-clip border border-border/60 bg-background/88 shadow-[0_24px_70px_-42px_color-mix(in_oklch,var(--foreground)_32%,transparent)] backdrop-blur-sm">
-        <header className="app-container app-topbar sticky top-4 z-20 flex shrink-0 items-center gap-3 rounded-2xl border border-border/70 bg-card/88 shadow-[0_12px_32px_-24px_color-mix(in_oklch,var(--foreground)_36%,transparent)] backdrop-blur-xl">
-          <SidebarTrigger />
+        <header className="app-container app-topbar sticky top-4 z-20 flex shrink-0 items-center gap-2 rounded-2xl border border-border/70 bg-card/88 shadow-[0_12px_32px_-24px_color-mix(in_oklch,var(--foreground)_36%,transparent)] backdrop-blur-xl sm:gap-3">
+          <SidebarTrigger className="size-11 shrink-0" />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium">
+            <p
+              className="truncate text-sm font-medium"
+              title={activeMembership.workspaceName}
+            >
               {activeMembership.workspaceName}
             </p>
           </div>

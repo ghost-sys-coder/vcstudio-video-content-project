@@ -16,6 +16,10 @@ Spacing is defined in `app/spacing.css` and loaded by `app/globals.css`. It is s
 
 The navbar and main content share `app-container`, capped at 1600px and centered on wide displays. The navbar stays 56px high with 16px top clearance. The desktop inset surface uses the shared 12px shell margin; workbench height accounts for both vertical margins. The shell owns the page gutters and vertical clearance; routed pages add no competing outer padding. A collapsed sidebar changes the available width without changing these rules. The inset surface is a structural `div`, with one main-content landmark inside it.
 
+Navigation controls reserve their own space instead of shrinking out of view. The application uses 44px sidebar/account targets, truncates long workspace/account labels, and shows the account name from 1024px. Below 1024px the public header uses a shadcn Sheet for section links and account actions; the single header row remains 56px high. The sheet scrolls on short screens, closes after navigation and when resized to desktop, and retains keyboard focus management. Keep these breakpoints consistent when extending the navigation.
+
+Sidebar tooltips are disabled while expanded and on mobile, where labels are already visible. Hiding their popup alone leaves an invisible tooltip able to consume Escape before the mobile drawer can close.
+
 ## Page composition
 
 ```tsx

@@ -538,7 +538,7 @@ function SidebarMenuButton({
   }
 
   return (
-    <Tooltip>
+    <Tooltip disabled={state !== "collapsed" || isMobile}>
       {comp}
       <TooltipContent
         side="right"
