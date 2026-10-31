@@ -653,11 +653,12 @@ export const publishingEnvironmentSchema = z.object({
    * LinkedIn app cannot break Facebook or YouTube publishing; validated lazily
    * in `createSocialPostProvider`.
    */
-  LINKEDIN_CLIENT_ID: z.string().optional(),
-  LINKEDIN_CLIENT_SECRET: z.string().optional(),
+  // Quoted dotenv values preserve inner edge whitespace; never send it to OAuth.
+  LINKEDIN_CLIENT_ID: z.string().trim().optional(),
+  LINKEDIN_CLIENT_SECRET: z.string().trim().optional(),
   /** Dedicated Community Management app, shared by web OAuth and token refresh. */
-  LINKEDIN_PAGES_CLIENT_ID: z.string().optional(),
-  LINKEDIN_PAGES_CLIENT_SECRET: z.string().optional(),
+  LINKEDIN_PAGES_CLIENT_ID: z.string().trim().optional(),
+  LINKEDIN_PAGES_CLIENT_SECRET: z.string().trim().optional(),
   /**
    * Versioned REST API date, e.g. `202607`. LinkedIn requires this header.
    *

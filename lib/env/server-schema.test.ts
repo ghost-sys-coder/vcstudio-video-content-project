@@ -176,6 +176,22 @@ describe("publishing environment validation", () => {
     expect(result.LINKEDIN_PAGES_CLIENT_ID).toBe("pages-id");
     expect(result.LINKEDIN_CLIENT_ID).toBeUndefined();
   });
+
+  it("trims surrounding whitespace from both LinkedIn credential pairs", () => {
+    const result = publishingEnvironmentSchema.parse({
+      ...base,
+      LINKEDIN_CLIENT_ID: " \tprofile-id\n",
+      LINKEDIN_CLIENT_SECRET: "\r\nprofile-secret ",
+      LINKEDIN_PAGES_CLIENT_ID: " pages-id ",
+      LINKEDIN_PAGES_CLIENT_SECRET: "\tpages-secret\r\n",
+    });
+    expect(result).toMatchObject({
+      LINKEDIN_CLIENT_ID: "profile-id",
+      LINKEDIN_CLIENT_SECRET: "profile-secret",
+      LINKEDIN_PAGES_CLIENT_ID: "pages-id",
+      LINKEDIN_PAGES_CLIENT_SECRET: "pages-secret",
+    });
+  });
 });
 
 describe("speech provider environment validation", () => {

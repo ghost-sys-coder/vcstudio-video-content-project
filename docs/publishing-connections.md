@@ -26,6 +26,14 @@ https://vcstudio.veilcode.studio/api/linkedin/pages/callback
 
 The URI is derived from `{APP_BASE_URL}/api/linkedin/pages/callback` for each environment. Keep the profile app callback at `/api/linkedin/callback`. After configuring approved permissions and credentials, deploy the updated web app and `social-post-publish` worker before using Page connections in production. No deployment or worker start was performed during implementation; Marketing Studio and its schedules remain paused.
 
+### Invalid client ID troubleshooting
+
+A leading or trailing space **inside** a quoted dotenv value is part of the value. For example, `LINKEDIN_PAGES_CLIENT_ID=" example-id"` sends a different client identifier from `example-id` and LinkedIn rejects it. On 2026-11-01 this was confirmed in the local source and corrected in `.env`, `.env.vercel`, `.env.trigger`, and both production environment stores. Secret storage was preserved; no client secret was rotated.
+
+Shared publishing environment validation now trims surrounding whitespace from all four LinkedIn client ID/secret settings. Authorization URLs, code exchange, and worker refresh therefore use the same normalized credentials. Missing or blank app credentials still fail only when that app is used. The normalization guard requires the updated code to be deployed; correcting the remote value also fixes the existing release after its environment is refreshed. Vercel env changes require redeployment, and local development should be restarted after editing env files. Start a fresh connection from Accounts & connections rather than reusing an old LinkedIn URL containing the malformed ID. Approved product scopes and registered callback URLs remain separate requirements.
+
+The existing production web commit `1cf28a6` was redeployed successfully on 2026-11-01 with the corrected setting. Deployment `dpl_u61uGAUDEyAgUfJXP5CmgP6EheWY` is READY and serves `vcstudio.veilcode.studio`. Public-page and unauthenticated-route checks passed; the initial runtime error scan returned no error groups. Full owner consent was not exercised. The local normalization guard remains uncommitted, and no Trigger.dev worker was started or deployed.
+
 ### Connection flow
 
 1. An owner chooses **Connect LinkedIn Page** in Accounts & connections. The authorize route signs state with a Page-specific purpose, binds it to the user/workspace, and sets a short-lived HTTP-only state cookie. The callback checks this browser cookie, the signature/expiry/purpose, current membership, and the Social posting feature flag before exchanging a code.
