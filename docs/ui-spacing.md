@@ -31,7 +31,7 @@ Sidebar tooltips are disabled while expanded and on mobile, where labels are alr
     </div>
     <Button>Create project</Button>
   </header>
-  <div className="app-grid md:grid-cols-2 xl:grid-cols-3">
+  <div className="app-grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
     {/* Existing shadcn cards or domain card components. */}
   </div>
 </section>
@@ -42,6 +42,7 @@ Sidebar tooltips are disabled while expanded and on mobile, where labels are alr
 - `app-heading` supplies the 8px title/description rhythm and clears competing heading/paragraph block margins. Do not add 2px text offsets.
 - `app-section` groups related content with a 16px gap.
 - `app-grid` supplies responsive grid spacing; its column definition remains specific to the workflow.
+- Card collections need an explicit base column definition, such as `grid-cols-1`, so an implicit auto-sized track cannot expand to long content. The Projects grid uses its available container width for two/three columns. Grid cards use `min-w-0`, long descriptions wrap, and title/status and budget/date rows can wrap within the card. Keep pagination wrapping too; do not hide overflowing cards behind the shell's clipping.
 - `app-panel` supplies padding for custom panels. Shadcn `Card` uses the same token automatically; `size="sm"` remains a deliberate compact option.
 - `app-form-page` constrains forms to 1024px, aligned with the common left edge. `app-reading-page` constrains prose to 768px. Neither creates another page gutter.
 - `app-workbench` accounts for the shell's chrome and dynamic viewport height. Use it for a bounded conversation/editor surface instead of subtracting a fixed navbar height from `100vh`.

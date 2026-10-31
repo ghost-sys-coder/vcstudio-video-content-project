@@ -34,7 +34,7 @@ export function ProjectListPageContent({
   styles: SceneImageStylePresetView[];
 }) {
   return (
-    <section className="app-page">
+    <section className="@container app-page">
       <div className="app-page-header">
         <div className="app-heading">
           <p className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
@@ -63,7 +63,7 @@ export function ProjectListPageContent({
       </div>
 
       {projects.length ? (
-        <div className="app-grid md:grid-cols-2 xl:grid-cols-3">
+        <div className="app-grid grid-cols-1 @[640px]:grid-cols-2 @[1024px]:grid-cols-3">
           {projects.map((project) => (
             <ProjectCard key={project.id} project={project} />
           ))}
@@ -75,7 +75,7 @@ export function ProjectListPageContent({
       {pageCount > 1 ? (
         <nav
           aria-label="Project pages"
-          className="flex items-center justify-between gap-2"
+          className="flex min-w-0 flex-wrap items-center justify-between gap-3"
         >
           <p className="text-xs text-muted-foreground">
             Page {page} of {pageCount}
