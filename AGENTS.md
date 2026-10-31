@@ -6,6 +6,12 @@ This repository contains an AI assisted video production platform that converts 
 
 The first release is an internal production tool. The architecture must support future workspace collaboration and SaaS billing without implementing unnecessary SaaS features during the MVP.
 
+## Current operating constraint: Marketing Studio paused
+
+Marketing Studio must remain inactive while this project uses free Trigger.dev and Neon allowances. Keep `ENABLE_MARKETING_STUDIO=false` in local, Vercel, and worker configuration unless the user explicitly asks to resume it after credits are available. Do not enable a workspace, reactivate marketing schedules, or start/deploy Trigger.dev workers merely to verify a UI change. Use mocked worker tests instead. Preserve the existing low-frequency core recovery profile: shared reservation recovery every 30 minutes and storage reconciliation every six hours. Recovery of already-created usage reservations remains necessary even while marketing is disabled.
+
+Keep Marketing Studio visible as a locked, paused sidebar entry for owners and editors even when the deployment flag is off. Its informational dialog must not query marketing data, start work, or offer an activation control during the deployment pause. Menu visibility does not authorize Marketing Studio access.
+
 ## Mandatory execution process
 
 Before changing code:

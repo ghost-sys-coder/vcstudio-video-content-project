@@ -70,7 +70,7 @@ const DEPLOY_CONTROL_ENV_KEYS = new Set([
  */
 function readWorkerEnvFile(): Record<string, string> {
   try {
-    const raw = readFileSync(join(process.cwd(), ".env.trigger.dev"), "utf8");
+    const raw = readFileSync(join(process.cwd(), ".env.trigger"), "utf8");
     const result: Record<string, string> = {};
     for (const line of raw.split(/\r?\n/)) {
       const trimmed = line.trim();

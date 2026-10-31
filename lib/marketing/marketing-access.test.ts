@@ -6,6 +6,7 @@ const deployment = vi.hoisted(() => ({ enabled: true }));
 const stored = vi.hoisted(() => ({
   row: null as { studioEnabled: boolean } | null,
 }));
+const findSettings = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/env/server", () => ({
   getMarketingEnvironment: () => ({
@@ -13,7 +14,7 @@ vi.mock("@/lib/env/server", () => ({
   }),
 }));
 vi.mock("@/db/repositories/marketing-settings.repository", () => ({
-  findMarketingSettings: async () => stored.row,
+  findMarketingSettings: findSettings,
 }));
 
 import {
@@ -26,6 +27,8 @@ const workspaceId = "11111111-1111-4111-8111-111111111111";
 beforeEach(() => {
   deployment.enabled = true;
   stored.row = null;
+  findSettings.mockReset();
+  findSettings.mockImplementation(async () => stored.row);
 });
 
 describe("resolveMarketingAccess", () => {
@@ -61,6 +64,7 @@ describe("resolveMarketingAccess", () => {
       available: false,
       reason: "deployment_disabled",
     });
+    expect(findSettings).not.toHaveBeenCalled();
   });
 
   it("lets the deployment flag override an opted-in workspace", async () => {

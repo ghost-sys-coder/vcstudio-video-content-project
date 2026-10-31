@@ -58,3 +58,4 @@ google-cloud-credentials.json
 
 # Scratch file for drafting scene JSON before pasting it in.
 /temporary.json
+.env*.local

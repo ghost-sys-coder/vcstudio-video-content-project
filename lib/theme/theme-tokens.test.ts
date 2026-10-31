@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * Guards the invariants of the three theme blocks in `app/globals.css`.
+ * Guards the invariants of the Light and Dark theme blocks in `app/globals.css`.
  *
  * These are asserted against the stylesheet text because nothing else can see
  * them: a missing token or a missing `color-scheme` produces no type error, no
@@ -13,7 +13,7 @@ import { describe, expect, it } from "vitest";
  */
 const CSS = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
 
-const THEME_SELECTORS = [":root", ".dark", ".dim"] as const;
+const THEME_SELECTORS = [":root", ".dark"] as const;
 
 /** The theme blocks contain no nested braces, so this is unambiguous. */
 function themeBlock(selector: string): string {
@@ -52,9 +52,7 @@ describe("color-scheme", () => {
     expect(themeBlock(":root")).toMatch(/color-scheme:\s*light/);
   });
 
-  it.each([".dark", ".dim"])("%s uses the dark scheme", (selector) => {
-    // Dim is a dark-direction theme despite its name; a light scheme here
-    // would give it white dropdowns on a navy surface.
+  it.each([".dark"])("%s uses the dark scheme", (selector) => {
     expect(themeBlock(selector)).toMatch(/color-scheme:\s*dark/);
   });
 });
@@ -66,7 +64,7 @@ describe("theme token parity", () => {
     expect(base.size).toBeGreaterThan(30);
   });
 
-  it.each([".dark", ".dim"])(
+  it.each([".dark"])(
     "%s redefines every token the default theme declares",
     (selector) => {
       // A token missing from one theme silently inherits the light value,
@@ -78,7 +76,7 @@ describe("theme token parity", () => {
     },
   );
 
-  it.each([".dark", ".dim"])(
+  it.each([".dark"])(
     "%s introduces no token the default theme lacks",
     (selector) => {
       // The reverse direction: a token defined only in a dark theme is
@@ -90,55 +88,4 @@ describe("theme token parity", () => {
       expect(extra).toEqual([]);
     },
   );
-});
-
-describe("the dim theme", () => {
-  const block = themeBlock(".dim");
-
-  it("keeps a dark contrast direction", () => {
-    // Dim sits between light and dark in luminance but keeps dark's
-    // light-text-on-a-dark-surface direction; averaging the two schemes
-    // component-wise would cancel the contrast out entirely.
-    const background = block.match(/--background:\s*oklch\(([\d.]+)/)?.[1];
-    const foreground = block.match(/--foreground:\s*oklch\(([\d.]+)/)?.[1];
-    expect(Number(background)).toBeLessThan(0.5);
-    expect(Number(foreground)).toBeGreaterThan(0.8);
-  });
-
-  it("softens the foreground off pure white", () => {
-    // A large low-luminance surface with moderated-brightness text is what
-    // reduces strain; a maximum-contrast pairing is not the same thing.
-    const foreground = Number(
-      block.match(/--foreground:\s*oklch\(([\d.]+)/)?.[1],
-    );
-    expect(foreground).toBeLessThan(0.98);
-  });
-
-  it("carries the Stripe navy tint on its surfaces", () => {
-    // Chroma above zero is what distinguishes this from the neutral-grey
-    // version it replaced.
-    const chroma = Number(
-      block.match(/--background:\s*oklch\([\d.]+\s+([\d.]+)/)?.[1],
-    );
-    expect(chroma).toBeGreaterThan(0.01);
-  });
-
-  it("keeps surface chroma restrained enough to read against", () => {
-    // Navy carries the identity, but a saturated background is fatiguing over
-    // a long session.
-    const chroma = Number(
-      block.match(/--background:\s*oklch\([\d.]+\s+([\d.]+)/)?.[1],
-    );
-    expect(chroma).toBeLessThan(0.08);
-  });
-
-  it("reserves its saturated accent for the primary action", () => {
-    const primaryChroma = Number(
-      block.match(/--primary:\s*oklch\([\d.]+\s+([\d.]+)/)?.[1],
-    );
-    const mutedChroma = Number(
-      block.match(/--muted:\s*oklch\([\d.]+\s+([\d.]+)/)?.[1],
-    );
-    expect(primaryChroma).toBeGreaterThan(mutedChroma * 3);
-  });
 });

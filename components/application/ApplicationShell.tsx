@@ -1,5 +1,6 @@
 import type { WorkspaceMembershipView } from "@/db/repositories/workspaces.repository";
-import type { ApplicationUser, UserThemePreference } from "@/db/schema";
+import type { ApplicationUser } from "@/db/schema";
+import type { ThemePreference } from "@/lib/schemas/user";
 import { ApplicationSidebar } from "@/components/application/ApplicationSidebar";
 import { ThemeResyncEffect } from "@/components/application/ThemeResyncEffect";
 import { UserAccountMenu } from "@/components/application/UserAccountMenu";
@@ -15,11 +16,12 @@ export function ApplicationShell({
   canManageSettings,
   canManageUsage,
   canViewOperationalReadiness,
-  canUseMarketingStudio,
+  canViewMarketingStudio,
   children,
   defaultSidebarOpen,
   initialTheme,
   logoUrl,
+  marketingDeploymentEnabled,
   marketingStudioEnabled,
   memberships,
   themeResyncTarget,
@@ -30,14 +32,15 @@ export function ApplicationShell({
   canManageSettings: boolean;
   canManageUsage: boolean;
   canViewOperationalReadiness: boolean;
-  canUseMarketingStudio: boolean;
+  canViewMarketingStudio: boolean;
   children: React.ReactNode;
   defaultSidebarOpen: boolean;
-  initialTheme: UserThemePreference;
+  initialTheme: ThemePreference;
   logoUrl: string | null;
+  marketingDeploymentEnabled: boolean;
   marketingStudioEnabled: boolean;
   memberships: WorkspaceMembershipView[];
-  themeResyncTarget: UserThemePreference | null;
+  themeResyncTarget: ThemePreference | null;
   user: ApplicationUser;
 }) {
   return (
@@ -49,9 +52,10 @@ export function ApplicationShell({
         canManageSettings={canManageSettings}
         canManageUsage={canManageUsage}
         canViewOperationalReadiness={canViewOperationalReadiness}
-        canUseMarketingStudio={canUseMarketingStudio}
+        canViewMarketingStudio={canViewMarketingStudio}
         initialTheme={initialTheme}
         logoUrl={logoUrl}
+        marketingDeploymentEnabled={marketingDeploymentEnabled}
         marketingStudioEnabled={marketingStudioEnabled}
         memberships={memberships}
         userDisplayName={user.displayName}

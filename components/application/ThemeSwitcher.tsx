@@ -1,6 +1,6 @@
 "use client";
 
-import { Moon, Sun, SunMoon } from "lucide-react";
+import { Moon, Sun } from "lucide-react";
 import { useState, useTransition } from "react";
 import { updateThemePreferenceAction } from "@/app/(authenticated)/app/actions";
 import { SidebarMenuItem, useSidebar } from "@/components/ui/sidebar";
@@ -10,34 +10,32 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type { UserThemePreference } from "@/db/schema";
-import { themeClassName } from "@/lib/theme/theme-classes";
+import type { ThemePreference } from "@/lib/schemas/user";
+import {
+  isValidThemePreference,
+  themeClassName,
+} from "@/lib/theme/theme-classes";
 import { cn } from "@/lib/utils";
 
 const THEME_OPTIONS: {
-  value: UserThemePreference;
+  value: ThemePreference;
   label: string;
   Icon: typeof Sun;
 }[] = [
   { value: "light", label: "Light", Icon: Sun },
-  { value: "dim", label: "Dim", Icon: SunMoon },
   { value: "dark", label: "Dark", Icon: Moon },
 ];
 
-function applyThemeClass(theme: UserThemePreference) {
+function applyThemeClass(theme: ThemePreference) {
   const target = themeClassName(theme);
   const root = document.documentElement;
   root.classList.toggle("dark", target === "dark");
-  root.classList.toggle("dim", target === "dim");
+  root.classList.remove("dim");
 }
 
 /**
- * Three-way segmented control (light / dim / dark) in the sidebar footer.
- *
- * Replaces a single click-to-cycle button: with three themes a cycle button
- * can only ever show what a click leads to *next*, never which theme is
- * actually active. This keeps the current theme visibly selected at all
- * times and reaches any theme in exactly one click.
+ * Light/Dark segmented control in the sidebar footer. The current theme stays
+ * visibly selected, and either appearance is available in one click.
  *
  * Colors are overridden to the sidebar's own `--sidebar-*` tokens rather than
  * the page-level `--background`/`--muted` the shared `Tabs` primitive uses by
@@ -47,14 +45,14 @@ function applyThemeClass(theme: UserThemePreference) {
 export function ThemeSwitcher({
   initialTheme,
 }: {
-  initialTheme: UserThemePreference;
+  initialTheme: ThemePreference;
 }) {
-  const [theme, setTheme] = useState<UserThemePreference>(initialTheme);
+  const [theme, setTheme] = useState<ThemePreference>(initialTheme);
   const [isPending, startTransition] = useTransition();
   const { isMobile, state } = useSidebar();
   const collapsed = state === "collapsed" && !isMobile;
 
-  function select(next: UserThemePreference) {
+  function select(next: ThemePreference) {
     if (next === theme) return;
     const previous = theme;
 
@@ -76,7 +74,9 @@ export function ThemeSwitcher({
     <SidebarMenuItem>
       <Tabs
         aria-label="Theme"
-        onValueChange={(value) => select(value as UserThemePreference)}
+        onValueChange={(value) => {
+          if (isValidThemePreference(value)) select(value);
+        }}
         orientation={collapsed ? "vertical" : "horizontal"}
         value={theme}
       >

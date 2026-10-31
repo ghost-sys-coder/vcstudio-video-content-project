@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 
-const files = [".env.example", ".env", ".env.trigger.dev", ".env.vercel"];
+const files = [".env.example", ".env", ".env.trigger", ".env.vercel"];
 const keysByFile = new Map(
   files.map((file) => {
     try {
@@ -19,27 +19,27 @@ const keysByFile = new Map(
 
 const rules = {
   STORAGE_RECONCILIATION_DRY_RUN: {
-    required: [".env.example", ".env", ".env.trigger.dev"],
+    required: [".env.example", ".env", ".env.trigger"],
     forbidden: [".env.vercel"],
   },
   STORAGE_RECONCILIATION_BATCH_SIZE: {
-    required: [".env.example", ".env", ".env.trigger.dev"],
+    required: [".env.example", ".env", ".env.trigger"],
     forbidden: [".env.vercel"],
   },
   STORAGE_RECONCILIATION_ABANDONED_UPLOAD_HOURS: {
-    required: [".env.example", ".env", ".env.trigger.dev"],
+    required: [".env.example", ".env", ".env.trigger"],
     forbidden: [".env.vercel"],
   },
   E2E_CLERK_USER_EMAIL: {
     required: [".env.example", ".env"],
-    forbidden: [".env.trigger.dev", ".env.vercel"],
+    forbidden: [".env.trigger", ".env.vercel"],
   },
   SECURITY_CSP_MODE: {
     required: [".env.example", ".env", ".env.vercel"],
-    forbidden: [".env.trigger.dev"],
+    forbidden: [".env.trigger"],
   },
   READINESS_ENVIRONMENT: {
-    required: [".env.example", ".env", ".env.vercel", ".env.trigger.dev"],
+    required: [".env.example", ".env", ".env.vercel", ".env.trigger"],
     forbidden: [],
   },
 };

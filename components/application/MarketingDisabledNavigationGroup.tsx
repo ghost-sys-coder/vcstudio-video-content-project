@@ -22,24 +22,13 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
-/**
- * The Marketing entry while the workspace has the studio switched off.
- *
- * Shown rather than hidden, because the two states mean different things to a
- * user: a hidden entry says "this app has no marketing feature", while a locked
- * one says "it has one and it is off". Only the second is true here, and only
- * the second is actionable.
- *
- * It collapses to a **single** row instead of the seven-item menu — offering
- * seven links that all open the same dialog would be noise — and the dialog
- * tells the user what to do, which differs by role: an owner is given the link,
- * everybody else is told who to ask, because sending an editor to a settings
- * page that will bounce them to access-denied is worse than saying so up front.
- */
+/** Static navigation for a deployment pause or a workspace that is switched off. */
 export function MarketingDisabledNavigationGroup({
   canManageSettings,
+  deploymentEnabled,
 }: {
   canManageSettings: boolean;
+  deploymentEnabled: boolean;
 }) {
   return (
     <SidebarGroup>
@@ -49,36 +38,58 @@ export function MarketingDisabledNavigationGroup({
           <SidebarMenuItem>
             <Dialog>
               <DialogTrigger
+                aria-label={
+                  deploymentEnabled
+                    ? "Marketing Studio — switched off"
+                    : "Marketing Studio — paused"
+                }
                 render={
-                  <SidebarMenuButton tooltip="Marketing Studio — switched off" />
+                  <SidebarMenuButton
+                    tooltip={
+                      deploymentEnabled
+                        ? "Marketing Studio — switched off"
+                        : "Marketing Studio — paused"
+                    }
+                  />
                 }
               >
                 <Sparkles />
                 <span>Studio</span>
-                <Lock className="ml-auto size-3.5 text-muted-foreground" />
+                <span className="ml-auto text-xs text-muted-foreground">
+                  {deploymentEnabled ? "Off" : "Paused"}
+                </span>
+                <Lock className="size-3.5 text-muted-foreground" />
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>The Marketing Studio is off</DialogTitle>
+                  <DialogTitle>
+                    {deploymentEnabled
+                      ? "The Marketing Studio is off"
+                      : "Marketing Studio is paused"}
+                  </DialogTitle>
                   <DialogDescription>
-                    {canManageSettings
-                      ? "It is switched off for this workspace. Turn it on in workspace settings and it will appear here straight away."
-                      : "It is switched off for this workspace. A workspace owner can turn it on from workspace settings."}
+                    {!deploymentEnabled
+                      ? "Marketing Studio is paused to conserve Trigger.dev and Neon credits. It will stay inactive until you choose to resume it."
+                      : canManageSettings
+                        ? "It is switched off for this workspace. Turn it on in workspace settings and it will appear here straight away."
+                        : "It is switched off for this workspace. A workspace owner can turn it on from workspace settings."}
                   </DialogDescription>
                 </DialogHeader>
                 <div className="rounded-lg border border-notice-info-edge bg-notice-info p-3 text-sm text-notice-info-foreground">
-                  The Studio drafts content with AI, so it spends from this
-                  workspace&apos;s budget. That is why it starts switched off
-                  rather than on.
+                  {deploymentEnabled
+                    ? "The Studio drafts content with AI, so it spends from this workspace’s budget. That is why it starts switched off rather than on."
+                    : "Opening this menu does not load marketing data or start background work."}
                 </div>
                 <DialogFooter>
                   <DialogClose render={<Button variant="outline" />}>
                     Close
                   </DialogClose>
-                  {canManageSettings ? (
+                  {deploymentEnabled && canManageSettings ? (
                     <DialogClose
+                      nativeButton={false}
                       render={
                         <Button
+                          nativeButton={false}
                           render={<Link href="/app/settings/workspace" />}
                         />
                       }

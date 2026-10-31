@@ -2,11 +2,12 @@ import "server-only";
 
 import { eq } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
-import { users, type UserThemePreference } from "@/db/schema";
+import { users } from "@/db/schema";
+import type { ThemePreference } from "@/lib/schemas/user";
 
 export async function updateUserThemePreference(input: {
   userId: string;
-  theme: UserThemePreference;
+  theme: ThemePreference;
 }) {
   const [user] = await getDatabase()
     .update(users)

@@ -8,7 +8,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { THEME_COOKIE } from "@/lib/theme/theme-cookie";
 import {
-  isValidThemePreference,
+  normalizeThemePreference,
   themeClassName,
 } from "@/lib/theme/theme-classes";
 import { cn } from "@/lib/utils";
@@ -36,7 +36,7 @@ export default async function RootLayout({
 }>) {
   const cookieStore = await cookies();
   const cookieValue = cookieStore.get(THEME_COOKIE)?.value;
-  const theme = isValidThemePreference(cookieValue) ? cookieValue : "light";
+  const theme = normalizeThemePreference(cookieValue);
 
   return (
     <html

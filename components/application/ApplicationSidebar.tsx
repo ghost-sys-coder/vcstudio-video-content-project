@@ -14,7 +14,7 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { WorkspaceMembershipView } from "@/db/repositories/workspaces.repository";
-import type { UserThemePreference } from "@/db/schema";
+import type { ThemePreference } from "@/lib/schemas/user";
 import { getUserInitials } from "@/lib/users/user-initials";
 import { LogoutConfirmDialog } from "@/components/application/LogoutConfirmDialog";
 import { MarketingDisabledNavigationGroup } from "@/components/application/MarketingDisabledNavigationGroup";
@@ -43,9 +43,10 @@ export function ApplicationSidebar({
   canManageSettings,
   canManageUsage,
   canViewOperationalReadiness,
-  canUseMarketingStudio,
+  canViewMarketingStudio,
   initialTheme,
   logoUrl,
+  marketingDeploymentEnabled,
   marketingStudioEnabled,
   memberships,
   userDisplayName,
@@ -56,9 +57,10 @@ export function ApplicationSidebar({
   canManageSettings: boolean;
   canManageUsage: boolean;
   canViewOperationalReadiness: boolean;
-  canUseMarketingStudio: boolean;
-  initialTheme: UserThemePreference;
+  canViewMarketingStudio: boolean;
+  initialTheme: ThemePreference;
   logoUrl: string | null;
+  marketingDeploymentEnabled: boolean;
   marketingStudioEnabled: boolean;
   memberships: WorkspaceMembershipView[];
   userDisplayName: string;
@@ -204,15 +206,13 @@ export function ApplicationSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
         {canComposePosts ? <SocialNavigationGroup /> : null}
-        {canUseMarketingStudio ? (
+        {canViewMarketingStudio ? (
           marketingStudioEnabled ? (
             <MarketingNavigationGroup />
           ) : (
-            // Listed but locked rather than hidden. A user who has heard the
-            // studio exists should find out it is switched off and how to fix
-            // that, instead of concluding the app does not have the feature.
             <MarketingDisabledNavigationGroup
               canManageSettings={canManageSettings}
+              deploymentEnabled={marketingDeploymentEnabled}
             />
           )
         ) : null}

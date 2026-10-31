@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import type { UserThemePreference } from "@/db/schema";
+import type { ThemePreference } from "@/lib/schemas/user";
 import {
   THEME_COOKIE,
   THEME_COOKIE_MAX_AGE_SECONDS,
@@ -16,14 +16,14 @@ import { themeClassName } from "@/lib/theme/theme-classes";
 export function ThemeResyncEffect({
   targetTheme,
 }: {
-  targetTheme: UserThemePreference | null;
+  targetTheme: ThemePreference | null;
 }) {
   useEffect(() => {
     if (!targetTheme) return;
     const target = themeClassName(targetTheme);
     const root = document.documentElement;
     root.classList.toggle("dark", target === "dark");
-    root.classList.toggle("dim", target === "dim");
+    root.classList.remove("dim");
     document.cookie = `${THEME_COOKIE}=${targetTheme}; path=/; max-age=${THEME_COOKIE_MAX_AGE_SECONDS}`;
   }, [targetTheme]);
 
