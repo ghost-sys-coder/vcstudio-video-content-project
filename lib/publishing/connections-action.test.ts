@@ -80,4 +80,32 @@ describe("shared account disconnect action", () => {
     expect(mocks.context).not.toHaveBeenCalled();
     expect(mocks.disconnect).not.toHaveBeenCalled();
   });
+
+  it("does not audit or refresh a connection outside the authorized workspace", async () => {
+    mocks.context.mockResolvedValue({
+      activeMembership: { workspaceId: "authorized-workspace", role: "owner" },
+      user: { id: "actor" },
+    });
+    mocks.disconnect.mockResolvedValue({ disconnected: false });
+    await expect(disconnectWorkspaceChannelAction(request())).resolves.toEqual({
+      success: false,
+      error: "That channel could not be found.",
+    });
+    expect(mocks.audit).not.toHaveBeenCalled();
+    expect(mocks.revalidate).not.toHaveBeenCalled();
+  });
+
+  it("reports a safe failure when local disconnection cannot be persisted", async () => {
+    mocks.context.mockResolvedValue({
+      activeMembership: { workspaceId: "authorized-workspace", role: "owner" },
+      user: { id: "actor" },
+    });
+    mocks.disconnect.mockRejectedValue(new Error("private database detail"));
+    await expect(disconnectWorkspaceChannelAction(request())).resolves.toEqual({
+      success: false,
+      error: "The channel could not be disconnected.",
+    });
+    expect(mocks.audit).not.toHaveBeenCalled();
+    expect(mocks.revalidate).not.toHaveBeenCalled();
+  });
 });

@@ -4,7 +4,7 @@ import { disconnectPlatformConnection } from "@/db/commands/platform-connection-
 import { findPlatformConnectionWithTokens } from "@/db/repositories/publishing.repository";
 import { openSecret } from "@/lib/crypto/secret-box";
 import { getPublishingEnvironment } from "@/lib/env/server";
-import { createVideoPublishProvider } from "@/lib/publishing/provider-registry";
+import { createPlatformOAuthProvider } from "@/lib/publishing/social-post-registry";
 
 export async function disconnectPlatformAuthorization(input: {
   connectionId: string;
@@ -14,18 +14,27 @@ export async function disconnectPlatformAuthorization(input: {
   if (!connection) return { disconnected: false, providerRevoked: false };
 
   let providerRevoked = false;
-  const provider = createVideoPublishProvider(connection.platform);
-  if (provider.revokeAuthorization && connection.accessTokenSealed) {
+  if (connection.accessTokenSealed) {
     try {
-      await provider.revokeAuthorization({
-        accessToken: openSecret({
-          sealed: connection.accessTokenSealed,
-          key: getPublishingEnvironment().PLATFORM_TOKEN_ENCRYPTION_KEY,
-        }),
-      });
-      providerRevoked = true;
+      const provider = createPlatformOAuthProvider(connection.platform);
+      if (provider.revokeAuthorization) {
+        await provider.revokeAuthorization({
+          accessToken: openSecret({
+            sealed: connection.accessTokenSealed,
+            key: getPublishingEnvironment().PLATFORM_TOKEN_ENCRYPTION_KEY,
+          }),
+        });
+        providerRevoked = true;
+      }
     } catch {
-      // Local credential destruction must still succeed if a provider is down.
+      // Provider construction, decryption, and revocation are all best effort.
+      // None may prevent destroying this workspace's saved credentials.
+      console.warn(
+        "Platform revocation unavailable; clearing local credentials.",
+        {
+          platform: connection.platform,
+        },
+      );
     }
   }
 

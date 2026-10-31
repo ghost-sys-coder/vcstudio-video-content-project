@@ -1,7 +1,10 @@
 "use client";
 
 import { CheckCircle2Icon, TriangleAlertIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import {
+  DisconnectChannelDialog,
+  type DisconnectChannelResult,
+} from "@/components/publish/DisconnectChannelDialog";
 import type { ConnectionView } from "@/lib/publishing/publishing-view";
 
 export function PlatformConnectionRow({
@@ -13,7 +16,7 @@ export function PlatformConnectionRow({
   connection: ConnectionView;
   canManage: boolean;
   busy: boolean;
-  onDisconnect: (connectionId: string) => void;
+  onDisconnect: (connectionId: string) => Promise<DisconnectChannelResult>;
 }) {
   const isActive = connection.status === "active";
 
@@ -52,15 +55,13 @@ export function PlatformConnectionRow({
       </div>
 
       {canManage && connection.status !== "revoked" ? (
-        <Button
+        <DisconnectChannelDialog
+          accountName={connection.accountName}
+          connectionId={connection.id}
           disabled={busy}
-          onClick={() => onDisconnect(connection.id)}
-          size="sm"
-          type="button"
-          variant="outline"
-        >
-          Disconnect
-        </Button>
+          onDisconnect={onDisconnect}
+          platformLabel={connection.platformLabel}
+        />
       ) : null}
     </li>
   );

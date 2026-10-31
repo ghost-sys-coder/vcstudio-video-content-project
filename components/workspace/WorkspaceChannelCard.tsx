@@ -7,7 +7,10 @@ import {
 } from "lucide-react";
 import { PlatformMarkIcon } from "@/components/brand/PlatformMarkIcon";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import {
+  DisconnectChannelDialog,
+  type DisconnectChannelResult,
+} from "@/components/publish/DisconnectChannelDialog";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { PLATFORM_BRAND_BACKGROUND_CLASS } from "@/lib/platforms/platform-brand";
 import type { WorkspaceChannelView } from "@/lib/publishing/workspace-connections-view";
@@ -19,15 +22,13 @@ const STATUS_LABELS: Record<WorkspaceChannelView["status"], string> = {
 };
 
 export function WorkspaceChannelCard({
-  busy,
   canManageConnections,
   channel,
   onDisconnect,
 }: {
-  busy: boolean;
   canManageConnections: boolean;
   channel: WorkspaceChannelView;
-  onDisconnect: (connectionId: string) => void;
+  onDisconnect: (connectionId: string) => Promise<DisconnectChannelResult>;
 }) {
   const active = channel.status === "active";
 
@@ -94,15 +95,12 @@ export function WorkspaceChannelCard({
 
         {canManageConnections && channel.status !== "revoked" ? (
           <CardFooter className="mt-auto justify-end bg-transparent">
-            <Button
-              disabled={busy}
-              onClick={() => onDisconnect(channel.id)}
-              size="sm"
-              type="button"
-              variant="outline"
-            >
-              {busy ? "Disconnecting…" : "Disconnect"}
-            </Button>
+            <DisconnectChannelDialog
+              accountName={channel.accountName}
+              connectionId={channel.id}
+              onDisconnect={onDisconnect}
+              platformLabel={channel.platformLabel}
+            />
           </CardFooter>
         ) : null}
       </Card>

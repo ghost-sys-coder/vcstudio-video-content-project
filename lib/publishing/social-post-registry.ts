@@ -59,7 +59,7 @@ export function isSocialPostPlatformConfigured(
 }
 
 /**
- * The OAuth half of a platform integration, for the connect/callback routes.
+ * The OAuth half of a platform integration, for connection and disconnection.
  *
  * The four video platforms reuse their video provider, which already implements
  * `PlatformOAuthProvider`; LinkedIn and X get their own, because neither has a

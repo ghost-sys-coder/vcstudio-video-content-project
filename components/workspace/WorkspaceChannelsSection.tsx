@@ -1,7 +1,6 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
 import { disconnectWorkspaceChannelAction } from "@/app/(authenticated)/app/settings/workspace/actions";
 import { ConnectYouTubeButton } from "@/components/publish/ConnectYouTubeButton";
 import { ConnectFacebookButton } from "@/components/publish/ConnectFacebookButton";
@@ -73,11 +72,6 @@ export function WorkspaceChannelsSection({
   oauthStatus: ConnectionOAuthStatus;
 }) {
   const router = useRouter();
-  const [pendingConnectionId, setPendingConnectionId] = useState<string | null>(
-    null,
-  );
-  const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
   const activeCount = initialData.channels.filter(
     (channel) => channel.status === "active",
   ).length;
@@ -85,17 +79,12 @@ export function WorkspaceChannelsSection({
     (platform) => !platform.available,
   );
 
-  function disconnect(connectionId: string) {
-    setError(null);
-    setPendingConnectionId(connectionId);
-    startTransition(async () => {
-      const formData = new FormData();
-      formData.set("connectionId", connectionId);
-      const result = await disconnectWorkspaceChannelAction(formData);
-      if (!result.success) setError(result.error);
-      setPendingConnectionId(null);
-      if (result.success) router.refresh();
-    });
+  async function disconnect(connectionId: string) {
+    const formData = new FormData();
+    formData.set("connectionId", connectionId);
+    const result = await disconnectWorkspaceChannelAction(formData);
+    if (result.success) router.refresh();
+    return result;
   }
 
   const oauthMessages = [
@@ -177,14 +166,6 @@ export function WorkspaceChannelsSection({
           {message}
         </p>
       ))}
-      {error ? (
-        <p
-          className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-          role="alert"
-        >
-          {error}
-        </p>
-      ) : null}
       {!initialData.enabled ? (
         <p className="rounded-lg border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
           Video publishing is currently disabled for this deployment.
@@ -196,7 +177,6 @@ export function WorkspaceChannelsSection({
           <ul className="app-grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))]">
             {initialData.channels.map((channel) => (
               <WorkspaceChannelCard
-                busy={isPending && pendingConnectionId === channel.id}
                 canManageConnections={canManageConnections}
                 channel={channel}
                 key={channel.id}

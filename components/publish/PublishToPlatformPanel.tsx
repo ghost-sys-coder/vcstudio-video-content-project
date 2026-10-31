@@ -380,8 +380,8 @@ export function PublishToPlatformPanel({
       formData.set("projectId", projectId);
       formData.set("connectionId", connectionId);
       const result = await disconnectPlatformAction(formData);
-      if (!result.success) setError(result.error);
-      await refresh();
+      if (result.success) await refresh();
+      return result;
     } finally {
       setBusy(false);
     }
