@@ -40,27 +40,30 @@ export function ImageQualitySelector({
   ];
 
   return (
-    <fieldset className="space-y-2" disabled={disabled}>
+    <fieldset
+      className="@container w-full min-w-0 space-y-2"
+      disabled={disabled}
+    >
       <legend className="text-sm font-medium">Quality</legend>
-      <div className="grid gap-2 sm:grid-cols-3">
+      <div className="grid min-w-0 gap-2 @[480px]:grid-cols-3">
         {qualityOptions.map((option) => {
           const id = `${idPrefix}-quality-${option.value}`;
           return (
             <label
-              className="has-checked:border-foreground has-checked:bg-muted/60 flex cursor-pointer items-start gap-2 rounded-xl border p-3 transition-colors has-disabled:cursor-not-allowed has-disabled:opacity-50"
+              className="has-checked:border-foreground has-checked:bg-muted/60 flex min-w-0 cursor-pointer items-start gap-2 rounded-xl border p-3 transition-colors has-disabled:cursor-not-allowed has-disabled:opacity-50"
               htmlFor={id}
               key={option.value}
             >
               <input
                 checked={value === option.value}
-                className="mt-0.5"
+                className="mt-0.5 shrink-0"
                 id={id}
                 name={`${idPrefix}-quality`}
                 onChange={() => onChange(option.value)}
                 type="radio"
                 value={option.value}
               />
-              <span>
+              <span className="min-w-0 wrap-anywhere">
                 <span className="block text-sm font-medium">
                   {option.label}
                 </span>

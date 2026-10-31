@@ -52,6 +52,8 @@ Keep navigation, labels, counters, tables, editing controls, timeline geometry, 
 
 Use the existing shadcn `Select` primitives, with `FormSelect` for a named form field or a simple controlled choice. `FormSelect` supplies labels before the popup opens and preserves uncontrolled form reset behavior. Every `SelectItem` must have an explicit string value, including `value=""` for an empty choice. Use `Input` for neighboring text, number, date, time, and color fields. Both `SelectTrigger` and `Input` are 40px tall by default; keep that height consistent across a row. A multiline textarea, checkbox, radio, or range slider retains its appropriate geometry.
 
+Nested production panels must adapt to their own width. Use container queries for scene image configuration, size, quality, and reference grids; a wide viewport can still contain a narrow editor column. Set `min-w-0` on grid children and fieldsets so intrinsic fieldset sizing cannot stretch the parent. Keep checkbox/radio controls from shrinking and let their text wrap. Select values truncate within the trigger while the arrow retains its width; option popups use the trigger width capped by available viewport space and wrap long labels. Fix the sizing constraint instead of hiding overflowing controls.
+
 ## Other surfaces
 
 The public site uses `app-public-container` with the same responsive gutters and a 1280px cap. Its hero, graphic mockups, and promotional sections retain their larger composition spacing. Legal headers and articles share `app-legal-container`, capped at the 768px reading width. Authentication, onboarding, and invitations use `app-standalone` for viewport-safe centering and the same responsive gutters. Dialogs and sheets retain the existing shadcn spacing and viewport clearances.

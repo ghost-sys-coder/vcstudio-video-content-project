@@ -26,7 +26,7 @@ export function ReferenceAssetSelector({
   return (
     <fieldset
       aria-describedby={descriptionId}
-      className="space-y-3"
+      className="@container w-full min-w-0 space-y-3"
       disabled={disabled}
       id={id}
     >
@@ -45,13 +45,13 @@ export function ReferenceAssetSelector({
         fidelity when the model supports it.
       </p>
       {references.length ? (
-        <div className="grid max-h-72 gap-2 overflow-y-auto pr-1 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid max-h-72 min-w-0 gap-2 overflow-y-auto pr-1 @[480px]:grid-cols-2 @[720px]:grid-cols-3">
           {references.map((reference) => {
             const checked = selected.has(reference.id);
             const checkboxId = `${id}-${reference.id}`;
             return (
               <label
-                className="has-checked:border-foreground has-checked:bg-muted/50 grid cursor-pointer grid-cols-[4rem_1fr] gap-3 rounded-xl border p-2 transition-colors has-disabled:cursor-not-allowed has-disabled:opacity-50"
+                className="has-checked:border-foreground has-checked:bg-muted/50 grid min-w-0 cursor-pointer grid-cols-[4rem_minmax(0,1fr)] gap-3 rounded-xl border p-2 transition-colors has-disabled:cursor-not-allowed has-disabled:opacity-50"
                 htmlFor={checkboxId}
                 key={reference.id}
               >
@@ -69,7 +69,7 @@ export function ReferenceAssetSelector({
                   <span className="flex items-start gap-2">
                     <input
                       checked={checked}
-                      className="mt-0.5"
+                      className="mt-0.5 shrink-0"
                       disabled={!checked && atLimit}
                       id={checkboxId}
                       onChange={(event) => {

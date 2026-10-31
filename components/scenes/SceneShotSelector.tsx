@@ -37,7 +37,7 @@ export function SceneShotSelector({
   const options = Array.from({ length: offered }, (_, index) => index);
 
   return (
-    <div className="space-y-2">
+    <div className="min-w-0 space-y-2">
       <label className="text-sm font-medium" htmlFor={id}>
         Image in this scene
       </label>

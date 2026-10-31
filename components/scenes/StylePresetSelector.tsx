@@ -21,7 +21,7 @@ export function StylePresetSelector({
   const selectedPreset = presets.find((preset) => preset.versionId === value);
 
   return (
-    <div className="space-y-2">
+    <div className="min-w-0 space-y-2">
       <Label htmlFor={id}>Visual style</Label>
       <FormSelect
         disabled={disabled || presets.length === 0}
@@ -39,7 +39,7 @@ export function StylePresetSelector({
           </SelectItem>
         ))}
       </FormSelect>
-      <p className="min-h-8 text-xs text-muted-foreground">
+      <p className="min-h-8 text-xs text-muted-foreground wrap-anywhere">
         {selectedPreset?.description ??
           "A versioned style preset is required before generation."}
       </p>

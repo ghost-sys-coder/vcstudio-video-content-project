@@ -131,7 +131,7 @@ export function SceneImagePanel({
   return (
     <section
       aria-labelledby={`${idPrefix}-image-panel-heading`}
-      className="space-y-5 rounded-xl border bg-card p-4"
+      className="@container min-w-0 space-y-5 rounded-xl border bg-card p-4 wrap-anywhere"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -156,7 +156,7 @@ export function SceneImagePanel({
         </div>
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid min-w-0 gap-4 @[640px]:grid-cols-2">
         <StylePresetSelector
           disabled={configurationDisabled || !canGenerate}
           id={`${idPrefix}-style-preset`}

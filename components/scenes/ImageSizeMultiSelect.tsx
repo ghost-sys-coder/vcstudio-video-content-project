@@ -25,12 +25,12 @@ export function ImageSizeMultiSelect({
   return (
     <fieldset
       aria-describedby={descriptionId}
-      className="@container space-y-2"
+      className="@container w-full min-w-0 space-y-2"
       disabled={disabled}
       id={id}
     >
       <legend className="text-sm font-medium">Image sizes</legend>
-      <div className="grid gap-2 @[420px]:grid-cols-3">
+      <div className="grid min-w-0 gap-2 @[420px]:grid-cols-3">
         {SCENE_IMAGE_SIZE_OPTIONS.map((option) => {
           const checked = selected.has(option.value);
           const checkboxId = `${id}-${option.value}`;
@@ -43,7 +43,7 @@ export function ImageSizeMultiSelect({
             >
               <input
                 checked={checked}
-                className="mt-0.5"
+                className="mt-0.5 shrink-0"
                 disabled={isOnlySelected}
                 id={checkboxId}
                 onChange={(event) => {
@@ -54,7 +54,7 @@ export function ImageSizeMultiSelect({
                 }}
                 type="checkbox"
               />
-              <span className="min-w-0">
+              <span className="min-w-0 wrap-anywhere">
                 <span className="block text-sm font-medium">
                   {option.label}
                 </span>

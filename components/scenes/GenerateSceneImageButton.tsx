@@ -62,7 +62,7 @@ export function GenerateSceneImageButton({
         >
           Review and generate
         </DialogTrigger>
-        <DialogContent>
+        <DialogContent className="wrap-anywhere">
           <DialogHeader>
             <DialogTitle>
               Confirm paid image generation
@@ -74,7 +74,7 @@ export function GenerateSceneImageButton({
                 : "Each confirmation creates a new generation version and a new billable provider request. Older results remain available."}
             </DialogDescription>
           </DialogHeader>
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded-xl border bg-muted/30 p-4 text-sm">
+          <dl className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 rounded-xl border bg-muted/30 p-4 text-sm">
             <dt className="text-muted-foreground">Total estimate</dt>
             <dd className="text-right font-semibold tabular-nums">
               {formatUsdCents(estimatedCostCents)}
