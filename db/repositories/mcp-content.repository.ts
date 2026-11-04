@@ -1,8 +1,56 @@
 import "server-only";
 import { and, asc, desc, eq, ilike, isNull, or, gte, lte } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
-import { mediaAssets, scenes, sceneVersions, socialPosts } from "@/db/schema";
+import {
+  mediaAssets,
+  scenes,
+  sceneVersions,
+  socialPosts,
+  sceneVariantFramings,
+  projectOutputVariants,
+} from "@/db/schema";
+import { mcpSceneImageFramingSchema } from "@studio/contracts";
 import { findLatestCompletedSceneAnalysisRun } from "@/db/repositories/scenes.repository";
+export async function listMcpSceneImageFramings(input: {
+  workspaceId: string;
+  projectId: string;
+  sceneId: string;
+  sceneVersionId: string;
+}) {
+  const rows = await getDatabase()
+    .select({
+      outputVariantId: sceneVariantFramings.outputVariantId,
+      aspectRatio: projectOutputVariants.aspectRatio,
+      outputWidth: projectOutputVariants.width,
+      outputHeight: projectOutputVariants.height,
+      sourceImageGenerationId: sceneVariantFramings.sourceImageGenerationId,
+      mode: sceneVariantFramings.mode,
+      focalPointXBps: sceneVariantFramings.focalPointXBps,
+      focalPointYBps: sceneVariantFramings.focalPointYBps,
+      scaleBps: sceneVariantFramings.scaleBps,
+      backgroundColor: sceneVariantFramings.backgroundColor,
+    })
+    .from(sceneVariantFramings)
+    .innerJoin(
+      projectOutputVariants,
+      and(
+        eq(projectOutputVariants.id, sceneVariantFramings.outputVariantId),
+        eq(projectOutputVariants.workspaceId, input.workspaceId),
+        eq(projectOutputVariants.projectId, input.projectId),
+      ),
+    )
+    .where(
+      and(
+        eq(sceneVariantFramings.workspaceId, input.workspaceId),
+        eq(sceneVariantFramings.projectId, input.projectId),
+        eq(sceneVariantFramings.sceneId, input.sceneId),
+        eq(sceneVariantFramings.sceneVersionId, input.sceneVersionId),
+      ),
+    )
+    .orderBy(asc(projectOutputVariants.aspectRatio))
+    .limit(3);
+  return rows.map((row) => mcpSceneImageFramingSchema.parse(row));
+}
 export async function listMcpSceneWindow(input: {
   workspaceId: string;
   projectId: string;

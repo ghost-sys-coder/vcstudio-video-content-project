@@ -4,7 +4,8 @@ Connection, import/reuse and publication milestones are deployed for controlled
 owner-only production use. Production web and worker MCP are enabled; local and
 Preview defaults remain disabled. User verification covers ChatGPT connection,
 workspace reads, image import/Social draft, desktop project reuse, explicit
-scene-image approval and the first real LinkedIn text-and-image publication. Private access and continued MCP
+scene-image approval, saved scheduling/cancellation and the first real LinkedIn
+text-and-image publication. Private access and continued MCP
 availability are also user-verified. The remaining client and workflow checks
 below are distinct from the completed deployment; local tests alone do not prove
 live client compatibility.
@@ -25,15 +26,63 @@ live client compatibility.
 
 ## Remaining live acceptance
 
-- Prepare a real scheduled Social post with exact content, destination, local
-  time, timezone and UTC instant. Human approval is required before scheduling.
-  Verify the calendar/status, then exercise cancellation through its own review.
-  Do not schedule another copy of the already-published test post by default.
-- Test Claude web and desktop separately: OAuth, workspace grants, reads,
-  import or documented upload fallback, and the review/browser fallback.
+- Complete Claude web/desktop publication review and explicit scene-image review.
+  Claude web connection, project reads, draft saving and browser image-upload/attachment
+  are verified. Desktop reads, browser-upload and project/script/scene reuse have
+  succeeded; saved framing read-back after the correction below still needs a live check.
   Distinguish unsupported remote connections from unavailable chat-file access.
 - Verify desktop file import and signed-in browser upload/review handoffs. Reuse
   of an existing library image does not establish native desktop file transfer.
+  Claude Desktop's browser-upload fallback is verified; native chat-file access is
+  optional when the documented fallback works.
+
+### Claude Desktop reuse and saved framing correction - 2026-11-04
+
+The desktop client completed the browser-upload, zero-budget project, script draft,
+approved manual scene and provider-free image assignment. A bounded production read
+confirmed project `d4b12a01-b596-4540-93c8-05012cf1e523`, scene
+`d44488f3-a54e-4d64-a2d8-dae210c1f6ee` at approved version 1, and pending image
+`d9467a41-1826-45c3-9415-678e514e09a4`. The library original
+`3047f4c6-d55b-42a2-9485-d5ddf40c6f6e` is ready, PNG, 1122 x 1402.
+
+Both actual private files were downloaded read-only and inspected at full size.
+All eight portrait views remain present. The 1536 x 1024 scene copy is the accepted
+landscape image canvas, not the video's final resolution. Its saved 1920 x 1080
+output framing is contain, centered, scale 10000 (100%). For this portrait,
+containing the padded canvas in 16:9 preserves the whole image with side bars.
+No existing file or approval was changed.
+
+`assign_scene_image` now returns `importFit` (contain or explicit cover), stored
+`image` dimensions and the saved `outputFraming`. `get_scene` returns image pixel
+dimensions and bounded `imageFramings` per output, each tied to its exact
+`sourceImageGenerationId`. These are persisted settings, not an inferred fit.
+An absent saved framing retains the application's cover default. Existing
+idempotent operation results remain unchanged; use a fresh `get_scene` for current
+framing rather than assigning again merely to obtain richer metadata.
+
+The renderer's automatic pacing could still zoom/pan contain images and crop their
+edges during playback. New shared preview/render snapshots now disable automatic
+camera motion for visible contain images, including mixed-shot scenes. Explicit
+manual scale/crop settings remain user choices. Previously frozen snapshots retain
+their historical motion for reproducibility.
+
+Ready images are decoded/validated inline; `inspectionStatus` describes asynchronous
+video/audio inspection and may be null for a ready still. The tool description now
+states this. Import operation/asset UUIDs and assignment operation/generation UUIDs
+are intentionally correlated for retry-safe creation; they remain separate records
+with explicit field names and provenance. No background inspection task is added
+for already-validated still images.
+
+The image remains pending review. Publication review in Claude remains a separate
+acceptance step. No paid generation, rendering, public post or schedule was started.
+This correction requires no migration, environment, dependency or worker change.
+
+Verification passed: 286 focused MCP/render/output/pacing and isolated PostgreSQL
+tests, TypeScript, environment placement and production build. Lint passed with
+four pre-existing warnings. The actual stored portrait derivative also matches
+the deterministic full-image contain conversion byte-for-byte. All 15 isolated browser journeys also passed after running sequentially with the
+build (their shared temporary directory prevents concurrent execution). No live
+client read-back of the richer framing response has been claimed.
 
 Scheduling, revocation preserving approved schedules, stale/replayed approvals,
 workspace isolation and failed-target retry already have mocked/service or
@@ -72,9 +121,9 @@ Accept scene-image approval as passed. No VCStudio connector tools are exposed
 to the coding session, so future live client calls still require the user's
 connected client. Do not substitute direct SQL mutations or collect session tokens.
 
-### Current live step: scheduling and cancellation
+### Initial scheduling preparation
 
-The next prompt prepares a new text-only Social draft, **VCStudio — building with
+The initial prompt prepares a new text-only Social draft, **VCStudio — building with
 boundaries**, for the personal LinkedIn account. Its relevant copy discusses
 private rollout and explicit content decisions. Proposed time: 11 November 2026,
 10:00 Africa/Kampala (`2026-11-11T07:00:00Z`). The published post must not be
@@ -95,7 +144,7 @@ human approval, or request a fresh preview for this same post if it has expired.
 
 ### Destination persistence defect discovered during live verification
 
-Scheduling acceptance is paused while correcting a confirmed draft-persistence
+Scheduling acceptance was paused while correcting a confirmed draft-persistence
 bug. The composer kept checked accounts in component-local state, while its save
 payload and database command persisted only copy/media. MCP preview preparation
 kept the requested account inside its operation but did not save draft intent.
@@ -122,8 +171,18 @@ and tenant constraints and backfills existing targets without altering them. It
 passed isolated PostgreSQL tests and a temporary production-clone check: all 14
 valid existing choices were copied, all three foreign keys and the matching
 Drizzle ledger entry exist, and post/target counts and content/state digests match
-production. The test draft stays a draft with no targets. Production application
-of this migration and the corrective web deployment remain pending.
+production. At migration verification, the test post was still a draft with no
+targets. After explicit user
+approval, the migration was applied to production and the temporary clone was
+deleted. Production read-back confirmed 14 saved choices, all three foreign keys,
+the matching migration hash/ledger entry and unchanged post/target digests.
+
+The web correction is deployed as `27d2905d2027cf5c271d2ce8d55055bd1c33764e`,
+Vercel `dpl_D6a6vY1CjcZo4o49s16G4C17GCp6`, production READY on the canonical
+domain. Anonymous public-page, waitlist/signup, private composer/API, MCP challenge
+and framing checks passed. No worker deployment or environment change was needed.
+The user subsequently answered **We are good now** to the MCP/manual
+save-and-refresh regression check. Accept destination persistence as live-verified.
 
 Corrective verification passed: 2,830 Vitest tests (162 intentionally skipped),
 all 15 isolated Playwright journeys, TypeScript, full lint with four existing
@@ -139,6 +198,130 @@ post's current revision and prepare a fresh preview for the same account/time.
 Confirm that account is selected in the composer, then manually save/change/clear
 a choice and reload to verify persistence before continuing scheduling acceptance.
 Do not approve an old pre-fix preview or create another copy of the test draft.
+
+### Saved schedule verified; cancellation is next - 2026-11-04
+
+Following the persistence confirmation, a bounded exact-workspace/post production
+read found the existing draft already scheduled:
+
+- Post `9206ff25-759c-4d9d-9913-64a646306288`, version 8, `status=scheduled`.
+- Scheduled instant `2026-11-11T07:00:00.000Z`, timezone `Africa/Kampala`,
+  equivalent to 11 November 2026 at 10:00 local time.
+- One saved destination and one actual target: personal LinkedIn **Tamale Frank**,
+  connection `9def266d-fabd-4e4c-a7c0-0eaa1f0173d3`.
+- Operation `127ac3b0-8e49-4f5d-9b0c-4db99878352a` is `publish_post`, succeeded,
+  and records the exact post with `scheduled=true`.
+- Target status is pending, with no external post ID or publication timestamp.
+
+Accept saved scheduling as verified. Do not prepare a duplicate schedule. This
+does not establish future scheduled delivery or a separate client calendar read.
+The next user-side prompt reads the calendar and prepares `action=cancel_schedule`
+for this same post, its current version and exact target IDs. The user must review
+and click **Approve cancellation**; **Cancel request** merely dismisses a preview.
+The coding session made only SELECTs; the subsequent cancellation result is
+recorded below.
+
+### Cancellation verified; Claude web is next - 2026-11-04
+
+The user reported **Done and successful** after the cancellation-review prompt.
+A bounded exact-workspace/post production SELECT corroborated:
+
+- Post `9206ff25-759c-4d9d-9913-64a646306288` is draft, version 9, with
+  `scheduled_at=null`; its name/content and one saved destination remain.
+- Cancellation operation `50d4b938-9a13-4d2a-8e05-14433acf3f7f` succeeded and
+  records `cancelled=true` for this exact post.
+- No destination is queued, publishing or published, and none has a publication
+  timestamp or external post ID. Cleared scheduling removes it from the future
+  scheduled-calendar range; no new public post was sent by this test.
+
+Accept scheduling and cancellation as passed. The client in these latest replies
+was identified only as connected ChatGPT; do not assign a new independent
+web-versus-desktop result. Do not recreate the schedule to repeat this check.
+
+The next user-side check is Claude web OAuth and read-only project listing.
+Configure the canonical MCP URL using OAuth and the published Claude identity
+when offered, sign in with an existing allowed owner identity, then invoke
+connection discovery. A new connection initially has no workspace authority.
+Grant **Read** only to the new Claude connection in VCStudio, leaving the existing
+ChatGPT grants intact, and list projects without mutations. Add editing/media and
+review/publication grants only when their respective acceptance steps need them.
+The user subsequently confirmed Claude web lists projects successfully. Accept
+Claude web OAuth/workspace/project reads as user-verified. File/import/edit/review
+journeys and Claude desktop remain separate pending checks.
+
+### Claude web draft and browser upload fallback verified
+
+Retain Read and add Edit and Media only to the new Claude connection for the
+selected workspace. Create or reuse a dedicated draft named **Claude web MCP
+verification 2026-11-04**, save the exact text **Claude web MCP verification**, and
+request `import_asset` with `source.kind=upload`, title **Claude web import test**
+and that draft's `destination.postId`. Use a stable idempotency key for retries.
+The assistant should present the signed-in handoff, not claim access to an
+unavailable chat file or start generation.
+
+The user selects an existing image in the VCStudio handoff page. After completion,
+Claude checks `get_operation`/`get_asset`, verifies ready media, reads the current
+post revision and attaches the new asset through `save_post`. The import preserves
+the destination hint but does not itself attach the image, so that final draft save
+is necessary. Do not attach it twice or overwrite an unrelated draft. Read back
+the exact text, attachment and operation/asset/post IDs. No project, generation,
+render, publication or schedule is needed. Browser fallback acceptance does not
+establish native Claude chat-file transfer.
+
+The user reported the completed flow; a bounded workspace/import/asset/attachment
+production SELECT corroborated:
+
+- Import `9dcf39a8-b705-4190-9081-ff60a428c0c9` succeeded with source kind upload,
+  `inspectionPending=false`, provenance and a frozen accepted upload copy.
+- Asset has the same ID, title **Claude web import test**, original filename
+  `jake-character-sheet.png`, PNG, 1672 x 941, 2,129,282 bytes, ready, no warnings.
+- Its intended and actual post is `3135ab16-8439-42af-83a6-09a896b488f6`, named
+  **Claude web MCP verification 2026-11-04**, version 3, exact text **Claude web MCP
+  verification**, still draft, no schedule or publication targets.
+- The ready library asset has one matching attachment on that post.
+
+Accept Claude web draft saving and browser-upload fallback/attachment as passed.
+This does not establish native Claude attachment access or its approval UI path.
+
+Two reported observations are intentional:
+
+- `inspectionStatus=null` on this image does not mean validation was skipped.
+  `finishMcpImport` verifies actual byte size, supported image format and decoded
+  content through Sharp before marking it ready. The asynchronous inspection
+  status and verified-metadata union describe video/audio FFprobe inspection;
+  those uploads must complete that separate worker path before use.
+- One import deliberately uses its operation UUID as the media asset UUID.
+  `authorizeMcpUpload`, completion, recovery and import status lookup all follow
+  this deterministic identity for retry safety. The records remain separate,
+  workspace-scoped entities with explicit operation/media fields and provenance.
+  A shared UUID alone is not an accidental collision or evidence of a defect.
+
+No runtime fix is required for these observations. All seven existing
+import-service tests passed when rerun for the raised validation concern,
+including real Sharp decoding and disguised/oversized file rejection.
+
+### Claude Desktop reads passed; upload and reuse are next
+
+The user explicitly ran Claude Desktop and confirmed active/non-revoked
+connection, owner workspace access, exact draft version 3/text, the one ready
+attached PNG and 1672 x 941 dimensions. Accept desktop reads as user-verified.
+This does not yet establish desktop transfer, editing, scene reuse or review.
+
+Next, retain Read/Edit/Media and add Review on the Claude workspace grant. In
+Claude Desktop, create or reuse **Claude desktop MCP reuse verification
+2026-11-04** with 16:9, 30 fps, English and a zero project budget. Save the exact
+script draft **Claude desktop MCP verification**, keeping the script unapproved.
+Create and explicitly approve one manual scene with that narration and a brief
+to show the full uploaded image. No analysis or provider generation is needed.
+
+Request a browser image-upload handoff titled **Claude desktop import test**,
+retaining this exact project/scene destination. After the user selects an existing
+image in VCStudio and the operation/asset are ready, assign that imported asset
+through `assign_scene_image` with contain fit and the current scene revision.
+Preserve the library original and leave the scene image pending review. Return
+project, scene, import, asset and assignment IDs plus read-back. Reuse request keys
+on retries and do not duplicate the test project/scene/import. No rendering,
+publication or scheduling belongs in this check. The live result is pending.
 
 For the later Claude checks, follow the current official
 [custom remote connector instructions](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp),
@@ -266,12 +449,12 @@ Next.js/ESLint to 16.4.5, Sharp to 0.35.5, proxy-addr and tar 7. No forced major
 upgrade was applied to the legacy Trigger CLI dependency. This is not a clean
 audit; the existing CLI dependency remains a separate security follow-up.
 
-| Client          | Remote OAuth/MCP             | Native chat files            | Interactive approval | Browser/upload fallback |
-| --------------- | ---------------------------- | ---------------------------- | -------------------- | ----------------------- |
-| ChatGPT web     | OAuth/reads user verified    | File-reference import passed | Not run              | Local fixtures only     |
-| ChatGPT desktop | Tools/project reuse verified | Not run                      | Not run              | Local fixtures only     |
-| Claude web      | Not run                      | Not run                      | Not run              | Local fixtures only     |
-| Claude desktop  | Not run                      | Not run                      | Not run              | Local fixtures only     |
+| Client          | Remote OAuth/MCP                      | Native chat files            | Interactive approval | Browser/upload fallback     |
+| --------------- | ------------------------------------- | ---------------------------- | -------------------- | --------------------------- |
+| ChatGPT web     | OAuth/reads user verified             | File-reference import passed | Not run              | Local fixtures only         |
+| ChatGPT desktop | Tools/project reuse verified          | Not run                      | Not run              | Local fixtures only         |
+| Claude web      | OAuth/project reads verified          | Not run                      | Not run              | Upload/draft attach passed  |
+| Claude desktop  | Connection/draft/asset reads verified | Not run                      | Not run              | Desktop upload test pending |
 
 The production database, Clerk resource/scopes and deployment prerequisites are
 complete. The user explicitly approved the controlled rollout on 2026-11-04.

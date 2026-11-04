@@ -1,4 +1,5 @@
 import "server-only";
+import { mcpSceneImageFramingSchema } from "@studio/contracts";
 import { findMediaAsset } from "@/db/repositories/media-assets.repository";
 import { findCurrentScene } from "@/db/repositories/scenes.repository";
 import { listProjectOutputVariants } from "@/db/repositories/output-variants.repository";
@@ -63,6 +64,18 @@ export async function assignMcpImage(
         "conflict",
         "Approve the current scene version before assigning an image.",
       );
+      const variants = await listProjectOutputVariants({
+        workspaceId: context.workspaceId,
+        projectId: project.id,
+      });
+      const target = variants.find(
+        (v) => v.aspectRatio === project.aspectRatio,
+      );
+      requireMcp(
+        target,
+        "not_found",
+        "The project's output format is unavailable.",
+      );
       const size = getSceneImageSizeForAspectRatio(project.aspectRatio);
       const bytes = await fitImportedImage(
         await downloadMediaAssetBytes(asset.objectKey),
@@ -95,28 +108,20 @@ export async function assignMcpImage(
         etag,
         requestedByUserId: context.principal.userId,
       });
-      const variants = await listProjectOutputVariants({
+      const framing = await saveSceneVariantFraming({
         workspaceId: context.workspaceId,
         projectId: project.id,
+        outputVariantId: target.id,
+        sceneId: input.sceneId,
+        sceneVersionId: current.version.id,
+        sourceImageGenerationId: created.id,
+        mode: "contain",
+        focalPointXBps: 5000,
+        focalPointYBps: 5000,
+        scaleBps: 10000,
+        backgroundColor: "#000000",
+        updatedByUserId: context.principal.userId,
       });
-      const target = variants.find(
-        (v) => v.aspectRatio === project.aspectRatio,
-      );
-      if (target)
-        await saveSceneVariantFraming({
-          workspaceId: context.workspaceId,
-          projectId: project.id,
-          outputVariantId: target.id,
-          sceneId: input.sceneId,
-          sceneVersionId: current.version.id,
-          sourceImageGenerationId: created.id,
-          mode: "contain",
-          focalPointXBps: 5000,
-          focalPointYBps: 5000,
-          scaleBps: 10000,
-          backgroundColor: "#000000",
-          updatedByUserId: context.principal.userId,
-        });
       await addMcpAssetOrigin({
         workspaceId: context.workspaceId,
         operationId,
@@ -127,6 +132,15 @@ export async function assignMcpImage(
       return {
         generationId: created.id,
         reviewStatus: "pending",
+        importFit: input.fit,
+        sourceMediaAssetId: asset.id,
+        image: { size, width, height },
+        outputFraming: mcpSceneImageFramingSchema.parse({
+          ...framing,
+          aspectRatio: target.aspectRatio,
+          outputWidth: target.width,
+          outputHeight: target.height,
+        }),
         href: `/app/projects/${project.id}/scenes?sceneId=${input.sceneId}`,
       };
     },

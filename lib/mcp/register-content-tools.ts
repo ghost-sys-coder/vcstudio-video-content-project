@@ -20,7 +20,10 @@ import { findProjectBrief } from "@/db/repositories/project-briefs.repository";
 import { loadProjectProductionReadiness } from "@/db/repositories/production-queue.repository";
 import { findCurrentScene } from "@/db/repositories/scenes.repository";
 import { listSceneImageGenerationSummaries } from "@/db/repositories/scene-images.repository";
-import { listMcpSceneWindow } from "@/db/repositories/mcp-content.repository";
+import {
+  listMcpSceneWindow,
+  listMcpSceneImageFramings,
+} from "@/db/repositories/mcp-content.repository";
 import {
   createMcpProject,
   updateMcpBrief,
@@ -189,7 +192,7 @@ export function registerContentTools(register: McpToolRegistrar) {
   );
   register(
     "get_scene",
-    "Read a current scene and bounded image review history. Images are not automatically approved.",
+    "Read a current scene, bounded image review history and saved imageFramings per output. Image canvas size can differ from output dimensions; match framing by sourceImageGenerationId. Missing saved framing uses the application's cover default. Images are not automatically approved.",
     "vcstudio:read",
     project.extend({ sceneId: z.uuid() }),
     true,
@@ -200,17 +203,28 @@ export function registerContentTools(register: McpToolRegistrar) {
         workspaceId: ctx.workspaceId,
       });
       requireMcp(current, "not_found", "That scene is unavailable.");
-      const images = await listSceneImageGenerationSummaries({
-        ...p,
-        workspaceId: ctx.workspaceId,
-        sceneVersionId: current.version.id,
-        limit: 24,
-      });
+      const [images, imageFramings] = await Promise.all([
+        listSceneImageGenerationSummaries({
+          ...p,
+          workspaceId: ctx.workspaceId,
+          sceneVersionId: current.version.id,
+          limit: 24,
+        }),
+        listMcpSceneImageFramings({
+          ...p,
+          workspaceId: ctx.workspaceId,
+          sceneVersionId: current.version.id,
+        }),
+      ]);
       return {
         ...current,
+        imageFramings,
         images: images.map((i) => ({
           id: i.generation.id,
           size: i.generation.size,
+          width: i.generation.assetWidth,
+          height: i.generation.assetHeight,
+          shotIndex: i.generation.shotIndex,
           status: i.generation.status,
           reviewStatus: i.generation.reviewStatus,
           source: i.generation.source,

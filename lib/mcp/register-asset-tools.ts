@@ -48,7 +48,7 @@ export function registerAssetTools(register: McpToolRegistrar) {
   );
   register(
     "get_asset",
-    "Inspect one workspace asset and its verification state; open its authorized download link when needed.",
+    "Inspect one workspace asset and its verification state; open its authorized download link when needed. Ready still images have been decoded and validated inline; inspectionStatus is for background video/audio inspection and may be null for images.",
     "vcstudio:read",
     mcpWorkspaceInput.extend({ mediaAssetId: z.uuid() }),
     true,
@@ -132,7 +132,7 @@ export function registerAssetTools(register: McpToolRegistrar) {
   );
   register(
     "assign_scene_image",
-    "Use a verified library still in an approved scene. Default contain preserves all content. Cover explicitly crops. Creates an unapproved, project-owned copy at no generation charge.",
+    "Use a ready, decoded PNG/JPEG/WebP library still in an approved scene. Default contain preserves all content; cover explicitly crops. Creates an unapproved project-owned copy at no generation charge. Returns importFit, storage-canvas dimensions and persisted outputFraming separately. The accepted scene canvas can differ from the final video size; contain display preserves it within that output.",
     "vcstudio:media",
     mcpMutationInput.extend({
       projectId: z.uuid(),

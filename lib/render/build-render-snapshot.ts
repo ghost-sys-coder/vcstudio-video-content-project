@@ -132,7 +132,14 @@ export function buildRenderTimelineSnapshot(input: {
         startFrame: scene.startFrame,
         endFrame: scene.endFrame,
         durationFrames: scene.durationFrames,
-        cameraMotion: scenePacing.cameraMotion,
+        // Show-all framing must remain show-all throughout playback. Automatic
+        // pacing zooms/pans otherwise crop its edges despite 100% saved scale.
+        // Only new snapshots change; historical frozen renders retain motion.
+        cameraMotion: (shots ?? [scene.image]).some(
+          (image) => image.framing?.mode === "contain",
+        )
+          ? "none"
+          : scenePacing.cameraMotion,
         transition: scenePacing.transition,
         image: {
           objectKey: scene.image.objectKey,

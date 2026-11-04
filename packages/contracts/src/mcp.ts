@@ -19,6 +19,20 @@ export const mcpScopeSchema = z.enum([
 export const MCP_SCOPES = mcpScopeSchema.options;
 export type McpScope = z.infer<typeof mcpScopeSchema>;
 export const mcpWorkspaceInput = z.object({ workspaceId: z.uuid() });
+/** Persisted display framing, distinct from a scene image's storage canvas. */
+export const mcpSceneImageFramingSchema = z.object({
+  outputVariantId: z.uuid(),
+  aspectRatio: z.enum(["16:9", "9:16", "1:1"]),
+  outputWidth: z.number().int().positive(),
+  outputHeight: z.number().int().positive(),
+  sourceImageGenerationId: z.uuid(),
+  mode: z.enum(["contain", "cover"]),
+  focalPointXBps: z.number().int().min(0).max(10000),
+  focalPointYBps: z.number().int().min(0).max(10000),
+  scaleBps: z.number().int().min(10000).max(30000),
+  backgroundColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+});
+export type McpSceneImageFraming = z.infer<typeof mcpSceneImageFramingSchema>;
 export const mcpMutationInput = mcpWorkspaceInput.extend({
   idempotencyKey: z.string().min(8).max(128),
 });
