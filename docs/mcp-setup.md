@@ -135,12 +135,12 @@ Next.js/ESLint to 16.4.5, Sharp to 0.35.5, proxy-addr and tar 7. No forced major
 upgrade was applied to the legacy Trigger CLI dependency. This is not a clean
 audit; the existing CLI dependency remains a separate security follow-up.
 
-| Client          | Remote OAuth/MCP | Native chat files | Interactive approval | Browser/upload fallback |
-| --------------- | ---------------- | ----------------- | -------------------- | ----------------------- |
-| ChatGPT web     | Not run          | Not run           | Not run              | Local fixtures only     |
-| ChatGPT desktop | Not run          | Not run           | Not run              | Local fixtures only     |
-| Claude web      | Not run          | Not run           | Not run              | Local fixtures only     |
-| Claude desktop  | Not run          | Not run           | Not run              | Local fixtures only     |
+| Client          | Remote OAuth/MCP          | Native chat files            | Interactive approval | Browser/upload fallback |
+| --------------- | ------------------------- | ---------------------------- | -------------------- | ----------------------- |
+| ChatGPT web     | OAuth/reads user verified | File-reference import passed | Not run              | Local fixtures only     |
+| ChatGPT desktop | Not run                   | Not run                      | Not run              | Local fixtures only     |
+| Claude web      | Not run                   | Not run                      | Not run              | Local fixtures only     |
+| Claude desktop  | Not run                   | Not run                      | Not run              | Local fixtures only     |
 
 The production database, Clerk resource/scopes and deployment prerequisites are
 complete. The user explicitly approved the controlled rollout on 2026-11-04.
@@ -149,8 +149,11 @@ Production web and Trigger.dev now use `ENABLE_MCP=true`; Vercel Preview, local
 files mirror their production flags. Marketing remains paused and the seven
 existing schedule activation states and intervals are unchanged.
 
-Actual consent-based token issuance, exact audience and all client workflows are
-still acceptance gates. Never weaken audience validation to force a connection.
+The user has reported a successful authenticated ChatGPT web request through the
+production handler, which enforces the canonical token audience. No raw token was
+collected or separately inspected. Workspace/project reads, one image import and one attached Social draft are verified
+as recorded below. Scene reuse, review, publication and the remaining client
+workflows are still acceptance gates. Never weaken audience validation.
 Live public posting requires approval of the exact content/accounts. Client tests
 must distinguish remote MCP support from chat-file access and review UI support.
 
@@ -187,8 +190,9 @@ backfill remain off.
 
 The Clerk authorization-server metadata returned HTTP 200, advertised CIMD and
 S256, included all five custom scopes, and omitted a dynamic-registration endpoint.
-Actual consent, token issuance/audience and each client workflow still need live
-testing. The deployed web discovery now returns HTTP 200 for the canonical resource.
+The deployed web discovery returns HTTP 200 for the canonical resource. The first
+ChatGPT web authentication succeeded according to the user report below; broader
+client workflows still need live testing.
 
 ## Controlled production rollout - 2026-11-04
 
@@ -233,5 +237,70 @@ The user selected ChatGPT web first. Follow OpenAI's current
    and explicit human approval. Record per-destination results. Do not treat a
    connected server as proof that native chat-file transfer works.
 
-Real OAuth consent, workspace grants and client journeys have not yet been
-verified; the compatibility matrix above remains intentionally unaccepted.
+On 2026-11-04 the user reported that ChatGPT web connected successfully and the
+API responded: authentication valid, connection not revoked, no workspaces granted,
+Marketing paused, and AI generation not exposed. ChatGPT could not retrieve content
+without a workspace grant. This accepts the initial connection check only; native
+chat files, interactive approval and end-to-end content journeys remain untested.
+
+The user subsequently reported successful authorization for VeilCode Studio
+(`veilcode-studio-68d39c29`), owner role, with Read, Edit, Media, Review and Publish
+grants. ChatGPT retrieved the one authorized workspace and seven project records.
+This accepts workspace/project reads in ChatGPT web. Subsequent import and Social draft tests are recorded below. Scene review and
+publication operations still need live verification. Publishing still
+requires the separate human approval of each prepared operation.
+
+Code inspection explains the reported `planning` plus `hasPublished: true` records:
+`listProjects` derives the flag from any `videoPublications.status = succeeded`
+record in the workspace; project status is a separate production lifecycle with no
+`published` enum value. Publication completion updates the publication record, not
+project status. A successful record can also represent platform inbox delivery,
+so the flag alone does not establish a currently public post. No project status
+was changed based on this observation.
+
+### Image import and Social draft verified - 2026-11-04
+
+The user confirmed the image imported and the Social draft was created with internal
+name and description/text `MCP import test`. A bounded read against the exact
+workspace and test post independently corroborated:
+
+- Post `ade9399e-dc02-450f-9284-d4634f392163`: matching name and plain text, status
+  `draft`, no scheduled time, and the imported image attached.
+- Asset `1fa9e033-3186-42f9-946c-945297d97891`: kind `image`, status `ready`.
+- Its import operation succeeded with `sourceKind: file`, exercising the MCP file
+  reference adapter. This does not establish access to every generated ChatGPT
+  image, or test the alternative URL/upload paths.
+
+Next, use a separate zero-budget test project to save conversation text as a script,
+create/approve a manual scene, and assign this existing library image with contain
+fitting. The resulting image must remain awaiting review until explicitly approved.
+Verify whole-image framing in the UI. Publication/scheduling approval and remaining
+clients stay pending. Marketing remains paused and LinkedIn Pages remains on hold.
+
+### Project creation regression and correction - 2026-11-04
+
+The user's next test was blocked by `invalid_input` before creating the project.
+The same request failed through the real SDK locally with both zero and positive
+budgets. Omitted reference selectors normalize to null in the existing project
+schema. The SDK returned that validated output, but the generic wrapper and project
+service each parsed it again as input, rejecting normalized null values. Budget
+validation was not the cause; the supported minimum remains zero.
+
+The registrar now passes the SDK-validated output through a typed Standard Schema
+interface without reparsing it. The project service accepts the validated output;
+workspace grants, role checks, selector restrictions and durable idempotency still
+apply. The original browser schema was not weakened. Application Zod error results
+now include up to eight field/message pairs, with bounded lengths and no rejected
+input values; SDK-level invalid fields remain identified by its validation errors.
+
+Regression tests exercise the actual SDK, content registration and project service
+with mocked persistence: zero/positive budgets, omitted/empty options, numeric
+coercion, retry reuse, changed-key inputs, denied grants, unsupported reference IDs
+and invalid fields. A separate transformed-output test guards all registered tools.
+The relevant 116 MCP/project tests, TypeScript, environment checks, changed-file
+formatting, lint (four existing warnings) and production build passed.
+
+This is a web-only correction. It needs no schema, migration, dependency, environment
+or worker deployment changes. Keep the existing imported image and Social draft.
+Project/script/scene reuse acceptance remains blocked until the corrected web
+release is deployed and the user retries; no budget increase is needed.

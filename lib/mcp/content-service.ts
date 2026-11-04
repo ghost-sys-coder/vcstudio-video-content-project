@@ -34,9 +34,8 @@ import { requireMcp } from "./errors";
 export async function createMcpProject(
   context: McpContext,
   key: string,
-  input: unknown,
+  parsed: z.infer<typeof createProjectSchema>,
 ) {
-  const parsed = createProjectSchema.parse(input);
   requireCapability(context.membership.role, "mutateWorkspaceData");
   // Reference-bearing creation belongs to the existing UI until those selectors
   // are exposed: never bypass their ownership/version resolution.

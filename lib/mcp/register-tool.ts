@@ -1,5 +1,9 @@
 import { z } from "zod";
-import type { McpServer, CallToolResult } from "@modelcontextprotocol/server";
+import type {
+  McpServer,
+  CallToolResult,
+  StandardSchemaWithJSON,
+} from "@modelcontextprotocol/server";
 import type { McpPrincipal, McpScope } from "@studio/contracts";
 import { authorizeMcp, type McpContext } from "./context";
 import { McpError } from "./errors";
@@ -16,6 +20,13 @@ export function toolResult(data: unknown): CallToolResult {
   };
 }
 export function toolError(error: unknown): CallToolResult {
+  const issues =
+    error instanceof z.ZodError
+      ? error.issues.slice(0, 8).map((issue) => ({
+          field: issue.path.map(String).join(".").slice(0, 200) || "input",
+          message: issue.message.slice(0, 500),
+        }))
+      : undefined;
   const code =
     error instanceof McpError
       ? error.code
@@ -25,15 +36,16 @@ export function toolError(error: unknown): CallToolResult {
   const message =
     error instanceof McpError
       ? error.message
-      : error instanceof z.ZodError
-        ? (error.issues[0]?.message ?? "Invalid tool input.")
+      : issues
+        ? issues[0]
+          ? `${issues[0].field}: ${issues[0].message}`
+          : "Invalid tool input."
         : "The action could not be completed. Refresh the current content before retrying.";
+  const result = { ok: false, code, message, ...(issues ? { issues } : {}) };
   return {
     isError: true,
-    content: [
-      { type: "text", text: JSON.stringify({ ok: false, code, message }) },
-    ],
-    structuredContent: { ok: false, code, message },
+    content: [{ type: "text", text: JSON.stringify(result) }],
+    structuredContent: result,
   };
 }
 export function createToolRegistrar(
@@ -48,7 +60,7 @@ export function createToolRegistrar(
     readOnly: boolean,
     handler: (context: McpContext, input: z.infer<S>) => Promise<unknown>,
   ) {
-    const wireSchema: z.ZodObject = schema;
+    const wireSchema: StandardSchemaWithJSON<z.input<S>, z.output<S>> = schema;
     server.registerTool(
       name,
       {
@@ -65,9 +77,10 @@ export function createToolRegistrar(
             scope === "vcstudio:publish" || name === "import_asset",
         },
       },
-      async (args) => {
+      async (parsed) => {
         try {
-          const parsed = schema.parse(args);
+          // The SDK already validated and transformed this schema's input.
+          // Parsing its output again can reject normalized optional values.
           const workspaceId = z
             .object({ workspaceId: z.uuid() })
             .parse(parsed).workspaceId;
