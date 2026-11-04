@@ -4,7 +4,13 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveOperationalLimitsAction } from "@/app/(authenticated)/app/usage/actions";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardDescription,
+} from "@/components/ui/card";
+import { SlidersHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -34,26 +40,44 @@ export function OperationalLimitsForm({
     setError(null);
     setMessage(null);
     startTransition(async () => {
-      const result = await saveOperationalLimitsAction(formData);
-      if (!result.success) {
-        setError(result.error ?? "The limits could not be saved.");
-        return;
+      try {
+        const result = await saveOperationalLimitsAction(formData);
+        if (!result.success) {
+          setError(result.error ?? "The limits could not be saved.");
+          return;
+        }
+        setMessage("Operational limits saved.");
+        router.refresh();
+      } catch {
+        setError("The limits could not be saved. Please try again.");
       }
-      setMessage("Operational limits saved.");
-      router.refresh();
     });
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Operational limits</CardTitle>
+    <Card className="@container min-w-0 self-start">
+      <CardHeader className="border-b">
+        <div className="mb-3 flex size-10 items-center justify-center rounded-xl bg-secondary">
+          <SlidersHorizontal aria-hidden="true" className="size-5" />
+        </div>
+        <h3 className="text-lg font-semibold tracking-tight">
+          Operational limits
+        </h3>
+        <CardDescription>
+          Keep batches and renders within the limits you choose.
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <form action={submit} className="space-y-5">
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            submit(new FormData(event.currentTarget));
+          }}
+          className="space-y-5"
+        >
           <input name="workspaceId" type="hidden" value={workspaceId} />
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-2">
+          <div className="grid grid-cols-1 items-end gap-4 @sm:grid-cols-2">
+            <div className="min-w-0 space-y-2">
               <Label htmlFor="max-images-batch">Images per batch</Label>
               <Input
                 defaultValue={maxImagesPerBatch ?? ""}
@@ -65,8 +89,8 @@ export function OperationalLimitsForm({
                 type="number"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="max-audio-batch">Scenes per audio batch</Label>
+            <div className="min-w-0 space-y-2">
+              <Label htmlFor="max-audio-batch">Audio scenes per batch</Label>
               <Input
                 defaultValue={maxScenesPerAudioBatch ?? ""}
                 disabled={pending}
@@ -77,7 +101,7 @@ export function OperationalLimitsForm({
                 type="number"
               />
             </div>
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2 @sm:col-span-2">
               <Label htmlFor="max-render-seconds">Max render seconds</Label>
               <Input
                 defaultValue={maxRenderDurationSeconds ?? ""}
@@ -99,11 +123,14 @@ export function OperationalLimitsForm({
             </p>
           ) : null}
           {message ? (
-            <p className="text-sm text-emerald-700" role="status">
+            <p
+              className="rounded-lg border border-notice-ready-edge bg-notice-ready p-3 text-sm text-notice-ready-foreground"
+              role="status"
+            >
               {message}
             </p>
           ) : null}
-          <Button disabled={pending} type="submit">
+          <Button disabled={pending} type="submit" className="w-full sm:w-auto">
             {pending ? "Saving…" : "Save limits"}
           </Button>
         </form>

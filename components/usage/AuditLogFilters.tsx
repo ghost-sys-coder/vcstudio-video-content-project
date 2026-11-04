@@ -23,12 +23,12 @@ export function AuditLogFilters({ action }: { action: string | null }) {
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <Label className="text-sm" htmlFor="audit-action-filter">
+    <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+      <Label className="shrink-0 text-sm" htmlFor="audit-action-filter">
         Filter
       </Label>
       <FormSelect
-        className="w-auto"
+        className="w-full sm:w-64"
         id="audit-action-filter"
         onValueChange={(selectedValue) => onChange(selectedValue)}
         value={action ?? ""}

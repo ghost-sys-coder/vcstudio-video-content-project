@@ -4,13 +4,16 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveBudgetSettingsAction } from "@/app/(authenticated)/app/usage/actions";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardDescription,
+} from "@/components/ui/card";
+import { Wallet } from "lucide-react";
+import { formatBudgetDollars } from "@/lib/usage/usage-presentation";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
-function toDollars(cents: number): string {
-  return (cents / 100).toFixed(2);
-}
 
 export function BudgetSettingsForm({
   workspaceId,
@@ -32,29 +35,45 @@ export function BudgetSettingsForm({
     setError(null);
     setMessage(null);
     startTransition(async () => {
-      const result = await saveBudgetSettingsAction(formData);
-      if (!result.success) {
-        setError(result.error ?? "The budget could not be saved.");
-        return;
+      try {
+        const result = await saveBudgetSettingsAction(formData);
+        if (!result.success) {
+          setError(result.error ?? "The budget could not be saved.");
+          return;
+        }
+        setMessage("Budget settings saved.");
+        router.refresh();
+      } catch {
+        setError("The budget could not be saved. Please try again.");
       }
-      setMessage("Budget settings saved.");
-      router.refresh();
     });
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Budgets</CardTitle>
+    <Card className="@container min-w-0 self-start">
+      <CardHeader className="border-b">
+        <div className="mb-3 flex size-10 items-center justify-center rounded-xl bg-secondary">
+          <Wallet aria-hidden="true" className="size-5" />
+        </div>
+        <h3 className="text-lg font-semibold tracking-tight">Budgets</h3>
+        <CardDescription>
+          Define spending ceilings and when to ask for extra confirmation.
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <form action={submit} className="space-y-5">
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            submit(new FormData(event.currentTarget));
+          }}
+          className="space-y-5"
+        >
           <input name="workspaceId" type="hidden" value={workspaceId} />
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-2">
+          <div className="grid grid-cols-1 items-end gap-4 @sm:grid-cols-2">
+            <div className="min-w-0 space-y-2">
               <Label htmlFor="daily-budget">Daily budget (USD)</Label>
               <Input
-                defaultValue={toDollars(dailyBudgetCents)}
+                defaultValue={formatBudgetDollars(dailyBudgetCents)}
                 disabled={pending}
                 id="daily-budget"
                 min="0"
@@ -63,10 +82,10 @@ export function BudgetSettingsForm({
                 type="number"
               />
             </div>
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2">
               <Label htmlFor="monthly-budget">Monthly budget (USD)</Label>
               <Input
-                defaultValue={toDollars(monthlyBudgetCents)}
+                defaultValue={formatBudgetDollars(monthlyBudgetCents)}
                 disabled={pending}
                 id="monthly-budget"
                 min="0"
@@ -75,10 +94,12 @@ export function BudgetSettingsForm({
                 type="number"
               />
             </div>
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2 @sm:col-span-2">
               <Label htmlFor="confirm-threshold">Confirm above (USD)</Label>
               <Input
-                defaultValue={toDollars(manualConfirmationThresholdCents)}
+                defaultValue={formatBudgetDollars(
+                  manualConfirmationThresholdCents,
+                )}
                 disabled={pending}
                 id="confirm-threshold"
                 min="0"
@@ -98,11 +119,14 @@ export function BudgetSettingsForm({
             </p>
           ) : null}
           {message ? (
-            <p className="text-sm text-emerald-700" role="status">
+            <p
+              className="rounded-lg border border-notice-ready-edge bg-notice-ready p-3 text-sm text-notice-ready-foreground"
+              role="status"
+            >
               {message}
             </p>
           ) : null}
-          <Button disabled={pending} type="submit">
+          <Button disabled={pending} type="submit" className="w-full sm:w-auto">
             {pending ? "Saving…" : "Save budgets"}
           </Button>
         </form>

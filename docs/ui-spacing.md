@@ -64,3 +64,30 @@ The public site uses `app-public-container` with the same responsive gutters and
 ## Verification
 
 Check representative screens at 390, 768, 1280, 1680, and 2560px, with expanded/collapsed navigation and Light/Dark themes. Confirm navbar/content alignment, consistent section gaps, readable form widths, wrapping heading actions, no horizontal page overflow, and usable editor/chat heights. Exercise dialogs and existing actions with mocked data. Marketing Studio must remain paused; UI verification does not authorize database reads, worker starts, provider calls, or schedule changes.
+
+## Operations dashboards
+
+Readiness and Usage follow the AI connection settings page: use the existing
+Geist font, a small workspace-context label, a 24/30px page title and readable
+muted supporting copy. Keep the outer `app-page` geometry owned by the shell.
+Inside, use shared Card headers/footers, restrained icon surfaces and semantic
+notice colors for status badges. A ready service, disabled optional service,
+unavailable check and failed check must remain distinguishable by text as well
+as color. Readiness summaries count the existing reported checks only; styling
+must not trigger new probes or worker deployment.
+
+Usage totals are labelled committed because pending reservations count alongside
+settled spend. Budget progress exposes accessible labels, remaining amounts and
+an explicit zero-budget state. Keep money formatting and display calculations
+in presentation helpers, separate from enforced budget/domain calculations.
+Budget and operational-limit input grids use container queries, so neighbouring
+cards remain usable inside the application sidebar. Save failures retain entered
+values and show inline feedback.
+
+Use the shadcn Table container for ledger/audit/project tables and let the table
+area scroll horizontally on narrow screens. Keep the card and page within their
+parent width. Pagination wraps and uses shadcn button styling on actual links;
+disabled controls remain native buttons. Disable link prefetch on these table
+controls to preserve bounded reads. Audit filters live in their table header and
+wrap below the title on narrow screens. Filter changes preserve ledger paging
+and reset only audit paging, using the existing route/query behavior.

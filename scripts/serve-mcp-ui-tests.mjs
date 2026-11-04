@@ -14,6 +14,7 @@ for (const [name, entry] of [
   ["host", "e2e/mcp/fixtures/host.ts"],
   ["waitlist", "e2e/mcp/fixtures/waitlist-entry.tsx"],
   ["post-composer", "e2e/mcp/fixtures/post-composer-entry.tsx"],
+  ["operations", "e2e/mcp/fixtures/operations-entry.tsx"],
 ]) {
   const bundle = await build({
     entryPoints: [entry],
@@ -25,6 +26,16 @@ for (const [name, entry] of [
     define: { "process.env.NODE_ENV": '"production"' },
     alias: {
       "next/link": path.resolve("e2e/mcp/fixtures/MockNextLink.tsx"),
+      ...(name === "operations"
+        ? {
+            "next/navigation": path.resolve(
+              "e2e/mcp/fixtures/MockOperationsNavigation.ts",
+            ),
+            "@/app/(authenticated)/app/usage/actions": path.resolve(
+              "e2e/mcp/fixtures/MockOperationsActions.ts",
+            ),
+          }
+        : {}),
       ...(name === "post-composer"
         ? {
             "next/link": path.resolve("e2e/mcp/fixtures/MockNextLink.tsx"),
@@ -73,6 +84,7 @@ const server = createServer(async (req, res) => {
     "/review.html": path.resolve("public/mcp/review.html"),
     "/waitlist.html": path.join(out, "waitlist.html"),
     "/post-composer.html": path.join(out, "post-composer.html"),
+    "/operations.html": path.join(out, "operations.html"),
   };
   if (!allowed[filename]) {
     res.writeHead(404).end();
