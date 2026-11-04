@@ -7,6 +7,8 @@ const m = vi.hoisted(() => ({
   memberships: vi.fn(),
   prepare: vi.fn(),
   confirm: vi.fn(),
+  previewOrigin: vi.fn(),
+  mediaPreviews: vi.fn(),
 }));
 vi.mock("@/lib/mcp/context", () => ({ authorizeMcp: m.authorize }));
 vi.mock("@/lib/mcp/rate-limit", () => ({ enforceMcpRateLimit: vi.fn() }));
@@ -22,7 +24,11 @@ vi.mock("@/lib/mcp/publishing-service", () => ({
   approveMcpPublication: m.confirm,
 }));
 vi.mock("@/lib/mcp/media-previews", () => ({
-  loadMcpMediaPreviews: vi.fn().mockResolvedValue([]),
+  loadMcpMediaPreviews: m.mediaPreviews,
+  getMcpMediaPreviewOrigin: m.previewOrigin,
+}));
+vi.mock("node:fs/promises", () => ({
+  readFile: vi.fn().mockResolvedValue("<!doctype html><title>Review</title>"),
 }));
 vi.mock("@/lib/mcp/import-service", () => ({ startMcpImport: vi.fn() }));
 import { Client } from "@modelcontextprotocol/client";
@@ -45,6 +51,10 @@ beforeEach(() => {
   m.connection.mockResolvedValue(ctx.connection);
   m.grants.mockResolvedValue([ctx.grant]);
   m.memberships.mockResolvedValue([ctx.membership]);
+  m.previewOrigin.mockResolvedValue(
+    "https://studio.account.r2.cloudflarestorage.com",
+  );
+  m.mediaPreviews.mockResolvedValue([]);
   m.prepare.mockResolvedValue({
     operation: publicOperation(mcpOperationFixture()),
     preview: {
@@ -79,6 +89,21 @@ async function client() {
   return instance;
 }
 describe("real MCP SDK interoperability", () => {
+  it("allows the actual signed media origin in the review resource's narrow CSP", async () => {
+    const result = await (
+      await client()
+    ).readResource({
+      uri: "ui://vcstudio/publication-review.html",
+    });
+    expect(result.contents[0]._meta).toMatchObject({
+      ui: {
+        csp: {
+          connectDomains: [],
+          resourceDomains: ["https://studio.account.r2.cloudflarestorage.com"],
+        },
+      },
+    });
+  });
   it("negotiates the protocol and exposes focused v1 tools, native file metadata and app-only approval", async () => {
     const tools = (await (await client()).listTools()).tools;
     expect(tools.map((t) => t.name)).toEqual(
@@ -109,6 +134,13 @@ describe("real MCP SDK interoperability", () => {
     expect(JSON.stringify(file?.inputSchema)).toContain("download_url");
   });
   it("keeps the approval proof outside content and structured model data", async () => {
+    m.mediaPreviews.mockResolvedValue([
+      {
+        id: mcpIds.asset,
+        kind: "image",
+        url: "https://studio.account.r2.cloudflarestorage.com/preview.png?X-Amz-Signature=private-media-signature",
+      },
+    ]);
     const result = await (
       await client()
     ).callTool({
@@ -128,6 +160,12 @@ describe("real MCP SDK interoperability", () => {
     expect(
       JSON.stringify([result.content, result.structuredContent]),
     ).not.toContain("private-ui-proof");
+    expect(result._meta?.mediaPreviews).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: mcpIds.asset })]),
+    );
+    expect(
+      JSON.stringify([result.content, result.structuredContent]),
+    ).not.toContain("private-media-signature");
     expect(m.confirm).not.toHaveBeenCalled();
   });
   it("does not treat a model's confirmed boolean as approval", async () => {

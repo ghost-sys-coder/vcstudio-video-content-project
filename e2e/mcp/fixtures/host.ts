@@ -2,7 +2,14 @@ import {
   AppBridge,
   PostMessageTransport,
 } from "@modelcontextprotocol/ext-apps/app-bridge";
-import { preview, workspaceId, operationId } from "./data";
+import {
+  preview,
+  workspaceId,
+  operationId,
+  mediaId,
+  mediaOrigin,
+} from "./data";
+const withMedia = new URLSearchParams(location.search).has("withMedia");
 const frame = document.createElement("iframe");
 frame.title = "VCStudio review";
 frame.style.cssText = "width:100%;height:1200px;border:0";
@@ -29,7 +36,21 @@ bridge.oninitialized = async () => {
           workspaceId,
           status: "requires_approval",
         },
-        preview,
+        preview: withMedia
+          ? {
+              ...preview,
+              media: [
+                {
+                  id: mediaId,
+                  name: "Imported portrait",
+                  kind: "image",
+                  contentType: "image/png",
+                  sizeBytes: 100,
+                  etag: "etag",
+                },
+              ],
+            }
+          : preview,
         approvalUrl: `https://vcstudio.example/app/mcp/operations/${operationId}`,
       },
     },
@@ -37,6 +58,15 @@ bridge.oninitialized = async () => {
       approvalProof: new URLSearchParams(location.search).has("noProof")
         ? undefined
         : "private-user-interface-proof-123456789",
+      mediaPreviews: withMedia
+        ? [
+            {
+              id: mediaId,
+              kind: "image",
+              url: `${mediaOrigin}/preview.png?X-Amz-Signature=fixture-only`,
+            },
+          ]
+        : [],
     },
   });
 };

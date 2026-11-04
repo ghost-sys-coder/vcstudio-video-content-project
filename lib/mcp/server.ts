@@ -30,8 +30,10 @@ import { registerAssetTools } from "./register-asset-tools";
 import { registerSocialTools } from "./register-social-tools";
 import { mcpBaseUrl } from "./config";
 import { enforceMcpRateLimit } from "./rate-limit";
-import { loadMcpMediaPreviews } from "./media-previews";
-import { getStorageEnvironment } from "@/lib/env/server";
+import {
+  getMcpMediaPreviewOrigin,
+  loadMcpMediaPreviews,
+} from "./media-previews";
 import { getPublishingEnvironment } from "@/lib/env/server";
 import { roleAllowsScope } from "./policy";
 
@@ -261,9 +263,7 @@ export function createVcStudioMcpServer(principal: McpPrincipal) {
               prefersBorder: true,
               csp: {
                 connectDomains: [],
-                resourceDomains: [
-                  new URL(getStorageEnvironment().R2_ENDPOINT).origin,
-                ],
+                resourceDomains: [await getMcpMediaPreviewOrigin()],
               },
             },
           },

@@ -135,12 +135,12 @@ Next.js/ESLint to 16.4.5, Sharp to 0.35.5, proxy-addr and tar 7. No forced major
 upgrade was applied to the legacy Trigger CLI dependency. This is not a clean
 audit; the existing CLI dependency remains a separate security follow-up.
 
-| Client          | Remote OAuth/MCP          | Native chat files            | Interactive approval | Browser/upload fallback |
-| --------------- | ------------------------- | ---------------------------- | -------------------- | ----------------------- |
-| ChatGPT web     | OAuth/reads user verified | File-reference import passed | Not run              | Local fixtures only     |
-| ChatGPT desktop | Not run                   | Not run                      | Not run              | Local fixtures only     |
-| Claude web      | Not run                   | Not run                      | Not run              | Local fixtures only     |
-| Claude desktop  | Not run                   | Not run                      | Not run              | Local fixtures only     |
+| Client          | Remote OAuth/MCP             | Native chat files            | Interactive approval | Browser/upload fallback |
+| --------------- | ---------------------------- | ---------------------------- | -------------------- | ----------------------- |
+| ChatGPT web     | OAuth/reads user verified    | File-reference import passed | Not run              | Local fixtures only     |
+| ChatGPT desktop | Tools/project reuse verified | Not run                      | Not run              | Local fixtures only     |
+| Claude web      | Not run                      | Not run                      | Not run              | Local fixtures only     |
+| Claude desktop  | Not run                      | Not run                      | Not run              | Local fixtures only     |
 
 The production database, Clerk resource/scopes and deployment prerequisites are
 complete. The user explicitly approved the controlled rollout on 2026-11-04.
@@ -152,7 +152,8 @@ existing schedule activation states and intervals are unchanged.
 The user has reported a successful authenticated ChatGPT web request through the
 production handler, which enforces the canonical token audience. No raw token was
 collected or separately inspected. Workspace/project reads, one image import and one attached Social draft are verified
-as recorded below. Scene reuse, review, publication and the remaining client
+as recorded below. ChatGPT desktop project/script/manual-scene operations and image
+reuse are also verified. Scene-image review, publication and the remaining client
 workflows are still acceptance gates. Never weaken audience validation.
 Live public posting requires approval of the exact content/accounts. Client tests
 must distinguish remote MCP support from chat-file access and review UI support.
@@ -271,11 +272,10 @@ workspace and test post independently corroborated:
   reference adapter. This does not establish access to every generated ChatGPT
   image, or test the alternative URL/upload paths.
 
-Next, use a separate zero-budget test project to save conversation text as a script,
-create/approve a manual scene, and assign this existing library image with contain
-fitting. The resulting image must remain awaiting review until explicitly approved.
-Verify whole-image framing in the UI. Publication/scheduling approval and remaining
-clients stay pending. Marketing remains paused and LinkedIn Pages remains on hold.
+The subsequent zero-budget project/script/manual-scene and full-image reuse test
+passed in ChatGPT desktop, as recorded below. Publication/scheduling approval and
+remaining client paths stay pending. Marketing remains paused and LinkedIn Pages
+remains on hold.
 
 ### Project creation regression and correction - 2026-11-04
 
@@ -302,5 +302,71 @@ formatting, lint (four existing warnings) and production build passed.
 
 This is a web-only correction. It needs no schema, migration, dependency, environment
 or worker deployment changes. Keep the existing imported image and Social draft.
-Project/script/scene reuse acceptance remains blocked until the corrected web
-release is deployed and the user retries; no budget increase is needed.
+Corrective commit `3301fd4` deployed successfully in Vercel production deployment
+`dpl_S3QvumpPysyvGrFJiNhuyMNCZkKZ`. The user then completed the reuse test from
+ChatGPT desktop with the zero budget unchanged.
+
+### ChatGPT desktop project/script/scene reuse verified - 2026-11-04
+
+The user deliberately switched to ChatGPT desktop for the reuse test and confirmed
+the results in VCStudio. A bounded read scoped to the known workspace, project and
+scene independently corroborated the saved state:
+
+- Project `347cddbd-db2c-473d-939a-488111fc49e0`, **MCP reuse test**, 16:9,
+  1920 x 1080, 30 fps, English, maximum budget zero, status draft.
+- Script draft exactly `This is an MCP reuse test`, revision 1.
+- Manual scene `afa983f5-da55-45a7-8596-1bed0cb0b448` approved.
+- Assigned image `0726730b-13f6-4208-b035-b982dd1c06f2`, uploaded-image source,
+  succeeded, review pending, actual assignment cost zero, contain framing.
+- Provenance links it to existing library asset
+  `1fa9e033-3186-42f9-946c-945297d97891`, still ready. A boolean comparison confirmed
+  different object keys for the project image and shared original without selecting
+  or displaying either key. This corroborates an independent project-owned copy.
+- The user visually confirmed the portrait's complete content fits within the wide
+  composition. No crop, paid generation, render, publish or schedule was requested
+  or initiated as part of this journey.
+
+This accepts these desktop tool operations, not desktop native file import or
+interactive MCP Apps approval. The earlier file-reference import and Social draft
+were tested in ChatGPT web. Both clients still need publication-review/approval
+acceptance, with actual publication/scheduling only after explicit human review.
+Claude web/desktop remain untested. The next publication test can stop at an exact
+preview for a user-selected eligible destination; the existing scene image remains
+pending review until separately requested.
+
+### Publication preview observed; private-image CSP corrected - 2026-11-04
+
+The supplied ChatGPT screenshots show destination selection followed by an exact
+preview of `MCP import test`, draft version 3, one imported image and the selected
+LinkedIn personal-profile destination Tamale Frank. The operation requires approval;
+the original Social post remains a draft without a schedule or applied publishing
+destination. These screenshots accept preview preparation and display of the
+approval boundary, not successful approval/execution or scheduling. They follow
+the desktop test but do not separately verify the web review path.
+
+The actual **Review publication** widget displayed a broken image. A local-only
+signing check against the production runtime file confirmed that the signed URL's
+bucket-prefixed origin differed from the widget's base-endpoint allowlist. No R2
+request was made and no signed URL/credentials were printed. A real SDK resource
+regression reproduced the wrong origin before the correction.
+
+`getMcpMediaPreviewOrigin` now obtains only the origin from the same download signer
+used for private media previews. This handles virtual-hosted and path-style buckets
+without guessed hostname rules, wildcards or extra network access. The ephemeral
+probe URL is discarded; actual preview URLs remain private UI metadata. The resource
+uses the standard `ui.csp.resourceDomains` surface documented in the
+[OpenAI reference](https://developers.openai.com/plugins/reference). Normal site
+framing headers and the widget's empty connection-domain allowlist stay intact.
+
+Verification passed: 122 relevant MCP/project tests across 17 files, eight isolated
+Playwright journeys, TypeScript, lint with four existing warnings, environment
+placement, changed-file formatting and the production build. Tests include real SDK URL signing for virtual-hosted/dotted/path-style
+endpoints, exact resource CSP metadata, private URL exclusion from model content,
+and actual image decode/display under restrictive CSP in Light/Dark mobile layouts.
+An unlisted image origin is blocked before any network request. Approval is not
+triggered by image display. Storage/providers/workers remain mocked in verification.
+
+After deployment, refresh the VCStudio connection metadata in ChatGPT and prepare
+a fresh preview: existing resource policies may be cached and approvals expire after
+ten minutes. Confirm the actual image is visible before counting visual review as
+accepted. No human approval or publication should be inferred from the screenshots.
