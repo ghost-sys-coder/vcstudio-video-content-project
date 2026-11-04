@@ -15,7 +15,8 @@ export type ReadinessItem = {
   action: string | null;
 };
 export type ReadinessView = {
-  checkedAt: Date;
+  /** ISO timestamp: Next's data cache JSON-serializes this view. */
+  checkedAt: string;
   deployment: ReadinessItem[];
   workspace: ReadinessItem[];
 };
@@ -110,7 +111,7 @@ export async function loadOperationalReadiness(
     snapshot.connections.length - activeConnections.length;
   const google = snapshot.googleBusiness;
   return {
-    checkedAt: now,
+    checkedAt: now.toISOString(),
     deployment: [
       {
         id: "schema",

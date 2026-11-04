@@ -2,7 +2,7 @@ import type { ReadinessView } from "@/lib/readiness/readiness";
 import type { UsageDashboardView } from "@/lib/usage/usage-dashboard";
 export const operationsWorkspaceId = "11111111-1111-4111-8111-111111111111";
 export const readinessView: ReadinessView = {
-  checkedAt: new Date("2026-11-05T08:15:00Z"),
+  checkedAt: "2026-11-05T08:15:00.000Z",
   deployment: [
     {
       id: "schema",

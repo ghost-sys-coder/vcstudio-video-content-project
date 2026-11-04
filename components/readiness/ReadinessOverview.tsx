@@ -57,7 +57,7 @@ export function ReadinessOverview({ view }: { view: ReadinessView }) {
         <Clock3 aria-hidden="true" className="size-3.5 shrink-0" />
         <p>
           Last checked{" "}
-          <time dateTime={view.checkedAt.toISOString()}>
+          <time dateTime={view.checkedAt}>
             {formatReadinessCheckedAt(view.checkedAt)}
           </time>
         </p>

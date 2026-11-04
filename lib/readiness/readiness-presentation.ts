@@ -58,6 +58,6 @@ const checkedDate = new Intl.DateTimeFormat("en-GB", {
   timeStyle: "short",
   timeZone: "UTC",
 });
-export function formatReadinessCheckedAt(value: Date): string {
-  return `${checkedDate.format(value)} UTC`;
+export function formatReadinessCheckedAt(value: string): string {
+  return `${checkedDate.format(new Date(value))} UTC`;
 }

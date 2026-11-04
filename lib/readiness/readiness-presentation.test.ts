@@ -44,8 +44,8 @@ describe("readiness presentation", () => {
     });
   });
   it("labels its timestamp independently of the server timezone", () => {
-    expect(
-      formatReadinessCheckedAt(new Date("2026-11-05T00:30:00+03:00")),
-    ).toBe("4 Nov 2026, 21:30 UTC");
+    expect(formatReadinessCheckedAt("2026-11-05T00:30:00+03:00")).toBe(
+      "4 Nov 2026, 21:30 UTC",
+    );
   });
 });

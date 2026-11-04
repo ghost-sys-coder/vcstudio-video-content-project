@@ -50,6 +50,10 @@ for (const theme of ["light", "dark"]) {
           await expect(
             page.getByText("5 Nov 2026, 08:15 UTC", { exact: true }),
           ).toBeVisible();
+          await expect(page.locator("time")).toHaveAttribute(
+            "datetime",
+            "2026-11-05T08:15:00.000Z",
+          );
         } else {
           await expect(
             page.getByRole("heading", { name: "Usage & budgets", exact: true }),

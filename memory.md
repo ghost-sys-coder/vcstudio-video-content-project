@@ -2,11 +2,19 @@
 
 Last updated: 2026-11-05 (Africa/Kampala)
 
+## Latest work - Readiness cached-render crash (2026-11-05)
+
+- User reported production `/app/readiness` falling into the error boundary after the UI release. Vercel confirmed `TypeError: a.checkedAt.toISOString is not a function` on deployment `dpl_HRjWUaxiizKQDT6N9zybCdtjjMrv`, commit `2897bf4`.
+- Cause: Next.js `unstable_cache` serializes Date objects to strings. The redesigned overview assumed a Date on a warm cache read. The Readiness view now carries an ISO string consistently; display formatting parses it explicitly and the time element uses it directly.
+- Added an integration regression with the actual Next.js cache serializer and isolated in-memory backing store, mocking database and storage. It covers fresh/cached rendering, avoiding repeated probes and workspace isolation. Both regression cases failed before the fix and now pass. The browser fixture also uses an ISO string.
+- Validation passed all nine Readiness unit/integration tests, six focused Light/Dark/mobile browser checks, formatting, TypeScript, full lint (four existing warnings) and production build. The initial sandbox build failed to download existing Google Fonts; the network-enabled rerun passed.
+- This fix is local and unreleased. No database, environment, dependency or worker changes; preserve the existing 60-second cache, Marketing pause, private access and closed MCP live test round.
+
 ## Latest work - Readiness and Usage UI (2026-11-05)
 
 - User requested the premium MCP settings design on Readiness and Usage. Both now share Geist typography, semantic status badges, panel hierarchy, responsive controls/tables and clearer summaries. Budget edits survive failed saves, and pagination retains link semantics. Existing loaders, readiness probe/cache frequency, authorization and budget enforcement remain unchanged.
 - Final checks passed34 unit tests, all35 isolated browser journeys, TypeScript, formatting, full lint with four existing warnings, focused lint and production build. Reviewed Light/Dark desktop/mobile layouts with synthetic data. No production worker/provider/database calls or live-client acceptance testing.
-- Changes are local/uncommitted/undeployed, based on779e7ea. No migration, environment or dependency changes. README/ui-spacing documentation and this memory are current. Preserve Marketing pause, LinkedIn Pages hold, owner-only access and the closed MCP live test round below.
+- User committed and released the UI as `2897bf4`, following `779e7ea`. No migration, environment or dependency changes. The later Readiness cached-render defect is recorded above. Preserve Marketing pause, LinkedIn Pages hold, owner-only access and the closed MCP live test round below.
 
 ## Current handoff - MCP live verification closed by owner (2026-11-04)
 
