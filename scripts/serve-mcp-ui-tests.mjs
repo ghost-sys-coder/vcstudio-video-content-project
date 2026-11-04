@@ -12,6 +12,7 @@ const css =
 for (const [name, entry] of [
   ["harness", "e2e/mcp/fixtures/entry.tsx"],
   ["host", "e2e/mcp/fixtures/host.ts"],
+  ["waitlist", "e2e/mcp/fixtures/waitlist-entry.tsx"],
 ]) {
   const bundle = await build({
     entryPoints: [entry],
@@ -22,6 +23,12 @@ for (const [name, entry] of [
     target: "es2022",
     define: { "process.env.NODE_ENV": '"production"' },
     alias: {
+      ...(name === "waitlist"
+        ? {
+            "@clerk/nextjs": path.resolve("e2e/mcp/fixtures/MockClerk.ts"),
+            "next/link": path.resolve("e2e/mcp/fixtures/MockNextLink.tsx"),
+          }
+        : {}),
       "@/app/(authenticated)/app/settings/mcp/actions": path.resolve(
         "e2e/mcp/fixtures/actions.ts",
       ),
@@ -48,6 +55,7 @@ const server = createServer(async (req, res) => {
     "/host.html": path.join(out, "host.html"),
     "/harness.html": path.join(out, "harness.html"),
     "/review.html": path.resolve("public/mcp/review.html"),
+    "/waitlist.html": path.join(out, "waitlist.html"),
   };
   if (!allowed[filename]) {
     res.writeHead(404).end();

@@ -1,6 +1,27 @@
 import { z } from "zod";
 import { decodeEncryptionKey } from "@/lib/crypto/secret-box";
 
+export const privateAccessEnvironmentSchema = z.object({
+  ENABLE_PRIVATE_ACCESS: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((value) => value === "true"),
+  PRIVATE_ACCESS_CLERK_USER_IDS: z
+    .string()
+    .default("")
+    .transform((value) => [
+      ...new Set(
+        value
+          .split(",")
+          .map((id) => id.trim())
+          .filter(Boolean),
+      ),
+    ])
+    .pipe(
+      z.array(z.string().regex(/^user_[A-Za-z0-9]+$/, "Invalid Clerk user ID")),
+    ),
+});
+
 export const mcpEnvironmentSchema = z.object({
   ENABLE_MCP: z
     .enum(["true", "false"])
@@ -10,6 +31,7 @@ export const mcpEnvironmentSchema = z.object({
 });
 
 export const serverEnvironmentSchema = z.object({
+  ...privateAccessEnvironmentSchema.shape,
   CLERK_SECRET_KEY: z.string().min(1, "CLERK_SECRET_KEY is required"),
   CLERK_WEBHOOK_SIGNING_SECRET: z
     .string()

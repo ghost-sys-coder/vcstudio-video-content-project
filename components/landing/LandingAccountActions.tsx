@@ -1,6 +1,6 @@
 "use client";
 
-import { Show, SignInButton, SignUpButton } from "@clerk/nextjs";
+import { Show, SignInButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -25,15 +25,15 @@ export function LandingAccountActions({
             Sign in
           </Button>
         </SignInButton>
-        <SignUpButton>
-          <Button
-            className="h-11 rounded-full lg:h-9"
-            onClick={onNavigate}
-            type="button"
-          >
-            Create account
-          </Button>
-        </SignUpButton>
+        <Button
+          className="h-11 rounded-full lg:h-9"
+          onClick={onNavigate}
+          nativeButton={false}
+          role="link"
+          render={<Link href="/waitlist" />}
+        >
+          Join waitlist
+        </Button>
       </Show>
       <Show when="signed-in">
         <Button

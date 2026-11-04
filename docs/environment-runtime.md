@@ -10,6 +10,21 @@ be copied to another runtime merely for convenience.
 | `.env.trigger` | Trigger.dev                     | Background tasks and scheduled workers. Synchronized during deployment. Never committed. |
 | `.env.example` | Repository                      | Key catalogue and safe defaults only; contains no real credentials.                      |
 
+## Owner-only private development
+
+`ENABLE_PRIVATE_ACCESS` and `PRIVATE_ACCESS_CLERK_USER_IDS` belong only in `.env`,
+`.env.vercel` and the credential-free `.env.example` catalogue. They are web-only;
+do not copy them into `.env.trigger`. Vercel Production and Preview must both
+set the flag to `true` and preserve the two existing owner Clerk IDs. Keep the
+real IDs out of tracked source and documentation. Existing email addresses and
+login methods stay attached to those accounts.
+
+The flag defaults to `true`. An empty ID list denies application access. Clerk
+must also remain in **Waitlist** access mode to close new account registration;
+the custom `/waitlist` form stores interest in Clerk without creating a workspace.
+Waitlist approval alone cannot grant private application access. See
+[private access operations](private-access.md) before any reopening.
+
 ## LinkedIn Page credentials
 
 `LINKEDIN_PAGES_CLIENT_ID` and `LINKEDIN_PAGES_CLIENT_SECRET` identify the separate Community Management-only application. They belong in `.env`, `.env.vercel`, and `.env.trigger`: web routes authorize/connect Pages, and the worker refreshes their tokens using the same application. Preserve `LINKEDIN_CLIENT_ID`/`LINKEDIN_CLIENT_SECRET` for personal profiles. `LINKEDIN_API_VERSION` now belongs in both deployed runtimes because Page discovery and publishing share the versioned REST API.

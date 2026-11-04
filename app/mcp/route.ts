@@ -56,14 +56,17 @@ export async function POST(request: Request) {
   } catch (error) {
     const unauthenticated =
       error instanceof McpError && error.code === "unauthenticated";
+    const denied =
+      error instanceof McpError && error.code === "permission_denied";
     return Response.json(
       {
-        error: unauthenticated
-          ? error.message
-          : "MCP is unavailable. Check connection setup.",
+        error:
+          unauthenticated || denied
+            ? error.message
+            : "MCP is unavailable. Check connection setup.",
       },
       {
-        status: unauthenticated ? 401 : 503,
+        status: unauthenticated ? 401 : denied ? 403 : 503,
         headers: {
           ...(origin
             ? {

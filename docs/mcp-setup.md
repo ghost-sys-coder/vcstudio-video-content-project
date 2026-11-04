@@ -366,7 +366,32 @@ and actual image decode/display under restrictive CSP in Light/Dark mobile layou
 An unlisted image origin is blocked before any network request. Approval is not
 triggered by image display. Storage/providers/workers remain mocked in verification.
 
-After deployment, refresh the VCStudio connection metadata in ChatGPT and prepare
-a fresh preview: existing resource policies may be cached and approvals expire after
-ten minutes. Confirm the actual image is visible before counting visual review as
-accepted. No human approval or publication should be inferred from the screenshots.
+The correction deployed as `f4f0d08edad03ecf8a055afac7a259c503c8085c`, Vercel
+`dpl_AdVaKUTymW9v9GQ2FGQV5ezQTE4F`, production READY. Discovery, OAuth challenge,
+origin rejection and site framing protection were checked after deployment.
+
+The user subsequently answered **Image displays correctly** after being asked to
+refresh the VCStudio connection and prepare a fresh preview. Accept the live image
+preview as passed. No approval execution, post publication or schedule creation was
+reported, so those gates remain open. The confirmation does not add separate
+Claude or web-versus-desktop compatibility results.
+
+For future widget policy changes, refresh the connection metadata and create a
+fresh preview because resource policies may be cached and approvals expire after
+ten minutes. Keep Marketing paused and LinkedIn Pages on hold.
+
+### First real publication and private-access restriction - 2026-11-04
+
+The user confirmed the first live LinkedIn personal-profile publication succeeded
+with both text and an image. Accept this as user-verified publication of a real
+post; do not infer scheduling, Claude compatibility or a separate client-specific
+approval run from that report. No additional post was created for this access
+restriction.
+
+MCP remains enabled for the existing approved owner identities. The global
+private-development gate now checks the verified OAuth subject before looking up
+or synchronizing an application user. Valid tokens, scopes and workspace grants
+cannot bypass `ENABLE_PRIVATE_ACCESS=true` and the configured Clerk owner IDs.
+Outsider OAuth calls return permission denied (HTTP 403). Existing owner scopes,
+workspace grants, connections and approved schedules are preserved. Public OAuth
+discovery remains available. See [private access](private-access.md).

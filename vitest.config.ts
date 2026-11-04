@@ -8,6 +8,8 @@ export default defineConfig({
     },
   },
   test: {
+    // Tests use mocked identities; private-access tests explicitly enable the gate.
+    env: { ENABLE_PRIVATE_ACCESS: "false" },
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],

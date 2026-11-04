@@ -1,9 +1,14 @@
 import { clerkMiddleware } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { buildSecurityHeaders } from "@/lib/security/security-headers";
+import { isPrivateApplicationPath } from "@/lib/auth/private-access";
+import { privateAccessResponse } from "@/lib/auth/private-access-response";
 
-export default clerkMiddleware((_auth, request) => {
-  const response = NextResponse.next();
+export default clerkMiddleware(async (auth, request) => {
+  const response = isPrivateApplicationPath(request.nextUrl.pathname)
+    ? (privateAccessResponse(request, (await auth()).userId) ??
+      NextResponse.next())
+    : NextResponse.next();
   const nodeEnvironment =
     process.env.NODE_ENV === "production"
       ? "production"

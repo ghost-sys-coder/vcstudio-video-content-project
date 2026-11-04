@@ -49,7 +49,11 @@ export default async function RootLayout({
       lang="en"
     >
       <body className="min-h-full flex flex-col">
-        <ClerkProvider appearance={{ theme: shadcn }} telemetry={false}>
+        <ClerkProvider
+          appearance={{ theme: shadcn }}
+          telemetry={false}
+          waitlistUrl="/waitlist"
+        >
           <TooltipProvider>{children}</TooltipProvider>
         </ClerkProvider>
         <Toaster />

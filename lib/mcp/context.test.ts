@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 const m = vi.hoisted(() => ({
   auth: vi.fn(),
@@ -31,6 +31,7 @@ vi.mock("./config", () => ({ mcpBaseUrl: () => "https://vcstudio.example" }));
 import { authenticateMcp, authorizeMcp, authorizeMcpBrowser } from "./context";
 import { mcpContextFixture } from "@/lib/test-utils/mcp-fixtures";
 const ctx = mcpContextFixture();
+afterEach(() => vi.unstubAllEnvs());
 function jwt(aud = "https://vcstudio.example/mcp") {
   return `header.${Buffer.from(JSON.stringify({ aud })).toString("base64url")}.verified-by-clerk`;
 }
@@ -55,6 +56,22 @@ beforeEach(() => {
   m.membership.mockResolvedValue(ctx.membership);
 });
 describe("authenticated MCP authority", () => {
+  it("blocks valid outsider OAuth tokens before any application user access", async () => {
+    vi.stubEnv("ENABLE_PRIVATE_ACCESS", "true");
+    vi.stubEnv("PRIVATE_ACCESS_CLERK_USER_IDS", "user_owner1,user_owner2");
+    await expect(authenticateMcp()).rejects.toMatchObject({
+      code: "permission_denied",
+    });
+    expect(m.user).not.toHaveBeenCalled();
+    expect(m.connection).not.toHaveBeenCalled();
+  });
+  it("retains the existing owner's MCP authentication", async () => {
+    vi.stubEnv("ENABLE_PRIVATE_ACCESS", "true");
+    vi.stubEnv("PRIVATE_ACCESS_CLERK_USER_IDS", ctx.principal.clerkUserId);
+    await expect(authenticateMcp()).resolves.toMatchObject({
+      userId: ctx.principal.userId,
+    });
+  });
   it("accepts only resource-bound OAuth tokens and checks external token revocation", async () => {
     expect((await authenticateMcp()).userId).toBe(ctx.principal.userId);
     for (const changed of [

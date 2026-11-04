@@ -1,4 +1,4 @@
-import { Show, SignUpButton } from "@clerk/nextjs";
+import { Show } from "@clerk/nextjs";
 import { ArrowRightIcon } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -24,12 +24,16 @@ export function LandingCtaSection() {
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Show when="signed-out">
-              <SignUpButton>
-                <Button className="rounded-full px-6" size="lg" type="button">
-                  Create account
-                  <ArrowRightIcon data-icon="inline-end" />
-                </Button>
-              </SignUpButton>
+              <Button
+                className="rounded-full px-6"
+                size="lg"
+                nativeButton={false}
+                role="link"
+                render={<Link href="/waitlist" />}
+              >
+                Join waitlist
+                <ArrowRightIcon data-icon="inline-end" />
+              </Button>
             </Show>
             <Show when="signed-in">
               <Button

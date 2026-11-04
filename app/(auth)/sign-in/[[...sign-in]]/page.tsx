@@ -1,5 +1,5 @@
-import { SignIn } from "@clerk/nextjs";
+import { OwnerSignIn } from "@/components/auth/OwnerSignIn";
 
 export default function SignInPage() {
-  return <SignIn />;
+  return <OwnerSignIn />;
 }

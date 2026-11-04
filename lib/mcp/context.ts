@@ -17,6 +17,10 @@ import { McpError, requireMcp } from "./errors";
 import { assertMcpAccess } from "./policy";
 import { assertMcpTokenResource } from "./token-resource";
 import { mcpBaseUrl } from "./config";
+import {
+  canAccessPrivateApplication,
+  PRIVATE_ACCESS_MESSAGE,
+} from "@/lib/auth/private-access";
 
 export function requireMcpEnabled() {
   requireMcp(
@@ -50,6 +54,11 @@ export async function authenticateMcp(): Promise<McpPrincipal> {
       verified.subject === token.userId,
     "unauthenticated",
     "This OAuth authorization expired or was revoked. Reconnect your account.",
+  );
+  requireMcp(
+    canAccessPrivateApplication(token.userId),
+    "permission_denied",
+    PRIVATE_ACCESS_MESSAGE,
   );
   const user =
     (await findActiveUserByClerkId(token.userId)) ??

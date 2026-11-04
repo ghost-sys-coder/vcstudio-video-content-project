@@ -18,6 +18,14 @@ const keysByFile = new Map(
 );
 
 const rules = {
+  ENABLE_PRIVATE_ACCESS: {
+    required: [".env.example", ".env", ".env.vercel"],
+    forbidden: [".env.trigger"],
+  },
+  PRIVATE_ACCESS_CLERK_USER_IDS: {
+    required: [".env.example", ".env", ".env.vercel"],
+    forbidden: [".env.trigger"],
+  },
   ENABLE_MCP: {
     required: [".env.example", ".env", ".env.vercel", ".env.trigger"],
     forbidden: [],
