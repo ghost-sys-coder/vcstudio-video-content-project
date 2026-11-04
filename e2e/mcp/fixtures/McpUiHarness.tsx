@@ -1,7 +1,13 @@
 import { McpSettingsPage } from "@/components/mcp/McpSettingsPage";
 import { McpUploadPanel } from "@/components/mcp/McpUploadPanel";
 import { McpBrowserApproval } from "@/components/mcp/McpBrowserApproval";
-import { settings, preview, workspaceId, operationId } from "./data";
+import {
+  settings,
+  populatedSettings,
+  preview,
+  workspaceId,
+  operationId,
+} from "./data";
 export function McpUiHarness() {
   const mode = new URLSearchParams(location.search).get("mode");
   if (mode === "upload")
@@ -25,5 +31,17 @@ export function McpUiHarness() {
         />
       </main>
     );
-  return <McpSettingsPage data={settings} />;
+  return (
+    <McpSettingsPage
+      data={
+        mode === "settings-populated"
+          ? populatedSettings
+          : mode === "settings-empty"
+            ? { ...settings, connections: [] }
+            : mode === "settings-paused"
+              ? { ...settings, enabled: false, connections: [] }
+              : settings
+      }
+    />
+  );
 }

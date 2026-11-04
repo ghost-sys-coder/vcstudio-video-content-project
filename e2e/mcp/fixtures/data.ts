@@ -43,3 +43,65 @@ export const settings: McpSettingsView = {
   ],
   activity: [],
 };
+
+export const populatedSettings: McpSettingsView = {
+  ...settings,
+  workspaces: [
+    ...settings.workspaces,
+    {
+      workspaceId: "99999999-9999-4999-8999-999999999999",
+      workspaceName: "Reference workspace",
+      workspaceSlug: "reference",
+      role: "viewer",
+      allowedScopes: ["vcstudio:read"],
+    },
+  ],
+  connections: [
+    {
+      ...settings.connections[0],
+      clientId: "https://chatgpt.com/connector/client-metadata.json",
+      grants: [
+        {
+          connectionId: operationId,
+          workspaceId,
+          scopes: [...MCP_SCOPES],
+          createdAt: new Date("2026-11-05T08:00:00Z"),
+          updatedAt: new Date("2026-11-05T08:00:00Z"),
+        },
+      ],
+    },
+    {
+      id: "66666666-6666-4666-8666-666666666666",
+      clientId:
+        "https://claude.ai/" +
+        "long-client-identifier/".repeat(6) +
+        "client-metadata.json",
+      revoked: true,
+      grants: [],
+    },
+  ],
+  activity: [
+    {
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      kind: "import_asset",
+      status: "succeeded",
+      error: null,
+      createdAt: "2026-11-05T08:00:00.000Z",
+    },
+    {
+      id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      kind: "publish_post",
+      status: "requires_approval",
+      error: null,
+      createdAt: "2026-11-05T07:50:00.000Z",
+    },
+    {
+      id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      kind: "import_asset",
+      status: "failed",
+      error:
+        "This download link expired. Start a new import with a fresh link.",
+      createdAt: "2026-11-05T07:40:00.000Z",
+    },
+  ],
+};

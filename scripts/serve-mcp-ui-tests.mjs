@@ -24,6 +24,7 @@ for (const [name, entry] of [
     target: "es2022",
     define: { "process.env.NODE_ENV": '"production"' },
     alias: {
+      "next/link": path.resolve("e2e/mcp/fixtures/MockNextLink.tsx"),
       ...(name === "post-composer"
         ? {
             "next/link": path.resolve("e2e/mcp/fixtures/MockNextLink.tsx"),

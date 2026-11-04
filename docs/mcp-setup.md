@@ -6,9 +6,39 @@ Preview defaults remain disabled. User verification covers ChatGPT connection,
 workspace reads, image import/Social draft, desktop project reuse, explicit
 scene-image approval, saved scheduling/cancellation and the first real LinkedIn
 text-and-image publication. Private access and continued MCP
-availability are also user-verified. The remaining client and workflow checks
-below are distinct from the completed deployment; local tests alone do not prove
-live client compatibility.
+availability are also user-verified. The user confirmed Claude web cancellation
+and closed the live verification round on 2026-11-04, choosing to handle further
+issues during ongoing use. The coverage notes below distinguish observed client
+journeys from unexercised details; local tests alone do not prove universal client
+compatibility. No further proactive live tests are requested.
+
+## Connection settings presentation - 2026-11-05
+
+The settings page now separates guided connection setup, an access/approval overview,
+per-client workspace permission cards and recent activity. Availability is a filled
+shadcn badge with a status dot; paused deployments have a distinct warning badge.
+The endpoint has the existing accessible copy control. Known HTTPS client hosts
+receive readable display labels while the full OAuth client identifier remains
+visible; these labels do not establish trust or change authorization. Activity
+rows expose status, explicit UTC timestamps, safe errors and links to operation
+details with prefetch disabled.
+
+Shared gutters, panel spacing, Geist typography and Light/Dark colors apply to
+both narrow and wide layouts. Empty connections/activity and paused deployments
+have dedicated presentation. Workspace selection, scope names/defaults, role
+restrictions, save/reconnect behavior and revocation confirmation retain their
+existing server actions and policies. No additional data queries, schema, feature
+flags, providers, environment variables or worker changes were introduced.
+
+Verification uses only isolated browser fixtures and mocked actions. This UI work
+does not reopen the owner-closed live-client acceptance round. No production
+connection/grant/schedule mutation or deployment is part of this presentation task.
+
+Verification passed: 31 relevant unit tests, 24 isolated browser journeys (including
+nine settings cases across Light/Dark and 390/768/1440px), TypeScript, formatting,
+lint with four pre-existing warnings, and the production build. The nine settings
+journeys were rechecked after the final typography adjustment. Screenshots were
+reviewed in both themes. The correction remains local and uncommitted.
 
 ## Delivered milestones
 
@@ -21,20 +51,34 @@ live client compatibility.
    browser approval, scheduling, cancellation and per-destination status.
 4. Release verification: production prerequisites, deployment and anonymous live
    checks passed. Local protocol, PostgreSQL, provider/worker mocks and responsive
-   browser checks passed. ChatGPT live acceptance is partial; Claude and the
-   remaining journeys below still need individual verification.
+   browser checks passed. Exercised ChatGPT and Claude journeys are recorded
+   below. The owner closed live testing after Claude web cancellation; remaining
+   coverage observations are deferred rather than release blockers.
 
-## Remaining live acceptance
+## Live verification round closed - 2026-11-04
 
-- Complete Claude web/desktop publication review and explicit scene-image review.
-  Claude web connection, project reads, draft saving and browser image-upload/attachment
-  are verified. Desktop reads, browser-upload and project/script/scene reuse have
-  succeeded; saved framing read-back after the correction below still needs a live check.
-  Distinguish unsupported remote connections from unavailable chat-file access.
-- Verify desktop file import and signed-in browser upload/review handoffs. Reuse
-  of an existing library image does not establish native desktop file transfer.
-  Claude Desktop's browser-upload fallback is verified; native chat-file access is
-  optional when the documented fallback works.
+The user confirmed successful cancellation of the existing schedule through Claude
+web and explicitly said testing is done, with any further failures to be handled
+as the project moves forward. Accept the exercised workflows for controlled
+owner-only use. Do not request more client tests, recreate schedules or change
+fixtures merely to complete the earlier checklist unless the user reopens testing
+or reports a concrete issue.
+
+Recorded coverage includes ChatGPT connection/workspace access, file-reference
+import/Social draft, desktop project/script/manual-scene reuse, scene-image review,
+real LinkedIn text-and-image publication, scheduling and cancellation; Claude web
+connection/reads/draft/browser-upload and successful cancellation; and Claude
+Desktop reads/browser-upload/project reuse, saved framing, embedded review,
+human approval and scheduling.
+
+Deferred coverage observations are retained honestly: automatic native chat-file
+access is not established for every client; Claude Desktop's upload fallback is
+verified; Claude's separate explicit scene-image review was not exercised; and the
+final Claude web cancellation review surface/operation ID were not reported. These
+are not new test requests. Leave the existing pending scene image for normal user
+review. Do not silently approve it or delete test content during this closeout.
+
+Earlier next-step notes below are historical and are superseded by this closure.
 
 ### Claude Desktop reuse and saved framing correction - 2026-11-04
 
@@ -77,12 +121,122 @@ The image remains pending review. Publication review in Claude remains a separat
 acceptance step. No paid generation, rendering, public post or schedule was started.
 This correction requires no migration, environment, dependency or worker change.
 
-Verification passed: 286 focused MCP/render/output/pacing and isolated PostgreSQL
-tests, TypeScript, environment placement and production build. Lint passed with
+Verification passed: 295 relevant tests (286 focused MCP/render/output/pacing and
+isolated PostgreSQL tests plus nine existing production-baseline tests), TypeScript,
+environment placement and production build. Lint passed with
 four pre-existing warnings. The actual stored portrait derivative also matches
 the deterministic full-image contain conversion byte-for-byte. All 15 isolated browser journeys also passed after running sequentially with the
-build (their shared temporary directory prevents concurrent execution). No live
-client read-back of the richer framing response has been claimed.
+build (their shared temporary directory prevents concurrent execution). The live
+Claude Desktop read-back was subsequently confirmed by the user, as recorded below.
+
+Corrective commit `3ba0c41fc4b496be63d9ca2461093371cdd4cb00` is pushed and
+Vercel production deployment `dpl_AMypMod7yM3G3jUkPH1i8h8mZV9D` is READY on
+`vcstudio.veilcode.studio`. Post-release checks passed: landing/waitlist 200,
+private scene redirect to sign-in, private image 401, MCP 401 with OAuth challenge,
+and discovery 200 with the canonical resource. Site framing protection remains
+DENY. The user subsequently refreshed the Claude Desktop connector and confirmed
+a read-only `get_scene` returns image `d9467a41-1826-45c3-9415-678e514e09a4` at
+1536 x 1024 and its exact matching saved framing: mode contain, scaleBps 10000,
+outputWidth 1920, outputHeight 1080, centered with black background. Review stayed
+pending and nothing was changed. Accept live saved-framing read-back as passed;
+do not reassign the image or approve it as a side effect of inspection.
+
+Next, check Claude Desktop publication review using existing relevant draft
+`9206ff25-759c-4d9d-9913-64a646306288`, **VCStudio — building with boundaries**.
+A bounded production read after the framing confirmation found version 9, draft,
+no schedule or publication lock, no attachments or queued/publishing/published
+targets, and the personal LinkedIn selection preserved. Read its current version
+in Claude, keep text and attachments unchanged, and prepare a fresh scheduling
+preview for only Tamale Frank at 11 November 2026, 10:00 Africa/Kampala
+(07:00 UTC). Do not create another draft or execute a schedule. Request any missing
+Publish grant only for the existing Claude connection and this workspace; preserve
+ChatGPT grants. Inspect the embedded review if available or the signed-in browser
+fallback, then report which surface worked and the operation ID. Stop before
+approval. Preview preparation is not scheduling or publication. Claude web review
+and explicit scene-image review remain separate pending acceptance steps.
+
+### Claude Desktop scheduling preview and embedded review passed - 2026-11-04
+
+The user reported successful preparation of operation
+`c0b505a1-6f7f-4c16-a4d5-a896e2642dd6` for existing post
+`9206ff25-759c-4d9d-9913-64a646306288`. A bounded production read confirmed:
+
+- Operation `requires_approval`, with preview version 9 and text exactly matching
+  the saved draft. No attachment or new post was introduced.
+- Only personal LinkedIn Tamale Frank, connection
+  `9def266d-fabd-4e4c-a7c0-0eaa1f0173d3`, was selected.
+- Preview time `2026-11-11T07:00:00.000Z`, timezone Africa/Kampala: 11 November
+  at 10:00 AM locally.
+- Post still draft version 9, no saved scheduled instant, dispatch lock or
+  queued/publishing/published target. The coding session performed only a SELECT.
+- Pending approval expired/expires at `2026-11-04T19:49:47.533Z` (22:49:47 Kampala).
+  It was current at the verification read; freshness must be checked again before
+  any later approval.
+
+Claude's narrative said no interactive review appeared, while the user's report
+said it did. Asked specifically which surface they saw, the user selected
+**An interactive approval panel inside Claude**. Treat this direct observation as
+Claude Desktop embedded review-display acceptance. Do not mark the browser fallback
+as tested by this report, and do not confuse panel display with human approval or
+schedule execution. No copy changes were requested; retain the exact existing
+business-relevant draft rather than adopting the assistant's editorial suggestions.
+
+Next, the user inspects the exact text/account/time and approves through the human
+review panel only if correct, then asks Claude to read back this post and its
+calendar entry. If the preview has expired, prepare a fresh preview for the same
+post/current version/destination/time with a new request key; do not recreate a
+draft or approve an expired operation. Do not publish immediately or add media.
+After successful schedule read-back, use Claude web to prepare and explicitly
+approve cancellation of that exact schedule, preserving the draft. These executions
+are tracked individually below; Desktop approval/scheduling has now passed,
+while Claude web cancellation remains pending.
+
+### Claude Desktop approval and saved scheduling passed - 2026-11-04
+
+The user completed human approval and provided Claude Desktop's post/calendar
+read-back. A bounded production SELECT, scoped to the exact workspace, post and
+approval operation, independently confirmed:
+
+- Operation `c0b505a1-6f7f-4c16-a4d5-a896e2642dd6` succeeded, with
+  `scheduled=true`, `cancelled=false`, and this exact post ID in the result.
+- Post `9206ff25-759c-4d9d-9913-64a646306288` is scheduled at version 10,
+  `scheduled_at=2026-11-11T07:00:00.000Z`, timezone Africa/Kampala. The user
+  confirmed the calendar agrees: 11 November 2026, 10:00 AM locally.
+- Saved text equals the approved immutable preview. Attachments remain empty.
+- Exactly one target exists: `1c8e7f3e-cf1e-4c1f-8477-51eb0fdcc350`, personal
+  LinkedIn connection `9def266d-fabd-4e4c-a7c0-0eaa1f0173d3`, pending with no
+  external published URL. There is no duplicate target or immediate publication.
+- The transient MCP dispatch lock is clear after successful scheduling. This
+  remains an ordinary approved Social schedule, not a pending MCP approval.
+
+Accept Claude Desktop approval and saved scheduling as passed. The coding session
+only read production data. Do not recreate this schedule or publish another copy.
+Next switch to Claude web with the same connection/workspace, read the current
+post/calendar, and use `prepare_publication` with `action=cancel_schedule`, the
+current revision, exact existing destination IDs and a new request key. Show the
+cancellation review and stop for deliberate human approval. The user clicks
+**Approve cancellation**, not **Cancel request**, then asks for fresh post/calendar
+reads confirming draft status, no scheduled instant, preserved copy/attachments
+and the cancellation operation result. Report whether the review was embedded
+or used the signed-in browser fallback. This web-client cancellation acceptance
+and explicit Claude scene-image review remain pending.
+
+### Claude web cancellation confirmed; testing closed by owner - 2026-11-04
+
+The user reported that cancellation of post
+`9206ff25-759c-4d9d-9913-64a646306288` succeeded after the Claude web cancellation
+prompt. They explicitly closed testing and chose to handle future issues during
+ongoing use. Mark Claude web cancellation as user-confirmed. The final operation
+ID, post revision and review surface were not supplied, and no additional live
+read or test was run for this closeout. Do not claim those details independently
+verified or ask the user for more evidence after their decision to stop testing.
+
+This closes the current live acceptance round; it does not establish universal
+native file access or erase the distinction between tested and deferred client
+paths. README, setup documentation and project memory record the decision. No
+runtime code, migration, environment, provider, deployment or worker changes were
+made, and no public post or new schedule was created during closeout. Preserve
+owner-only access, paused Marketing Studio and the LinkedIn Pages hold.
 
 Scheduling, revocation preserving approved schedules, stale/replayed approvals,
 workspace isolation and failed-target retry already have mocked/service or

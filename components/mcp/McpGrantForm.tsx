@@ -8,7 +8,7 @@ import { SelectItem } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { saveMcpGrantAction } from "@/app/(authenticated)/app/settings/mcp/actions";
 import type { McpSettingsView } from "@/lib/mcp/settings-view";
-import { MCP_SCOPE_LABELS } from "@/lib/mcp/scope-labels";
+import { MCP_SCOPE_LABELS, MCP_SCOPE_TITLES } from "@/lib/mcp/scope-labels";
 export function McpGrantForm({
   connection,
   workspaces,
@@ -44,23 +44,40 @@ export function McpGrantForm({
           ))}
         </FormSelect>
       </div>
-      <fieldset key={workspaceId} className="grid gap-3">
-        <legend className="mb-3 font-medium">
-          Allow this AI connection to
-        </legend>
+      <fieldset key={workspaceId} className="min-w-0 space-y-2">
+        <legend className="mb-3 text-sm font-medium">Permissions</legend>
         {MCP_SCOPES.map((scope) => (
-          <Label key={scope} className="flex items-center gap-3">
+          <Label
+            key={scope}
+            className="cursor-pointer items-start gap-3 rounded-xl border border-transparent bg-muted/45 p-3 transition-colors hover:border-border hover:bg-muted has-disabled:cursor-not-allowed has-disabled:opacity-60"
+          >
             <Checkbox
               name="scopes"
               value={scope}
               defaultChecked={saved.includes(scope)}
               disabled={pending || !selected?.allowedScopes.includes(scope)}
+              className="mt-0.5"
             />
-            {MCP_SCOPE_LABELS[scope]}
+            <span className="min-w-0 space-y-1">
+              <span className="block text-sm font-medium leading-snug">
+                {MCP_SCOPE_TITLES[scope]}
+              </span>
+              <span className="block text-xs font-normal leading-relaxed text-muted-foreground">
+                {MCP_SCOPE_LABELS[scope]}
+              </span>
+            </span>
           </Label>
         ))}
       </fieldset>
-      <Button type="submit" disabled={pending}>
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        Permissions apply to this workspace. Your workspace role and the
+        application&apos;s OAuth consent also limit access.
+      </p>
+      <Button
+        type="submit"
+        disabled={pending}
+        className="w-full whitespace-normal sm:w-auto sm:self-start"
+      >
         {pending
           ? "Saving…"
           : connection.revoked
