@@ -14,6 +14,9 @@ export async function scheduleSocialPost(input: {
   workspaceId: string;
   postId: string;
   scheduledAt: Date;
+  dispatchNow?: boolean;
+  expectedVersion?: number;
+  mcpOperationId?: string;
   timezone: string;
   targets: {
     platform: ContentPlatform;
@@ -27,15 +30,22 @@ export async function scheduleSocialPost(input: {
   const updatedPost = database
     .update(socialPosts)
     .set({
-      status: "scheduled",
-      scheduledAt: input.scheduledAt,
+      status: input.dispatchNow ? "publishing" : "scheduled",
+      scheduledAt: input.dispatchNow ? null : input.scheduledAt,
       scheduledTimezone: input.timezone,
+      version: sql`${socialPosts.version} + 1`,
       updatedAt: updateMarker,
     })
     .where(
       and(
         eq(socialPosts.id, input.postId),
         eq(socialPosts.workspaceId, input.workspaceId),
+        input.expectedVersion
+          ? eq(socialPosts.version, input.expectedVersion)
+          : undefined,
+        input.mcpOperationId
+          ? eq(socialPosts.mcpOperationId, input.mcpOperationId)
+          : sql`${socialPosts.mcpOperationId} is null`,
         inArray(socialPosts.status, [...REPUBLISHABLE_SOCIAL_POST_STATUSES]),
       ),
     )
@@ -54,7 +64,10 @@ export async function scheduleSocialPost(input: {
         and(
           eq(socialPosts.id, input.postId),
           eq(socialPosts.workspaceId, input.workspaceId),
-          eq(socialPosts.status, "scheduled"),
+          eq(
+            socialPosts.status,
+            input.dispatchNow ? "publishing" : "scheduled",
+          ),
           eq(socialPosts.updatedAt, updateMarker),
         ),
       ),
@@ -106,7 +119,10 @@ export async function scheduleSocialPost(input: {
           and(
             eq(socialPosts.id, input.postId),
             eq(socialPosts.workspaceId, input.workspaceId),
-            eq(socialPosts.status, "scheduled"),
+            eq(
+              socialPosts.status,
+              input.dispatchNow ? "publishing" : "scheduled",
+            ),
             eq(socialPosts.updatedAt, updateMarker),
           ),
         ),
@@ -128,12 +144,15 @@ export async function scheduleSocialPost(input: {
 export async function cancelSocialPostSchedule(input: {
   workspaceId: string;
   postId: string;
+  expectedVersion?: number;
+  mcpOperationId?: string;
 }): Promise<{ cancelled: boolean }> {
   const result = await getDatabase()
     .update(socialPosts)
     .set({
       status: "draft",
       scheduledAt: null,
+      version: sql`${socialPosts.version} + 1`,
       updatedAt: new Date(),
     })
     .where(
@@ -141,6 +160,12 @@ export async function cancelSocialPostSchedule(input: {
         eq(socialPosts.id, input.postId),
         eq(socialPosts.workspaceId, input.workspaceId),
         eq(socialPosts.status, "scheduled"),
+        input.expectedVersion
+          ? eq(socialPosts.version, input.expectedVersion)
+          : undefined,
+        input.mcpOperationId
+          ? eq(socialPosts.mcpOperationId, input.mcpOperationId)
+          : sql`${socialPosts.mcpOperationId} is null`,
       ),
     )
     .returning({ id: socialPosts.id });
@@ -173,7 +198,7 @@ export async function claimDueSocialPosts(input: {
     set status = 'publishing', updated_at = now()
     where id in (
       select id from social_posts
-      where status = 'scheduled' and scheduled_at <= ${now}
+      where status = 'scheduled' and scheduled_at <= ${now} and mcp_operation_id is null
       order by scheduled_at
       limit ${input.limit}
       for update skip locked

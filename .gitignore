@@ -23,6 +23,7 @@
 
 # production
 /build
+/public/mcp/
 
 # misc
 .DS_Store

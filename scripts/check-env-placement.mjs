@@ -18,6 +18,10 @@ const keysByFile = new Map(
 );
 
 const rules = {
+  ENABLE_MCP: {
+    required: [".env.example", ".env", ".env.vercel", ".env.trigger"],
+    forbidden: [],
+  },
   LINKEDIN_API_VERSION: {
     required: [".env.example", ".env", ".env.vercel", ".env.trigger"],
     forbidden: [],

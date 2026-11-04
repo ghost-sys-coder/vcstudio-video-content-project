@@ -1,0 +1,59 @@
+import { build } from "esbuild";
+import { readFile, mkdir, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
+import path from "node:path";
+await import("./build-mcp-widget.mjs");
+const out = path.resolve(".next/mcp-ui-tests");
+await mkdir(out, { recursive: true });
+const css =
+  (await readFile("public/mcp/review.html", "utf8")).match(
+    /<style>([\s\S]*?)<\/style>/,
+  )?.[1] ?? "";
+for (const [name, entry] of [
+  ["harness", "e2e/mcp/fixtures/entry.tsx"],
+  ["host", "e2e/mcp/fixtures/host.ts"],
+]) {
+  const bundle = await build({
+    entryPoints: [entry],
+    bundle: true,
+    write: false,
+    format: "esm",
+    platform: "browser",
+    target: "es2022",
+    define: { "process.env.NODE_ENV": '"production"' },
+    alias: {
+      "@/app/(authenticated)/app/settings/mcp/actions": path.resolve(
+        "e2e/mcp/fixtures/actions.ts",
+      ),
+      "@/app/(authenticated)/app/mcp/operations/[operationId]/actions":
+        path.resolve("e2e/mcp/fixtures/actions.ts"),
+    },
+  });
+  await writeFile(
+    path.join(out, `${name}.html`),
+    `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><style>body{margin:0;padding:16px;min-width:0}</style></head><body><div id="root"></div><script type="module">${bundle.outputFiles[0].text.replace(/<\/script/gi, "<\\/script")}</script></body></html>`,
+  );
+}
+const server = createServer(async (req, res) => {
+  const filename = new URL(req.url, "http://localhost").pathname;
+  if (filename === "/__test_shutdown" && req.method === "POST") {
+    res.writeHead(204).end();
+    setImmediate(() => {
+      server.closeAllConnections();
+      server.close();
+    });
+    return;
+  }
+  const allowed = {
+    "/host.html": path.join(out, "host.html"),
+    "/harness.html": path.join(out, "harness.html"),
+    "/review.html": path.resolve("public/mcp/review.html"),
+  };
+  if (!allowed[filename]) {
+    res.writeHead(404).end();
+    return;
+  }
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.end(await readFile(allowed[filename]));
+});
+server.listen(38173, "127.0.0.1");

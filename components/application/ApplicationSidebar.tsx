@@ -190,6 +190,16 @@ export function ApplicationSidebar({
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ) : null}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={pathname.startsWith("/app/settings/mcp")}
+                  render={<SidebarLink href="/app/settings/mcp" />}
+                  tooltip="AI connections"
+                >
+                  <Settings />
+                  <span>AI connections</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
               {canManageSettings ? (
                 <SidebarMenuItem>
                   <SidebarMenuButton

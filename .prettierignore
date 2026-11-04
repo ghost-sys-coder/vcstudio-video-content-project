@@ -6,3 +6,4 @@ migrations/
 # Build and coverage output.
 .next/
 coverage/
+public/mcp/

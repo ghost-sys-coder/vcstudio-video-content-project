@@ -37,6 +37,148 @@ export const workspaceRoleEnum = pgEnum("workspace_role", [
   "viewer",
 ]);
 
+// MCP OAuth clients are user-owned. Workspace authority is granted separately;
+// an OAuth login never grants membership or access to every workspace.
+export const mcpConnections = pgTable(
+  "mcp_connections",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    clientId: text("client_id").notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex("mcp_connections_user_client_unique").on(t.userId, t.clientId),
+  ],
+);
+
+export const mcpWorkspaceGrants = pgTable(
+  "mcp_workspace_grants",
+  {
+    connectionId: uuid("connection_id")
+      .notNull()
+      .references(() => mcpConnections.id, { onDelete: "cascade" }),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    scopes: jsonb("scopes").$type<string[]>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.connectionId, t.workspaceId] }),
+    index("mcp_grants_workspace_index").on(t.workspaceId),
+  ],
+);
+
+export const mcpOperations = pgTable(
+  "mcp_operations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    connectionId: uuid("connection_id")
+      .notNull()
+      .references(() => mcpConnections.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    idempotencyKey: text("idempotency_key").notNull(),
+    fingerprint: text("fingerprint").notNull(),
+    status: text("status")
+      .$type<import("@studio/contracts").McpOperationStatus>()
+      .notNull(),
+    input: jsonb("input").$type<Record<string, unknown>>().notNull(),
+    result: jsonb("result").$type<Record<string, unknown>>(),
+    error: text("error"),
+    sealedSource: text("sealed_source"),
+    approvalHash: text("approval_hash"),
+    triggerRunId: text("trigger_run_id"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex("mcp_operations_request_unique").on(
+      t.connectionId,
+      t.workspaceId,
+      t.idempotencyKey,
+    ),
+    uniqueIndex("mcp_operations_id_workspace_unique").on(t.id, t.workspaceId),
+    index("mcp_operations_recovery_index").on(t.status, t.expiresAt),
+    index("mcp_operations_workspace_created_index").on(
+      t.workspaceId,
+      t.createdAt,
+    ),
+    foreignKey({
+      columns: [t.connectionId, t.workspaceId],
+      foreignColumns: [
+        mcpWorkspaceGrants.connectionId,
+        mcpWorkspaceGrants.workspaceId,
+      ],
+    }),
+    check(
+      "mcp_operations_status_valid",
+      sql`${t.status} in ('awaiting_upload','requires_approval','queued','running','approved','succeeded','failed','cancelled','expired')`,
+    ),
+  ],
+);
+
+export const mcpAssetOrigins = pgTable(
+  "mcp_asset_origins",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    operationId: uuid("operation_id").notNull(),
+    mediaAssetId: uuid("media_asset_id").notNull(),
+    sceneImageId: uuid("scene_image_id"),
+    attribution: text("attribution").notNull().default(""),
+    sourceHost: text("source_host"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    foreignKey({
+      columns: [t.operationId, t.workspaceId],
+      foreignColumns: [mcpOperations.id, mcpOperations.workspaceId],
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [t.mediaAssetId, t.workspaceId],
+      foreignColumns: [mediaAssets.id, mediaAssets.workspaceId],
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [t.sceneImageId, t.workspaceId],
+      foreignColumns: [
+        sceneImageGenerations.id,
+        sceneImageGenerations.workspaceId,
+      ],
+    }).onDelete("cascade"),
+    uniqueIndex("mcp_asset_origins_operation_unique").on(t.operationId),
+    index("mcp_asset_origins_asset_index").on(t.workspaceId, t.mediaAssetId),
+  ],
+);
+
 export const webhookStatusEnum = pgEnum("webhook_status", [
   "processing",
   "completed",
@@ -556,6 +698,9 @@ export const usageEventTypeEnum = pgEnum("usage_event_type", [
 ]);
 
 export const auditActionEnum = pgEnum("audit_action", [
+  "mcp_connection_changed",
+  "mcp_action_completed",
+  "mcp_action_failed",
   "workspace_created",
   "channel_profile_created",
   "channel_profile_updated",
@@ -4381,6 +4526,7 @@ export const socialPosts = pgTable(
     }),
     /** Optimistic lock: a stale composer tab cannot overwrite a newer edit. */
     version: integer("version").notNull().default(1),
+    mcpOperationId: uuid("mcp_operation_id").references(() => mcpOperations.id),
     createdByUserId: uuid("created_by_user_id")
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),

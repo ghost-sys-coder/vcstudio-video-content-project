@@ -74,6 +74,7 @@ export const contentPlatformSchema = z.enum([
 ]);
 
 export const briefSchema = z.object({
+  expectedUpdatedAt: z.iso.datetime({ offset: true }).nullable().optional(),
   projectId: z.uuid(),
   topic: z.string().trim().max(2000).default(""),
   targetAudience: z.string().trim().max(1000).default(""),

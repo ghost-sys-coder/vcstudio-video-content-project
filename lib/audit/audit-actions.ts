@@ -6,6 +6,9 @@ export type AuditMetadataValue = string | number | boolean | null;
 export type AuditMetadata = Record<string, AuditMetadataValue>;
 
 export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
+  mcp_connection_changed: "AI connection permissions changed",
+  mcp_action_completed: "AI connection action completed",
+  mcp_action_failed: "AI connection action failed",
   workspace_created: "Workspace created",
   role_changed: "Member role changed",
   project_archived: "Project archived",

@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  outputFileTracingIncludes: { "/mcp": ["./public/mcp/review.html"] },
   // The Remotion server renderer and bundler run only inside the Trigger.dev
   // rendering worker (see trigger/video-render.ts). They ship native binaries
   // and a headless Chromium and must never be traced into the Next.js server

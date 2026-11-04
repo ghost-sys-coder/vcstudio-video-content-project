@@ -1,6 +1,14 @@
 import { z } from "zod";
 import { decodeEncryptionKey } from "@/lib/crypto/secret-box";
 
+export const mcpEnvironmentSchema = z.object({
+  ENABLE_MCP: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
+  APP_BASE_URL: z.url().default("http://localhost:3000"),
+});
+
 export const serverEnvironmentSchema = z.object({
   CLERK_SECRET_KEY: z.string().min(1, "CLERK_SECRET_KEY is required"),
   CLERK_WEBHOOK_SIGNING_SECRET: z

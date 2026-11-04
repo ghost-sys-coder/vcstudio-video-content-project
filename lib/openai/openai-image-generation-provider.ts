@@ -1,7 +1,7 @@
 import "server-only";
 
 import OpenAI, { toFile } from "openai";
-import sharp from "sharp";
+import sharp, { type Metadata } from "sharp";
 import type { ImageGenerationUsage } from "@/lib/costs/scene-image-cost";
 import {
   ImageGenerationProviderResponseError,
@@ -139,7 +139,7 @@ export class OpenAiImageGenerationProvider implements ImageGenerationProvider {
         usage,
       });
 
-    let metadata: sharp.Metadata;
+    let metadata: Metadata;
     try {
       metadata = await sharp(bytes, { failOn: "error" }).metadata();
     } catch {

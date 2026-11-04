@@ -54,6 +54,7 @@ export async function scheduleSocialPostPublication(input: {
   timezone: string;
   connectionIds: string[];
   requestNonce: string;
+  mcpOperationId?: string;
   captionOverrides?: { platform: SocialPostPlatform; text: string }[];
   now?: Date;
 }): Promise<{ scheduledAt: Date }> {
@@ -72,6 +73,10 @@ export async function scheduleSocialPostPublication(input: {
     postId: input.postId,
   });
   if (!post) throw new SocialPostScheduleError("That post no longer exists.");
+  if (post.mcpOperationId && post.mcpOperationId !== input.mcpOperationId)
+    throw new SocialPostScheduleError(
+      "This post has an approved publication in progress.",
+    );
   if (!isRepublishableStatus(post.status))
     throw new SocialPostScheduleError(
       "This post has already been sent or is on its way.",
@@ -195,6 +200,8 @@ export async function scheduleSocialPostPublication(input: {
     scheduledAt: instant.scheduledAt,
     timezone: input.timezone,
     targets,
+    expectedVersion: post.version,
+    mcpOperationId: input.mcpOperationId,
   });
   if (!scheduled)
     throw new SocialPostScheduleError("That post could not be scheduled.");
@@ -205,10 +212,14 @@ export async function scheduleSocialPostPublication(input: {
 export async function cancelSocialPostPublication(input: {
   workspaceId: string;
   postId: string;
+  expectedVersion?: number;
+  mcpOperationId?: string;
 }): Promise<void> {
   const result = await cancelSocialPostSchedule({
     workspaceId: input.workspaceId,
     postId: input.postId,
+    expectedVersion: input.expectedVersion,
+    mcpOperationId: input.mcpOperationId,
   });
   if (!result.cancelled)
     throw new SocialPostScheduleError(

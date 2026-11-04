@@ -5,11 +5,10 @@ import { tasks } from "@trigger.dev/sdk";
 import { isRepublishableStatus } from "@/db/commands/social-post-commands";
 import {
   createSocialPostTargets,
-  markSocialPostPublishing,
   markSocialPostTargetFailed,
   markSocialPostTargetQueued,
-  replaceSocialPostTargets,
 } from "@/db/commands/social-post-target-commands";
+import { scheduleSocialPost } from "@/db/commands/social-post-schedule-commands";
 import { findReadyMediaAssets } from "@/db/repositories/media-assets.repository";
 import { findPlatformConnectionSummary } from "@/db/repositories/publishing.repository";
 import {
@@ -61,6 +60,7 @@ export async function startSocialPostPublication(input: {
   postId: string;
   connectionIds: string[];
   requestNonce: string;
+  mcpOperationId?: string;
   captionOverrides?: { platform: SocialPostPlatform; text: string }[];
 }): Promise<{ dispatched: number }> {
   const environment = getPublishingEnvironment();
@@ -80,6 +80,10 @@ export async function startSocialPostPublication(input: {
   });
   if (!post)
     throw new SocialPostPublicationError("That post no longer exists.");
+  if (post.mcpOperationId && post.mcpOperationId !== input.mcpOperationId)
+    throw new SocialPostPublicationError(
+      "This post has an approved publication in progress.",
+    );
   if (!isRepublishableStatus(post.status))
     throw new SocialPostPublicationError(
       "This post has already been sent or is on its way.",
@@ -206,24 +210,41 @@ export async function startSocialPostPublication(input: {
       .filter((target) => target.status === "published")
       .map((target) => target.connectionId),
   );
-  const targets = await replaceSocialPostTargets({
-    workspaceId: input.workspaceId,
-    postId: post.id,
-    targets: resolved.filter(
-      (entry) => !alreadyPublished.has(entry.connectionId),
-    ),
-  });
-
-  if (targets.length === 0)
+  const pendingTargets = resolved.filter(
+    (entry) => !alreadyPublished.has(entry.connectionId),
+  );
+  if (!pendingTargets.length)
     throw new SocialPostPublicationError(
       "Every chosen destination has already received this post.",
     );
-
-  await markSocialPostPublishing({
+  // The shared dispatch transaction claims the current version before replacing
+  // targets. Browser requests cannot race an MCP approval or overwrite its lock.
+  const claimed = await scheduleSocialPost({
     workspaceId: input.workspaceId,
     postId: post.id,
+    scheduledAt: new Date(),
+    timezone: post.scheduledTimezone,
+    dispatchNow: true,
+    expectedVersion: post.version,
+    mcpOperationId: input.mcpOperationId,
+    targets: pendingTargets,
   });
-
+  if (!claimed)
+    throw new SocialPostPublicationError(
+      "This post changed or another publication is already in progress.",
+    );
+  const requestKeys = new Set(
+    pendingTargets.map((target) => target.idempotencyKey),
+  );
+  const targets = (
+    await listSocialPostTargets({
+      workspaceId: input.workspaceId,
+      postId: post.id,
+    })
+  ).filter(
+    (target) =>
+      requestKeys.has(target.idempotencyKey) && target.status === "pending",
+  );
   let dispatched = 0;
   for (const target of targets) {
     try {

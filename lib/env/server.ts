@@ -1,5 +1,10 @@
 import "server-only";
 
+import { mcpEnvironmentSchema } from "@/lib/env/server-schema";
+export function getMcpEnvironment() {
+  return mcpEnvironmentSchema.parse(process.env);
+}
+
 import {
   clerkWebhookEnvironmentSchema,
   databaseEnvironmentSchema,

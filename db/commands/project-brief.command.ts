@@ -1,4 +1,5 @@
 import "server-only";
+import { and, eq, sql } from "drizzle-orm";
 
 import { getDatabase } from "@/db/drizzle";
 import { projectBriefs, type ContentPlatform } from "@/db/schema";
@@ -19,9 +20,10 @@ export async function saveProjectBrief(input: {
   hookAngle: string;
   niche: string;
   userId: string;
-}): Promise<void> {
+  expectedUpdatedAt?: Date | null;
+}): Promise<Date | null> {
   const now = new Date();
-  await getDatabase()
+  const [saved] = await getDatabase()
     .insert(projectBriefs)
     .values({
       workspaceId: input.workspaceId,
@@ -38,6 +40,14 @@ export async function saveProjectBrief(input: {
     })
     .onConflictDoUpdate({
       target: projectBriefs.projectId,
+      setWhere: and(
+        eq(projectBriefs.workspaceId, input.workspaceId),
+        input.expectedUpdatedAt === undefined
+          ? undefined
+          : input.expectedUpdatedAt === null
+            ? sql`false`
+            : eq(projectBriefs.updatedAt, input.expectedUpdatedAt),
+      ),
       set: {
         topic: input.topic,
         targetAudience: input.targetAudience,
@@ -49,5 +59,7 @@ export async function saveProjectBrief(input: {
         updatedByUserId: input.userId,
         updatedAt: now,
       },
-    });
+    })
+    .returning({ updatedAt: projectBriefs.updatedAt });
+  return saved?.updatedAt ?? null;
 }

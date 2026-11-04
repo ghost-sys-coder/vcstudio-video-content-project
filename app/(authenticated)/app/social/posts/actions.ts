@@ -5,10 +5,7 @@ import { redirect } from "next/navigation";
 import {
   createSocialPost,
   deleteSocialPostDraft,
-  updateSocialPostDraft,
 } from "@/db/commands/social-post-commands";
-import { findReadyMediaAssets } from "@/db/repositories/media-assets.repository";
-import { findPublishableRenders } from "@/db/repositories/video-render.repository";
 import { recordAuditEvent } from "@/lib/audit/record-audit-event";
 import { RateLimitExceededError } from "@/lib/domain/errors";
 import {
@@ -30,6 +27,7 @@ import {
   saveSocialPostSchema,
   scheduleSocialPostSchema,
 } from "@/lib/schemas/social-post";
+import { saveAuthorizedSocialDraft } from "@/lib/social/save-social-draft";
 import { renderPortableDocumentToPlainText } from "@/lib/social/render-plain-text";
 
 export type SaveSocialPostResult =
@@ -126,50 +124,13 @@ export async function saveSocialPostAction(
     requireCapability(context.activeMembership.role, "composePosts");
     const workspaceId = context.activeMembership.workspaceId;
 
-    // Every attachment must still be live in *this* workspace. Checking here
-    // rather than relying on the foreign key is what stops a crafted request
-    // from attaching another tenant's media or another project's render.
-    const libraryIds = parsed.data.attachments
-      .filter((attachment) => attachment.source === "library")
-      .map((attachment) => attachment.id);
-    if (libraryIds.length > 0) {
-      const assets = await findReadyMediaAssets({
-        workspaceId,
-        mediaAssetIds: libraryIds,
-      });
-      if (assets.length !== libraryIds.length)
-        return {
-          ok: false,
-          error: "One of those attachments is no longer in the library.",
-        };
-    }
-    const renderIds = parsed.data.attachments
-      .filter((attachment) => attachment.source === "render")
-      .map((attachment) => attachment.id);
-    if (renderIds.length > 0) {
-      const renders = await findPublishableRenders({
-        workspaceId,
-        renderIds,
-      });
-      if (renders.length !== renderIds.length)
-        return {
-          ok: false,
-          error: "One of those renders is no longer available.",
-        };
-    }
-
     const plainText = renderPortableDocumentToPlainText(
       parsed.data.bodyDocument,
     );
-    const result = await updateSocialPostDraft({
-      workspaceId,
-      postId: parsed.data.postId,
-      expectedVersion: parsed.data.expectedVersion,
-      name: parsed.data.name,
-      bodyDocument: parsed.data.bodyDocument,
-      bodyPlainText: plainText,
-      attachments: parsed.data.attachments,
-    });
+    const result = await saveAuthorizedSocialDraft(
+      { workspaceId, role: context.activeMembership.role },
+      parsed.data,
+    );
 
     if (result.outcome === "not_editable")
       return {

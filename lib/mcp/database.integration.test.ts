@@ -1,0 +1,375 @@
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { readFile } from "node:fs/promises";
+import { PGlite } from "@electric-sql/pglite";
+import { drizzle } from "drizzle-orm/pglite";
+vi.mock("server-only", () => ({}));
+const shared = vi.hoisted(() => ({ database: undefined as unknown }));
+vi.mock("@/db/drizzle", () => ({ getDatabase: () => shared.database }));
+import {
+  ensureMcpConnection,
+  saveMcpGrant,
+  beginMcpOperation,
+  consumeMcpApproval,
+  revokeMcpConnection,
+  findMcpOperation,
+} from "@/db/repositories/mcp.repository";
+import { lockMcpPost } from "@/db/commands/mcp-post-lock";
+import { updateSocialPostDraft } from "@/db/commands/social-post-commands";
+import { saveProjectBrief } from "@/db/commands/project-brief.command";
+import { scheduleSocialPost } from "@/db/commands/social-post-schedule-commands";
+import { mcpIds } from "@/lib/test-utils/mcp-fixtures";
+const pg = new PGlite();
+let connectionId: string;
+beforeAll(async () => {
+  await pg.exec(`
+    create table users (id uuid primary key);
+    create type audit_action as enum ('workspace_created');
+    create table workspaces (id uuid primary key);
+    create table workspace_members (workspace_id uuid, user_id uuid, role text);
+    create table project_briefs (id uuid primary key default gen_random_uuid(), workspace_id uuid not null, project_id uuid unique, topic text, target_audience text, tone text, target_duration_seconds integer, primary_platform text, hook_angle text, niche text, updated_by_user_id uuid, created_at timestamptz default now(), updated_at timestamptz);
+    create table media_assets (id uuid primary key, workspace_id uuid not null, unique(id, workspace_id));
+    create table scene_image_generations (id uuid primary key, workspace_id uuid not null, unique(id, workspace_id));
+    create table social_posts (id uuid primary key, workspace_id uuid not null, name text not null default '', body_document jsonb not null default '{"type":"doc","content":[]}', body_plain_text text not null default '', status text not null default 'draft', version integer not null default 1, scheduled_at timestamptz, scheduled_timezone text not null default 'UTC', project_id uuid, created_by_user_id uuid, created_at timestamptz default now(), updated_at timestamptz default now());
+    create table social_post_media (id uuid primary key default gen_random_uuid(), post_id uuid not null references social_posts(id), workspace_id uuid not null, media_asset_id uuid references media_assets(id), render_id uuid, position integer not null, unique(post_id,position));
+    create type content_platform as enum ('linkedin');
+    create table social_post_targets (id uuid primary key default gen_random_uuid(), post_id uuid not null references social_posts(id), workspace_id uuid not null, platform content_platform, connection_id uuid, override_body_plain_text text, idempotency_key text, status text default 'pending', unique(post_id,connection_id));
+    insert into users values ('${mcpIds.user}');
+    insert into workspaces values ('${mcpIds.workspace}'), ('88888888-8888-4888-8888-888888888888');
+    insert into workspace_members values ('${mcpIds.workspace}', '${mcpIds.user}', 'owner');
+    insert into social_posts (id,workspace_id) values ('${mcpIds.post}','${mcpIds.workspace}');
+    insert into media_assets values ('${mcpIds.asset}','${mcpIds.workspace}');
+  `);
+  await pg.exec(
+    await readFile(
+      "migrations/20261103225447_mcp_import_reuse_publish/migration.sql",
+      "utf8",
+    ),
+  );
+  const db = drizzle({ client: pg });
+  await pg.exec(
+    await readFile(
+      "migrations/20261103225718_mcp_audit_events/migration.sql",
+      "utf8",
+    ),
+  );
+  await pg.exec(
+    await readFile(
+      "migrations/20261103233638_mcp_project_provenance_cleanup/migration.sql",
+      "utf8",
+    ),
+  );
+  shared.database = Object.assign(db, {
+    batch: (queries: { toSQL(): { sql: string; params: unknown[] } }[]) =>
+      pg.transaction(async (tx) => {
+        const results = [];
+        for (const query of queries) {
+          const sql = query.toSQL();
+          results.push((await tx.query(sql.sql, sql.params)).rows);
+        }
+        return results;
+      }),
+  });
+  connectionId = (await ensureMcpConnection(mcpIds.user, "test-client")).id;
+  await saveMcpGrant({
+    connectionId,
+    userId: mcpIds.user,
+    workspaceId: mcpIds.workspace,
+    scopes: ["vcstudio:read", "vcstudio:edit", "vcstudio:publish"],
+  });
+}, 30000);
+afterAll(async () => {
+  await pg.close();
+});
+function operationInput(
+  key: string,
+  status: "requires_approval" | "queued" | "approved" = "requires_approval",
+) {
+  return {
+    workspaceId: mcpIds.workspace,
+    connectionId,
+    userId: mcpIds.user,
+    kind: "publish_post",
+    idempotencyKey: key,
+    fingerprint: "fingerprint",
+    status,
+    input: {},
+    approvalHash: "proof-hash",
+    expiresAt: new Date(Date.now() + 60000),
+  };
+}
+describe("MCP SQL and migration behavior", () => {
+  it("applies only the additive MCP migration and preserves existing tables", async () => {
+    const [row] = (
+      await pg.query<{ count: number }>(
+        "select count(*)::int as count from social_posts",
+      )
+    ).rows;
+    expect(row.count).toBe(1);
+  });
+  it("enforces workspace grants and idempotency uniqueness in PostgreSQL", async () => {
+    const first = await beginMcpOperation(operationInput("unique-request"));
+    const second = await beginMcpOperation(operationInput("unique-request"));
+    expect(first.created).toBe(true);
+    expect(second.created).toBe(false);
+    expect(second.operation.id).toBe(first.operation.id);
+    await expect(
+      beginMcpOperation({
+        ...operationInput("foreign-workspace"),
+        workspaceId: "88888888-8888-4888-8888-888888888888",
+      }),
+    ).rejects.toThrow();
+  });
+  it("consumes a correct proof exactly once and refuses foreign actors/workspaces", async () => {
+    const { operation } = await beginMcpOperation(
+      operationInput("single-use-proof"),
+    );
+    const base = {
+      operationId: operation.id,
+      workspaceId: mcpIds.workspace,
+      connectionId,
+      userId: mcpIds.user,
+    };
+    expect(
+      await consumeMcpApproval({ ...base, approvalHash: "wrong" }),
+    ).toBeNull();
+    expect(
+      await consumeMcpApproval({
+        ...base,
+        userId: mcpIds.asset,
+        approvalHash: "proof-hash",
+      }),
+    ).toBeNull();
+    expect(
+      (await consumeMcpApproval({ ...base, approvalHash: "proof-hash" }))
+        ?.status,
+    ).toBe("approved");
+    expect(
+      await consumeMcpApproval({ ...base, approvalHash: "proof-hash" }),
+    ).toBeNull();
+  });
+  it("saves text and attachments atomically, protects revisions and blocks edits after approval locking", async () => {
+    const input = {
+      workspaceId: mcpIds.workspace,
+      postId: mcpIds.post,
+      expectedVersion: 1,
+      name: "Imported post",
+      bodyPlainText: "Exact content",
+      bodyDocument: { type: "doc" as const, content: [] },
+      attachments: [{ source: "library" as const, id: mcpIds.asset }],
+    };
+    const result = await updateSocialPostDraft(input);
+    expect(result.outcome).toBe("updated");
+    expect(
+      (await pg.query("select * from social_post_media")).rows,
+    ).toHaveLength(1);
+    const invalid = {
+      ...input,
+      expectedVersion: 2,
+      bodyPlainText: "must roll back",
+      attachments: [
+        {
+          source: "library" as const,
+          id: "99999999-9999-4999-8999-999999999999",
+        },
+      ],
+    };
+    await expect(updateSocialPostDraft(invalid)).rejects.toThrow();
+    const row = (
+      await pg.query<{ version: number; body_plain_text: string }>(
+        "select version,body_plain_text from social_posts",
+      )
+    ).rows[0];
+    expect(row).toEqual({ version: 2, body_plain_text: "Exact content" });
+    const { operation } = await beginMcpOperation(operationInput("lock-post"));
+    expect(
+      await lockMcpPost({
+        workspaceId: mcpIds.workspace,
+        postId: mcpIds.post,
+        expectedVersion: 1,
+        operationId: operation.id,
+      }),
+    ).toBeNull();
+    expect(
+      await lockMcpPost({
+        workspaceId: mcpIds.workspace,
+        postId: mcpIds.post,
+        expectedVersion: 2,
+        operationId: operation.id,
+      }),
+    ).not.toBeNull();
+    expect(
+      (await updateSocialPostDraft({ ...input, expectedVersion: 2 })).outcome,
+    ).toBe("conflict");
+  });
+  it("rechecks current membership and publishing grants when atomically consuming approval", async () => {
+    const { operation } = await beginMcpOperation(
+      operationInput("current-membership"),
+    );
+    const proof = {
+      operationId: operation.id,
+      workspaceId: mcpIds.workspace,
+      connectionId,
+      userId: mcpIds.user,
+      approvalHash: "proof-hash",
+    };
+    await pg.exec("update workspace_members set role = 'viewer'");
+    expect(await consumeMcpApproval(proof)).toBeNull();
+    await pg.exec("update workspace_members set role = 'owner'");
+    await saveMcpGrant({
+      connectionId,
+      userId: mcpIds.user,
+      workspaceId: mcpIds.workspace,
+      scopes: ["vcstudio:read"],
+    });
+    expect(await consumeMcpApproval(proof)).toBeNull();
+    await saveMcpGrant({
+      connectionId,
+      userId: mcpIds.user,
+      workspaceId: mcpIds.workspace,
+      scopes: ["vcstudio:read", "vcstudio:publish"],
+    });
+    expect((await consumeMcpApproval(proof))?.status).toBe("approved");
+  });
+  it("protects brief edits from stale revisions and cross-workspace conflicts", async () => {
+    const input = {
+      workspaceId: mcpIds.workspace,
+      projectId: mcpIds.post,
+      userId: mcpIds.user,
+      topic: "Original brief",
+      targetAudience: "",
+      tone: "",
+      targetDurationSeconds: null,
+      primaryPlatform: "youtube" as const,
+      hookAngle: "",
+      niche: "",
+      expectedUpdatedAt: null,
+    };
+    const revision = await saveProjectBrief(input);
+    expect(revision).toBeInstanceOf(Date);
+    expect(
+      await saveProjectBrief({ ...input, topic: "Stale overwrite" }),
+    ).toBeNull();
+    expect(
+      await saveProjectBrief({
+        ...input,
+        expectedUpdatedAt: revision,
+        workspaceId: "88888888-8888-4888-8888-888888888888",
+      }),
+    ).toBeNull();
+    expect(
+      await saveProjectBrief({
+        ...input,
+        expectedUpdatedAt: revision,
+        topic: "Updated brief",
+      }),
+    ).toBeInstanceOf(Date);
+  });
+  it("deleting a project-owned scene copy preserves the shared library original", async () => {
+    const { operation } = await beginMcpOperation(
+      operationInput("reuse-provenance"),
+    );
+    const imageId = "77777777-7777-4777-8777-777777777777";
+    await pg.query("insert into scene_image_generations values ($1,$2)", [
+      imageId,
+      mcpIds.workspace,
+    ]);
+    await pg.query(
+      "insert into mcp_asset_origins (workspace_id,operation_id,media_asset_id,scene_image_id) values ($1,$2,$3,$4)",
+      [mcpIds.workspace, operation.id, mcpIds.asset, imageId],
+    );
+    await pg.query(
+      "delete from scene_image_generations where id=$1 and workspace_id=$2",
+      [imageId, mcpIds.workspace],
+    );
+    expect(
+      (await pg.query("select * from media_assets where id=$1", [mcpIds.asset]))
+        .rows,
+    ).toHaveLength(1);
+    expect(
+      (
+        await pg.query(
+          "select * from mcp_asset_origins where operation_id=$1",
+          [operation.id],
+        )
+      ).rows,
+    ).toHaveLength(0);
+  });
+  it("claims publication and target replacement atomically, refusing a browser request that races an MCP lock", async () => {
+    const postId = "99999999-9999-4999-8999-999999999999";
+    await pg.query(
+      "insert into social_posts (id,workspace_id) values ($1,$2)",
+      [postId, mcpIds.workspace],
+    );
+    const { operation } = await beginMcpOperation(
+      operationInput("dispatch-lock"),
+    );
+    await lockMcpPost({
+      workspaceId: mcpIds.workspace,
+      postId,
+      expectedVersion: 1,
+      operationId: operation.id,
+    });
+    const input = {
+      workspaceId: mcpIds.workspace,
+      postId,
+      scheduledAt: new Date(),
+      timezone: "UTC",
+      dispatchNow: true,
+      expectedVersion: 1,
+      targets: [
+        {
+          platform: "linkedin" as const,
+          connectionId: mcpIds.asset,
+          overrideBodyPlainText: null,
+          idempotencyKey: "target-key",
+        },
+      ],
+    };
+    expect(await scheduleSocialPost(input)).toBeNull();
+    expect(
+      (
+        await pg.query("select * from social_post_targets where post_id=$1", [
+          postId,
+        ])
+      ).rows,
+    ).toHaveLength(0);
+    expect(
+      (await scheduleSocialPost({ ...input, mcpOperationId: operation.id }))
+        ?.status,
+    ).toBe("publishing");
+    expect(
+      await scheduleSocialPost({ ...input, mcpOperationId: operation.id }),
+    ).toBeNull();
+    expect(
+      (
+        await pg.query("select * from social_post_targets where post_id=$1", [
+          postId,
+        ])
+      ).rows,
+    ).toHaveLength(1);
+  });
+  it("revocation clears queued secrets and pending approvals while retaining approved outbox entries", async () => {
+    const pending = await beginMcpOperation({
+      ...operationInput("cancel-pending", "queued"),
+      sealedSource: "encrypted-source",
+    });
+    const approved = await beginMcpOperation(
+      operationInput("keep-approved", "approved"),
+    );
+    await revokeMcpConnection(connectionId, mcpIds.user);
+    const cancelled = await findMcpOperation({
+      workspaceId: mcpIds.workspace,
+      operationId: pending.operation.id,
+    });
+    expect(cancelled?.status).toBe("cancelled");
+    expect(cancelled?.sealedSource).toBeNull();
+    expect(
+      (
+        await findMcpOperation({
+          workspaceId: mcpIds.workspace,
+          operationId: approved.operation.id,
+        })
+      )?.status,
+    ).toBe("approved");
+  });
+});

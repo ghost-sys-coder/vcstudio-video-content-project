@@ -21,6 +21,9 @@ export function BriefForm({
 }) {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [revision, setRevision] = useState(
+    brief?.updatedAt.toISOString() ?? "",
+  );
   const [pending, startTransition] = useTransition();
 
   return (
@@ -31,11 +34,13 @@ export function BriefForm({
           const result = await saveProjectBriefAction(formData);
           setError(result.error);
           setSaved(result.success);
+          if (result.briefUpdatedAt) setRevision(result.briefUpdatedAt);
         })
       }
       className="space-y-4 rounded-xl border bg-muted/20 p-4"
     >
       <input name="projectId" type="hidden" value={projectId} />
+      <input name="expectedUpdatedAt" type="hidden" value={revision} />
       <div>
         <h2 className="text-sm font-semibold">Content brief</h2>
         <p className="text-xs text-muted-foreground">

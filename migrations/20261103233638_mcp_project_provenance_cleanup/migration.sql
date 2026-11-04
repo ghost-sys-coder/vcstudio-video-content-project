@@ -1,0 +1,1 @@
+ALTER TABLE "mcp_asset_origins" DROP CONSTRAINT "mcp_asset_origins_LLSyoABP9mzJ_fkey", ADD CONSTRAINT "mcp_asset_origins_LLSyoABP9mzJ_fkey" FOREIGN KEY ("scene_image_id","workspace_id") REFERENCES "scene_image_generations"("id","workspace_id") ON DELETE CASCADE;

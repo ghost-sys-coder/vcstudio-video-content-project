@@ -2,6 +2,7 @@ import { schedules } from "@trigger.dev/sdk";
 import { runStorageReconciliation } from "@/lib/reconciliation/run-storage-reconciliation";
 import { getStorageReconciliationEnvironment } from "@/lib/env/server";
 import { dispatchPendingMediaInspections } from "@/lib/media/dispatch-pending-media-inspections";
+import { cleanMcpImports } from "@/lib/mcp/recovery";
 
 export const reconcileStorageTask = schedules.task({
   id: "reconcile-storage-assets",
@@ -28,6 +29,9 @@ export const reconcileStorageTask = schedules.task({
       }),
       dispatchPendingMediaInspections(25),
     ]);
-    return { storage, inspections };
+    const mcp = await cleanMcpImports(
+      environment.STORAGE_RECONCILIATION_DRY_RUN,
+    );
+    return { storage, inspections, mcp };
   },
 });

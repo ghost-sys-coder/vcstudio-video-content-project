@@ -1,6 +1,6 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
 import { users } from "@/db/schema";
 
@@ -10,6 +10,15 @@ export type SynchronizedUserProfile = {
   displayName: string;
   avatarUrl: string | null;
 };
+
+export async function findActiveUserByClerkId(clerkUserId: string) {
+  const [user] = await getDatabase()
+    .select()
+    .from(users)
+    .where(and(eq(users.clerkUserId, clerkUserId), isNull(users.deletedAt)))
+    .limit(1);
+  return user ?? null;
+}
 
 export async function upsertSynchronizedUser(profile: SynchronizedUserProfile) {
   const [user] = await getDatabase()

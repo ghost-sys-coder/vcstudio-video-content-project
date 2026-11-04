@@ -57,6 +57,7 @@ export type ProjectActionState = {
   error: string | null;
   success: boolean;
   revision?: number;
+  briefUpdatedAt?: string;
 };
 
 async function requireProjectMutation(projectId: string) {
@@ -248,6 +249,7 @@ export async function saveProjectBriefAction(
     formData.get("targetDurationSeconds") ?? "",
   ).trim();
   const parsed = briefSchema.safeParse({
+    expectedUpdatedAt: formData.get("expectedUpdatedAt") || null,
     projectId: formData.get("projectId"),
     topic: formData.get("topic") ?? "",
     targetAudience: formData.get("targetAudience") ?? "",
@@ -264,7 +266,7 @@ export async function saveProjectBriefAction(
     };
   try {
     const { context } = await requireProjectMutation(parsed.data.projectId);
-    await saveProjectBrief({
+    const updatedAt = await saveProjectBrief({
       workspaceId: context.activeMembership.workspaceId,
       projectId: parsed.data.projectId,
       topic: parsed.data.topic,
@@ -274,10 +276,23 @@ export async function saveProjectBriefAction(
       primaryPlatform: parsed.data.primaryPlatform,
       hookAngle: parsed.data.hookAngle,
       niche: parsed.data.niche,
+      expectedUpdatedAt: parsed.data.expectedUpdatedAt
+        ? new Date(parsed.data.expectedUpdatedAt)
+        : null,
       userId: context.user.id,
     });
+    if (!updatedAt)
+      return {
+        error:
+          "This brief changed in another session. Refresh before saving again.",
+        success: false,
+      };
     revalidatePath(`/app/projects/${parsed.data.projectId}/script`);
-    return { error: null, success: true };
+    return {
+      error: null,
+      success: true,
+      briefUpdatedAt: updatedAt.toISOString(),
+    };
   } catch {
     return { error: "The brief could not be saved.", success: false };
   }

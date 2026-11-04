@@ -36,6 +36,7 @@ function post(index: number): SocialPost {
     bodyDocument: { type: "doc", content: [] },
     bodyPlainText: "Caption",
     version: 1,
+    mcpOperationId: null,
     scheduledAt: null,
     scheduledTimezone: "UTC",
     projectId: null,

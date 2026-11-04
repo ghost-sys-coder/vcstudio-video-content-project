@@ -143,6 +143,7 @@ export async function createSocialPostForContentItem(input: {
     scheduledAt: null,
     scheduledTimezone: "UTC",
     version: 1,
+    mcpOperationId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -175,8 +176,32 @@ export async function updateSocialPostDraft(input: {
 > {
   const database = getDatabase();
 
-  const [post] = await database
-    .select({ status: socialPosts.status, version: socialPosts.version })
+  // Body, revision and attachments commit together. This also makes the row's
+  // MCP approval lock cover the entire draft rather than only its text.
+  const result = await database.execute<{ id: string }>(sql`
+    with claimed as (
+      update social_posts set name = ${input.name},
+        body_document = ${JSON.stringify(input.bodyDocument)}::jsonb,
+        body_plain_text = ${input.bodyPlainText}, version = version + 1, updated_at = now()
+      where id = ${input.postId}::uuid and workspace_id = ${input.workspaceId}::uuid
+        and version = ${input.expectedVersion} and status in ('draft','scheduled','failed')
+        and mcp_operation_id is null returning id
+    ), removed as (
+      delete from social_post_media using claimed
+      where social_post_media.post_id = claimed.id
+        and social_post_media.workspace_id = ${input.workspaceId}::uuid returning social_post_media.id
+    ), inserted as (
+      insert into social_post_media (post_id, workspace_id, media_asset_id, render_id, position)
+      select claimed.id, ${input.workspaceId}::uuid,
+        case when a.source = 'library' then a.id::uuid end,
+        case when a.source = 'render' then a.id::uuid end, a.position
+      from claimed cross join jsonb_to_recordset(${JSON.stringify(input.attachments.map((a, position) => ({ ...a, position })))}::jsonb) as a(source text, id text, position integer)
+      cross join (select count(*) from removed) removal_barrier returning id
+    ) select id from claimed
+  `);
+  if (!result.rows[0]) return { outcome: "conflict" };
+  const [updated] = await database
+    .select()
     .from(socialPosts)
     .where(
       and(
@@ -185,50 +210,7 @@ export async function updateSocialPostDraft(input: {
       ),
     )
     .limit(1);
-  if (!post) return { outcome: "not_editable" };
-  if (!isEditableStatus(post.status)) return { outcome: "not_editable" };
-
-  const [updated] = await database
-    .update(socialPosts)
-    .set({
-      name: input.name,
-      bodyDocument: input.bodyDocument,
-      bodyPlainText: input.bodyPlainText,
-      version: input.expectedVersion + 1,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(socialPosts.id, input.postId),
-        eq(socialPosts.workspaceId, input.workspaceId),
-        eq(socialPosts.version, input.expectedVersion),
-      ),
-    )
-    .returning();
-  if (!updated) return { outcome: "conflict" };
-
-  // Attachments are replaced wholesale rather than diffed. The list is short and
-  // fully ordered, so a replace is both simpler and immune to the position
-  // collisions a partial update would have to work around.
-  await database
-    .delete(socialPostMedia)
-    .where(
-      and(
-        eq(socialPostMedia.postId, input.postId),
-        eq(socialPostMedia.workspaceId, input.workspaceId),
-      ),
-    );
-  if (input.attachments.length > 0)
-    await database.insert(socialPostMedia).values(
-      input.attachments.map((attachment, position) => ({
-        postId: input.postId,
-        workspaceId: input.workspaceId,
-        mediaAssetId: attachment.source === "library" ? attachment.id : null,
-        renderId: attachment.source === "render" ? attachment.id : null,
-        position,
-      })),
-    );
-
+  if (!updated) return { outcome: "not_editable" };
   return { outcome: "updated", post: updated };
 }
 
