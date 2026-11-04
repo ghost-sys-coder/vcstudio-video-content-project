@@ -133,7 +133,7 @@ The final dependency audit reports 111 advisories: 1 low, 78 moderate, 31 high a
 `trigger.dev -> c12 -> giget`; it predates MCP. Targeted compatible fixes updated
 Next.js/ESLint to 16.4.5, Sharp to 0.35.5, proxy-addr and tar 7. No forced major
 upgrade was applied to the legacy Trigger CLI dependency. This is not a clean
-audit; review that tooling dependency before a controlled deployment.
+audit; the existing CLI dependency remains a separate security follow-up.
 
 | Client          | Remote OAuth/MCP | Native chat files | Interactive approval | Browser/upload fallback |
 | --------------- | ---------------- | ----------------- | -------------------- | ----------------------- |
@@ -142,17 +142,17 @@ audit; review that tooling dependency before a controlled deployment.
 | Claude web      | Not run          | Not run           | Not run              | Local fixtures only     |
 | Claude desktop  | Not run          | Not run           | Not run              | Local fixtures only     |
 
-Release requires checking Clerk's actual ability to issue the exact resource-bound
-JWT, custom scopes, CIMD/PKCE and callback registration, then staging the verified
-migration baseline, web and import worker. The documented Clerk MCP guide does
-not itself prove that this instance's token audience is configured correctly.
-If binding is unavailable, stop setup and resolve it with Clerk; do not accept
-unbound tokens, invent a supported dashboard option or introduce a second auth
-service without an architecture decision. Live public posting needs approval of
-the exact content/accounts. Production database migration is now complete. Vercel Production/Preview and Trigger.dev `prod` now
-explicitly store `ENABLE_MCP=false`. The worker Marketing flag was read back as
-`false`; no worker deployment was performed. No web deployment, worker deployment or public
-post was performed during this release preparation. Marketing remains paused.
+The production database, Clerk resource/scopes and deployment prerequisites are
+complete. The user explicitly approved the controlled rollout on 2026-11-04.
+Production web and Trigger.dev now use `ENABLE_MCP=true`; Vercel Preview, local
+`.env` and `.env.example` remain false. The ignored `.env.vercel` and `.env.trigger`
+files mirror their production flags. Marketing remains paused and the seven
+existing schedule activation states and intervals are unchanged.
+
+Actual consent-based token issuance, exact audience and all client workflows are
+still acceptance gates. Never weaken audience validation to force a connection.
+Live public posting requires approval of the exact content/accounts. Client tests
+must distinguish remote MCP support from chat-file access and review UI support.
 
 ## Clerk configuration verified during release preparation
 
@@ -188,11 +188,50 @@ backfill remain off.
 The Clerk authorization-server metadata returned HTTP 200, advertised CIMD and
 S256, included all five custom scopes, and omitted a dynamic-registration endpoint.
 Actual consent, token issuance/audience and each client workflow still need live
-testing after deployment. Current production web metadata at
-`/.well-known/oauth-protected-resource/mcp` returns 404 because the MCP code has
-not been deployed. The production database is now ready for that web release.
+testing. The deployed web discovery now returns HTTP 200 for the canonical resource.
 
-No Git commit/push, web deployment or worker deployment has occurred in this
-release-preparation step. MCP remains false in both remote runtimes and all local
-runtime files. Enable it only for an approved controlled rollout, with worker
-readiness verified first and user/client workspace grants still required.
+## Controlled production rollout - 2026-11-04
+
+- Implementation commit: `1b463a3c903022954a3314458aab27c7e2b94c46`, pushed to `master`.
+- Web: Vercel `dpl_8sXeKxDq6kAQCiJ77zEtuJg1sGYU`, production READY, about 130 seconds;
+  `https://vcstudio.veilcode.studio` serves that exact source commit.
+- Worker: Trigger.dev `20261104.1`, deployment
+  `deployment_q449zgkwfty5myfoki4kj`, promoted successfully. Its 31 registered tasks
+  include `mcp-media-import`; SDK and CLI are both 4.5.4.
+- Flags: production MCP true; Preview/local/example false. Production worker
+  Marketing false; the existing Vercel Marketing setting was preserved. All three
+  Marketing schedules remain inactive. Shared recovery stays every 30 minutes,
+  storage reconciliation every six hours; no schedules were added.
+- Live read-only checks: protected-resource and authorization-server metadata 200,
+  exact canonical resource and all five scopes, CIMD/S256, unauthenticated POST 401
+  with the resource-metadata challenge, untrusted Origin 403, ChatGPT preflight 204,
+  GET 405, signed-out settings 307, and site framing protection retained.
+- The deployment-scoped error/fatal runtime-log scan returned no groups. This is
+  a short smoke check, not evidence of authenticated end-to-end client acceptance.
+- No manual worker tasks, paid generation or public posts were triggered.
+- Trigger.dev SDK 4.5.4's `envvars.update` helper throws `name is not defined`
+  outside a task. The flag was updated through the same documented PUT API and
+  verified with the SDK's retrieve method; installed dependencies were not edited.
+
+### First client test: ChatGPT web
+
+The user selected ChatGPT web first. Follow OpenAI's current
+[connection instructions](https://developers.openai.com/apps-sdk/deploy/connect-chatgpt):
+
+1. Open [ChatGPT Plugins](https://chatgpt.com/plugins), select **+**, then
+   **Add custom MCP server**. Account/workspace policies can restrict this option.
+2. Name it **VCStudio**, use `https://vcstudio.veilcode.studio/mcp`, choose OAuth,
+   and complete the sign-in/consent flow. Do not use shared workspace credentials.
+3. Start a conversation with VCStudio selected and ask **Check my VCStudio connection**.
+4. Open [AI connections](https://vcstudio.veilcode.studio/app/settings/mcp), select
+   the connection/workspace and grant only the needed permissions. OAuth alone
+   does not grant workspace access.
+5. Ask it to list granted workspaces/projects. Then test importing a known image,
+   assigning it to a scene pending review, and saving text into a draft. Use the
+   secure upload handoff when ChatGPT cannot expose the original file.
+6. Test exact publication/schedule approval only with a chosen eligible account
+   and explicit human approval. Record per-destination results. Do not treat a
+   connected server as proof that native chat-file transfer works.
+
+Real OAuth consent, workspace grants and client journeys have not yet been
+verified; the compatibility matrix above remains intentionally unaccepted.
