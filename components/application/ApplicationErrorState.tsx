@@ -1,7 +1,11 @@
 "use client";
 
+import { useId, useState, useTransition } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AlertTriangleIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/Spinner";
 
 /**
  * Safe error boundary fallback. Shows an actionable, non-technical message and a
@@ -9,6 +13,11 @@ import { Button } from "@/components/ui/button";
  * detail. The underlying exception is reported to the server logs by Next.js.
  */
 export function ApplicationErrorState({ reset }: { reset: () => void }) {
+  const router = useRouter();
+  const [isRetrying, startRetry] = useTransition();
+  const [hasRetried, setHasRetried] = useState(false);
+  const statusId = useId();
+
   return (
     <div className="app-panel mx-auto flex min-h-[50dvh] max-w-md flex-col items-center justify-center gap-4 text-center">
       <span className="flex size-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
@@ -21,20 +30,39 @@ export function ApplicationErrorState({ reset }: { reset: () => void }) {
           dashboard if the problem continues.
         </p>
       </div>
-      <div className="flex gap-2">
-        <Button onClick={reset} type="button">
-          Try again
-        </Button>
+      <div className="flex flex-wrap justify-center gap-2">
         <Button
+          aria-busy={isRetrying}
+          aria-describedby={statusId}
+          disabled={isRetrying}
           onClick={() => {
-            window.location.href = "/app";
+            if (isRetrying) return;
+            setHasRetried(true);
+            startRetry(() => {
+              router.refresh();
+              reset();
+            });
           }}
           type="button"
-          variant="outline"
+        >
+          {isRetrying && <Spinner aria-hidden />}
+          {isRetrying ? "Trying again…" : "Try again"}
+        </Button>
+        <Link
+          href="/app"
+          prefetch={false}
+          className={buttonVariants({ variant: "outline" })}
         >
           Go to dashboard
-        </Button>
+        </Link>
       </div>
+      <p id={statusId} role="status" className="text-sm text-muted-foreground">
+        {isRetrying
+          ? "Reloading this view…"
+          : hasRetried
+            ? "This view is still unavailable. You can try again or return to the dashboard."
+            : ""}
+      </p>
     </div>
   );
 }

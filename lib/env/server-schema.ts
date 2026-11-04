@@ -195,6 +195,31 @@ export const sceneAnalysisEnvironmentSchema = z.object({
     .default(5000),
 });
 
+/** Operational controls do not depend on any generation provider credentials. */
+export const operationalLimitsEnvironmentSchema = z.object({
+  MAX_IMAGES_PER_BATCH: defaultedSetting(
+    z.coerce.number().int().min(1).max(100).default(25),
+  ),
+  MAX_SCENES_PER_AUDIO_BATCH: defaultedSetting(
+    z.coerce.number().int().min(1).max(100).default(25),
+  ),
+  MAX_RENDER_DURATION_SECONDS: defaultedSetting(
+    z.coerce.number().int().min(1).max(7200).default(900),
+  ),
+  MAX_RENDER_ATTEMPTS: defaultedSetting(
+    z.coerce.number().int().min(0).max(3).default(2),
+  ),
+});
+
+/** Empty placeholders use the existing default; explicit invalid values fail. */
+function defaultedSetting<T extends z.ZodType>(schema: T) {
+  return z.preprocess(
+    (value) =>
+      typeof value === "string" && value.trim() === "" ? undefined : value,
+    schema,
+  );
+}
+
 export const sceneImageEnvironmentSchema = z.object({
   OPENAI_API_KEY: z.string().min(1, "OPENAI_API_KEY is required"),
   OPENAI_IMAGE_MODEL: z.string().min(1).default("gpt-image-2"),
@@ -298,7 +323,8 @@ export const sceneImageEnvironmentSchema = z.object({
     .min(1)
     .max(100)
     .default(50),
-  MAX_IMAGES_PER_BATCH: z.coerce.number().int().min(1).max(100).default(25),
+  MAX_IMAGES_PER_BATCH:
+    operationalLimitsEnvironmentSchema.shape.MAX_IMAGES_PER_BATCH,
   GENERATION_RESERVATION_EXPIRY_MINUTES: z.coerce
     .number()
     .int()
@@ -472,12 +498,8 @@ export const sceneAudioEnvironmentSchema = z.object({
     .min(1)
     .max(100)
     .default(50),
-  MAX_SCENES_PER_AUDIO_BATCH: z.coerce
-    .number()
-    .int()
-    .min(1)
-    .max(100)
-    .default(25),
+  MAX_SCENES_PER_AUDIO_BATCH:
+    operationalLimitsEnvironmentSchema.shape.MAX_SCENES_PER_AUDIO_BATCH,
   MAX_NARRATION_CHARACTERS: z.coerce
     .number()
     .int()
@@ -564,13 +586,10 @@ export const renderEnvironmentSchema = z.object({
     .int()
     .positive()
     .default(5),
-  MAX_RENDER_DURATION_SECONDS: z.coerce
-    .number()
-    .int()
-    .min(1)
-    .max(7200)
-    .default(900),
-  MAX_RENDER_ATTEMPTS: z.coerce.number().int().min(0).max(3).default(2),
+  MAX_RENDER_DURATION_SECONDS:
+    operationalLimitsEnvironmentSchema.shape.MAX_RENDER_DURATION_SECONDS,
+  MAX_RENDER_ATTEMPTS:
+    operationalLimitsEnvironmentSchema.shape.MAX_RENDER_ATTEMPTS,
   VIDEO_RENDER_RESERVATION_EXPIRY_MINUTES: z.coerce
     .number()
     .int()

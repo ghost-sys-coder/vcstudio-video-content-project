@@ -14,6 +14,7 @@ import {
   sceneImageEnvironmentSchema,
   sceneVideoEnvironmentSchema,
   sceneAudioEnvironmentSchema,
+  operationalLimitsEnvironmentSchema,
   speechProviderEnvironmentSchema,
   subtitleEnvironmentSchema,
   renderEnvironmentSchema,
@@ -130,6 +131,10 @@ export function getSceneVideoEnvironment(): SceneVideoEnvironment {
 export function getSceneAudioEnvironment(): SceneAudioEnvironment {
   sceneAudioEnvironment ??= sceneAudioEnvironmentSchema.parse(process.env);
   return sceneAudioEnvironment;
+}
+
+export function getOperationalLimitsEnvironment() {
+  return operationalLimitsEnvironmentSchema.parse(process.env);
 }
 
 export function getSpeechProviderEnvironment(): SpeechProviderEnvironment {

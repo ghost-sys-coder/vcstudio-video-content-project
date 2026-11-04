@@ -3,22 +3,19 @@ import "server-only";
 import { getWorkspaceBudgetSettings } from "@/db/repositories/budget-settings.repository";
 import type { BudgetSettingsInput } from "@/lib/budgets/budget-settings";
 import {
-  getSceneAudioEnvironment,
-  getSceneImageEnvironment,
-  getRenderEnvironment,
+  getOperationalLimitsEnvironment,
   getUsageEnvironment,
 } from "@/lib/env/server";
 import type { EffectiveLimits } from "@/lib/budgets/budget-settings";
 import { resolveEffectiveLimits } from "@/lib/budgets/budget-settings";
 
 function limitEnvDefaults() {
+  const environment = getOperationalLimitsEnvironment();
   return {
-    maxImagesPerBatch: getSceneImageEnvironment().MAX_IMAGES_PER_BATCH,
-    maxScenesPerAudioBatch:
-      getSceneAudioEnvironment().MAX_SCENES_PER_AUDIO_BATCH,
-    maxRenderDurationSeconds:
-      getRenderEnvironment().MAX_RENDER_DURATION_SECONDS,
-    maxRetryAttempts: getRenderEnvironment().MAX_RENDER_ATTEMPTS,
+    maxImagesPerBatch: environment.MAX_IMAGES_PER_BATCH,
+    maxScenesPerAudioBatch: environment.MAX_SCENES_PER_AUDIO_BATCH,
+    maxRenderDurationSeconds: environment.MAX_RENDER_DURATION_SECONDS,
+    maxRetryAttempts: environment.MAX_RENDER_ATTEMPTS,
   };
 }
 
