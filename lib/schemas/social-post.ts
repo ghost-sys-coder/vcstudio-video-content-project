@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  MAX_SOCIAL_POST_DESTINATIONS,
+  socialPostConnectionIdsSchema,
+} from "@studio/contracts";
 import { portableDocumentSchema } from "@/lib/social/portable-document";
 import {
   getPlatformPostCapability,
@@ -31,6 +35,8 @@ export const saveSocialPostSchema = z.object({
   expectedVersion: z.coerce.number().int().min(1),
   name: z.string().trim().max(MAX_POST_NAME_LENGTH),
   bodyDocument: portableDocumentSchema,
+  // Omission preserves destinations for older callers; [] explicitly clears them.
+  connectionIds: socialPostConnectionIdsSchema.optional(),
   attachments: z
     .array(socialPostAttachmentRefSchema)
     .max(MAX_MEDIA_ASSETS_PER_POST)
@@ -43,7 +49,7 @@ export const saveSocialPostSchema = z.object({
     }, "The same media cannot be attached twice."),
 });
 
-export const MAX_POST_DESTINATIONS = 10;
+export const MAX_POST_DESTINATIONS = MAX_SOCIAL_POST_DESTINATIONS;
 
 export const socialPostCaptionOverridesSchema = z
   .array(

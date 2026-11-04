@@ -169,6 +169,7 @@ export async function updateSocialPostDraft(input: {
    * post can carry both library uploads and project renders.
    */
   attachments: SocialPostAttachmentRef[];
+  connectionIds?: string[];
 }): Promise<
   | { outcome: "updated"; post: SocialPost }
   | { outcome: "conflict" }
@@ -197,6 +198,18 @@ export async function updateSocialPostDraft(input: {
         case when a.source = 'render' then a.id::uuid end, a.position
       from claimed cross join jsonb_to_recordset(${JSON.stringify(input.attachments.map((a, position) => ({ ...a, position })))}::jsonb) as a(source text, id text, position integer)
       cross join (select count(*) from removed) removal_barrier returning id
+    ), removed_destinations as (
+      delete from social_post_draft_destinations using claimed
+      where social_post_draft_destinations.post_id = claimed.id
+        and social_post_draft_destinations.workspace_id = ${input.workspaceId}::uuid
+        and ${input.connectionIds !== undefined}
+      returning social_post_draft_destinations.connection_id
+    ), inserted_destinations as (
+      insert into social_post_draft_destinations (post_id, workspace_id, connection_id)
+      select claimed.id, ${input.workspaceId}::uuid, destination.id::uuid
+      from claimed cross join jsonb_array_elements_text(${JSON.stringify(input.connectionIds ?? [])}::jsonb) destination(id)
+      cross join (select count(*) from removed_destinations) destination_barrier
+      returning connection_id
     ) select id from claimed
   `);
   if (!result.rows[0]) return { outcome: "conflict" };

@@ -44,6 +44,8 @@ import { requireMcp, McpError } from "./errors";
 import { safeEquals } from "@/lib/crypto/secret-box";
 import { mcpObjectEtag } from "./storage-integrity";
 import { recordAuditEvent } from "@/lib/audit/record-audit-event";
+import { listSocialPostDraftConnectionIds } from "@/db/repositories/social-post-destinations.repository";
+import { beginMcpPublicationWithDestinations } from "@/db/commands/mcp-publication-destinations";
 
 export function publicationAuthority(context: McpContext) {
   return fingerprint({
@@ -270,7 +272,9 @@ export async function prepareMcpPublication(
   if (previous) {
     requireMcp(
       previous.kind === "publish_post" &&
-        fingerprint(previous.input.request) === fingerprint(input),
+        fingerprint(
+          previous.input.originalRequest ?? previous.input.request,
+        ) === fingerprint(input),
       "conflict",
       "That request key belongs to a different preview.",
     );
@@ -280,7 +284,22 @@ export async function prepareMcpPublication(
       uiProof: undefined,
     };
   }
-  const preview = await buildPublicationPreview(context, input);
+  const validatedPreview = await buildPublicationPreview(context, input);
+  const savedIds =
+    input.action === "cancel_schedule"
+      ? []
+      : await listSocialPostDraftConnectionIds({
+          workspaceId: context.workspaceId,
+          postId: input.postId,
+        });
+  const saveDestinations =
+    input.action !== "cancel_schedule" &&
+    fingerprint([...savedIds].sort()) !==
+      fingerprint([...input.connectionIds].sort());
+  const request = saveDestinations
+    ? { ...input, expectedVersion: input.expectedVersion + 1 }
+    : input;
+  const preview = { ...validatedPreview, version: request.expectedVersion };
   const proof = randomBytes(32).toString("base64url");
   const authority = publicationAuthority(context);
   const digest = fingerprint({
@@ -289,18 +308,77 @@ export async function prepareMcpPublication(
     preview,
     authority,
   });
-  const started = await beginMcpOperation({
+  const operationInput = {
     workspaceId: context.workspaceId,
     connectionId: context.connection.id,
     userId: context.principal.userId,
     kind: "publish_post",
     idempotencyKey: input.idempotencyKey,
     fingerprint: digest,
-    input: { request: input, preview, authority },
-    status: "requires_approval",
+    input: { request, originalRequest: input, preview, authority },
+    status: "requires_approval" as const,
     approvalHash: fingerprint(proof),
     expiresAt: new Date(Date.now() + 600_000),
-  });
+  };
+  let started;
+  try {
+    started = saveDestinations
+      ? await beginMcpPublicationWithDestinations({
+          ...operationInput,
+          postId: input.postId,
+          expectedVersion: input.expectedVersion,
+          connectionIds: input.connectionIds,
+        })
+      : await beginMcpOperation(operationInput);
+  } catch (error) {
+    // A concurrent same-key preparation may win the SQL uniqueness race.
+    // The losing transaction rolls back its draft changes before this read.
+    const existing = await findMcpOperationByKey(
+      context.connection.id,
+      context.workspaceId,
+      input.idempotencyKey,
+    );
+    if (!existing) throw error;
+    requireMcp(
+      existing.kind === "publish_post" &&
+        fingerprint(
+          existing.input.originalRequest ?? existing.input.request,
+        ) === fingerprint(input),
+      "conflict",
+      "That request key belongs to a different preview.",
+    );
+    return {
+      operation: publicOperation(existing),
+      preview: publicationPreviewSchema.parse(existing.input.preview),
+      uiProof: undefined,
+    };
+  }
+  if (!started) {
+    const existing = await findMcpOperationByKey(
+      context.connection.id,
+      context.workspaceId,
+      input.idempotencyKey,
+    );
+    if (existing) {
+      requireMcp(
+        existing.kind === "publish_post" &&
+          fingerprint(
+            existing.input.originalRequest ?? existing.input.request,
+          ) === fingerprint(input),
+        "conflict",
+        "That request key belongs to a different preview.",
+      );
+      return {
+        operation: publicOperation(existing),
+        preview: publicationPreviewSchema.parse(existing.input.preview),
+        uiProof: undefined,
+      };
+    }
+    throw new McpError(
+      "conflict",
+      "The draft changed while saving its destinations. Read it again and prepare a fresh preview.",
+    );
+  }
   requireMcp(
     started.operation.fingerprint === digest,
     "conflict",

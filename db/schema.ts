@@ -4622,6 +4622,41 @@ export const socialPostMedia = pgTable(
  * Per-target rather than per-post state is what lets a post report
  * `partially_failed` honestly — see `social_post_status`.
  */
+/** Draft intent only. Publication targets are created after separate approval. */
+export const socialPostDraftDestinations = pgTable(
+  "social_post_draft_destinations",
+  {
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    postId: uuid("post_id").notNull(),
+    connectionId: uuid("connection_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.postId, table.connectionId] }),
+    index("social_post_draft_destinations_workspace_connection_index").on(
+      table.workspaceId,
+      table.connectionId,
+    ),
+    foreignKey({
+      name: "social_post_draft_destinations_tenant_post_fkey",
+      columns: [table.postId, table.workspaceId],
+      foreignColumns: [socialPosts.id, socialPosts.workspaceId],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "social_post_draft_destinations_tenant_connection_fkey",
+      columns: [table.connectionId, table.workspaceId],
+      foreignColumns: [platformConnections.id, platformConnections.workspaceId],
+    }).onDelete("cascade"),
+  ],
+);
+
 export const socialPostTargets = pgTable(
   "social_post_targets",
   {

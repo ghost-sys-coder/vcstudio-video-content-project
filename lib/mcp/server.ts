@@ -166,7 +166,7 @@ export function createVcStudioMcpServer(principal: McpPrincipal) {
     "prepare_publication",
     {
       description:
-        "Prepare an immutable publish/schedule preview for human approval. To cancel an existing schedule use action=cancel_schedule with its current version and exact destination IDs. This executes nothing; the user must approve in the review panel or browser.",
+        "Save chosen destination accounts to the draft and prepare an immutable publish/schedule preview for human approval. This can advance the draft revision and returns its current version. No publication or scheduling executes until human review. To cancel an existing schedule use action=cancel_schedule with its current version and exact destination IDs.",
       inputSchema: mcpPublishInput,
       annotations: {
         readOnlyHint: false,

@@ -13,6 +13,7 @@ for (const [name, entry] of [
   ["harness", "e2e/mcp/fixtures/entry.tsx"],
   ["host", "e2e/mcp/fixtures/host.ts"],
   ["waitlist", "e2e/mcp/fixtures/waitlist-entry.tsx"],
+  ["post-composer", "e2e/mcp/fixtures/post-composer-entry.tsx"],
 ]) {
   const bundle = await build({
     entryPoints: [entry],
@@ -23,6 +24,20 @@ for (const [name, entry] of [
     target: "es2022",
     define: { "process.env.NODE_ENV": '"production"' },
     alias: {
+      ...(name === "post-composer"
+        ? {
+            "next/link": path.resolve("e2e/mcp/fixtures/MockNextLink.tsx"),
+            "next/navigation": path.resolve(
+              "e2e/mcp/fixtures/MockNavigation.ts",
+            ),
+            "@/app/(authenticated)/app/social/posts/actions": path.resolve(
+              "e2e/mcp/fixtures/MockSocialActions.ts",
+            ),
+            "@/app/(authenticated)/app/social/library-actions": path.resolve(
+              "e2e/mcp/fixtures/MockSocialActions.ts",
+            ),
+          }
+        : {}),
       ...(name === "waitlist"
         ? {
             "@clerk/nextjs": path.resolve("e2e/mcp/fixtures/MockClerk.ts"),
@@ -56,6 +71,7 @@ const server = createServer(async (req, res) => {
     "/harness.html": path.join(out, "harness.html"),
     "/review.html": path.resolve("public/mcp/review.html"),
     "/waitlist.html": path.join(out, "waitlist.html"),
+    "/post-composer.html": path.join(out, "post-composer.html"),
   };
   if (!allowed[filename]) {
     res.writeHead(404).end();

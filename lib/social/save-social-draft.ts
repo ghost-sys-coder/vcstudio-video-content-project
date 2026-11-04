@@ -6,6 +6,9 @@ import { updateSocialPostDraft } from "@/db/commands/social-post-commands";
 import { renderPortableDocumentToPlainText } from "@/lib/social/render-plain-text";
 import { requireCapability } from "@/lib/policies/workspace-policy";
 import type { WorkspaceRole } from "@/db/schema";
+import { findSocialPostDestinationConnections } from "@/db/repositories/social-post-destinations.repository";
+import { isSocialPostPlatform } from "./platform-post-capabilities";
+import { SocialDraftDestinationError } from "./social-draft-error";
 
 /** Shared web/MCP save boundary; callers resolve the user's membership first. */
 export async function saveAuthorizedSocialDraft(
@@ -14,6 +17,19 @@ export async function saveAuthorizedSocialDraft(
 ) {
   requireCapability(context.role, "composePosts");
   const input = saveSocialPostSchema.parse(raw);
+  if (input.connectionIds !== undefined) {
+    const connections = await findSocialPostDestinationConnections({
+      workspaceId: context.workspaceId,
+      connectionIds: input.connectionIds,
+    });
+    if (
+      connections.length !== input.connectionIds.length ||
+      connections.some(
+        (connection) => !isSocialPostPlatform(connection.platform),
+      )
+    )
+      throw new SocialDraftDestinationError();
+  }
   const libraryIds = input.attachments
     .filter((a) => a.source === "library")
     .map((a) => a.id);

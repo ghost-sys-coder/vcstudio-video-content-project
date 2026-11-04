@@ -4,10 +4,12 @@ Status: the user agreed to the MCP direction on 2026-11-04 and added external
 content import, project reuse and publishing from AI clients as a core requirement.
 MCP is the next product priority, ahead of the discussed video-generation expansion.
 The original proposal is retained below as the product scope record. The approved
-local implementation now adds the endpoint, authentication boundary and tools;
-deployment and real-client acceptance remain pending.
+v1 endpoint, authentication boundary and tools are deployed for the owner-only
+production pilot. ChatGPT import/reuse and scene-image approval, a real LinkedIn text-and-image publication
+and continued MCP access after the private-access restriction are user-verified.
+Remaining live acceptance is tracked in [MCP setup](mcp-setup.md).
 
-The user approved implementation of the import/reuse/publish plan. Local milestones 1-3 now exist; see [MCP setup and verification](mcp-setup.md) for the implementation, migrations, tests and remaining release gates. The proposal below records product scope, not live client acceptance.
+The user approved implementation of the import/reuse/publish plan. Milestones 1-3 are deployed; see [MCP setup and verification](mcp-setup.md) for the implementation, migrations, tests and remaining acceptance checks. The broader proposal below records candidate future scope; it does not make generation, rendering or administration part of delivered v1.
 
 ## Connection model
 

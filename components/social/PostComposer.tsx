@@ -59,9 +59,13 @@ export function PostComposer({
   );
   const [libraryAssets, setLibraryAssets] = useState<MediaAssetView[]>([]);
   const [version, setVersion] = useState(view.version);
+  const [selectedConnectionIds, setSelectedConnectionIds] = useState(
+    view.connectionIds,
+  );
   const [savedSnapshot, setSavedSnapshot] = useState(() => ({
     plainText: view.bodyPlainText,
     name: view.name,
+    connectionKey: [...view.connectionIds].sort().join(":"),
     attachmentKey: view.attachments
       .map((attachment) => `${attachment.source}:${attachment.asset.id}`)
       .join(":"),
@@ -98,6 +102,8 @@ export function PostComposer({
     .map((attachment) => `${attachment.source}:${attachment.asset.id}`)
     .join(":");
   const hasUnsavedChanges =
+    [...selectedConnectionIds].sort().join(":") !==
+      savedSnapshot.connectionKey ||
     plainText !== savedSnapshot.plainText ||
     name !== savedSnapshot.name ||
     attachmentKey !== savedSnapshot.attachmentKey;
@@ -111,6 +117,7 @@ export function PostComposer({
       data.set("expectedVersion", String(version));
       data.set("name", name);
       data.set("bodyDocument", JSON.stringify(document));
+      data.set("connectionIds", JSON.stringify(selectedConnectionIds));
       for (const attachment of attachments)
         data.append(
           "attachments",
@@ -120,7 +127,12 @@ export function PostComposer({
       const result = await saveSocialPostAction(data);
       if (result.ok) {
         setVersion(result.version);
-        setSavedSnapshot({ plainText, name, attachmentKey });
+        setSavedSnapshot({
+          plainText,
+          name,
+          attachmentKey,
+          connectionKey: [...selectedConnectionIds].sort().join(":"),
+        });
         setSavedAt(new Date().toLocaleTimeString());
       } else setError(result.error);
     });
@@ -295,6 +307,9 @@ export function PostComposer({
             postId={view.id}
             scheduledAt={view.scheduledAt}
             targets={view.targets}
+            selectedIds={selectedConnectionIds}
+            onSelectedIdsChange={setSelectedConnectionIds}
+            saving={pending}
           />
 
           <div>

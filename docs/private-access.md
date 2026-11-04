@@ -38,6 +38,18 @@ existing owner data. Marketing remains paused and LinkedIn Pages remains on hold
 
 ## Verification and operation
 
+Production release `9ae2aa1` was deployed on 2026-11-04. Anonymous live checks
+confirmed the public landing and waitlist, protected-page redirects, API rejection,
+signup redirection, OAuth discovery/challenge and retained framing protection.
+The live waitlist loaded without browser errors or mobile overflow; Dark theme
+and landing waitlist links were also checked without submitting an email.
+
+The user subsequently confirmed that their usual sign-in works, the waitlist
+works, new users attempting to sign in are blocked with clear feedback, and their
+existing MCP connection remains available. Accept these as user-verified live
+results. This does not independently verify both owner sign-ins, additional MCP
+clients or scheduling.
+
 - `npm run env:check` checks that the web-only settings are placed correctly.
 - `npm test` includes fail-closed/default behavior, exact identity matching,
   both approved identities, protected/public paths, API/redirect behavior,

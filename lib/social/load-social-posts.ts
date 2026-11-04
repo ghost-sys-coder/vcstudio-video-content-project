@@ -1,4 +1,5 @@
 import "server-only";
+import { listSocialPostDraftConnectionIds } from "@/db/repositories/social-post-destinations.repository";
 
 import type { SocialPostTarget } from "@/db/schema";
 import { listPlatformConnections } from "@/db/repositories/publishing.repository";
@@ -132,7 +133,7 @@ export async function loadSocialPostComposerView(input: {
   });
   if (!post) return null;
 
-  const [media, targets, connections] = await Promise.all([
+  const [media, targets, connections, connectionIds] = await Promise.all([
     listSocialPostMedia({
       workspaceId: input.workspaceId,
       postId: post.id,
@@ -142,6 +143,7 @@ export async function loadSocialPostComposerView(input: {
       postId: post.id,
     }),
     loadConnectionsByIdAndList(input.workspaceId),
+    listSocialPostDraftConnectionIds(input),
   ]);
 
   const attachments = await Promise.all(
@@ -168,7 +170,19 @@ export async function loadSocialPostComposerView(input: {
     scheduledTimezone: post.scheduledTimezone,
     attachments,
     targets: toTargetViews(targets, connections.byId),
-    availableConnections: connections.postable,
+    connectionIds,
+    availableConnections: [
+      ...connections.postable,
+      ...connectionIds
+        .filter(
+          (id) =>
+            !connections.postable.some((connection) => connection.id === id),
+        )
+        .flatMap((id) => {
+          const connection = connections.byId.get(id);
+          return connection ? [connection] : [];
+        }),
+    ],
     editable: isEditableStatus(post.status),
   };
 }

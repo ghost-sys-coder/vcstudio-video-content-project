@@ -44,6 +44,9 @@ export function PublishPostPanel({
   postId,
   scheduledAt,
   targets,
+  selectedIds,
+  onSelectedIdsChange,
+  saving,
 }: {
   canPublish: boolean;
   attachmentSummary: PostAttachmentSummary;
@@ -53,9 +56,11 @@ export function PublishPostPanel({
   postId: string;
   scheduledAt: string | null;
   targets: SocialPostTargetView[];
+  selectedIds: string[];
+  onSelectedIdsChange: (ids: string[]) => void;
+  saving: boolean;
 }) {
   const router = useRouter();
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [captionOverrides, setCaptionOverrides] = useState<
     Partial<Record<SocialPostPlatform, string>>
   >(() => {
@@ -105,7 +110,6 @@ export function PublishPostPanel({
       data.set("captionOverrides", JSON.stringify(requestCaptionOverrides));
       const result = await publishSocialPostAction(data);
       if (result.ok) {
-        setSelectedIds([]);
         router.refresh();
       } else setError(result.error);
     });
@@ -137,7 +141,13 @@ export function PublishPostPanel({
                 target.connectionId === connection.id &&
                 target.status === "published",
             );
-            const disabled = !canPublish || !eligible || alreadySent || pending;
+            const selected = selectedIds.includes(connection.id);
+            const disabled =
+              !canPublish ||
+              pending ||
+              saving ||
+              (!selected &&
+                (!eligible || alreadySent || connection.status !== "active"));
 
             return (
               <li key={connection.id}>
@@ -147,14 +157,14 @@ export function PublishPostPanel({
                   }`}
                 >
                   <input
-                    checked={selectedIds.includes(connection.id)}
+                    checked={selected}
                     className="mt-0.5"
                     disabled={disabled}
                     onChange={(event) =>
-                      setSelectedIds((current) =>
+                      onSelectedIdsChange(
                         event.target.checked
-                          ? [...current, connection.id]
-                          : current.filter((id) => id !== connection.id),
+                          ? [...selectedIds, connection.id]
+                          : selectedIds.filter((id) => id !== connection.id),
                       )
                     }
                     type="checkbox"
@@ -166,7 +176,12 @@ export function PublishPostPanel({
                     <span className="block truncate text-xs text-muted-foreground">
                       {connection.accountName}
                     </span>
-                    {alreadySent ? (
+                    {connection.status !== "active" ? (
+                      <span className="block text-xs text-muted-foreground">
+                        Reconnect this account before publishing, or remove it
+                        from the draft.
+                      </span>
+                    ) : alreadySent ? (
                       <span className="block text-xs text-muted-foreground">
                         Already sent to this account.
                       </span>

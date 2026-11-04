@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
+import { randomUUID } from "node:crypto";
 import { drizzle } from "drizzle-orm/pglite";
 vi.mock("server-only", () => ({}));
 const shared = vi.hoisted(() => ({ database: undefined as unknown }));
@@ -17,6 +18,8 @@ import { lockMcpPost } from "@/db/commands/mcp-post-lock";
 import { updateSocialPostDraft } from "@/db/commands/social-post-commands";
 import { saveProjectBrief } from "@/db/commands/project-brief.command";
 import { scheduleSocialPost } from "@/db/commands/social-post-schedule-commands";
+import { beginMcpPublicationWithDestinations } from "@/db/commands/mcp-publication-destinations";
+import { listSocialPostDraftConnectionIds } from "@/db/repositories/social-post-destinations.repository";
 import { mcpIds } from "@/lib/test-utils/mcp-fixtures";
 const pg = new PGlite();
 let connectionId: string;
@@ -29,7 +32,8 @@ beforeAll(async () => {
     create table project_briefs (id uuid primary key default gen_random_uuid(), workspace_id uuid not null, project_id uuid unique, topic text, target_audience text, tone text, target_duration_seconds integer, primary_platform text, hook_angle text, niche text, updated_by_user_id uuid, created_at timestamptz default now(), updated_at timestamptz);
     create table media_assets (id uuid primary key, workspace_id uuid not null, unique(id, workspace_id));
     create table scene_image_generations (id uuid primary key, workspace_id uuid not null, unique(id, workspace_id));
-    create table social_posts (id uuid primary key, workspace_id uuid not null, name text not null default '', body_document jsonb not null default '{"type":"doc","content":[]}', body_plain_text text not null default '', status text not null default 'draft', version integer not null default 1, scheduled_at timestamptz, scheduled_timezone text not null default 'UTC', project_id uuid, created_by_user_id uuid, created_at timestamptz default now(), updated_at timestamptz default now());
+    create table social_posts (id uuid primary key, workspace_id uuid not null, name text not null default '', body_document jsonb not null default '{"type":"doc","content":[]}', body_plain_text text not null default '', status text not null default 'draft', version integer not null default 1, scheduled_at timestamptz, scheduled_timezone text not null default 'UTC', project_id uuid, created_by_user_id uuid, created_at timestamptz default now(), updated_at timestamptz default now(), unique(id, workspace_id));
+    create table platform_connections (id uuid primary key, workspace_id uuid not null, unique(id, workspace_id));
     create table social_post_media (id uuid primary key default gen_random_uuid(), post_id uuid not null references social_posts(id), workspace_id uuid not null, media_asset_id uuid references media_assets(id), render_id uuid, position integer not null, unique(post_id,position));
     create type content_platform as enum ('linkedin');
     create table social_post_targets (id uuid primary key default gen_random_uuid(), post_id uuid not null references social_posts(id), workspace_id uuid not null, platform content_platform, connection_id uuid, override_body_plain_text text, idempotency_key text, status text default 'pending', unique(post_id,connection_id));
@@ -38,6 +42,7 @@ beforeAll(async () => {
     insert into workspace_members values ('${mcpIds.workspace}', '${mcpIds.user}', 'owner');
     insert into social_posts (id,workspace_id) values ('${mcpIds.post}','${mcpIds.workspace}');
     insert into media_assets values ('${mcpIds.asset}','${mcpIds.workspace}');
+    insert into platform_connections values ('${mcpIds.destination}','${mcpIds.workspace}');
   `);
   await pg.exec(
     await readFile(
@@ -55,6 +60,12 @@ beforeAll(async () => {
   await pg.exec(
     await readFile(
       "migrations/20261103233638_mcp_project_provenance_cleanup/migration.sql",
+      "utf8",
+    ),
+  );
+  await pg.exec(
+    await readFile(
+      "migrations/20261104104742_social_post_draft_destinations/migration.sql",
       "utf8",
     ),
   );
@@ -98,10 +109,177 @@ function operationInput(
   };
 }
 describe("MCP SQL and migration behavior", () => {
+  it("restores, preserves and clears selected draft accounts with revision protection and no dispatch targets", async () => {
+    const postId = randomUUID();
+    await pg.query("insert into social_posts(id,workspace_id) values ($1,$2)", [
+      postId,
+      mcpIds.workspace,
+    ]);
+    const input = {
+      workspaceId: mcpIds.workspace,
+      postId,
+      expectedVersion: 1,
+      name: "Saved accounts",
+      bodyPlainText: "Draft",
+      bodyDocument: { type: "doc" as const, content: [] },
+      attachments: [],
+      connectionIds: [mcpIds.destination],
+    };
+    expect((await updateSocialPostDraft(input)).outcome).toBe("updated");
+    expect(await listSocialPostDraftConnectionIds(input)).toEqual([
+      mcpIds.destination,
+    ]);
+    expect(
+      (
+        await updateSocialPostDraft({
+          ...input,
+          expectedVersion: 2,
+          connectionIds: undefined,
+        })
+      ).outcome,
+    ).toBe("updated");
+    expect(await listSocialPostDraftConnectionIds(input)).toEqual([
+      mcpIds.destination,
+    ]);
+    expect(
+      (
+        await updateSocialPostDraft({
+          ...input,
+          expectedVersion: 3,
+          connectionIds: [],
+        })
+      ).outcome,
+    ).toBe("updated");
+    expect(await listSocialPostDraftConnectionIds(input)).toEqual([]);
+    expect(
+      (await updateSocialPostDraft({ ...input, expectedVersion: 3 })).outcome,
+    ).toBe("conflict");
+    expect(await listSocialPostDraftConnectionIds(input)).toEqual([]);
+    expect(
+      (
+        await pg.query("select * from social_post_targets where post_id=$1", [
+          postId,
+        ])
+      ).rows,
+    ).toHaveLength(0);
+  });
+  it("rolls back the whole draft save for a cross-workspace destination", async () => {
+    const postId = randomUUID(),
+      foreignId = randomUUID();
+    await pg.query("insert into social_posts(id,workspace_id) values ($1,$2)", [
+      postId,
+      mcpIds.workspace,
+    ]);
+    await pg.query("insert into platform_connections values ($1,$2)", [
+      foreignId,
+      "88888888-8888-4888-8888-888888888888",
+    ]);
+    const input = {
+      workspaceId: mcpIds.workspace,
+      postId,
+      expectedVersion: 1,
+      name: "Original",
+      bodyPlainText: "Original",
+      bodyDocument: { type: "doc" as const, content: [] },
+      attachments: [],
+      connectionIds: [mcpIds.destination],
+    };
+    await updateSocialPostDraft(input);
+    await expect(
+      updateSocialPostDraft({
+        ...input,
+        expectedVersion: 2,
+        name: "Must roll back",
+        connectionIds: [foreignId],
+      }),
+    ).rejects.toThrow();
+    expect(
+      (
+        await pg.query("select name,version from social_posts where id=$1", [
+          postId,
+        ])
+      ).rows[0],
+    ).toEqual({ name: "Original", version: 2 });
+    expect(await listSocialPostDraftConnectionIds(input)).toEqual([
+      mcpIds.destination,
+    ]);
+    expect(
+      await listSocialPostDraftConnectionIds({
+        ...input,
+        workspaceId: "88888888-8888-4888-8888-888888888888",
+      }),
+    ).toEqual([]);
+  });
+  it("commits MCP destination intent, its revision and approval operation atomically without scheduling", async () => {
+    const postId = randomUUID(),
+      secondPostId = randomUUID();
+    await pg.query(
+      "insert into social_posts(id,workspace_id) values ($1,$3),($2,$3)",
+      [postId, secondPostId, mcpIds.workspace],
+    );
+    const input = {
+      ...operationInput(`destination-preview-${postId}`),
+      postId,
+      expectedVersion: 1,
+      connectionIds: [mcpIds.destination],
+      input: {
+        request: { postId, expectedVersion: 2 },
+        preview: { version: 2 },
+      },
+    };
+    const result = await beginMcpPublicationWithDestinations(input);
+    expect(result?.operation.status).toBe("requires_approval");
+    expect(result?.operation.input.request).toEqual({
+      postId,
+      expectedVersion: 2,
+    });
+    expect(await listSocialPostDraftConnectionIds(input)).toEqual([
+      mcpIds.destination,
+    ]);
+    expect(
+      (
+        await pg.query(
+          "select version,status,scheduled_at from social_posts where id=$1",
+          [postId],
+        )
+      ).rows[0],
+    ).toEqual({ version: 2, status: "draft", scheduled_at: null });
+    expect(
+      await beginMcpPublicationWithDestinations({
+        ...input,
+        idempotencyKey: "stale-destination-preview",
+      }),
+    ).toBeNull();
+    // Reusing a request key for another post must roll back its intent/revision.
+    await expect(
+      beginMcpPublicationWithDestinations({ ...input, postId: secondPostId }),
+    ).rejects.toThrow();
+    expect(
+      await listSocialPostDraftConnectionIds({
+        ...input,
+        postId: secondPostId,
+      }),
+    ).toEqual([]);
+    expect(
+      (
+        await pg.query("select version from social_posts where id=$1", [
+          secondPostId,
+        ])
+      ).rows[0],
+    ).toEqual({ version: 1 });
+    expect(
+      (
+        await pg.query("select * from social_post_targets where post_id=$1", [
+          postId,
+        ])
+      ).rows,
+    ).toHaveLength(0);
+  });
   it("applies only the additive MCP migration and preserves existing tables", async () => {
     const [row] = (
       await pg.query<{ count: number }>(
-        "select count(*)::int as count from social_posts",
+        "select count(*)::int as count from social_posts where id=$1 and workspace_id=$2",
+        [mcpIds.post, mcpIds.workspace],
       )
     ).rows;
     expect(row.count).toBe(1);
@@ -156,9 +334,16 @@ describe("MCP SQL and migration behavior", () => {
       bodyPlainText: "Exact content",
       bodyDocument: { type: "doc" as const, content: [] },
       attachments: [{ source: "library" as const, id: mcpIds.asset }],
+      connectionIds: [mcpIds.destination],
     };
     const result = await updateSocialPostDraft(input);
     expect(result.outcome).toBe("updated");
+    expect(
+      await listSocialPostDraftConnectionIds({
+        workspaceId: mcpIds.workspace,
+        postId: mcpIds.post,
+      }),
+    ).toEqual([mcpIds.destination]);
     expect(
       (await pg.query("select * from social_post_media")).rows,
     ).toHaveLength(1);
@@ -176,7 +361,8 @@ describe("MCP SQL and migration behavior", () => {
     await expect(updateSocialPostDraft(invalid)).rejects.toThrow();
     const row = (
       await pg.query<{ version: number; body_plain_text: string }>(
-        "select version,body_plain_text from social_posts",
+        "select version,body_plain_text from social_posts where id=$1 and workspace_id=$2",
+        [mcpIds.post, mcpIds.workspace],
       )
     ).rows[0];
     expect(row).toEqual({ version: 2, body_plain_text: "Exact content" });

@@ -8,14 +8,20 @@ const mocks = vi.hoisted(() => ({
   media: vi.fn(),
   connections: vi.fn(),
   sign: vi.fn(),
+  post: vi.fn(),
+  draftIds: vi.fn(),
+  postTargets: vi.fn(),
+}));
+vi.mock("@/db/repositories/social-post-destinations.repository", () => ({
+  listSocialPostDraftConnectionIds: mocks.draftIds,
 }));
 vi.mock("@/db/repositories/social-posts.repository", () => ({
   listSocialPosts: mocks.posts,
   listSocialPostTargetsForPosts: mocks.targets,
   listSocialPostMediaSummaries: mocks.summaries,
   listSocialPostMedia: mocks.media,
-  listSocialPostTargets: vi.fn(),
-  findSocialPost: vi.fn(),
+  listSocialPostTargets: mocks.postTargets,
+  findSocialPost: mocks.post,
 }));
 vi.mock("@/db/repositories/publishing.repository", () => ({
   listPlatformConnections: mocks.connections,
@@ -26,7 +32,10 @@ vi.mock("@/db/commands/social-post-commands", () => ({
 vi.mock("@/lib/storage/media-asset-storage", () => ({
   createMediaAssetDownloadUrl: mocks.sign,
 }));
-import { loadSocialPostsView } from "./load-social-posts";
+import {
+  loadSocialPostsView,
+  loadSocialPostComposerView,
+} from "./load-social-posts";
 function post(index: number): SocialPost {
   return {
     id: `post-${index}`,
@@ -49,6 +58,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.targets.mockResolvedValue([]);
   mocks.connections.mockResolvedValue([]);
+  mocks.draftIds.mockResolvedValue([]);
+  mocks.postTargets.mockResolvedValue([]);
   mocks.summaries.mockResolvedValue(
     new Map([
       [
@@ -64,6 +75,34 @@ beforeEach(() => {
   mocks.sign.mockResolvedValue("signed-preview");
 });
 describe("post list loading", () => {
+  it("restores saved destination IDs, including an unavailable account the user can remove", async () => {
+    mocks.post.mockResolvedValue(post(0));
+    mocks.media.mockResolvedValue([]);
+    mocks.draftIds.mockResolvedValue(["saved"]);
+    mocks.connections.mockResolvedValue([
+      {
+        id: "saved",
+        platform: "linkedin",
+        status: "revoked",
+        externalAccountName: "Saved profile",
+        externalAccountId: "urn:li:person:1",
+      },
+      {
+        id: "other",
+        platform: "linkedin",
+        status: "active",
+        externalAccountName: "Other profile",
+        externalAccountId: "urn:li:person:2",
+      },
+    ]);
+    const input = { workspaceId: "authorized", postId: "post-0" };
+    const view = await loadSocialPostComposerView(input);
+    expect(view?.connectionIds).toEqual(["saved"]);
+    expect(
+      view?.availableConnections.map((connection) => connection.id),
+    ).toEqual(["other", "saved"]);
+    expect(mocks.draftIds).toHaveBeenCalledWith(input);
+  });
   it.each([1, 50])(
     "uses one summary query for %s posts and skips unused previews",
     async (count) => {

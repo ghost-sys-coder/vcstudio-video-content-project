@@ -1,8 +1,13 @@
 # VCStudio MCP v1 setup and verification
 
-Connection, import/reuse and publication milestones are implemented locally.
-Keep the endpoint disabled until the release gates below are complete. No live
-acceptance on ChatGPT or Claude is claimed by the local tests.
+Connection, import/reuse and publication milestones are deployed for controlled
+owner-only production use. Production web and worker MCP are enabled; local and
+Preview defaults remain disabled. User verification covers ChatGPT connection,
+workspace reads, image import/Social draft, desktop project reuse, explicit
+scene-image approval and the first real LinkedIn text-and-image publication. Private access and continued MCP
+availability are also user-verified. The remaining client and workflow checks
+below are distinct from the completed deployment; local tests alone do not prove
+live client compatibility.
 
 ## Delivered milestones
 
@@ -13,9 +18,135 @@ acceptance on ChatGPT or Claude is claimed by the local tests.
    copies. Whole-image contain fitting is the default; review remains explicit.
 3. Publishing: Social drafts, destination validation, exact preview, MCP Apps or
    browser approval, scheduling, cancellation and per-destination status.
-4. Release verification: local protocol, PostgreSQL, provider/worker mocks and
-   responsive browser checks exist. Real client acceptance and deployment remain
-   pending; local browser fixtures do not prove OAuth or native client support.
+4. Release verification: production prerequisites, deployment and anonymous live
+   checks passed. Local protocol, PostgreSQL, provider/worker mocks and responsive
+   browser checks passed. ChatGPT live acceptance is partial; Claude and the
+   remaining journeys below still need individual verification.
+
+## Remaining live acceptance
+
+- Prepare a real scheduled Social post with exact content, destination, local
+  time, timezone and UTC instant. Human approval is required before scheduling.
+  Verify the calendar/status, then exercise cancellation through its own review.
+  Do not schedule another copy of the already-published test post by default.
+- Test Claude web and desktop separately: OAuth, workspace grants, reads,
+  import or documented upload fallback, and the review/browser fallback.
+  Distinguish unsupported remote connections from unavailable chat-file access.
+- Verify desktop file import and signed-in browser upload/review handoffs. Reuse
+  of an existing library image does not establish native desktop file transfer.
+
+Scheduling, revocation preserving approved schedules, stale/replayed approvals,
+workspace isolation and failed-target retry already have mocked/service or
+isolated PostgreSQL coverage. That evidence does not replace live journey results.
+Use existing assets and provider-free edits where possible. Live scheduling or
+publication still requires review of the exact content, destination and time;
+new generation, rendering and administration are outside v1.
+
+### Scene-image approval passed - 2026-11-04
+
+The user chose to finish MCP verification before video-generation planning. A
+bounded, exact-workspace production read confirmed the existing **MCP reuse test**
+fixture initially had approved scene version 1 and a successfully imported,
+zero-cost image awaiting review:
+
+- Project: `347cddbd-db2c-473d-939a-488111fc49e0`.
+- Scene: `afa983f5-da55-45a7-8596-1bed0cb0b448`.
+- Image generation: `0726730b-13f6-4208-b035-b982dd1c06f2`.
+- Before review: `status=succeeded`, `review_status=pending`, `reviewed_at=null`.
+
+The user ran the exact `review_scene_image` approval prompt in their connected
+ChatGPT conversation and reported an approved read-back. A second bounded,
+workspace/project/scene/image-scoped production read corroborated:
+
+- `review_status=approved`, processing succeeded and actual cost remains zero.
+- Approval operation `fc793b85-0aef-47cd-a0c1-b95e958afb41` is `review_image`,
+  succeeded and records the exact generation with `approved=true`.
+- The recorded reviewer matches the operation actor.
+- The library original remains ready and undeleted; the independent project-owned
+  copy and `contain` framing are preserved. No object keys or credentials were
+  selected into the result.
+- The project remains draft with a zero budget and approved scene version 1.
+  The client reports no generation, rendering, publication or scheduling.
+
+Accept scene-image approval as passed. No VCStudio connector tools are exposed
+to the coding session, so future live client calls still require the user's
+connected client. Do not substitute direct SQL mutations or collect session tokens.
+
+### Current live step: scheduling and cancellation
+
+The next prompt prepares a new text-only Social draft, **VCStudio — building with
+boundaries**, for the personal LinkedIn account. Its relevant copy discusses
+private rollout and explicit content decisions. Proposed time: 11 November 2026,
+10:00 Africa/Kampala (`2026-11-11T07:00:00Z`). The published post must not be
+edited or reused. Preparation stops before approval; the user must inspect and
+approve the exact review panel. The saved schedule and calendar entry are still
+pending verification, followed by separately reviewed cancellation. Do not treat
+the proposed time or the assistant's text as approval. If a preview expires,
+prepare a fresh one for the same draft rather than creating duplicate drafts.
+
+The user reported draft creation. A bounded production read found one matching
+post, `9206ff25-759c-4d9d-9913-64a646306288`, version 2, still `draft`, with no
+scheduled instant, attachments or destination records. Preview operation
+`7d4f1baa-c686-46d2-9d68-6547c5265e56` is `requires_approval` and records the
+intended UTC instant and Africa/Kampala timezone. Draft creation and schedule
+preparation are verified; scheduling execution and cancellation remain pending.
+The user was given the authenticated browser review URL to complete the required
+human approval, or request a fresh preview for this same post if it has expired.
+
+### Destination persistence defect discovered during live verification
+
+Scheduling acceptance is paused while correcting a confirmed draft-persistence
+bug. The composer kept checked accounts in component-local state, while its save
+payload and database command persisted only copy/media. MCP preview preparation
+kept the requested account inside its operation but did not save draft intent.
+Thus a correct preview and an empty composer selection could coexist, and a
+manual selection disappeared after Save draft plus reload.
+
+The corrective implementation adds `social_post_draft_destinations`, separately
+from dispatch targets. Browser saves commit selected accounts with copy/media and
+the same optimistic revision; omitted IDs preserve them and an explicit empty
+list clears them. The shared save validates workspace ownership, with composite
+foreign keys enforcing both post and account tenancy. Composer and `get_post`
+reads return the saved IDs, including unavailable selections for explicit removal.
+
+`save_post` accepts optional `connectionIds`. When `prepare_publication` changes
+the chosen accounts, one SQL transaction saves that intent, advances the draft
+revision and creates the exact approval operation. Retries bind to the original
+request while the preview uses the new revision; concurrent key/revision failures
+cannot partially change another draft or mint another approval proof. No dispatch
+target, schedule or provider task is created before separate human approval.
+Cancellation and previously approved schedules keep their existing dispatch path.
+
+Generated migration `20261104104742_social_post_draft_destinations` adds the table
+and tenant constraints and backfills existing targets without altering them. It
+passed isolated PostgreSQL tests and a temporary production-clone check: all 14
+valid existing choices were copied, all three foreign keys and the matching
+Drizzle ledger entry exist, and post/target counts and content/state digests match
+production. The test draft stays a draft with no targets. Production application
+of this migration and the corrective web deployment remain pending.
+
+Corrective verification passed: 2,830 Vitest tests (162 intentionally skipped),
+all 15 isolated Playwright journeys, TypeScript, full lint with four existing
+warnings, focused lint after the final error-handling changes, environment
+placement, changed-file formatting/secret review and the production build. The
+first full test run hit an unrelated five-second PDF extraction timeout while
+lint/TypeScript were also running; the complete rerun passed with
+`npm test -- --maxWorkers=2 --testTimeout=15000`. Provider and worker calls remain
+mocked. The tested migration hash matches the generated file exactly.
+
+After deployment, refresh the client's tool metadata, read the existing test
+post's current revision and prepare a fresh preview for the same account/time.
+Confirm that account is selected in the composer, then manually save/change/clear
+a choice and reload to verify persistence before continuing scheduling acceptance.
+Do not approve an old pre-fix preview or create another copy of the test draft.
+
+For the later Claude checks, follow the current official
+[custom remote connector instructions](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp),
+use the canonical `https://vcstudio.veilcode.studio/mcp` URL, OAuth sign-in and
+Claude's published client identity when offered. Grant only the selected owner
+workspace in VCStudio. Start with connection/project reads before any mutation.
+Validate web and desktop separately; support for a remote connector does not
+establish automatic access to chat-generated files.
 
 ## Runtime and authentication
 
@@ -153,8 +284,10 @@ The user has reported a successful authenticated ChatGPT web request through the
 production handler, which enforces the canonical token audience. No raw token was
 collected or separately inspected. Workspace/project reads, one image import and one attached Social draft are verified
 as recorded below. ChatGPT desktop project/script/manual-scene operations and image
-reuse are also verified. Scene-image review, publication and the remaining client
-workflows are still acceptance gates. Never weaken audience validation.
+reuse are also verified, and the user subsequently confirmed a real LinkedIn
+text-and-image publication. Scene-image approval is also now corroborated as
+recorded above. Scheduling and the remaining
+client workflows are still acceptance gates. Never weaken audience validation.
 Live public posting requires approval of the exact content/accounts. Client tests
 must distinguish remote MCP support from chat-file access and review UI support.
 
@@ -395,3 +528,8 @@ cannot bypass `ENABLE_PRIVATE_ACCESS=true` and the configured Clerk owner IDs.
 Outsider OAuth calls return permission denied (HTTP 403). Existing owner scopes,
 workspace grants, connections and approved schedules are preserved. Public OAuth
 discovery remains available. See [private access](private-access.md).
+
+The user subsequently verified normal sign-in, working waitlist registration,
+clear blocking feedback for new users and continued availability of the existing
+MCP connection after private-access release `9ae2aa1`. This confirms access
+continuity, without adding another client-compatibility or scheduling result.

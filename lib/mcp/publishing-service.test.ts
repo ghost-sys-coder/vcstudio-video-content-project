@@ -22,6 +22,14 @@ const m = vi.hoisted(() => ({
   publish: vi.fn(),
   schedule: vi.fn(),
   cancel: vi.fn(),
+  draftDestinations: vi.fn(),
+  prepareDestinations: vi.fn(),
+}));
+vi.mock("@/db/repositories/social-post-destinations.repository", () => ({
+  listSocialPostDraftConnectionIds: m.draftDestinations,
+}));
+vi.mock("@/db/commands/mcp-publication-destinations", () => ({
+  beginMcpPublicationWithDestinations: m.prepareDestinations,
 }));
 vi.mock("@/db/repositories/social-posts.repository", () => ({
   findSocialPost: m.post,
@@ -83,6 +91,11 @@ const request = {
 beforeEach(() => {
   vi.clearAllMocks();
   m.findKey.mockResolvedValue(null);
+  m.draftDestinations.mockResolvedValue([mcpIds.destination]);
+  m.prepareDestinations.mockImplementation(async (input) => ({
+    created: true,
+    operation: mcpOperationFixture(input),
+  }));
   m.post.mockResolvedValue({
     id: mcpIds.post,
     version: 2,
@@ -121,6 +134,47 @@ async function pendingOperation() {
   });
 }
 describe("publication approval boundary", () => {
+  it("persists MCP-chosen draft accounts and advances the exact preview revision without dispatch", async () => {
+    m.draftDestinations.mockResolvedValue([]);
+    const result = await prepareMcpPublication(ctx, request);
+    expect(m.prepareDestinations).toHaveBeenCalledWith(
+      expect.objectContaining({
+        postId: request.postId,
+        expectedVersion: 2,
+        connectionIds: request.connectionIds,
+        input: expect.objectContaining({
+          originalRequest: request,
+          request: { ...request, expectedVersion: 3 },
+          preview: expect.objectContaining({ version: 3 }),
+        }),
+      }),
+    );
+    expect(result.preview.version).toBe(3);
+    expect(m.begin).not.toHaveBeenCalled();
+    expect(m.publish).not.toHaveBeenCalled();
+    expect(m.schedule).not.toHaveBeenCalled();
+  });
+  it("returns the original-key preview after its saved destination revision changed", async () => {
+    m.draftDestinations.mockResolvedValue([]);
+    await prepareMcpPublication(ctx, request);
+    const input = m.prepareDestinations.mock.calls[0]?.[0];
+    m.findKey.mockResolvedValue(mcpOperationFixture(input));
+    const retry = await prepareMcpPublication(ctx, request);
+    expect(retry.preview.version).toBe(3);
+    expect(retry.uiProof).toBeUndefined();
+    expect(m.prepareDestinations).toHaveBeenCalledTimes(1);
+    await expect(
+      prepareMcpPublication(ctx, { ...request, expectedVersion: 3 }),
+    ).rejects.toThrow("different preview");
+  });
+  it("rejects a concurrent destination edit instead of preparing an approval for the wrong revision", async () => {
+    m.draftDestinations.mockResolvedValue([]);
+    m.prepareDestinations.mockResolvedValue(null);
+    await expect(prepareMcpPublication(ctx, request)).rejects.toThrow(
+      "draft changed",
+    );
+    expect(m.publish).not.toHaveBeenCalled();
+  });
   it("prepares exact content without posting and returns a proof separately", async () => {
     const result = await prepareMcpPublication(ctx, request);
     expect(result.preview.text).toBe("Approved exact copy");
@@ -129,6 +183,34 @@ describe("publication approval boundary", () => {
     expect(m.publish).not.toHaveBeenCalled();
     expect(m.schedule).not.toHaveBeenCalled();
   });
+  it.each(["stale_revision", "unique_key_race"])(
+    "returns the winning same-key preview after %s without reissuing its proof",
+    async (mode) => {
+      m.draftDestinations.mockResolvedValue([]);
+      const preview = {
+        ...(await buildPublicationPreview(ctx, request)),
+        version: 3,
+      };
+      const existing = mcpOperationFixture({
+        input: {
+          request: { ...request, expectedVersion: 3 },
+          originalRequest: request,
+          preview,
+          authority: publicationAuthority(ctx),
+        },
+      });
+      m.findKey.mockResolvedValueOnce(null).mockResolvedValue(existing);
+      if (mode === "stale_revision")
+        m.prepareDestinations.mockResolvedValue(null);
+      else
+        m.prepareDestinations.mockRejectedValue(new Error("Unique constraint"));
+      const result = await prepareMcpPublication(ctx, request);
+      expect(result.preview.version).toBe(3);
+      expect(result.uiProof).toBeUndefined();
+      expect(m.publish).not.toHaveBeenCalled();
+      expect(m.schedule).not.toHaveBeenCalled();
+    },
+  );
   it("returns an existing immutable preparation after dispatch rather than recreating it", async () => {
     const op = await pendingOperation();
     m.findKey.mockResolvedValue({ ...op, status: "succeeded" });

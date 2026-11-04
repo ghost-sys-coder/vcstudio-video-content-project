@@ -70,6 +70,7 @@ export type SocialPostComposerView = {
   targets: SocialPostTargetView[];
   /** Connected accounts this workspace could send to, whatever is attached. */
   availableConnections: PostConnectionView[];
+  connectionIds: string[];
   editable: boolean;
 };
 

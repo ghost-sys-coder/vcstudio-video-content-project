@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { socialPostConnectionIdsSchema } from "@studio/contracts";
+import { listSocialPostDraftConnectionIds } from "@/db/repositories/social-post-destinations.repository";
 import {
   mcpMutationInput,
   mcpPageInput,
@@ -15,7 +17,8 @@ import { listMcpPosts } from "@/db/repositories/mcp-content.repository";
 import { saveAuthorizedSocialDraft } from "@/lib/social/save-social-draft";
 import { portableDocumentSchema } from "@/lib/social/portable-document";
 import { requireMcpProject } from "./project-access";
-import { requireMcp } from "./errors";
+import { requireMcp, McpError } from "./errors";
+import { SocialDraftDestinationError } from "@/lib/social/social-draft-error";
 import { mutateOnce } from "./operations";
 import type { McpToolRegistrar } from "./register-tool";
 
@@ -92,9 +95,13 @@ export function registerSocialTools(register: McpToolRegistrar) {
         postId: p.postId,
       });
       requireMcp(post, "not_found", "That post is unavailable.");
-      const [media, targets] = await Promise.all([
+      const [media, targets, connectionIds] = await Promise.all([
         listSocialPostMedia({ workspaceId: ctx.workspaceId, postId: p.postId }),
         listSocialPostTargets({
+          workspaceId: ctx.workspaceId,
+          postId: p.postId,
+        }),
+        listSocialPostDraftConnectionIds({
           workspaceId: ctx.workspaceId,
           postId: p.postId,
         }),
@@ -107,6 +114,7 @@ export function registerSocialTools(register: McpToolRegistrar) {
         status: post.status,
         scheduledAt: post.scheduledAt,
         timezone: post.scheduledTimezone,
+        connectionIds,
         attachments: media.map((a) => ({
           source: a.source,
           id: a.sourceId,
@@ -150,13 +158,14 @@ export function registerSocialTools(register: McpToolRegistrar) {
   );
   register(
     "save_post",
-    "Save exact plain-text post copy and an ordered list of workspace library assets. Requires the current version. Does not publish.",
+    "Save exact post copy, library assets and selected destination connectionIds on the draft. Omit connectionIds to preserve them; [] clears them. Requires the current version. Does not publish or schedule.",
     "vcstudio:edit",
     mcpMutationInput.extend({
       postId: z.uuid(),
       expectedVersion: z.number().int().positive(),
       name: z.string().max(120),
       text: z.string().max(20000),
+      connectionIds: socialPostConnectionIdsSchema.optional(),
       mediaAssetIds: z
         .array(z.uuid())
         .max(20)
@@ -178,6 +187,7 @@ export function registerSocialTools(register: McpToolRegistrar) {
           {
             postId: p.postId,
             expectedVersion: p.expectedVersion,
+            connectionIds: p.connectionIds,
             name: p.name,
             bodyDocument,
             attachments: p.mediaAssetIds.map((id) => ({
@@ -185,7 +195,11 @@ export function registerSocialTools(register: McpToolRegistrar) {
               id,
             })),
           },
-        );
+        ).catch((error: unknown) => {
+          if (error instanceof SocialDraftDestinationError)
+            throw new McpError("destination_unavailable", error.message);
+          throw error;
+        });
         requireMcp(
           saved.outcome === "updated",
           "conflict",

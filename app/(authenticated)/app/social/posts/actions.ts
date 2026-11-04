@@ -28,6 +28,7 @@ import {
   scheduleSocialPostSchema,
 } from "@/lib/schemas/social-post";
 import { saveAuthorizedSocialDraft } from "@/lib/social/save-social-draft";
+import { SocialDraftDestinationError } from "@/lib/social/social-draft-error";
 import { renderPortableDocumentToPlainText } from "@/lib/social/render-plain-text";
 
 export type SaveSocialPostResult =
@@ -86,10 +87,17 @@ export async function saveSocialPostAction(
   formData: FormData,
 ): Promise<SaveSocialPostResult> {
   let bodyDocument: unknown;
+  let connectionIds: unknown;
   try {
     bodyDocument = JSON.parse(String(formData.get("bodyDocument") ?? "null"));
+    const destinations = formData.get("connectionIds");
+    connectionIds =
+      destinations === null ? undefined : JSON.parse(String(destinations));
   } catch {
-    return { ok: false, error: "The post body could not be read." };
+    return {
+      ok: false,
+      error: "The post body or selected accounts could not be read.",
+    };
   }
 
   const parsed = saveSocialPostSchema.safeParse({
@@ -97,6 +105,7 @@ export async function saveSocialPostAction(
     expectedVersion: formData.get("expectedVersion"),
     name: formData.get("name") ?? "",
     bodyDocument,
+    connectionIds,
     // Sent as `source:id` pairs so one repeated field carries both, matching how
     // the rest of this form is encoded.
     attachments: formData
@@ -147,8 +156,14 @@ export async function saveSocialPostAction(
     revalidatePath("/app/social/posts");
     revalidatePath(`/app/social/posts/${parsed.data.postId}`);
     return { ok: true, version: result.post.version, plainText };
-  } catch {
-    return { ok: false, error: "That post could not be saved." };
+  } catch (error) {
+    return {
+      ok: false,
+      error:
+        error instanceof SocialDraftDestinationError
+          ? error.message
+          : "That post could not be saved.",
+    };
   }
 }
 

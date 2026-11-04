@@ -1,5 +1,14 @@
 import { z } from "zod";
 
+export const MAX_SOCIAL_POST_DESTINATIONS = 20;
+export const socialPostConnectionIdsSchema = z
+  .array(z.uuid())
+  .max(MAX_SOCIAL_POST_DESTINATIONS)
+  .refine(
+    (ids) => new Set(ids).size === ids.length,
+    "Choose each account only once.",
+  );
+
 export const mcpScopeSchema = z.enum([
   "vcstudio:read",
   "vcstudio:edit",
@@ -47,11 +56,10 @@ export const mcpPublishInput = mcpMutationInput.extend({
   action: z.enum(["publish", "cancel_schedule"]).optional(),
   postId: z.uuid(),
   expectedVersion: z.number().int().positive(),
-  connectionIds: z
-    .array(z.uuid())
-    .min(1)
-    .max(20)
-    .refine((v) => new Set(v).size === v.length),
+  connectionIds: socialPostConnectionIdsSchema.refine(
+    (ids) => ids.length > 0,
+    "Choose at least one account.",
+  ),
   scheduledAt: z.iso.datetime({ offset: true }).optional(),
   timezone: z.string().max(100).default("UTC"),
 });
