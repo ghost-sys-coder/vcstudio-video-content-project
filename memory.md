@@ -1,5 +1,13 @@
 # Project memory
 
+## Latest work — TikTok sandbox connections and Video Studio badges (5 November 2026)
+
+- User put Google video generation on hold until the required minimum payment is affordable. Do not submit another Google generation, make a payment, enable billing or release the existing 60c unresolved reservation automatically. Google video project `gen-lang-client-0377504214` had `billingEnabled=false`; credits alone did not make its API key paid-tier eligible.
+- Requested prominent coloured badges for “Independent creation” and generation availability, plus a TikTok connect modal taking sandbox app credentials for separate owned accounts. The shadcn dialog uses sandbox Client Key/Client Secret, then real TikTok-hosted login/consent. Each account must already be a sandbox target user (ten per sandbox); no TikTok account passwords are collected.
+- Custom app credentials are encrypted per connection, bound to workspace/external account and omitted from safe read models. Sandbox OAuth has purpose-specific signed state and an encrypted expiring HttpOnly browser cookie. Workers, preflight, refresh and disconnection select the saved account's app; existing production connections retain global app credentials. TikTok remains inbox-only, with no production approval implied.
+- User explicitly approved the production migration and web/worker release. Generated migration `20261105105401_tiktok_sandbox_connection_clients` was applied through Drizzle on the existing test branch and production, with its original hash recorded. Fingerprints across ten business tables stayed unchanged, including all existing connections. No new env variables/dependencies or background schedules. Keep Marketing paused, LinkedIn Pages on hold and private access intact.
+- Verification passed 650 regression tests across 88 files, 33 final targeted checks, all 13 isolated browser journeys, formatting, TypeScript, environment placement, lint (three existing warnings) and the production build. Light/Dark mobile/desktop screenshots were inspected. No real TikTok connection/post or Google generation was used. Setup/release order: `docs/publishing-connections.md#tiktok-sandbox-connections`; final deployment references are recorded in ignored `.vercel/tiktok-release.json` during rollout.
+
 ## Current release: Video Studio follow-up (5 November 2026)
 
 - User explicitly requested: push the current work, merge into production, handle the remaining issues later. Keep this turn limited to release; do not run another Google generation or reopen MCP client acceptance tests.

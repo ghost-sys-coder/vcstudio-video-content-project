@@ -1,5 +1,12 @@
 # Video Studio and project footage
 
+**Current operating hold — 5 November 2026:** the user has deferred live Google
+video generation until the required minimum payment is affordable. The API key's
+project `gen-lang-client-0377504214` was confirmed to have billing disabled; the
+reported promotional credits do not establish paid-tier access. Do not make a
+payment, enable billing or submit another smoke clip automatically. The existing
+failed operation remains reserved until its charge outcome is reconciled.
+
 ## Using the application
 
 Open **Video Studio** in the application sidebar to create a clip without a

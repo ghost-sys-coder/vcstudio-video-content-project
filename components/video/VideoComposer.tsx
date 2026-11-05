@@ -151,7 +151,10 @@ export function VideoComposer({
               </p>
             </div>
           </div>
-          <Badge variant="outline">
+          <Badge
+            variant="outline"
+            className="h-7 border-violet-300 bg-violet-100 px-3 font-semibold text-violet-900 dark:border-violet-700 dark:bg-violet-950 dark:text-violet-200"
+          >
             {target?.kind === "scene"
               ? "Project narration"
               : "Independent creation"}

@@ -2100,6 +2100,8 @@ export const platformConnections = pgTable(
     externalAccountName: text("external_account_name").notNull().default(""),
     externalAccountUrl: text("external_account_url"),
     accessTokenSealed: text("access_token_sealed").notNull(),
+    /** Per-connection TikTok sandbox app credentials; excluded from read models. */
+    oauthClientCredentialsSealed: text("oauth_client_credentials_sealed"),
     /** Null when the platform issues no refresh token (re-consent required). */
     refreshTokenSealed: text("refresh_token_sealed"),
     accessTokenExpiresAt: timestamp("access_token_expires_at", {
@@ -2135,6 +2137,10 @@ export const platformConnections = pgTable(
       table.workspaceId,
       table.platform,
       table.status,
+    ),
+    check(
+      "platform_connections_custom_client_tiktok_only",
+      sql`${table.oauthClientCredentialsSealed} is null or (${table.platform} = 'tiktok' and length(${table.oauthClientCredentialsSealed}) > 0)`,
     ),
   ],
 );

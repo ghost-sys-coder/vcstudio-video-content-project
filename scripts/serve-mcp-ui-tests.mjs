@@ -18,6 +18,7 @@ for (const [name, entry] of [
   ["application-error", "e2e/mcp/fixtures/application-error-entry.tsx"],
   ["queue", "e2e/mcp/fixtures/queue-entry.tsx"],
   ["video", "e2e/mcp/fixtures/video-entry.tsx"],
+  ["tiktok-connect", "e2e/mcp/fixtures/tiktok-connect-entry.tsx"],
 ]) {
   const bundle = await build({
     entryPoints: [entry],
@@ -28,6 +29,12 @@ for (const [name, entry] of [
     target: "es2022",
     define: { "process.env.NODE_ENV": '"production"' },
     alias: {
+      ...(name === "tiktok-connect"
+        ? {
+            "@/app/(authenticated)/app/social/accounts/tiktok-actions":
+              path.resolve("e2e/mcp/fixtures/MockTikTokActions.ts"),
+          }
+        : {}),
       ...(name === "video"
         ? {
             "next/navigation": path.resolve(
@@ -112,6 +119,7 @@ const server = createServer(async (req, res) => {
     "/application-error.html": path.join(out, "application-error.html"),
     "/app/queue": path.join(out, "queue.html"),
     "/video.html": path.join(out, "video.html"),
+    "/tiktok-connect.html": path.join(out, "tiktok-connect.html"),
   };
   if (!allowed[filename]) {
     res.writeHead(404).end();

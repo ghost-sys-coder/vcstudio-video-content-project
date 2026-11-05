@@ -13,6 +13,8 @@ import type {
   PlatformAccount,
   PlatformTokens,
 } from "@/lib/publishing/video-publish-provider";
+import type { TikTokSandboxCredentials } from "@studio/contracts/publishing";
+import { sealTikTokSandboxCredentials } from "@/lib/publishing/tiktok-sandbox-credentials";
 
 /**
  * Store (or re-store) a workspace's authorization for a platform account.
@@ -27,7 +29,10 @@ export async function upsertPlatformConnection(input: {
   account: PlatformAccount;
   tokens: PlatformTokens;
   connectedByUserId: string;
+  tikTokSandboxCredentials?: TikTokSandboxCredentials;
 }): Promise<PlatformConnection> {
+  if (input.tikTokSandboxCredentials && input.platform !== "tiktok")
+    throw new Error("Sandbox credentials are only supported for TikTok.");
   const { PLATFORM_TOKEN_ENCRYPTION_KEY } = getPublishingEnvironment();
   const now = new Date();
   const accessTokenSealed = sealSecret({
@@ -37,6 +42,14 @@ export async function upsertPlatformConnection(input: {
   const refreshTokenSealed = input.tokens.refreshToken
     ? sealSecret({
         plaintext: input.tokens.refreshToken,
+        key: PLATFORM_TOKEN_ENCRYPTION_KEY,
+      })
+    : null;
+  const oauthClientCredentialsSealed = input.tikTokSandboxCredentials
+    ? sealTikTokSandboxCredentials({
+        credentials: input.tikTokSandboxCredentials,
+        workspaceId: input.workspaceId,
+        externalAccountId: input.account.externalAccountId,
         key: PLATFORM_TOKEN_ENCRYPTION_KEY,
       })
     : null;
@@ -50,6 +63,7 @@ export async function upsertPlatformConnection(input: {
       externalAccountName: input.account.externalAccountName,
       externalAccountUrl: input.account.externalAccountUrl,
       accessTokenSealed,
+      oauthClientCredentialsSealed,
       refreshTokenSealed,
       accessTokenExpiresAt: input.tokens.expiresAt,
       scopes: input.tokens.scopes.join(" "),
@@ -66,9 +80,14 @@ export async function upsertPlatformConnection(input: {
         externalAccountName: input.account.externalAccountName,
         externalAccountUrl: input.account.externalAccountUrl,
         accessTokenSealed,
+        oauthClientCredentialsSealed,
         // Google omits the refresh token on re-consent in some flows; keep the
         // stored one rather than nulling a still-valid credential.
-        ...(refreshTokenSealed ? { refreshTokenSealed } : {}),
+        ...(input.platform === "tiktok"
+          ? { refreshTokenSealed }
+          : refreshTokenSealed
+            ? { refreshTokenSealed }
+            : {}),
         accessTokenExpiresAt: input.tokens.expiresAt,
         scopes: input.tokens.scopes.join(" "),
         status: "active",
@@ -163,6 +182,7 @@ export async function disconnectPlatformConnection(input: {
     .set({
       status: "revoked",
       accessTokenSealed: "",
+      oauthClientCredentialsSealed: null,
       refreshTokenSealed: null,
       accessTokenExpiresAt: null,
       lastError: null,

@@ -12,6 +12,31 @@ Where supported, remote authorization revocation is attempted. Provider construc
 
 LinkedIn's current OAuth adapter does not implement remote revocation. Disconnecting it removes this workspace's saved credentials; it does not claim to revoke the member's LinkedIn-side app consent. Adding remote revocation would need a separately verified provider implementation. No new scopes or app credentials are required for this local-disconnection fix.
 
+## TikTok sandbox connections
+
+Connect/Add TikTok opens an accessible shadcn dialog rather than immediately using the global app. Supply the **Client Key and Client Secret from your app's Sandbox tab**. These identify the developer app; account login happens on TikTok's own consent page. The dialog never asks for an account password or an access token.
+
+Before connecting:
+
+1. In [TikTok for Developers](https://developers.tiktok.com/apps/), open the app's Sandbox configuration. Enable Login Kit and Content Posting API with `user.info.basic` and `video.upload`.
+2. Register the **exact callback displayed by the dialog** under Login Kit. It is derived from `APP_BASE_URL` and ends in `/api/tiktok/callback`. Production uses `https://vcstudio.veilcode.studio/api/tiktok/callback`. TikTok requires HTTPS; use an appropriate HTTPS development origin if testing locally, with matching app configuration and authenticated session.
+3. Add every TikTok account you own and want to connect under Sandbox settings → Target users. TikTok currently permits ten target users per sandbox. Adding a target user must be completed in TikTok's developer portal.
+4. Paste the sandbox app credentials into VCStudio, continue to TikTok, and authorize the intended account. If TikTok is signed in to another account, switch accounts there before granting consent. Repeat for each account; existing connections stay intact. Do not overwrite deployment-wide `TIKTOK_API_CLIENT_*` variables to switch accounts.
+
+The server rechecks current workspace ownership and `ENABLE_VIDEO_PUBLISHING` before starting and completing a connection. Credentials are bounded and validated with shared Zod contracts. The sandbox flow uses a distinct signed state purpose and an encrypted, HttpOnly, SameSite=Lax cookie scoped to `/api/tiktok`, expiring within ten minutes. The callback checks signature, purpose, expiry, current user/workspace and the cookie's exact state before exchanging a code. A lost or changed cookie cannot fall back to production credentials. Terminal redirects clear the cookie. Starting another sandbox flow in the same browser supersedes the unfinished one; finish accounts sequentially.
+
+Persisted sandbox credentials use the existing `PLATFORM_TOKEN_ENCRYPTION_KEY`, bound to workspace and external account inside the encrypted value. Safe read projections return `isSandbox` without returning the ciphertext. Sandbox connections appear as **TikTok · Sandbox** on Accounts & connections. Refresh, video/Social upload and remote revocation select the saved app on the server. A malformed or cross-account credential fails closed. Disconnect removes both OAuth tokens and the saved app credentials while retaining publication history. Reauthorizing the same external account updates its row; other accounts and workspaces are untouched.
+
+This uses TikTok's existing OAuth/API endpoints with the sandbox app's credentials, not a fabricated sandbox API host. The normal environment-configured app remains supported for existing production connections. Sandbox credentials are entered through the dialog and do not need new Vercel/Trigger.dev environment variables. Both runtimes still need the same existing encryption key.
+
+**Restrictions remain:** sandbox does not grant public direct posting. VCStudio requests only basic identity and inbox upload permissions; the creator must finish the post in TikTok. This does not claim approval for the production TikTok application. See [TikTok sandbox requirements](https://developers.tiktok.com/docs/en/add-a-sandbox) and [Login Kit web authorization](https://developers.tiktok.com/docs/en/login-kit-web).
+
+### Database and release order
+
+Generated migration `20261105105401_tiktok_sandbox_connection_clients` adds one nullable `platform_connections.oauth_client_credentials_sealed` column and a constraint limiting nonempty custom credentials to TikTok rows. Existing accounts, tokens and publication records are not backfilled or altered. Apply the reviewed migration before starting the updated web app or deploying either publishing worker, then deploy the matching web and worker code together. Do not replay already-applied historical migrations to bypass the existing migration-history gap. Local verification uses isolated PostgreSQL, mocked provider requests and browser fixtures; it never connects or posts to a real TikTok account.
+
+On 5 November 2026 the user explicitly approved production rollout. This migration was verified on the existing Neon test branch and applied to production through Drizzle, preserving its generated SQL hash and ledger entry. Fingerprints across ten business tables, including platform connections, stayed unchanged on both branches.
+
 ## LinkedIn profile and company-page support
 
 **Current status — 2026-11-01:** the user confirmed the dedicated Pages app is **Review in Progress** and put Page-connection work on hold until approval. LinkedIn's public authorization response rejects each required Page scope individually with `invalid_scope_error`. Resume after approval and confirmation that both scopes are available in the app's Auth settings. This hold does not change the personal-profile integration, existing credentials, or feature flags.

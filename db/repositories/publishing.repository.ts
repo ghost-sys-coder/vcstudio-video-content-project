@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
 import {
   platformConnections,
@@ -22,6 +22,7 @@ const connectionSummaryColumns = {
   externalAccountId: platformConnections.externalAccountId,
   externalAccountName: platformConnections.externalAccountName,
   externalAccountUrl: platformConnections.externalAccountUrl,
+  isSandbox: sql<boolean>`${platformConnections.oauthClientCredentialsSealed} is not null`,
   status: platformConnections.status,
   lastError: platformConnections.lastError,
   accessTokenExpiresAt: platformConnections.accessTokenExpiresAt,
@@ -36,6 +37,8 @@ export type PlatformConnectionSummary = {
   externalAccountId: string;
   externalAccountName: string;
   externalAccountUrl: string | null;
+  /** Derived server-side; the sealed app credentials never enter this projection. */
+  isSandbox?: boolean;
   status: PlatformConnection["status"];
   lastError: string | null;
   accessTokenExpiresAt: Date | null;

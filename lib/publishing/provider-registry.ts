@@ -12,6 +12,10 @@ import { InstagramVideoPublishProvider } from "@/lib/publishing/providers/instag
 import { TikTokVideoUploadProvider } from "@/lib/publishing/providers/tiktok-video-upload-provider";
 import { SimulatedVideoPublishProvider } from "@/lib/publishing/providers/simulated-video-publish-provider";
 import type { VideoPublishProvider } from "@/lib/publishing/video-publish-provider";
+import {
+  readTikTokSandboxCredentials,
+  type ConnectionClientContext,
+} from "@/lib/publishing/tiktok-sandbox-credentials";
 
 export class UnsupportedPlatformError extends Error {
   constructor(platform: string) {
@@ -63,7 +67,10 @@ function requireCredential(
  * beyond the connected page token, so they are always configured. In simulation
  * mode every platform is "configured" (the simulator needs no real credentials).
  */
-export function isPlatformConfigured(platform: ContentPlatform): boolean {
+export function isPlatformConfigured(
+  platform: ContentPlatform,
+  connection?: { isSandbox?: boolean },
+): boolean {
   const environment = getPublishingEnvironment();
   if (environment.ENABLE_PUBLISH_SIMULATION) return true;
   switch (platform) {
@@ -73,6 +80,7 @@ export function isPlatformConfigured(platform: ContentPlatform): boolean {
         Boolean(environment.GOOGLE_OAUTH_CLIENT_SECRET?.trim())
       );
     case "tiktok":
+      if (connection?.isSandbox) return true;
       return (
         Boolean(environment.TIKTOK_API_CLIENT_KEY?.trim()) &&
         Boolean(environment.TIKTOK_API_CLIENT_SECRET?.trim())
@@ -110,6 +118,7 @@ export function isPublishablePlatform(platform: ContentPlatform): boolean {
 
 export function createVideoPublishProvider(
   platform: ContentPlatform,
+  connection?: ConnectionClientContext,
 ): VideoPublishProvider {
   const environment = getPublishingEnvironment();
   // Testing/demo: one simulator stands in for every platform, so the publish
@@ -139,17 +148,26 @@ export function createVideoPublishProvider(
       return new InstagramVideoPublishProvider({
         apiVersion: environment.INSTAGRAM_GRAPH_API_VERSION,
       });
-    case "tiktok":
-      return new TikTokVideoUploadProvider({
-        clientKey: requireCredential(
-          environment.TIKTOK_API_CLIENT_KEY,
-          platform,
-        ),
-        clientSecret: requireCredential(
-          environment.TIKTOK_API_CLIENT_SECRET,
-          platform,
-        ),
-      });
+    case "tiktok": {
+      const sandbox = connection
+        ? readTikTokSandboxCredentials(
+            connection,
+            environment.PLATFORM_TOKEN_ENCRYPTION_KEY,
+          )
+        : null;
+      return new TikTokVideoUploadProvider(
+        sandbox ?? {
+          clientKey: requireCredential(
+            environment.TIKTOK_API_CLIENT_KEY,
+            platform,
+          ),
+          clientSecret: requireCredential(
+            environment.TIKTOK_API_CLIENT_SECRET,
+            platform,
+          ),
+        },
+      );
+    }
     // Publishing a *rendered video* to LinkedIn or X is not implemented. Both
     // are reachable through the social post pipeline instead, which is why they
     // are absent from PUBLISHABLE_PLATFORMS and can never reach this function

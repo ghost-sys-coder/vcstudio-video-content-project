@@ -86,7 +86,10 @@ export function VideoStudioPage({
             independently, then bring the result into your production.
           </p>
         </div>
-        <Badge variant="outline" className="h-7 gap-2 px-3">
+        <Badge
+          variant="outline"
+          className={`h-8 gap-2 px-3 text-xs font-semibold ${catalog.enabled ? "border-emerald-300 bg-emerald-100 text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-200" : "border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200"}`}
+        >
           <span
             className={`size-1.5 rounded-full ${catalog.enabled ? "bg-emerald-500" : "bg-amber-500"}`}
           />

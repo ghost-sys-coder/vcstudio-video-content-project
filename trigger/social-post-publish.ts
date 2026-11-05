@@ -210,7 +210,7 @@ export const socialPostPublishTask = task({
         })),
       );
 
-      const provider = createSocialPostProvider(target.platform);
+      const provider = createSocialPostProvider(target.platform, connection);
       const result = await provider.publishPost({
         tokens: { accessToken },
         account: { externalAccountId: connection.externalAccountId },

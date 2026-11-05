@@ -68,7 +68,8 @@ const X_OAUTH_MESSAGES: Record<string, string> = {
 const TIKTOK_OAUTH_MESSAGES: Record<string, string> = {
   connected: "The TikTok account is now connected to this workspace.",
   cancelled: "TikTok connection was cancelled.",
-  failed: "The TikTok account could not be connected. Please try again.",
+  failed:
+    "The TikTok account could not be connected. Check the sandbox credentials, target user, enabled scopes and exact callback, then connect again.",
   forbidden: "You do not have permission to connect that account.",
   invalid: "The TikTok authorization response was invalid or expired.",
 };

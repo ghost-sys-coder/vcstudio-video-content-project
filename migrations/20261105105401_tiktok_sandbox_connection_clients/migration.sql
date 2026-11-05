@@ -1,0 +1,2 @@
+ALTER TABLE "platform_connections" ADD COLUMN "oauth_client_credentials_sealed" text;--> statement-breakpoint
+ALTER TABLE "platform_connections" ADD CONSTRAINT "platform_connections_custom_client_tiktok_only" CHECK ("oauth_client_credentials_sealed" is null or ("platform" = 'tiktok' and length("oauth_client_credentials_sealed") > 0));

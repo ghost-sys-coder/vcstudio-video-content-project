@@ -73,13 +73,6 @@ export async function startVideoPublication(input: {
     throw new VideoPublicationRequestError(
       "Publishing to that platform is not available yet.",
     );
-  // Fail fast with a clear message rather than dispatching a job that would
-  // crash in the worker for a missing server credential.
-  if (!isPlatformConfigured(input.request.platform))
-    throw new VideoPublicationRequestError(
-      "Publishing to that platform isn't configured yet. Contact an administrator.",
-    );
-
   await enforceRateLimit({
     workspaceId: input.workspaceId,
     operation: "video_publication",
@@ -178,6 +171,11 @@ export async function startVideoPublication(input: {
   )
     throw new VideoPublicationRequestError(
       "Connect the account again before publishing.",
+    );
+
+  if (!isPlatformConfigured(input.request.platform, connection))
+    throw new VideoPublicationRequestError(
+      "Publishing to that platform isn't configured yet. Contact an administrator.",
     );
 
   const alreadyPublishing = await countActivePublicationsForRender({

@@ -112,7 +112,10 @@ export const videoPublishTask = task({
         return { publicationId: publication.id, status: "failed" as const };
       }
 
-      const provider = createVideoPublishProvider(publication.platform);
+      const provider = createVideoPublishProvider(
+        publication.platform,
+        connection,
+      );
 
       // Resolve a usable access token, refreshing when it is expired or close to it.
       let accessToken: string;

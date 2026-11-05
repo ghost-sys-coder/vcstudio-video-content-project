@@ -21,6 +21,7 @@ import { TwitterSocialPostProvider } from "@/lib/publishing/providers/twitter-so
 import { YouTubeSocialPostProvider } from "@/lib/publishing/providers/youtube-social-post-provider";
 import type { PlatformOAuthProvider } from "@/lib/publishing/platform-oauth-provider";
 import type { SocialPostProvider } from "@/lib/publishing/social-post-provider";
+import type { ConnectionClientContext } from "@/lib/publishing/tiktok-sandbox-credentials";
 import {
   isSocialPostPlatform,
   type SocialPostPlatform,
@@ -44,7 +45,7 @@ function requireCredential(
  */
 export function isSocialPostPlatformConfigured(
   platform: ContentPlatform,
-  account?: { externalAccountId: string },
+  account?: { externalAccountId: string; isSandbox?: boolean },
 ): boolean {
   const environment = getPublishingEnvironment();
   if (environment.ENABLE_SOCIAL_POST_SIMULATION) return true;
@@ -68,7 +69,7 @@ export function isSocialPostPlatformConfigured(
       Boolean(environment.TWITTER_CLIENT_ID?.trim()) &&
       Boolean(environment.TWITTER_CLIENT_SECRET?.trim())
     );
-  return isPlatformConfigured(platform);
+  return isPlatformConfigured(platform, account);
 }
 
 /**
@@ -120,20 +121,25 @@ export function createLinkedInPagesProvider(): LinkedInPagesProvider {
 }
 
 /** Select credentials from the server-loaded identity, never from browser input. */
-export function createConnectionOAuthProvider(connection: {
-  platform: ContentPlatform;
-  externalAccountId: string;
-}): Pick<PlatformOAuthProvider, "refreshTokens" | "revokeAuthorization"> {
+export function createConnectionOAuthProvider(
+  connection: {
+    platform: ContentPlatform;
+    externalAccountId: string;
+  } & ConnectionClientContext,
+): Pick<PlatformOAuthProvider, "refreshTokens" | "revokeAuthorization"> {
   if (
     connection.platform === "linkedin" &&
     resolveLinkedInAccount(connection.externalAccountId).kind === "page"
   )
     return createLinkedInPagesProvider();
+  if (connection.platform === "tiktok")
+    return createVideoPublishProvider("tiktok", connection);
   return createPlatformOAuthProvider(connection.platform);
 }
 
 export function createSocialPostProvider(
   platform: ContentPlatform,
+  connection?: ConnectionClientContext,
 ): SocialPostProvider {
   if (!isSocialPostPlatform(platform))
     throw new UnsupportedPlatformError(platform);
@@ -164,7 +170,9 @@ export function createSocialPostProvider(
         videoProvider: createVideoPublishProvider("instagram"),
       });
     case "tiktok":
-      return new TikTokSocialPostProvider(createVideoPublishProvider("tiktok"));
+      return new TikTokSocialPostProvider(
+        createVideoPublishProvider("tiktok", connection),
+      );
     case "youtube":
       return new YouTubeSocialPostProvider(
         createVideoPublishProvider("youtube"),
