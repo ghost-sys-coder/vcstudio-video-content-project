@@ -1,5 +1,10 @@
 # Project memory
 
+## Latest work — TikTok repeated authorization (5 November 2026)
+
+- The user confirmed that TikTok reuses the browser's currently logged-in account when trying to connect additional target accounts. The shared provider URL now sends TikTok's documented `disable_auto_auth=1`, covering sandbox and standard authorization. This requires TikTok to show authorization; it does not promise account selection, automatic logout or silent switching. The dialog and setup documentation tell the user to check the displayed identity and switch/log out of TikTok if necessary, using the same sandbox credentials for all target accounts and completing flows sequentially. Existing connected accounts remain independent; reauthorizing the same `open_id` updates only that row.
+- This is a web OAuth/UI follow-up with mocked verification. No schema, environment, dependency, paid provider call, public posting or worker release is required. Marketing remains paused.
+
 ## Latest work — Library attachment save flow (5 November 2026)
 
 - The user confirmed device uploads work but library attachment still does not, and explicitly requested a save button after choosing media. The earlier isolated image test covered local selection then a separate draft save; it did not reproduce a failure in the selection handler. Reproduction with application CSS and 24 items still completed that two-step flow. The picker now makes persistence explicit: **Save to post (N)** calls the existing shared draft save with the next attachment list, current text/name and destination choices, and closes only after successful persistence. A fixed footer stays visible while the grid scrolls; a busy state prevents dismissal/double saves, and failures retain selections. Composer feedback confirms media was saved.

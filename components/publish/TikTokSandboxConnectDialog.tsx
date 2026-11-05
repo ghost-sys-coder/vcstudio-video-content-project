@@ -108,7 +108,8 @@ export function TikTokSandboxConnectDialog({
         <p>
           Add each account under{" "}
           <strong>TikTok for Developers → Sandbox → Target users</strong>. You
-          can connect up to ten target accounts per sandbox, one at a time.
+          can keep up to ten target accounts connected per sandbox. Complete
+          each account&apos;s authorization separately.
         </p>
         <p className="text-muted-foreground">
           Enable Login Kit and Content Posting API with{" "}
@@ -180,8 +181,10 @@ export function TikTokSandboxConnectDialog({
         >
           <LockKeyhole className="mt-0.5 size-4 shrink-0" />
           Credentials stay encrypted. Enter app credentials here; TikTok handles
-          account sign-in on its own page. To add a different account, switch
-          accounts there before authorizing.
+          account sign-in on its own page. TikTok will show authorization each
+          time. Check the account shown before approving. To add another
+          account, switch accounts or log out of TikTok and sign in to the
+          intended account; your existing VCStudio connections stay connected.
         </p>
         <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs leading-relaxed text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
           Sandbox access does not enable public direct posting. Video delivery

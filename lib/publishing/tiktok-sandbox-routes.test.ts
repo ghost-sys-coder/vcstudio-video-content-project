@@ -114,6 +114,7 @@ describe("owner sandbox start and callback with real OAuth provider", () => {
     const url = new URL(result.authorizationUrl);
     expect(url.origin).toBe("https://www.tiktok.com");
     expect(url.searchParams.get("client_key")).toBe("sandbox-app");
+    expect(url.searchParams.get("disable_auto_auth")).toBe("1");
     expect(url.searchParams.get("scope")).toBe("user.info.basic,video.upload");
     expect(result.authorizationUrl).not.toContain("sandbox-secret");
     expect(mocks.cookieSet).toHaveBeenCalledWith(

@@ -44,6 +44,12 @@ describe("TikTokVideoUploadProvider", () => {
     expect(url.origin).toBe("https://www.tiktok.com");
     expect(url.searchParams.get("scope")).toBe("user.info.basic,video.upload");
     expect(url.searchParams.get("scope")).not.toContain("video.publish");
+    expect(url.searchParams.get("disable_auto_auth")).toBe("1");
+    expect(url.searchParams.get("state")).toBe("signed-state");
+    expect(url.searchParams.get("redirect_uri")).toBe(
+      "https://vcstudio.example/api/tiktok/callback",
+    );
+    expect(url.searchParams.has("client_secret")).toBe(false);
   });
 
   it("exchanges OAuth tokens and resolves the connected account", async () => {

@@ -31,6 +31,12 @@ for (const theme of ["light", "dark"])
       const dialog = page.getByRole("dialog");
       await expect(dialog).toBeVisible();
       await expect(
+        dialog.getByText(/Check the account shown before approving/),
+      ).toBeVisible();
+      await expect(
+        dialog.getByText(/keep up to ten target accounts connected/),
+      ).toBeVisible();
+      await expect(
         dialog.getByText("https://studio.example/api/tiktok/callback"),
       ).toBeVisible();
       await expect(dialog.getByLabel("Sandbox Client Secret")).toHaveAttribute(

@@ -177,6 +177,9 @@ export class TikTokVideoUploadProvider implements VideoPublishProvider {
     url.searchParams.set("client_key", this.input.clientKey);
     url.searchParams.set("scope", SCOPES.join(","));
     url.searchParams.set("response_type", "code");
+    // Show consent even for an existing TikTok session so adding another
+    // account cannot silently skip the opportunity to check its identity.
+    url.searchParams.set("disable_auto_auth", "1");
     url.searchParams.set("redirect_uri", request.redirectUri);
     url.searchParams.set("state", request.state);
     return url.toString();

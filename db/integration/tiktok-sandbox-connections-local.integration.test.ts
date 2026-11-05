@@ -112,6 +112,50 @@ describe("sandbox connections on isolated PostgreSQL using real application comm
       /secret-one|secret-two|oauthClientCredentialsSealed|accessTokenSealed/,
     );
   });
+  it("keeps both accounts connected when they share sandbox credentials and one is reauthorized", async () => {
+    const first = await connect(
+      "shared-sandbox-first",
+      "shared-sandbox-secret",
+    );
+    const second = await connect(
+      "shared-sandbox-second",
+      "shared-sandbox-secret",
+    );
+    const reauthorized = await connect(
+      "shared-sandbox-first",
+      "shared-sandbox-secret",
+    );
+    expect(reauthorized.id).toBe(first.id);
+    expect(first.id).not.toBe(second.id);
+    const connections = await listPlatformConnections({ workspaceId });
+    expect(
+      connections.filter((item) => [first.id, second.id].includes(item.id)),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: first.id,
+          status: "active",
+          isSandbox: true,
+        }),
+        expect.objectContaining({
+          id: second.id,
+          status: "active",
+          isSandbox: true,
+        }),
+      ]),
+    );
+    const storedSecond = await findPlatformConnectionWithTokens({
+      workspaceId,
+      connectionId: second.id,
+    });
+    expect(
+      storedSecond && readTikTokSandboxCredentials(storedSecond, key),
+    ).toEqual({
+      clientKey: "sandbox-client",
+      clientSecret: "shared-sandbox-secret",
+    });
+  });
+
   it("retains the same account row and sandbox app during token rotation, then clears every credential on disconnect", async () => {
     const original = await connect("rotation-account", "sandbox-secret");
     const again = await connect("rotation-account", "updated-secret");
