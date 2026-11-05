@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
-const m = vi.hoisted(() => ({ connections: vi.fn(), save: vi.fn() }));
+const m = vi.hoisted(() => ({
+  connections: vi.fn(),
+  save: vi.fn(),
+  assets: vi.fn(),
+}));
 vi.mock("@/db/repositories/social-post-destinations.repository", () => ({
   findSocialPostDestinationConnections: m.connections,
 }));
@@ -8,7 +12,7 @@ vi.mock("@/db/commands/social-post-commands", () => ({
   updateSocialPostDraft: m.save,
 }));
 vi.mock("@/db/repositories/media-assets.repository", () => ({
-  findReadyMediaAssets: vi.fn().mockResolvedValue([]),
+  findDraftAttachableMediaAssets: m.assets,
 }));
 vi.mock("@/db/repositories/video-render.repository", () => ({
   findPublishableRenders: vi.fn().mockResolvedValue([]),
@@ -29,8 +33,37 @@ beforeEach(() => {
     { id: mcpIds.destination, platform: "linkedin" },
   ]);
   m.save.mockResolvedValue({ outcome: "updated" });
+  m.assets.mockResolvedValue([]);
 });
 describe("shared Social draft destinations", () => {
+  it("accepts only workspace-validated draft media, including a pending video", async () => {
+    m.assets.mockResolvedValue([
+      {
+        id: mcpIds.asset,
+        kind: "video",
+        status: "pending",
+        inspectionStatus: "pending",
+      },
+    ]);
+    await saveAuthorizedSocialDraft(context, {
+      ...request,
+      attachments: [{ source: "library", id: mcpIds.asset }],
+    });
+    expect(m.assets).toHaveBeenCalledWith({
+      workspaceId: context.workspaceId,
+      mediaAssetIds: [mcpIds.asset],
+    });
+    expect(m.save).toHaveBeenCalledOnce();
+    m.save.mockClear();
+    m.assets.mockResolvedValue([]);
+    await expect(
+      saveAuthorizedSocialDraft(context, {
+        ...request,
+        attachments: [{ source: "library", id: mcpIds.asset }],
+      }),
+    ).rejects.toThrow("POST_MEDIA_UNAVAILABLE");
+    expect(m.save).not.toHaveBeenCalled();
+  });
   it("saves explicit accounts only after workspace ownership validation", async () => {
     await saveAuthorizedSocialDraft(context, {
       ...request,

@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { Loader2Icon } from "lucide-react";
 import { saveSocialPostAction } from "@/app/(authenticated)/app/social/posts/actions";
+import { getPostMediaStatusAction } from "@/app/(authenticated)/app/social/library-actions";
 import { MediaPickerDialog } from "@/components/social/MediaPickerDialog";
 import { MediaUploadDropzone } from "@/components/social/MediaUploadDropzone";
 import { PlatformPreviewCard } from "@/components/social/PlatformPreviewCard";
@@ -72,6 +73,8 @@ export function PostComposer({
   }));
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [checkingId, setCheckingId] = useState<string | null>(null);
+  const [mediaError, setMediaError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const plainText = useMemo(
@@ -101,12 +104,13 @@ export function PostComposer({
   const attachmentKey = attachments
     .map((attachment) => `${attachment.source}:${attachment.asset.id}`)
     .join(":");
+  const hasUnsavedMedia = attachmentKey !== savedSnapshot.attachmentKey;
   const hasUnsavedChanges =
     [...selectedConnectionIds].sort().join(":") !==
       savedSnapshot.connectionKey ||
     plainText !== savedSnapshot.plainText ||
     name !== savedSnapshot.name ||
-    attachmentKey !== savedSnapshot.attachmentKey;
+    hasUnsavedMedia;
 
   function save() {
     setError(null);
@@ -124,17 +128,23 @@ export function PostComposer({
           `${attachment.source}:${attachment.asset.id}`,
         );
 
-      const result = await saveSocialPostAction(data);
-      if (result.ok) {
-        setVersion(result.version);
-        setSavedSnapshot({
-          plainText,
-          name,
-          attachmentKey,
-          connectionKey: [...selectedConnectionIds].sort().join(":"),
-        });
-        setSavedAt(new Date().toLocaleTimeString());
-      } else setError(result.error);
+      try {
+        const result = await saveSocialPostAction(data);
+        if (result.ok) {
+          setVersion(result.version);
+          setSavedSnapshot({
+            plainText,
+            name,
+            attachmentKey,
+            connectionKey: [...selectedConnectionIds].sort().join(":"),
+          });
+          setSavedAt(new Date().toLocaleTimeString());
+        } else setError(result.error);
+      } catch {
+        setError(
+          "The draft could not be saved. Your changes are still here; try again.",
+        );
+      }
     });
   }
 
@@ -150,6 +160,60 @@ export function PostComposer({
       next.splice(target, 0, moved);
       return next;
     });
+  }
+
+  function attachAssets(assets: MediaAssetView[]) {
+    setAttachments((current) => {
+      const ids = new Set(
+        current
+          .filter((item) => item.source === "library")
+          .map((item) => item.asset.id),
+      );
+      return [
+        ...current,
+        ...assets
+          .filter((asset) => !ids.has(asset.id))
+          .map((asset) => ({
+            asset,
+            source: "library" as const,
+            unavailable: Boolean(
+              asset.inspectionPending || asset.inspectionFailed,
+            ),
+          })),
+      ];
+    });
+    setSavedAt(null);
+  }
+
+  async function checkMediaStatus(assetId: string) {
+    if (checkingId) return;
+    setCheckingId(assetId);
+    setMediaError(null);
+    try {
+      const result = await getPostMediaStatusAction(assetId);
+      if (!result.ok) {
+        setMediaError(result.error);
+        return;
+      }
+      setAttachments((current) =>
+        current.map((item) =>
+          item.source === "library" && item.asset.id === assetId
+            ? {
+                ...item,
+                asset: result.asset,
+                unavailable: Boolean(
+                  result.asset.inspectionPending ||
+                  result.asset.inspectionFailed,
+                ),
+              }
+            : item,
+        ),
+      );
+    } catch {
+      setMediaError("The media status could not be checked. Try again.");
+    } finally {
+      setCheckingId(null);
+    }
   }
 
   return (
@@ -207,7 +271,7 @@ export function PostComposer({
         </p>
       ) : null}
 
-      {error ? (
+      {error && !hasUnsavedMedia ? (
         <p
           aria-live="polite"
           className="rounded-xl border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive"
@@ -251,36 +315,19 @@ export function PostComposer({
                     .filter((attachment) => attachment.source === "library")
                     .map((attachment) => attachment.asset.id)}
                   recentAssets={libraryAssets}
-                  onConfirm={(assets) =>
-                    setAttachments((current) => [
-                      ...current,
-                      ...assets.map((asset) => ({
-                        asset,
-                        source: "library" as const,
-                        unavailable: false,
-                      })),
-                    ])
-                  }
+                  onConfirm={attachAssets}
                 />
               ) : null}
             </div>
-            {view.editable && canUpload ? (
-              <MediaUploadDropzone
-                maxImageBytes={maxImageBytes}
-                maxVideoBytes={maxVideoBytes}
-                onUploaded={(uploaded) => {
-                  setLibraryAssets((current) => [...uploaded, ...current]);
-                  setAttachments((current) => [
-                    ...current,
-                    ...uploaded.map((asset) => ({
-                      asset,
-                      source: "library" as const,
-                      unavailable: false,
-                    })),
-                  ]);
-                }}
-                workspaceId={workspaceId}
-              />
+            {mediaError ? (
+              <p role="alert" className="text-sm text-destructive">
+                {mediaError}
+              </p>
+            ) : null}
+            {error && hasUnsavedMedia ? (
+              <p role="alert" className="text-sm text-destructive">
+                {error}
+              </p>
             ) : null}
             <PostMediaAttachments
               attachments={attachments}
@@ -293,7 +340,40 @@ export function PostComposer({
                   ),
                 )
               }
+              onCheck={(assetId) => void checkMediaStatus(assetId)}
+              checkingId={checkingId}
             />
+            {view.editable && hasUnsavedMedia ? (
+              <div
+                role="status"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/40 bg-amber-500/5 p-3 text-sm text-amber-700 dark:text-amber-500"
+              >
+                <span>
+                  Media changes are ready. Save the draft to keep them.
+                </span>
+                <Button
+                  disabled={pending}
+                  onClick={save}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  {pending ? "Saving…" : "Save draft changes"}
+                </Button>
+              </div>
+            ) : null}
+            {view.editable && canUpload ? (
+              <MediaUploadDropzone
+                maxImageBytes={maxImageBytes}
+                maxVideoBytes={maxVideoBytes}
+                onUploaded={(uploaded) => {
+                  setLibraryAssets((current) => [...uploaded, ...current]);
+                  attachAssets(uploaded);
+                }}
+                onProcessing={attachAssets}
+                workspaceId={workspaceId}
+              />
+            ) : null}
           </div>
         </div>
 
@@ -304,6 +384,9 @@ export function PostComposer({
             canPublish={canPublish}
             connections={view.availableConnections}
             hasUnsavedChanges={hasUnsavedChanges}
+            mediaUnavailable={attachments.some(
+              (attachment) => attachment.unavailable,
+            )}
             postId={view.id}
             scheduledAt={view.scheduledAt}
             targets={view.targets}

@@ -1,6 +1,6 @@
 import "server-only";
 import { saveSocialPostSchema } from "@/lib/schemas/social-post";
-import { findReadyMediaAssets } from "@/db/repositories/media-assets.repository";
+import { findDraftAttachableMediaAssets } from "@/db/repositories/media-assets.repository";
 import { findPublishableRenders } from "@/db/repositories/video-render.repository";
 import { updateSocialPostDraft } from "@/db/commands/social-post-commands";
 import { renderPortableDocumentToPlainText } from "@/lib/social/render-plain-text";
@@ -37,7 +37,7 @@ export async function saveAuthorizedSocialDraft(
     .filter((a) => a.source === "render")
     .map((a) => a.id);
   const [assets, renders] = await Promise.all([
-    findReadyMediaAssets({
+    findDraftAttachableMediaAssets({
       workspaceId: context.workspaceId,
       mediaAssetIds: libraryIds,
     }),

@@ -49,6 +49,46 @@ function makeRender(overrides: Partial<VideoRender> = {}): VideoRender {
 }
 
 describe("toLibraryAttachment", () => {
+  it("marks pending and failed video inspection unavailable for publication", () => {
+    for (const [status, inspectionStatus, field] of [
+      ["pending", "running", "inspectionPending"],
+      ["failed", "failed", "inspectionFailed"],
+    ] as const) {
+      const attachment = toLibraryAttachment({
+        linkId: "l1",
+        position: 0,
+        asset: makeAsset({ kind: "video", status, inspectionStatus }),
+      });
+      expect(attachment.unavailable).toBe(true);
+      expect(attachment[field]).toBe(true);
+    }
+  });
+  it("blocks explicit pending or failed inspections even when the asset row says ready", () => {
+    for (const inspectionStatus of ["pending", "running", "failed"] as const) {
+      expect(
+        toLibraryAttachment({
+          linkId: "l1",
+          position: 0,
+          asset: makeAsset({
+            kind: "video",
+            status: "ready",
+            inspectionStatus,
+          }),
+        }).unavailable,
+      ).toBe(true);
+    }
+    expect(
+      toLibraryAttachment({
+        linkId: "l1",
+        position: 0,
+        asset: makeAsset({
+          kind: "video",
+          status: "ready",
+          inspectionStatus: null,
+        }),
+      }).unavailable,
+    ).toBe(false);
+  });
   it("falls back to the file name when the author gave no title", () => {
     const attachment = toLibraryAttachment({
       linkId: "l1",

@@ -109,6 +109,62 @@ function operationInput(
   };
 }
 describe("MCP SQL and migration behavior", () => {
+  it("retains attachments and destination selections over repeated draft saves", async () => {
+    const postId = randomUUID();
+    await pg.query("insert into social_posts(id,workspace_id) values ($1,$2)", [
+      postId,
+      mcpIds.workspace,
+    ]);
+    const base = {
+      workspaceId: mcpIds.workspace,
+      postId,
+      name: "Attachment save",
+      bodyPlainText: "Draft",
+      bodyDocument: { type: "doc" as const, content: [] },
+      connectionIds: [mcpIds.destination],
+    };
+    expect(
+      (
+        await updateSocialPostDraft({
+          ...base,
+          expectedVersion: 1,
+          attachments: [],
+        })
+      ).outcome,
+    ).toBe("updated");
+    expect(
+      (
+        await updateSocialPostDraft({
+          ...base,
+          expectedVersion: 2,
+          attachments: [{ source: "library" as const, id: mcpIds.asset }],
+        })
+      ).outcome,
+    ).toBe("updated");
+    expect(
+      (
+        await updateSocialPostDraft({
+          ...base,
+          expectedVersion: 3,
+          attachments: [{ source: "library" as const, id: mcpIds.asset }],
+        })
+      ).outcome,
+    ).toBe("updated");
+    expect(
+      (
+        await pg.query(
+          "select media_asset_id from social_post_media where post_id=$1",
+          [postId],
+        )
+      ).rows,
+    ).toEqual([{ media_asset_id: mcpIds.asset }]);
+    expect(
+      await listSocialPostDraftConnectionIds({
+        workspaceId: mcpIds.workspace,
+        postId,
+      }),
+    ).toEqual([mcpIds.destination]);
+  });
   it("restores, preserves and clears selected draft accounts with revision protection and no dispatch targets", async () => {
     const postId = randomUUID();
     await pg.query("insert into social_posts(id,workspace_id) values ($1,$2)", [
@@ -345,7 +401,11 @@ describe("MCP SQL and migration behavior", () => {
       }),
     ).toEqual([mcpIds.destination]);
     expect(
-      (await pg.query("select * from social_post_media")).rows,
+      (
+        await pg.query("select * from social_post_media where post_id=$1", [
+          mcpIds.post,
+        ])
+      ).rows,
     ).toHaveLength(1);
     const invalid = {
       ...input,

@@ -1,5 +1,11 @@
 # Project memory
 
+## Latest work — Social draft attachments (5 November 2026)
+
+- The user reported that selecting library media or uploading a local file did not seem to attach it to a Social post. Browser reproduction showed images attached to unsaved composer state and saved correctly, but their list was below the large upload panel. It now appears above the uploader, with an explicit unsaved notice and nearby draft-save action. The user's existing post was only read and was not modified.
+- Video uploads previously returned no asset while inspection was pending. The composer now receives a client-safe pending reference and can save it with the draft. Pending/failed videos have no preview and cannot publish or schedule, including from MCP and the Social worker. A user-triggered status check refreshes inspection state without idle polling, new scheduled tasks or additional workers. Workspace validation and revision locks remain intact; legacy ready videos with no inspection state preserve existing behavior.
+- No schema migration, dependency, environment change, provider generation or public post is needed. Release requires the existing `social-post-publish` worker to receive the shared media safety checks before the updated web app, because users can edit scheduled drafts. Marketing remains paused. See `docs/ui-loading.md` and the Social attachment tests.
+
 ## Latest work — TikTok sandbox connections and Video Studio badges (5 November 2026)
 
 - User put Google video generation on hold until the required minimum payment is affordable. Do not submit another Google generation, make a payment, enable billing or release the existing 60c unresolved reservation automatically. Google video project `gen-lang-client-0377504214` had `billingEnabled=false`; credits alone did not make its API key paid-tier eligible.

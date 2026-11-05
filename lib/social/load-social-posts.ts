@@ -152,7 +152,9 @@ export async function loadSocialPostComposerView(input: {
         attachment,
         // An attachment whose file is gone has no key to sign; the view marks it
         // unavailable and the preview falls back rather than 403-ing.
-        attachment.objectKey === ""
+        attachment.objectKey === "" ||
+          attachment.inspectionPending ||
+          attachment.inspectionFailed
           ? ""
           : await createMediaAssetDownloadUrl(attachment.objectKey),
       ),

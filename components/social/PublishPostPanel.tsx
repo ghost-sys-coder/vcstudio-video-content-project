@@ -41,6 +41,7 @@ export function PublishPostPanel({
   basePlainText,
   connections,
   hasUnsavedChanges,
+  mediaUnavailable,
   postId,
   scheduledAt,
   targets,
@@ -53,6 +54,7 @@ export function PublishPostPanel({
   basePlainText: string;
   connections: PostConnectionView[];
   hasUnsavedChanges: boolean;
+  mediaUnavailable: boolean;
   postId: string;
   scheduledAt: string | null;
   targets: SocialPostTargetView[];
@@ -252,6 +254,12 @@ export function PublishPostPanel({
         </p>
       ) : null}
 
+      {mediaUnavailable ? (
+        <p className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-2 text-xs text-amber-700 dark:text-amber-500">
+          Check or remove unavailable media before publishing or scheduling.
+        </p>
+      ) : null}
+
       {error ? (
         <p aria-live="polite" className="text-sm text-destructive">
           {error}
@@ -262,14 +270,24 @@ export function PublishPostPanel({
         <div className="flex flex-wrap gap-2">
           <SchedulePostDialog
             captionOverrides={requestCaptionOverrides}
-            disabled={selectedIds.length === 0 || pending || hasUnsavedChanges}
+            disabled={
+              selectedIds.length === 0 ||
+              pending ||
+              hasUnsavedChanges ||
+              mediaUnavailable
+            }
             postId={postId}
             scheduledAt={scheduledAt}
             selectedConnectionIds={selectedIds}
           />
           <Button
             className="flex-1"
-            disabled={selectedIds.length === 0 || pending || hasUnsavedChanges}
+            disabled={
+              selectedIds.length === 0 ||
+              pending ||
+              hasUnsavedChanges ||
+              mediaUnavailable
+            }
             onClick={publish}
             type="button"
           >

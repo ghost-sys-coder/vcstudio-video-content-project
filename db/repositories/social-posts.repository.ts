@@ -88,6 +88,8 @@ export async function listSocialPostMedia(input: {
       asset: {
         id: mediaAssets.id,
         kind: mediaAssets.kind,
+        status: mediaAssets.status,
+        inspectionStatus: mediaAssets.inspectionStatus,
         objectKey: mediaAssets.objectKey,
         contentType: mediaAssets.contentType,
         sizeBytes: mediaAssets.sizeBytes,
@@ -180,6 +182,8 @@ export async function listSocialPostMediaSummaries(input: {
       postId: socialPostMedia.postId,
       assetId: mediaAssets.id,
       assetKind: mediaAssets.kind,
+      assetStatus: mediaAssets.status,
+      assetInspectionStatus: mediaAssets.inspectionStatus,
       assetDeletedAt: mediaAssets.deletedAt,
       assetObjectKey: input.includePreviews
         ? mediaAssets.objectKey
@@ -223,7 +227,15 @@ export async function listSocialPostMediaSummaries(input: {
     };
     summary.mediaCount++;
     if (input.includePreviews && !summary.previewObjectKey) {
-      if (row.assetId && row.assetDeletedAt === null && row.assetObjectKey) {
+      if (
+        row.assetId &&
+        row.assetStatus === "ready" &&
+        (row.assetKind !== "video" ||
+          row.assetInspectionStatus === null ||
+          row.assetInspectionStatus === "succeeded") &&
+        row.assetDeletedAt === null &&
+        row.assetObjectKey
+      ) {
         summary.previewObjectKey = row.assetObjectKey;
         summary.previewKind = row.assetKind;
       } else if (

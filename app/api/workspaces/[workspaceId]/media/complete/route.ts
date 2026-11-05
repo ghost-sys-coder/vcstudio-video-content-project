@@ -113,7 +113,7 @@ export async function POST(
     }
 
     if (kind === "video") {
-      await prepareMediaAssetInspection({
+      const pendingAsset = await prepareMediaAssetInspection({
         workspaceId,
         mediaAssetId: asset.id,
         sizeBytes: inspected.sizeBytes,
@@ -131,6 +131,7 @@ export async function POST(
       return NextResponse.json(
         {
           inspectionPending: true,
+          asset: toMediaAssetView(pendingAsset, ""),
           message:
             "Upload complete. The video is being verified before it becomes selectable.",
         },

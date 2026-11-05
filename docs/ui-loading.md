@@ -20,6 +20,8 @@ Loading indicators describe a real pending request. They do not replace limiting
 
 ## Application error recovery
 
+- Social draft media appears above the upload area so selected files are immediately visible. Freshly uploaded videos can be saved in the draft while their existing background inspection runs; no preview or publication is allowed before verification. The composer offers an on-demand status check and does not poll while idle. An inspection failure remains visible and removable. Existing workspace and revision checks still apply.
+
 - The shared application error boundary retries a server view by refreshing the router and resetting the boundary in one React transition. The shadcn retry button shows a spinner and “Trying again…” while the request is pending, disables duplicate submissions, and announces a visible status message. A failed retry keeps a usable retry control with explicit feedback; a successful retry replaces the fallback with the loaded view.
 - The dashboard escape control remains a keyboard-accessible navigation link. Retry controls wrap within narrow containers and support Light/Dark themes and reduced motion.
 

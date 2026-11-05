@@ -118,6 +118,8 @@ export function toPostAttachmentView(
       originalFileName: attachment.originalFileName,
       createdAt: attachment.createdAt.toISOString(),
       previewUrl,
+      ...(attachment.inspectionPending ? { inspectionPending: true } : {}),
+      ...(attachment.inspectionFailed ? { inspectionFailed: true } : {}),
     },
     source: attachment.source,
     unavailable: attachment.unavailable,

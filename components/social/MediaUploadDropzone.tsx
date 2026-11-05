@@ -30,11 +30,13 @@ export function MediaUploadDropzone({
   maxImageBytes,
   maxVideoBytes,
   onUploaded,
+  onProcessing,
   workspaceId,
 }: {
   maxImageBytes: number;
   maxVideoBytes: number;
   onUploaded: (assets: MediaAssetView[]) => void;
+  onProcessing?: (assets: MediaAssetView[]) => void;
   workspaceId: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -50,14 +52,14 @@ export function MediaUploadDropzone({
     setFailures([]);
     const uploaded: MediaAssetView[] = [];
     const failed: UploadFailure[] = [];
-    let processing = 0;
+    const processing: MediaAssetView[] = [];
 
     for (const file of files) {
       setPendingFileName(file.name);
       try {
         const asset = await uploadMediaAsset({ workspaceId, file });
-        if (asset) uploaded.push(asset);
-        else processing += 1;
+        if (asset.inspectionPending) processing.push(asset);
+        else uploaded.push(asset);
       } catch (error) {
         failed.push({
           fileName: file.name,
@@ -71,8 +73,9 @@ export function MediaUploadDropzone({
 
     setPendingFileName(null);
     setFailures(failed);
-    setProcessingCount(processing);
+    setProcessingCount(processing.length);
     if (uploaded.length > 0) onUploaded(uploaded);
+    if (processing.length > 0) onProcessing?.(processing);
   }
 
   return (
@@ -95,7 +98,9 @@ export function MediaUploadDropzone({
         <UploadCloudIcon aria-hidden className="size-6 text-muted-foreground" />
         <div className="space-y-1">
           <p className="text-sm font-medium">
-            Drop images or videos here to add them to the library
+            {onProcessing
+              ? "Drop images or videos here to add them to this post"
+              : "Drop images or videos here to add them to the library"}
           </p>
           <p className="text-xs text-muted-foreground">
             JPEG, PNG, WebP, GIF up to {formatBytes(maxImageBytes)} · MP4, MOV,
@@ -133,7 +138,7 @@ export function MediaUploadDropzone({
       </div>
 
       <div aria-live="polite">
-        {processingCount > 0 ? (
+        {processingCount > 0 && !onProcessing ? (
           <p className="rounded-xl border bg-muted/40 p-3 text-sm text-muted-foreground">
             {processingCount} video{processingCount === 1 ? " is" : "s are"}{" "}
             being verified. It will appear in the library after server-side

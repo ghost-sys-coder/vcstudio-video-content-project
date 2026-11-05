@@ -9,6 +9,7 @@ import {
   inArray,
   isNull,
   lt,
+  ne,
   or,
   sql,
 } from "drizzle-orm";
@@ -20,6 +21,18 @@ import { MEDIA_LIBRARY_PAGE_SIZE } from "@/lib/media/library-navigation";
 /** Cap on one page of the library grid, so a large workspace cannot fan out. */
 export const MEDIA_ASSET_PAGE_SIZE = 60;
 
+/** Explicit pending or failed video inspections are not ready; legacy null states remain usable. */
+function isReadyMediaAsset() {
+  return and(
+    eq(mediaAssets.status, "ready"),
+    or(
+      ne(mediaAssets.kind, "video"),
+      isNull(mediaAssets.inspectionStatus),
+      eq(mediaAssets.inspectionStatus, "succeeded"),
+    ),
+  );
+}
+
 /** Keyset pagination avoids scanning increasingly large offsets. */
 export async function listMediaAssetWindow(input: {
   workspaceId: string;
@@ -29,7 +42,7 @@ export async function listMediaAssetWindow(input: {
 }): Promise<MediaAsset[]> {
   const conditions = [
     eq(mediaAssets.workspaceId, input.workspaceId),
-    eq(mediaAssets.status, "ready"),
+    isReadyMediaAsset(),
     isNull(mediaAssets.deletedAt),
   ];
   if (input.kind) conditions.push(eq(mediaAssets.kind, input.kind));
@@ -75,7 +88,7 @@ export async function listMediaAssets(input: {
 }): Promise<MediaAsset[]> {
   const conditions = [
     eq(mediaAssets.workspaceId, input.workspaceId),
-    eq(mediaAssets.status, "ready"),
+    isReadyMediaAsset(),
     isNull(mediaAssets.deletedAt),
   ];
   if (input.kind) conditions.push(eq(mediaAssets.kind, input.kind));
@@ -97,7 +110,7 @@ export async function countMediaAssets(input: {
 }): Promise<number> {
   const conditions = [
     eq(mediaAssets.workspaceId, input.workspaceId),
-    eq(mediaAssets.status, "ready"),
+    isReadyMediaAsset(),
     isNull(mediaAssets.deletedAt),
   ];
   if (input.kind) conditions.push(eq(mediaAssets.kind, input.kind));
@@ -149,8 +162,34 @@ export async function findReadyMediaAssets(input: {
       and(
         eq(mediaAssets.workspaceId, input.workspaceId),
         inArray(mediaAssets.id, input.mediaAssetIds),
-        eq(mediaAssets.status, "ready"),
+        isReadyMediaAsset(),
         isNull(mediaAssets.deletedAt),
+      ),
+    );
+}
+
+/** Drafts may retain uploaded videos awaiting inspection; publishing still requires ready. */
+export async function findDraftAttachableMediaAssets(input: {
+  workspaceId: string;
+  mediaAssetIds: string[];
+}): Promise<MediaAsset[]> {
+  if (input.mediaAssetIds.length === 0) return [];
+  return getDatabase()
+    .select()
+    .from(mediaAssets)
+    .where(
+      and(
+        eq(mediaAssets.workspaceId, input.workspaceId),
+        inArray(mediaAssets.id, input.mediaAssetIds),
+        isNull(mediaAssets.deletedAt),
+        or(
+          isReadyMediaAsset(),
+          and(
+            eq(mediaAssets.kind, "video"),
+            inArray(mediaAssets.status, ["pending", "ready"]),
+            inArray(mediaAssets.inspectionStatus, ["pending", "running"]),
+          ),
+        ),
       ),
     );
 }

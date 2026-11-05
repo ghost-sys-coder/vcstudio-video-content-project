@@ -1,6 +1,14 @@
 "use server";
 
+import { z } from "zod";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
+import { findMediaAsset } from "@/db/repositories/media-assets.repository";
+import {
+  toMediaAssetView,
+  type MediaAssetView,
+} from "@/lib/media/media-asset-view";
+import { createMediaAssetDownloadUrl } from "@/lib/storage/media-asset-storage";
+import { mediaAvailability } from "@/lib/media/media-availability";
 import {
   loadMediaLibraryPage,
   type MediaLibraryPageView,
@@ -42,6 +50,47 @@ export async function getMediaLibraryPageAction(
     return {
       ok: false,
       error: "The media library could not be loaded. Please try again.",
+    };
+  }
+}
+
+/** On-demand inspection status, scoped to the current authorized workspace. */
+export async function getPostMediaStatusAction(
+  input: unknown,
+): Promise<{ ok: true; asset: MediaAssetView } | { ok: false; error: string }> {
+  const parsed = z.uuid().safeParse(input);
+  if (!parsed.success)
+    return { ok: false, error: "That media reference is invalid." };
+  const context = await getAuthenticatedWorkspaceContext();
+  if (!context || !can(context.activeMembership.role, "composePosts"))
+    return { ok: false, error: "You cannot check media in this workspace." };
+  try {
+    const asset = await findMediaAsset({
+      workspaceId: context.activeMembership.workspaceId,
+      mediaAssetId: parsed.data,
+    });
+    if (!asset || asset.deletedAt)
+      return { ok: false, error: "That media is no longer available." };
+    if (
+      asset.status === "pending" &&
+      (asset.kind !== "video" ||
+        !["pending", "running", "failed"].includes(
+          asset.inspectionStatus ?? "",
+        ))
+    )
+      return {
+        ok: false,
+        error:
+          "The upload has not started verification. Try again later or remove it from the draft.",
+      };
+    const previewUrl = mediaAvailability(asset).ready
+      ? await createMediaAssetDownloadUrl(asset.objectKey)
+      : "";
+    return { ok: true, asset: toMediaAssetView(asset, previewUrl) };
+  } catch {
+    return {
+      ok: false,
+      error: "The media status could not be checked. Try again.",
     };
   }
 }

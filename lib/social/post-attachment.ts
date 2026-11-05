@@ -1,9 +1,12 @@
 import type { MediaAsset, MediaAssetKind, VideoRender } from "@/db/schema";
+import { mediaAvailability } from "@/lib/media/media-availability";
 
 type LibraryAttachmentAsset = Pick<
   MediaAsset,
   | "id"
   | "kind"
+  | "status"
+  | "inspectionStatus"
   | "objectKey"
   | "contentType"
   | "sizeBytes"
@@ -66,6 +69,8 @@ export type SocialPostAttachment = {
    * (a published post must show what it sent) but publishing must refuse it.
    */
   unavailable: boolean;
+  inspectionPending?: boolean;
+  inspectionFailed?: boolean;
 };
 
 /**
@@ -116,6 +121,7 @@ export function toLibraryAttachment(input: {
   position: number;
   asset: LibraryAttachmentAsset;
 }): SocialPostAttachment {
+  const availability = mediaAvailability(input.asset);
   return {
     linkId: input.linkId,
     position: input.position,
@@ -135,7 +141,9 @@ export function toLibraryAttachment(input: {
     altText: input.asset.altText,
     originalFileName: input.asset.originalFileName,
     createdAt: input.asset.createdAt,
-    unavailable: input.asset.deletedAt !== null,
+    unavailable: input.asset.deletedAt !== null || !availability.ready,
+    ...(availability.inspectionPending ? { inspectionPending: true } : {}),
+    ...(availability.inspectionFailed ? { inspectionFailed: true } : {}),
   };
 }
 

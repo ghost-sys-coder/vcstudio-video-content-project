@@ -1,5 +1,6 @@
 import type { MediaAsset, MediaAssetKind } from "@/db/schema";
 import type { VerifiedMediaMetadata } from "@/lib/media/media-inspection";
+import { mediaAvailability } from "@/lib/media/media-availability";
 
 /**
  * The client-safe projection of a library asset.
@@ -26,12 +27,16 @@ export type MediaAssetView = {
   createdAt: string;
   /** Short-lived signed R2 URL. Regenerated on every page load; never stored. */
   previewUrl: string;
+  /** A video can be saved in a draft while server-side inspection finishes. */
+  inspectionPending?: boolean;
+  inspectionFailed?: boolean;
 };
 
 export function toMediaAssetView(
   asset: MediaAsset,
   previewUrl: string,
 ): MediaAssetView {
+  const availability = mediaAvailability(asset);
   return {
     id: asset.id,
     kind: asset.kind,
@@ -48,5 +53,7 @@ export function toMediaAssetView(
     originalFileName: asset.originalFileName,
     createdAt: asset.createdAt.toISOString(),
     previewUrl,
+    ...(availability.inspectionPending ? { inspectionPending: true } : {}),
+    ...(availability.inspectionFailed ? { inspectionFailed: true } : {}),
   };
 }

@@ -1,6 +1,12 @@
 "use client";
 
-import { ArrowLeftIcon, ArrowRightIcon, XIcon } from "lucide-react";
+import {
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  FilmIcon,
+  Loader2Icon,
+  XIcon,
+} from "lucide-react";
 import { MediaAssetPreview } from "@/components/social/MediaAssetPreview";
 import { Button } from "@/components/ui/button";
 import type { PostAttachmentView } from "@/lib/social/social-post-view";
@@ -16,11 +22,15 @@ export function PostMediaAttachments({
   editable,
   onMove,
   onRemove,
+  onCheck,
+  checkingId,
 }: {
   attachments: PostAttachmentView[];
   editable: boolean;
   onMove: (assetId: string, direction: -1 | 1) => void;
   onRemove: (assetId: string) => void;
+  onCheck: (assetId: string) => void;
+  checkingId: string | null;
 }) {
   if (attachments.length === 0)
     return (
@@ -34,14 +44,51 @@ export function PostMediaAttachments({
     <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       {attachments.map((attachment, index) => (
         <li className="space-y-1" key={attachment.asset.id}>
-          <MediaAssetPreview asset={attachment.asset} />
+          {attachment.asset.inspectionPending ||
+          attachment.asset.inspectionFailed ? (
+            <div
+              className="flex aspect-square items-center justify-center rounded-lg border bg-muted"
+              aria-label={`Video: ${attachment.asset.title}`}
+            >
+              <FilmIcon aria-hidden className="size-8 text-muted-foreground" />
+            </div>
+          ) : (
+            <MediaAssetPreview asset={attachment.asset} />
+          )}
           <p className="truncate text-xs" title={attachment.asset.title}>
             {attachment.asset.title}
           </p>
           {attachment.source === "render" ? (
             <p className="text-xs text-muted-foreground">Project render</p>
           ) : null}
-          {attachment.unavailable ? (
+          {attachment.asset.inspectionPending ? (
+            <div className="space-y-1 text-xs text-amber-700 dark:text-amber-500">
+              <p>
+                Video verification in progress. Save the draft; publishing is
+                available after verification.
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={checkingId !== null}
+                onClick={() => onCheck(attachment.asset.id)}
+              >
+                {checkingId === attachment.asset.id ? (
+                  <>
+                    <Loader2Icon className="animate-spin" /> Checking…
+                  </>
+                ) : (
+                  "Check status"
+                )}
+              </Button>
+            </div>
+          ) : attachment.asset.inspectionFailed ? (
+            <p className="text-xs text-destructive">
+              Video verification failed. Remove this file and try another
+              upload.
+            </p>
+          ) : attachment.unavailable ? (
             <p className="text-xs text-amber-700 dark:text-amber-500">
               {attachment.source === "render"
                 ? "This render is no longer available — re-render before posting."

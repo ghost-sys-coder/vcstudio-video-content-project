@@ -357,6 +357,22 @@ describe("publication approval boundary", () => {
       "verification",
     );
   });
+  it("refuses an attachment still undergoing inspection before preparing any approval", async () => {
+    m.media.mockResolvedValue([
+      {
+        source: "library",
+        sourceId: mcpIds.asset,
+        kind: "video",
+        unavailable: true,
+        inspectionPending: true,
+      },
+    ]);
+    await expect(buildPublicationPreview(ctx, request)).rejects.toThrow(
+      "attachment is unavailable",
+    );
+    expect(m.publish).not.toHaveBeenCalled();
+    expect(m.schedule).not.toHaveBeenCalled();
+  });
   it("keeps LinkedIn Pages on hold even if credentials and a connection exist", async () => {
     m.connection.mockResolvedValue({
       id: mcpIds.destination,

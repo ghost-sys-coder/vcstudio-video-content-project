@@ -204,8 +204,8 @@ export const mediaAssetKindEnum = pgEnum("media_asset_kind", [
 ]);
 
 // Library uploads are two-phase (authorize a signed PUT, then confirm), so a row
-// exists before its object does. `pending` is that gap; a row only becomes
-// selectable in the composer once the upload was confirmed and inspected.
+// exists before its object does. Library selection requires a ready asset;
+// a freshly uploaded video may also remain attached to a draft during inspection.
 export const mediaAssetStatusEnum = pgEnum("media_asset_status", [
   "pending",
   "ready",

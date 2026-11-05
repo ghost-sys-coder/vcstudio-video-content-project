@@ -69,6 +69,9 @@ for (const [name, entry] of [
         : {}),
       ...(name === "post-composer"
         ? {
+            "@/lib/media/read-video-duration.client": path.resolve(
+              "e2e/mcp/fixtures/MockVideoDuration.ts",
+            ),
             "next/link": path.resolve("e2e/mcp/fixtures/MockNextLink.tsx"),
             "next/navigation": path.resolve(
               "e2e/mcp/fixtures/MockNavigation.ts",
