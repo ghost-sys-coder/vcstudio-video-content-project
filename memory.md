@@ -1,5 +1,10 @@
 # Project memory
 
+## Latest work — Library attachment save flow (5 November 2026)
+
+- The user confirmed device uploads work but library attachment still does not, and explicitly requested a save button after choosing media. The earlier isolated image test covered local selection then a separate draft save; it did not reproduce a failure in the selection handler. Reproduction with application CSS and 24 items still completed that two-step flow. The picker now makes persistence explicit: **Save to post (N)** calls the existing shared draft save with the next attachment list, current text/name and destination choices, and closes only after successful persistence. A fixed footer stays visible while the grid scrolls; a busy state prevents dismissal/double saves, and failures retain selections. Composer feedback confirms media was saved.
+- The browser harness now compiles real application Tailwind CSS for the post composer and supplies a complete 24-asset library. Coverage includes short Light/Dark layouts, keyboard save, network failure/retry, revision-conflict feedback, cancellation, exact attachment order and whole-draft persistence after reload. This is a web-only follow-up; no worker, schema, environment or dependency update is needed. Marketing remains paused.
+
 ## Latest work — Social draft attachments (5 November 2026)
 
 - The user reported that selecting library media or uploading a local file did not seem to attach it to a Social post. Browser reproduction showed images attached to unsaved composer state and saved correctly, but their list was below the large upload panel. It now appears above the uploader, with an explicit unsaved notice and nearby draft-save action. The user's existing post was only read and was not modified.

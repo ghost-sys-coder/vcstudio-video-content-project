@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { ImagePlusIcon } from "lucide-react";
+import { useRef, useState } from "react";
+import { ImagePlusIcon, Loader2Icon } from "lucide-react";
 import { MediaAssetPreview } from "@/components/social/MediaAssetPreview";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +18,8 @@ import type { MediaAssetView } from "@/lib/media/media-asset-view";
 import { useMediaLibraryPages } from "@/hooks/useMediaLibraryPages";
 import { mergeMediaAssets } from "@/lib/media/merge-media-assets";
 
+export type MediaPickerSaveResult = { ok: true } | { ok: false; error: string };
+
 /**
  * Picks library media to attach to a post.
  *
@@ -27,20 +29,27 @@ import { mergeMediaAssets } from "@/lib/media/merge-media-assets";
  */
 export function MediaPickerDialog({
   attachedIds,
+  disabled = false,
   recentAssets,
   onConfirm,
 }: {
   attachedIds: string[];
+  disabled?: boolean;
   recentAssets: MediaAssetView[];
-  onConfirm: (assets: MediaAssetView[]) => void;
+  onConfirm: (assets: MediaAssetView[]) => Promise<MediaPickerSaveResult>;
 }) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const saveInFlight = useRef(false);
   const pages = useMediaLibraryPages();
   const library = mergeMediaAssets(recentAssets, pages.assets);
   const available = library.filter((asset) => !attachedIds.includes(asset.id));
 
   function toggle(assetId: string) {
+    if (saveInFlight.current) return;
+    setSaveError(null);
     setSelectedIds((current) =>
       current.includes(assetId)
         ? current.filter((id) => id !== assetId)
@@ -48,116 +57,178 @@ export function MediaPickerDialog({
     );
   }
 
+  async function saveSelection() {
+    if (saveInFlight.current || selectedIds.length === 0) return;
+    const assets = selectedIds.flatMap((id) => {
+      const asset = library.find((item) => item.id === id);
+      return asset ? [asset] : [];
+    });
+    if (assets.length !== selectedIds.length) {
+      setSaveError(
+        "Some selected media is no longer available. Reopen the library and select it again.",
+      );
+      return;
+    }
+    saveInFlight.current = true;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const result = await onConfirm(assets);
+      if (!result.ok) {
+        setSaveError(result.error);
+        return;
+      }
+      setOpen(false);
+      setSelectedIds([]);
+      pages.cancel();
+    } catch {
+      setSaveError(
+        "The media could not be saved to this post. Your selection is still here; try again.",
+      );
+    } finally {
+      saveInFlight.current = false;
+      setSaving(false);
+    }
+  }
+
   return (
     <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
+        if (saveInFlight.current) return;
         setOpen(nextOpen);
         if (nextOpen) {
           setSelectedIds([]);
+          setSaveError(null);
           void pages.loadFirst();
         } else pages.cancel();
       }}
     >
-      <DialogTrigger render={<Button size="sm" variant="outline" />}>
+      <DialogTrigger
+        disabled={disabled}
+        render={<Button size="sm" variant="outline" />}
+      >
         <ImagePlusIcon />
         Attach media
       </DialogTrigger>
-      <DialogContent className="sm:max-w-3xl">
-        <DialogHeader>
+      <DialogContent
+        className="flex flex-col overflow-hidden sm:max-w-3xl"
+        showCloseButton={!saving}
+      >
+        <DialogHeader className="shrink-0">
           <DialogTitle>Attach from the media library</DialogTitle>
           <DialogDescription>
-            Pick in the order you want them to appear. What you attach decides
-            which platforms this post can go to.
+            Select images or videos in the order you want them to appear, then
+            save them to this post.
           </DialogDescription>
         </DialogHeader>
 
-        {pages.loading && !pages.loaded ? (
-          <p role="status">Loading media…</p>
-        ) : null}
-        {pages.error ? (
-          <div role="alert" className="space-y-2">
-            <p>{pages.error}</p>
+        <div className="min-h-0 overflow-y-auto space-y-3">
+          {pages.loading && !pages.loaded ? (
+            <p role="status">Loading media…</p>
+          ) : null}
+          {pages.error ? (
+            <div role="alert" className="space-y-2">
+              <p>{pages.error}</p>
+              <Button
+                onClick={() => {
+                  void (pages.loaded ? pages.loadMore() : pages.loadFirst());
+                }}
+                type="button"
+                variant="outline"
+              >
+                Try again
+              </Button>
+            </div>
+          ) : null}
+          {!pages.loaded ? null : available.length === 0 ? (
+            <p className="rounded-xl border border-dashed bg-muted/30 p-6 text-center text-sm text-muted-foreground">
+              Nothing left to attach. Upload more in the media library.
+            </p>
+          ) : (
+            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {available.map((asset) => {
+                const order = selectedIds.indexOf(asset.id);
+                return (
+                  <li key={asset.id}>
+                    <button
+                      aria-label={asset.title}
+                      aria-pressed={order >= 0}
+                      disabled={saving}
+                      className={`relative w-full space-y-1 rounded-lg border p-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                        order >= 0
+                          ? "border-primary bg-primary/5"
+                          : "hover:bg-accent"
+                      }`}
+                      onClick={() => toggle(asset.id)}
+                      type="button"
+                    >
+                      <MediaAssetPreview asset={asset} controls={false} />
+                      <p className="truncate text-xs">{asset.title}</p>
+                      {order >= 0 ? (
+                        <span className="absolute top-2 right-2 flex size-5 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                          {order + 1}
+                        </span>
+                      ) : null}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          {pages.nextCursor ? (
             <Button
+              disabled={pages.loading || saving}
               onClick={() => {
-                void (pages.loaded ? pages.loadMore() : pages.loadFirst());
+                void pages.loadMore();
               }}
               type="button"
               variant="outline"
             >
-              Try again
+              {pages.loading ? "Loading…" : "Load more media"}
+            </Button>
+          ) : null}
+        </div>
+
+        <DialogFooter className="shrink-0 flex-col sm:items-center sm:justify-between">
+          <div className="space-y-1">
+            <p role="status" aria-live="polite" className="font-medium">
+              {saving
+                ? "Saving media to this post…"
+                : selectedIds.length > 0
+                  ? `${selectedIds.length} ${selectedIds.length === 1 ? "file" : "files"} selected`
+                  : "Select media to attach"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Saves your selection and current draft changes.
+            </p>
+            {saveError ? (
+              <p role="alert" className="text-sm text-destructive">
+                {saveError}
+              </p>
+            ) : null}
+          </div>
+          <div className="flex shrink-0 justify-end gap-2">
+            <DialogClose
+              disabled={saving}
+              render={<Button type="button" variant="outline" />}
+            >
+              Cancel
+            </DialogClose>
+            <Button
+              disabled={selectedIds.length === 0 || saving}
+              onClick={() => void saveSelection()}
+              type="button"
+            >
+              {saving ? (
+                <Loader2Icon aria-hidden className="animate-spin" />
+              ) : null}
+              {saving
+                ? "Saving…"
+                : `Save to post${selectedIds.length > 0 ? ` (${selectedIds.length})` : ""}`}
             </Button>
           </div>
-        ) : null}
-        {!pages.loaded ? null : available.length === 0 ? (
-          <p className="rounded-xl border border-dashed bg-muted/30 p-6 text-center text-sm text-muted-foreground">
-            Nothing left to attach. Upload more in the media library.
-          </p>
-        ) : (
-          <ul className="grid max-h-96 grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-4">
-            {available.map((asset) => {
-              const order = selectedIds.indexOf(asset.id);
-              return (
-                <li key={asset.id}>
-                  <button
-                    aria-pressed={order >= 0}
-                    className={`relative w-full space-y-1 rounded-lg border p-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                      order >= 0
-                        ? "border-primary bg-primary/5"
-                        : "hover:bg-accent"
-                    }`}
-                    onClick={() => toggle(asset.id)}
-                    type="button"
-                  >
-                    <MediaAssetPreview asset={asset} controls={false} />
-                    <p className="truncate text-xs">{asset.title}</p>
-                    {order >= 0 ? (
-                      <span className="absolute top-2 right-2 flex size-5 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
-                        {order + 1}
-                      </span>
-                    ) : null}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-
-        {pages.nextCursor ? (
-          <Button
-            disabled={pages.loading}
-            onClick={() => {
-              void pages.loadMore();
-            }}
-            type="button"
-            variant="outline"
-          >
-            {pages.loading ? "Loading…" : "Load more media"}
-          </Button>
-        ) : null}
-
-        <DialogFooter>
-          <DialogClose render={<Button variant="outline" />}>
-            Cancel
-          </DialogClose>
-          <DialogClose
-            render={
-              <Button
-                disabled={selectedIds.length === 0}
-                onClick={() =>
-                  onConfirm(
-                    selectedIds
-                      .map((id) => library.find((asset) => asset.id === id))
-                      .filter((asset): asset is MediaAssetView =>
-                        Boolean(asset),
-                      ),
-                  )
-                }
-              />
-            }
-          >
-            Attach {selectedIds.length > 0 ? selectedIds.length : ""}
-          </DialogClose>
         </DialogFooter>
       </DialogContent>
     </Dialog>

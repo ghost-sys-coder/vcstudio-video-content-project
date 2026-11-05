@@ -2,6 +2,20 @@ import { z } from "zod";
 import type { SocialPostComposerView } from "@/lib/social/social-post-view";
 import type { MediaAssetView } from "@/lib/media/media-asset-view";
 import { socialPostConnectionIdsSchema } from "@studio/contracts";
+import {
+  portableDocumentSchema,
+  type PortableDocument,
+} from "@/lib/social/portable-document";
+import { renderPortableDocumentToPlainText } from "@/lib/social/render-plain-text";
+const fixtureDocument: PortableDocument = {
+  type: "doc",
+  content: [
+    {
+      type: "paragraph",
+      content: [{ type: "text", text: "A relevant saved post." }],
+    },
+  ],
+};
 export const draftKey = "vcstudio-social-draft-fixture";
 export const personalId = "44444444-4444-4444-8444-444444444444";
 export const businessId = "55555555-5555-4555-8555-555555555555";
@@ -27,6 +41,15 @@ export const uploadedImage: MediaAssetView = {
   altText: "Uploaded image",
   originalFileName: "uploaded.png",
 };
+export const libraryPageAssets: MediaAssetView[] = [
+  libraryImage,
+  ...Array.from({ length: 23 }, (_, index) => ({
+    ...libraryImage,
+    id: `aaaaaaaa-aaaa-4aaa-8aaa-${String(index + 1).padStart(12, "0")}`,
+    title: `Library image ${index + 2}`,
+    altText: `Library image ${index + 2}`,
+  })),
+];
 export const uploadedVideo: MediaAssetView = {
   ...libraryImage,
   id: "99999999-9999-4999-8999-999999999999",
@@ -47,13 +70,14 @@ export function fixtureAssets(): MediaAssetView[] {
       : videoStatus === "failed"
         ? { ...uploadedVideo, inspectionPending: false, inspectionFailed: true }
         : uploadedVideo;
-  return [libraryImage, uploadedImage, video];
+  return [...libraryPageAssets, uploadedImage, video];
 }
 export const draftStateSchema = z.object({
   version: z.number(),
   name: z.string(),
   connectionIds: socialPostConnectionIdsSchema,
   attachmentIds: z.array(z.string()).default([]),
+  bodyDocument: portableDocumentSchema.default(() => fixtureDocument),
 });
 export function composerFixture(): SocialPostComposerView {
   const raw = localStorage.getItem(draftKey);
@@ -66,21 +90,14 @@ export function composerFixture(): SocialPostComposerView {
           ? [personalId]
           : [],
         attachmentIds: [],
+        bodyDocument: fixtureDocument,
       };
   return {
     id: "33333333-3333-4333-8333-333333333333",
     ...state,
     status: "draft",
-    bodyDocument: {
-      type: "doc",
-      content: [
-        {
-          type: "paragraph",
-          content: [{ type: "text", text: "A relevant saved post." }],
-        },
-      ],
-    },
-    bodyPlainText: "A relevant saved post.",
+    bodyDocument: state.bodyDocument,
+    bodyPlainText: renderPortableDocumentToPlainText(state.bodyDocument),
     scheduledAt: null,
     scheduledTimezone: "UTC",
     editable: true,

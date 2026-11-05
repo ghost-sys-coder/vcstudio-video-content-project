@@ -1,11 +1,14 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Loader2Icon } from "lucide-react";
 import { saveSocialPostAction } from "@/app/(authenticated)/app/social/posts/actions";
 import { getPostMediaStatusAction } from "@/app/(authenticated)/app/social/library-actions";
-import { MediaPickerDialog } from "@/components/social/MediaPickerDialog";
+import {
+  MediaPickerDialog,
+  type MediaPickerSaveResult,
+} from "@/components/social/MediaPickerDialog";
 import { MediaUploadDropzone } from "@/components/social/MediaUploadDropzone";
 import { PlatformPreviewCard } from "@/components/social/PlatformPreviewCard";
 import { PostBodyEditor } from "@/components/social/PostBodyEditor";
@@ -28,6 +31,7 @@ import type {
   SocialPostComposerView,
 } from "@/lib/social/social-post-view";
 import { MAX_POST_NAME_LENGTH } from "@/lib/schemas/social-post";
+import { appendLibraryAttachments } from "@/lib/social/append-library-attachments";
 
 /**
  * The post composer.
@@ -75,7 +79,8 @@ export function PostComposer({
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [checkingId, setCheckingId] = useState<string | null>(null);
   const [mediaError, setMediaError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
+  const saveInFlight = useRef(false);
 
   const plainText = useMemo(
     () => renderPortableDocumentToPlainText(document),
@@ -112,40 +117,56 @@ export function PostComposer({
     name !== savedSnapshot.name ||
     hasUnsavedMedia;
 
-  function save() {
+  async function save(
+    nextAttachments = attachments,
+  ): Promise<MediaPickerSaveResult> {
+    if (saveInFlight.current)
+      return {
+        ok: false,
+        error: "The draft is already being saved. Please wait.",
+      };
+    saveInFlight.current = true;
+    setPending(true);
     setError(null);
     setSavedAt(null);
-    startTransition(async () => {
+    try {
       const data = new FormData();
       data.set("postId", view.id);
       data.set("expectedVersion", String(version));
       data.set("name", name);
       data.set("bodyDocument", JSON.stringify(document));
       data.set("connectionIds", JSON.stringify(selectedConnectionIds));
-      for (const attachment of attachments)
+      for (const attachment of nextAttachments)
         data.append(
           "attachments",
           `${attachment.source}:${attachment.asset.id}`,
         );
 
-      try {
-        const result = await saveSocialPostAction(data);
-        if (result.ok) {
-          setVersion(result.version);
-          setSavedSnapshot({
-            plainText,
-            name,
-            attachmentKey,
-            connectionKey: [...selectedConnectionIds].sort().join(":"),
-          });
-          setSavedAt(new Date().toLocaleTimeString());
-        } else setError(result.error);
-      } catch {
-        setError(
-          "The draft could not be saved. Your changes are still here; try again.",
-        );
+      const result = await saveSocialPostAction(data);
+      if (result.ok) {
+        setVersion(result.version);
+        setSavedSnapshot({
+          plainText,
+          name,
+          attachmentKey: nextAttachments
+            .map((item) => `${item.source}:${item.asset.id}`)
+            .join(":"),
+          connectionKey: [...selectedConnectionIds].sort().join(":"),
+        });
+        setSavedAt(new Date().toLocaleTimeString());
+        return { ok: true };
       }
-    });
+      setError(result.error);
+      return { ok: false, error: result.error };
+    } catch {
+      const message =
+        "The draft could not be saved. Your changes are still here; try again.";
+      setError(message);
+      return { ok: false, error: message };
+    } finally {
+      saveInFlight.current = false;
+      setPending(false);
+    }
   }
 
   function moveAttachment(assetId: string, direction: -1 | 1) {
@@ -163,26 +184,18 @@ export function PostComposer({
   }
 
   function attachAssets(assets: MediaAssetView[]) {
-    setAttachments((current) => {
-      const ids = new Set(
-        current
-          .filter((item) => item.source === "library")
-          .map((item) => item.asset.id),
-      );
-      return [
-        ...current,
-        ...assets
-          .filter((asset) => !ids.has(asset.id))
-          .map((asset) => ({
-            asset,
-            source: "library" as const,
-            unavailable: Boolean(
-              asset.inspectionPending || asset.inspectionFailed,
-            ),
-          })),
-      ];
-    });
+    setAttachments((current) => appendLibraryAttachments(current, assets));
     setSavedAt(null);
+  }
+
+  async function saveLibraryAssets(assets: MediaAssetView[]) {
+    const result = await save(appendLibraryAttachments(attachments, assets));
+    if (result.ok) {
+      // An already-running upload may finish while this request saves. Preserve
+      // that new unsaved file rather than replacing the current attachment list.
+      setAttachments((current) => appendLibraryAttachments(current, assets));
+    }
+    return result;
   }
 
   async function checkMediaStatus(assetId: string) {
@@ -241,7 +254,11 @@ export function PostComposer({
             <p aria-live="polite" className="text-xs text-muted-foreground">
               {savedAt ? `Saved at ${savedAt}` : null}
             </p>
-            <Button disabled={pending} onClick={save} type="button">
+            <Button
+              disabled={pending}
+              onClick={() => void save()}
+              type="button"
+            >
               {pending ? (
                 <>
                   <Loader2Icon aria-hidden className="animate-spin" />
@@ -315,7 +332,8 @@ export function PostComposer({
                     .filter((attachment) => attachment.source === "library")
                     .map((attachment) => attachment.asset.id)}
                   recentAssets={libraryAssets}
-                  onConfirm={attachAssets}
+                  disabled={pending}
+                  onConfirm={saveLibraryAssets}
                 />
               ) : null}
             </div>
@@ -353,7 +371,7 @@ export function PostComposer({
                 </span>
                 <Button
                   disabled={pending}
-                  onClick={save}
+                  onClick={() => void save()}
                   size="sm"
                   type="button"
                   variant="outline"
@@ -361,6 +379,11 @@ export function PostComposer({
                   {pending ? "Saving…" : "Save draft changes"}
                 </Button>
               </div>
+            ) : null}
+            {savedAt && !hasUnsavedMedia && attachments.length > 0 ? (
+              <p role="status" className="text-sm text-notice-ready-foreground">
+                Media saved to this post.
+              </p>
             ) : null}
             {view.editable && canUpload ? (
               <MediaUploadDropzone

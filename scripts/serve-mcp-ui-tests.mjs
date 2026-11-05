@@ -2,6 +2,8 @@ import { build } from "esbuild";
 import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import path from "node:path";
+import postcss from "postcss";
+import tailwindcss from "@tailwindcss/postcss";
 await import("./build-mcp-widget.mjs");
 const out = path.resolve(".next/mcp-ui-tests");
 await mkdir(out, { recursive: true });
@@ -9,6 +11,14 @@ const css =
   (await readFile("public/mcp/review.html", "utf8")).match(
     /<style>([\s\S]*?)<\/style>/,
   )?.[1] ?? "";
+const applicationCss = (
+  await postcss([tailwindcss()]).process(
+    await readFile("app/globals.css", "utf8"),
+    {
+      from: path.resolve("app/globals.css"),
+    },
+  )
+).css;
 for (const [name, entry] of [
   ["harness", "e2e/mcp/fixtures/entry.tsx"],
   ["host", "e2e/mcp/fixtures/host.ts"],
@@ -99,7 +109,7 @@ for (const [name, entry] of [
   });
   await writeFile(
     path.join(out, `${name}.html`),
-    `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><style>body{margin:0;padding:16px;min-width:0}</style></head><body><div id="root"></div><script type="module">${bundle.outputFiles[0].text.replace(/<\/script/gi, "<\\/script")}</script></body></html>`,
+    `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${name === "post-composer" ? applicationCss : css}</style><style>body{margin:0;padding:16px;min-width:0}</style></head><body><div id="root"></div><script type="module">${bundle.outputFiles[0].text.replace(/<\/script/gi, "<\\/script")}</script></body></html>`,
   );
 }
 const server = createServer(async (req, res) => {
