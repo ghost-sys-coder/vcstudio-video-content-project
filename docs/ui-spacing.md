@@ -91,3 +91,20 @@ disabled controls remain native buttons. Disable link prefetch on these table
 controls to preserve bounded reads. Audit filters live in their table header and
 wrap below the title on narrow screens. Filter changes preserve ledger paging
 and reset only audit paging, using the existing route/query behavior.
+
+## Production queue
+
+The Queue follows the same Geist typography and shared page/card geometry. Its
+overview counts the projects shown on the current page; blocked and awaiting
+review counts may overlap. Do not label page-local counts as workspace totals.
+The existing readiness/release filters apply after paging, so explain their
+scope and preserve pagination when the current page has no matches.
+
+Group attention links and the 40px shadcn release/channel selects in a filter
+card. Controls stack on narrow screens, and long channel labels remain inside
+the trigger. Project cards let titles wrap, group stage/release badges, label
+channel and planned UTC release metadata, and give the next step a clear link.
+Recovery lists keep every warning, blocker and outstanding review visible.
+Use theme notice colors for shared production badges and review lists. Disable
+link prefetch on these production navigation controls; styling must not add
+queries, asset probes or background work.

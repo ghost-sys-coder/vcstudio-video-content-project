@@ -1,5 +1,15 @@
+"use client";
+
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { SlidersHorizontal } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { FormSelect } from "@/components/ui/FormSelect";
+import { Label } from "@/components/ui/label";
+import { SelectItem } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/Spinner";
 import {
   PRODUCTION_QUEUE_ATTENTION_FILTERS,
   PRODUCTION_QUEUE_RELEASE_FILTERS,
@@ -12,10 +22,6 @@ import {
   buildProductionQueueHref,
 } from "@/lib/production/production-queue-view";
 
-/**
- * Link-based filters, so the queue stays a plain addressable URL that can be
- * bookmarked and shared. Changing a filter always returns to page one.
- */
 export function ProductionQueueFilters({
   attention,
   channelProfileId,
@@ -27,89 +33,131 @@ export function ProductionQueueFilters({
   channels: { id: string; name: string }[];
   release: ProductionQueueReleaseFilter;
 }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const filtered =
+    attention !== "all" || release !== "all" || channelProfileId !== null;
+  const unavailableChannel =
+    channelProfileId !== null &&
+    !channels.some((channel) => channel.id === channelProfileId);
+  function navigate(href: string) {
+    startTransition(() => router.push(href));
+  }
   return (
-    <nav aria-label="Queue filters" className="space-y-3">
-      <div className="flex flex-wrap gap-2">
-        {PRODUCTION_QUEUE_ATTENTION_FILTERS.map((value) => (
-          <Button
-            key={value}
-            nativeButton={false}
-            render={
+    <Card className="min-w-0 shadow-sm">
+      <CardHeader className="border-b">
+        <div className="app-page-header items-center">
+          <div className="flex items-center gap-3">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-secondary">
+              <SlidersHorizontal aria-hidden="true" className="size-4" />
+            </div>
+            <h2 className="text-lg font-semibold tracking-tight">
+              Focus your queue
+            </h2>
+          </div>
+          {filtered && (
+            <Link
+              href="/app/queue"
+              prefetch={false}
+              className={buttonVariants({ variant: "ghost", size: "sm" })}
+            >
+              Clear filters
+            </Link>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="grid min-w-0 gap-5 md:grid-cols-2">
+        <nav aria-label="Queue attention" className="space-y-2 md:col-span-2">
+          <p className="text-sm font-medium">Attention</p>
+          <div className="flex flex-wrap gap-2">
+            {PRODUCTION_QUEUE_ATTENTION_FILTERS.map((value) => (
               <Link
+                key={value}
                 href={buildProductionQueueHref({
                   attention: value,
                   channelProfileId,
                   release,
                 })}
-              />
-            }
-            size="sm"
-            variant={attention === value ? "default" : "outline"}
-          >
-            {ATTENTION_FILTER_LABELS[value]}
-          </Button>
-        ))}
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {PRODUCTION_QUEUE_RELEASE_FILTERS.map((value) => (
-          <Button
-            key={value}
-            nativeButton={false}
-            render={
-              <Link
-                href={buildProductionQueueHref({
-                  attention,
-                  channelProfileId,
-                  release: value,
+                prefetch={false}
+                aria-current={attention === value ? "page" : undefined}
+                className={buttonVariants({
+                  size: "sm",
+                  variant: attention === value ? "secondary" : "ghost",
                 })}
-              />
-            }
-            size="sm"
-            variant={release === value ? "secondary" : "ghost"}
-          >
-            {RELEASE_FILTER_LABELS[value]}
-          </Button>
-        ))}
-      </div>
-      {channels.length > 0 ? (
-        <div className="flex flex-wrap gap-2">
-          <Button
-            nativeButton={false}
-            render={
-              <Link
-                href={buildProductionQueueHref({
-                  attention,
-                  channelProfileId: null,
-                  release,
-                })}
-              />
-            }
-            size="sm"
-            variant={channelProfileId === null ? "secondary" : "ghost"}
-          >
-            Every channel
-          </Button>
-          {channels.map((channel) => (
-            <Button
-              key={channel.id}
-              nativeButton={false}
-              render={
-                <Link
-                  href={buildProductionQueueHref({
+              >
+                {ATTENTION_FILTER_LABELS[value]}
+              </Link>
+            ))}
+          </div>
+        </nav>
+        <div className="min-w-0 space-y-2">
+          <Label htmlFor="queue-release">Release state</Label>
+          <FormSelect
+            id="queue-release"
+            className="w-full min-w-0"
+            value={release}
+            disabled={isPending}
+            onValueChange={(value) => {
+              const nextRelease = PRODUCTION_QUEUE_RELEASE_FILTERS.find(
+                (candidate) => candidate === value,
+              );
+              if (nextRelease)
+                navigate(
+                  buildProductionQueueHref({
                     attention,
-                    channelProfileId: channel.id,
-                    release,
-                  })}
-                />
-              }
-              size="sm"
-              variant={channelProfileId === channel.id ? "secondary" : "ghost"}
-            >
-              {channel.name}
-            </Button>
-          ))}
+                    channelProfileId,
+                    release: nextRelease,
+                  }),
+                );
+            }}
+          >
+            {PRODUCTION_QUEUE_RELEASE_FILTERS.map((value) => (
+              <SelectItem key={value} value={value}>
+                {RELEASE_FILTER_LABELS[value]}
+              </SelectItem>
+            ))}
+          </FormSelect>
         </div>
-      ) : null}
-    </nav>
+        <div className="min-w-0 space-y-2">
+          <Label htmlFor="queue-channel">Channel</Label>
+          <FormSelect
+            id="queue-channel"
+            className="w-full min-w-0"
+            value={channelProfileId ?? ""}
+            disabled={isPending || channels.length === 0}
+            onValueChange={(value) =>
+              navigate(
+                buildProductionQueueHref({
+                  attention,
+                  channelProfileId: value || null,
+                  release,
+                }),
+              )
+            }
+          >
+            <SelectItem value="">Every channel</SelectItem>
+            {unavailableChannel && (
+              <SelectItem value={channelProfileId} disabled>
+                Unavailable channel
+              </SelectItem>
+            )}
+            {channels.map((channel) => (
+              <SelectItem key={channel.id} value={channel.id}>
+                {channel.name}
+              </SelectItem>
+            ))}
+          </FormSelect>
+        </div>
+        {isPending && (
+          <p
+            role="status"
+            className="flex items-center gap-2 text-xs text-muted-foreground md:col-span-2"
+          >
+            <Spinner aria-hidden />
+            Updating queue…
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }

@@ -15,9 +15,12 @@ export function ProductionBlockerList({
 }) {
   if (blockers.length === 0) return null;
   return (
-    <ul className="space-y-1">
+    <ul className="space-y-2">
       {blockers.map((blocker) => (
-        <li className="flex items-start gap-1.5 text-xs" key={blocker.kind}>
+        <li
+          className="flex min-w-0 items-start gap-2 text-sm leading-relaxed"
+          key={blocker.kind}
+        >
           {blocker.severity === "blocking" ? (
             <AlertTriangleIcon
               aria-hidden
@@ -32,14 +35,15 @@ export function ProductionBlockerList({
           <span
             className={
               blocker.severity === "blocking"
-                ? "text-destructive"
-                : "text-muted-foreground"
+                ? "text-destructive [overflow-wrap:anywhere]"
+                : "text-muted-foreground [overflow-wrap:anywhere]"
             }
           >
             {blocker.message}{" "}
             <Link
               className="underline underline-offset-2 hover:no-underline focus-visible:outline-2 focus-visible:outline-offset-2"
               href={`/app/projects/${projectId}/${blocker.action.href}`}
+              prefetch={false}
             >
               {blocker.action.label}
             </Link>

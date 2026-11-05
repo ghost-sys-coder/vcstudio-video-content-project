@@ -1,6 +1,7 @@
 import type {
   ProductionStage,
   ReleaseState,
+  ProductionReadiness,
 } from "@/lib/production/production-readiness";
 import type {
   ProductionQueueAttentionFilter,
@@ -28,6 +29,34 @@ export const RELEASE_STATE_LABELS: Record<ReleaseState, string> = {
   rendered: "Rendered",
   published: "Published",
 };
+
+export const RELEASE_STATE_TONES: Record<ReleaseState, string> = {
+  published:
+    "border-notice-ready-edge bg-notice-ready text-notice-ready-foreground",
+  rendered:
+    "border-notice-info-edge bg-notice-info text-notice-info-foreground",
+  scheduled:
+    "border-notice-warning-edge bg-notice-warning text-notice-warning-foreground",
+  unpublished: "border-border bg-muted text-muted-foreground",
+};
+
+/** Page-local counts only; a project may appear in both attention counts. */
+export function summarizeProductionQueue(
+  items: ReadonlyArray<{
+    readiness: Pick<ProductionReadiness, "blockers" | "reviews">;
+  }>,
+) {
+  return {
+    shown: items.length,
+    blocked: items.filter((item) =>
+      item.readiness.blockers.some(
+        (blocker) => blocker.severity === "blocking",
+      ),
+    ).length,
+    awaitingReview: items.filter((item) => item.readiness.reviews.length > 0)
+      .length,
+  };
+}
 
 export const RELEASE_FILTER_LABELS: Record<
   ProductionQueueReleaseFilter,

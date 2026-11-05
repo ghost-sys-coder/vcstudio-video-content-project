@@ -1,5 +1,8 @@
 import { Badge } from "@/components/ui/badge";
-import { RELEASE_STATE_LABELS } from "@/lib/production/production-queue-view";
+import {
+  RELEASE_STATE_LABELS,
+  RELEASE_STATE_TONES,
+} from "@/lib/production/production-queue-view";
 import type { ReleaseState } from "@/lib/production/production-readiness";
 
 /**
@@ -7,18 +10,10 @@ import type { ReleaseState } from "@/lib/production/production-readiness";
  * a published one are different things and a scheduled one is neither.
  */
 export function ProductionReleaseBadge({ state }: { state: ReleaseState }) {
-  const tone: Record<ReleaseState, string> = {
-    published:
-      "bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300",
-    rendered:
-      "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
-    scheduled: "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300",
-    unpublished: "",
-  };
   return (
     <Badge
-      className={tone[state] || undefined}
-      variant={state === "unpublished" ? "secondary" : undefined}
+      className={`h-6 px-2.5 text-xs ${RELEASE_STATE_TONES[state]}`}
+      variant="outline"
     >
       {RELEASE_STATE_LABELS[state]}
     </Badge>

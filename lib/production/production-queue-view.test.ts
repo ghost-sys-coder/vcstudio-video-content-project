@@ -3,7 +3,61 @@ import {
   RELEASE_STATE_LABELS,
   buildProductionQueueHref,
   formatPlannedRelease,
+  summarizeProductionQueue,
 } from "@/lib/production/production-queue-view";
+import type { ProductionReadiness } from "./production-readiness";
+
+describe("page-local queue summary", () => {
+  it("counts projects once, keeps warnings separate from blockers and allows overlapping reviews", () => {
+    const action = { label: "Review", href: "scenes" };
+    const blocked: Pick<ProductionReadiness, "blockers" | "reviews"> = {
+      blockers: [
+        {
+          kind: "images_failed",
+          severity: "blocking",
+          message: "Failed",
+          action,
+        },
+        {
+          kind: "audio_failed",
+          severity: "blocking",
+          message: "Failed",
+          action,
+        },
+      ],
+      reviews: [
+        {
+          kind: "images_awaiting_review",
+          count: 3,
+          message: "Three reviews",
+          action,
+        },
+      ],
+    };
+    const warning: Pick<ProductionReadiness, "blockers" | "reviews"> = {
+      blockers: [
+        {
+          kind: "render_failed",
+          severity: "warning",
+          message: "Warning",
+          action,
+        },
+      ],
+      reviews: [],
+    };
+    expect(
+      summarizeProductionQueue([
+        { readiness: blocked },
+        { readiness: warning },
+      ]),
+    ).toEqual({ shown: 2, blocked: 1, awaitingReview: 1 });
+    expect(summarizeProductionQueue([])).toEqual({
+      shown: 0,
+      blocked: 0,
+      awaitingReview: 0,
+    });
+  });
+});
 
 describe("buildProductionQueueHref", () => {
   it("keeps the bare queue URL clean when nothing is filtered", () => {

@@ -12,18 +12,22 @@ export function ProductionReviewList({
 }) {
   if (reviews.length === 0) return null;
   return (
-    <ul className="space-y-1">
+    <ul className="space-y-2">
       {reviews.map((review) => (
-        <li className="flex items-start gap-1.5 text-xs" key={review.kind}>
+        <li
+          className="flex min-w-0 items-start gap-2 text-sm leading-relaxed"
+          key={review.kind}
+        >
           <EyeIcon
             aria-hidden
-            className="mt-0.5 size-3.5 shrink-0 text-amber-600"
+            className="mt-1 size-3.5 shrink-0 text-notice-warning-foreground"
           />
-          <span className="text-amber-700 dark:text-amber-500">
+          <span className="text-notice-warning-foreground [overflow-wrap:anywhere]">
             {review.message}{" "}
             <Link
               className="underline underline-offset-2 hover:no-underline focus-visible:outline-2 focus-visible:outline-offset-2"
               href={`/app/projects/${projectId}/${review.action.href}`}
+              prefetch={false}
             >
               {review.action.label}
             </Link>

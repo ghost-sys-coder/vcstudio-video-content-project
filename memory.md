@@ -2,6 +2,13 @@
 
 Last updated: 2026-11-05 (Africa/Kampala)
 
+## Latest work - Production queue UI (2026-11-05)
+
+- User requested the Queue UI receive the same design as MCP settings, Readiness and Usage. Updated the page hierarchy, added a summary of loaded rows, grouped attention links with shadcn release/channel selects, and made project cards, metadata, next-step links, badges, issue lists and empty/pagination states consistent with the operations pages.
+- Important existing behavior: readiness/release filters run after SQL pagination. Counts are explicitly page-local and can overlap; an empty filtered page keeps pagination to later matches. Query/readiness logic remains unchanged. Filter changes preserve the other supported filters and reset the page. Links avoid prefetch; disabled paging controls are native buttons.
+- Validation passed 77 targeted unit tests, nine isolated Queue browser checks, formatting, TypeScript, full lint with three existing warnings, focused lint and production build. Visually inspected Light desktop and Dark mobile screenshots; all four Light/Dark desktop/mobile layout cases passed, as did URL/filter preservation, filtered-empty pagination, empty/out-of-range recovery, long selects and unavailable-channel recovery. No live database/provider/worker verification was used.
+- Queue work is complete locally and uncommitted. The prior push authorization was for the completed dashboard recovery follow-up, not a request to publish this new UI. No migrations, environment values, dependencies or workers changed. Keep Marketing paused, owner-only access intact and the MCP live-test round closed.
+
 ## Release follow-up authorized (2026-11-05)
 
 - User explicitly authorized committing and pushing the remaining verified changes to `master`, superseding the earlier hold. The follow-up contains final documentation and standard spinner slot markup; the Readiness and Usage/retry implementations are already in `53d600c` and `b808b96`.
