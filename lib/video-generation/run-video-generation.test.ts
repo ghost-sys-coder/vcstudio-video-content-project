@@ -152,6 +152,27 @@ beforeEach(() => {
   });
 });
 describe("durable video lifecycle with mocked providers and storage", () => {
+  it("shows actionable Google capacity feedback and retains uncertain charges without resubmission", async () => {
+    mocks.check.mockResolvedValue({
+      status: "failed",
+      jobId: "provider-job",
+      requestId: "request-id",
+      code: "google_resource_exhausted",
+      safeMessage: "Provider capacity unavailable",
+    });
+    expect(await runVideoGeneration(scope, mocks.wait)).toMatchObject({
+      status: "requires_reconciliation",
+      code: "google_resource_exhausted",
+    });
+    expect(mocks.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        values: expect.objectContaining({
+          safeErrorMessage: expect.stringContaining("RESOURCE_EXHAUSTED"),
+        }),
+      }),
+    );
+    expect(mocks.settle).not.toHaveBeenCalled();
+  });
   it("claims one submission, persists its handle before polling, inspects and saves privately", async () => {
     expect(await runVideoGeneration(scope, mocks.wait)).toMatchObject({
       status: "succeeded",

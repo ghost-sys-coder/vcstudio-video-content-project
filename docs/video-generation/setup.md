@@ -129,3 +129,11 @@ UGC avatars, voice cloning, provider video editing/extension, lip-sync and
 Marketing automation remain subsequent features. Generation is not exposed through
 MCP v1. Existing MCP import/reuse/publish behavior is preserved. Marketing Studio
 remains paused, LinkedIn Pages remains on hold, and private access remains enabled.
+
+## Production verification result (5 November 2026)
+
+The web app and worker were released after both migrations passed on a production clone and production. Existing business rows were unchanged. The initial worker is 20261105.1; public landing/waitlist and private-route/MCP authentication checks pass.
+
+The only live Google operation reached the provider and failed with `RESOURCE_EXHAUSTED`. Google returned no video and no usage totals. The application retains the 60-cent estimate until billing can be confirmed; it does not label it a paid charge or issue another billable request. Check the API project associated with `GOOGLE_AI_VIDEO_GENERATION_API_KEY` in [AI Studio rate limits](https://ai.dev/rate-limit) and its billing page. A credit balance does not establish model quota or available capacity. [Google rate-limit documentation](https://ai.google.dev/gemini-api/docs/rate-limits) describes resource-exhaustion responses. Live successful-generation verification remains outstanding; deterministic provider, transfer, inspection and actual local mixed-media render checks passed.
+
+The isolated verification branch `br-weathered-sky-airuhtwg` is retained with five-minute auto-suspend; it is separate from production and contains only the migration-test changes.

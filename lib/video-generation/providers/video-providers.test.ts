@@ -11,6 +11,28 @@ function json(value: unknown) {
   });
 }
 describe("documented Google video protocol", () => {
+  it("preserves the documented resource-exhaustion code without exposing raw provider details", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      json({
+        id: "quota-job",
+        status: "failed",
+        errors: [
+          {
+            code: "RESOURCE_EXHAUSTED",
+            message: "sensitive internal detail",
+          },
+        ],
+      }),
+    );
+    const result = await new GoogleVideoProvider("key", fetcher).check(
+      "quota-job",
+    );
+    expect(result).toMatchObject({
+      status: "failed",
+      code: "google_resource_exhausted",
+    });
+    expect(JSON.stringify(result)).not.toContain("sensitive internal detail");
+  });
   const model = VIDEO_MODELS[0]!;
   const request = {
     ...defaultVideoRequest(model),

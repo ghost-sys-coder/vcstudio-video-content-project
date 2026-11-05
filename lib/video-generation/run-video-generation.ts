@@ -310,7 +310,9 @@ export async function runVideoGeneration(
         errorCode: code,
         safeErrorMessage: unbilled
           ? "Video could not start. Check model access and reference assets; no generation charge was recorded."
-          : "This operation needs attention. Its estimate remains reserved. Resume the existing provider job when available; do not submit a duplicate.",
+          : code === "google_resource_exhausted"
+            ? "Google could not allocate video capacity (RESOURCE_EXHAUSTED). Check this API project's model quota, rate limits and billing in Google AI Studio. No video was returned. The estimate remains reserved until its charge is confirmed; do not submit a duplicate."
+            : "This operation needs attention. Its estimate remains reserved. Resume the existing provider job when available; do not submit a duplicate.",
         ...(unbilled ? { completedAt: new Date() } : {}),
         encryptedOutput: null,
       },

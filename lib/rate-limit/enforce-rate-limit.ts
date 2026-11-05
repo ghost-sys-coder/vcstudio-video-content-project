@@ -10,6 +10,7 @@ import {
 } from "@/lib/rate-limit/rate-limit";
 
 export type RateLimitedOperation =
+  | "video_generation"
   | "scene_analysis"
   | "scene_image_generation"
   | "scene_audio_generation"

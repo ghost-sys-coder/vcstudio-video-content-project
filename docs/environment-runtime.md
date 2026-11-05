@@ -30,9 +30,7 @@ overrides versioned, validated model pricing; unavailable rates cannot start.
 All eight variables belong in local, web and worker configuration. Reuse the
 existing signing and token-encryption secrets; no new signing service is added.
 
-This work is not yet released. Keep generation disabled until the mixed-media
-renderer, migration verification and complete release checks pass. Marketing
-remains paused and the existing recovery schedules retain their frequency.
+The feature is enabled in production after renderer, migration and release checks. Google is the only configured provider; the first live operation returned RESOURCE_EXHAUSTED without an output. Resolve provider quota/capacity before further live verification. Marketing remains paused and recovery schedules retain their frequency. Blank budget/rate placeholders use their documented defaults; explicitly invalid values remain errors.
 
 ## Usage and operational defaults
 

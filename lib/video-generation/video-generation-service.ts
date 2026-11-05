@@ -31,6 +31,7 @@ import {
 } from "@/db/commands/video-generation-commands";
 import { loadEffectiveWorkspaceBudget } from "@/lib/budgets/workspace-budget";
 import { recordAuditEvent } from "@/lib/audit/record-audit-event";
+import { enforceRateLimit } from "@/lib/rate-limit/enforce-rate-limit";
 import { findVideoModel, findVideoPricing } from "./video-model-catalog";
 import { planVideoGeneration } from "./plan-video-generation";
 import {
@@ -314,6 +315,10 @@ export async function startVideoGeneration(
   const quote = verifyVideoQuote({
     ...planned.quoteContext,
     token: input.quoteToken,
+  });
+  await enforceRateLimit({
+    workspaceId: context.workspaceId,
+    operation: "video_generation",
   });
   const budget = await loadEffectiveWorkspaceBudget(context);
   const finalPrompt =

@@ -957,48 +957,33 @@ export const publishingWebEnvironmentSchema = z.object({
 });
 
 export const usageEnvironmentSchema = z.object({
-  DEFAULT_DAILY_BUDGET_CENTS: z.coerce.number().int().positive().default(500),
-  DEFAULT_MONTHLY_BUDGET_CENTS: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(5000),
-  MANUAL_CONFIRMATION_THRESHOLD_CENTS: z.coerce
-    .number()
-    .int()
-    .nonnegative()
-    .max(100000)
-    .default(100),
+  DEFAULT_DAILY_BUDGET_CENTS: defaultedSetting(
+    z.coerce.number().int().positive().default(500),
+  ),
+  DEFAULT_MONTHLY_BUDGET_CENTS: defaultedSetting(
+    z.coerce.number().int().positive().default(5000),
+  ),
+  MANUAL_CONFIRMATION_THRESHOLD_CENTS: defaultedSetting(
+    z.coerce.number().int().nonnegative().max(100000).default(100),
+  ),
   // Fixed-window rate limiting for billable/mutating operations. Enforced in the
   // web runtime before a reservation is created, so these are Vercel-only.
-  RATE_LIMIT_WINDOW_SECONDS: z.coerce
-    .number()
-    .int()
-    .min(1)
-    .max(3600)
-    .default(60),
-  RATE_LIMIT_GENERATIONS_PER_WINDOW: z.coerce
-    .number()
-    .int()
-    .min(1)
-    .max(1000)
-    .default(30),
-  RATE_LIMIT_RENDERS_PER_WINDOW: z.coerce
-    .number()
-    .int()
-    .min(1)
-    .max(1000)
-    .default(10),
+  RATE_LIMIT_WINDOW_SECONDS: defaultedSetting(
+    z.coerce.number().int().min(1).max(3600).default(60),
+  ),
+  RATE_LIMIT_GENERATIONS_PER_WINDOW: defaultedSetting(
+    z.coerce.number().int().min(1).max(1000).default(30),
+  ),
+  RATE_LIMIT_RENDERS_PER_WINDOW: defaultedSetting(
+    z.coerce.number().int().min(1).max(1000).default(10),
+  ),
   /**
    * Marketing chat gets its own ceiling. A conversation is chatty by nature, so
    * sharing the generation limit would make ordinary use look like abuse.
    */
-  RATE_LIMIT_MARKETING_CHAT_PER_WINDOW: z.coerce
-    .number()
-    .int()
-    .min(1)
-    .max(1000)
-    .default(20),
+  RATE_LIMIT_MARKETING_CHAT_PER_WINDOW: defaultedSetting(
+    z.coerce.number().int().min(1).max(1000).default(20),
+  ),
 });
 
 export const storageReconciliationEnvironmentSchema = z.object({

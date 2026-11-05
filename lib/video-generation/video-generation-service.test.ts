@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   model: vi.fn(),
   price: vi.fn(),
   sceneImage: vi.fn(),
+  rate: vi.fn(),
 }));
 vi.mock("@/lib/auth/require-authenticated-user", () => ({
   requireAuthenticatedUser: mocks.user,
@@ -54,6 +55,9 @@ vi.mock("@/db/commands/video-generation-commands", async (original) => {
   };
 });
 vi.mock("@trigger.dev/sdk", () => ({ tasks: { trigger: mocks.trigger } }));
+vi.mock("@/lib/rate-limit/enforce-rate-limit", () => ({
+  enforceRateLimit: mocks.rate,
+}));
 vi.mock("@/lib/env/server", () => ({
   getVideoGenerationEnvironment: mocks.environment,
 }));
@@ -85,6 +89,7 @@ const workspaceId = "11111111-1111-4111-8111-111111111111",
   assetId = "33333333-3333-4333-8333-333333333333";
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.rate.mockResolvedValue(undefined);
   mocks.user.mockResolvedValue({ id: userId });
   mocks.membership.mockResolvedValue({ workspaceId, role: "owner" });
   mocks.existing.mockResolvedValue(null);
@@ -116,6 +121,25 @@ beforeEach(() => {
   });
 });
 describe("video service authorization, quotes and dispatch", () => {
+  it("applies the workspace generation rate limit before creating a paid reservation", async () => {
+    const quote = await quoteVideoGeneration(
+      workspaceId,
+      syntheticVideoRequest,
+    );
+    mocks.rate.mockRejectedValue(new Error("Rate limit reached"));
+    await expect(
+      startVideoGeneration(workspaceId, {
+        request: syntheticVideoRequest,
+        quoteToken: quote.token,
+        idempotencyKey: "rate-limited-test-request",
+      }),
+    ).rejects.toThrow("Rate limit");
+    expect(mocks.rate).toHaveBeenCalledWith({
+      workspaceId,
+      operation: "video_generation",
+    });
+    expect(mocks.reserve).not.toHaveBeenCalled();
+  });
   it("binds approved project image references to the exact authorized scene version", async () => {
     const target = {
       kind: "scene" as const,

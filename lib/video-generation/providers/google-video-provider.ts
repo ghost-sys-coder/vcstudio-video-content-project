@@ -18,6 +18,7 @@ const contentSchema = z.object({
 const interactionSchema = z.object({
   id: z.string().min(1).max(500),
   status: z.string(),
+  errors: z.array(z.object({ code: z.string() })).optional(),
   steps: z
     .array(
       z.object({
@@ -70,7 +71,9 @@ export class GoogleVideoProvider implements VideoProvider {
         status: "failed",
         jobId: data.id,
         requestId: data.id,
-        code: "google_generation_failed",
+        code: data.errors?.some((error) => error.code === "RESOURCE_EXHAUSTED")
+          ? "google_resource_exhausted"
+          : "google_generation_failed",
         safeMessage:
           "Google could not complete this video. Review the existing operation before retrying.",
       };

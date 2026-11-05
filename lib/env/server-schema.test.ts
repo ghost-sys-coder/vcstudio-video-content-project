@@ -72,6 +72,27 @@ describe("project environment validation", () => {
 });
 
 describe("usage environment validation", () => {
+  it("uses existing defaults for blank budget/rate placeholders while rejecting invalid explicit values", () => {
+    const blanks = Object.fromEntries(
+      Object.keys(usageEnvironmentSchema.shape).map((key) => [key, " "]),
+    );
+    expect(usageEnvironmentSchema.parse(blanks)).toEqual(
+      usageEnvironmentSchema.parse({}),
+    );
+    for (const key of [
+      "RATE_LIMIT_WINDOW_SECONDS",
+      "RATE_LIMIT_GENERATIONS_PER_WINDOW",
+      "RATE_LIMIT_RENDERS_PER_WINDOW",
+      "RATE_LIMIT_MARKETING_CHAT_PER_WINDOW",
+    ]) {
+      expect(usageEnvironmentSchema.safeParse({ [key]: "0" }).success).toBe(
+        false,
+      );
+      expect(
+        usageEnvironmentSchema.safeParse({ [key]: "invalid" }).success,
+      ).toBe(false);
+    }
+  });
   it("uses the Phase 10 budget and confirmation defaults", () => {
     expect(usageEnvironmentSchema.parse({})).toEqual({
       DEFAULT_DAILY_BUDGET_CENTS: 500,

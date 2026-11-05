@@ -66,7 +66,7 @@ checking current pricing. Do not spend the remaining credit on test batches.
 
 ## Delivery checklist
 
-Implementation and isolated verification are complete; production release is in progress. Four direct models across Google, Runway and Luma share authenticated quotes, reservations and durable workers. Both migrations passed on a production clone with unchanged business fingerprints. The final full suite passed 2,960 tests (163 skipped), all 55 mocked browser journeys passed, TypeScript passed and lint has only three existing warnings. Two additional actual-SQL readiness tests and the production-clone readiness query pass. A real local Remotion export verified mixed media, contain bars, looping and independent narration. No paid generation has run. The final production build passes; production migration/deployment and the bounded Google smoke remain.
+The base feature is live in production, with both migrations applied and the web/worker deployed. The full implementation suite passed 2,960 tests (163 skipped), all 55 mocked browser journeys passed, and actual local mixed-media export and database checks passed. The current quota-feedback/rate-limit follow-up passes 111 focused tests, lint with three existing warnings, and the production build including TypeScript. One live Google request returned RESOURCE_EXHAUSTED without video or usage totals; its 60-cent reservation remains pending. The user requested publishing the current work and deferring successful provider verification and remaining follow-up.
 
 - [x] Shared contracts, capability validation, quotes and idempotency rules.
 - [x] Verified official provider/model matrix and adapters with mocked tests.
@@ -79,7 +79,7 @@ Implementation and isolated verification are complete; production release is in 
 - [x] Existing usage, audit, media inspection and recovery integration.
 - [x] Responsive Light/Dark UI and keyboard/error/loading/empty states.
 - [x] Documentation, environment ownership, setup and rollout instructions.
-- [ ] Formatting, lint, TypeScript, unit/integration tests, critical mocked
+- [x] Formatting, lint, TypeScript, unit/integration tests, critical mocked
       browser journeys, environment checks, production build and dependency audit
       when dependencies change.
 - [ ] Requirement-by-requirement completion audit with concrete evidence.
@@ -97,6 +97,4 @@ intact. Verification uses mocked providers/workers and isolated PostgreSQL.
 
 The original baseline had a scene-only start task, a 720p ceiling, discarded native audio and image-only timeline inputs. The new implementation replaces these limits for the new generator and carries selected footage through actual previews and renders. Existing legacy workers remain disabled and share the conservative single-job video queue.
 
-Provider access and live output quality/cost cannot be verified without actual
-account access and explicit spending approval. The implementation must expose
-this honestly while remaining fully testable with deterministic fixtures.
+The authorized live Google check reached the provider but returned RESOURCE_EXHAUSTED. Successful live generation and confirmed usage remain unverified and are deferred at the user's request. No additional automatic provider call is authorized by this release request.
