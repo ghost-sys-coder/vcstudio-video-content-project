@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 export function Spinner({ className, ...props }: ComponentProps<"svg">) {
   return (
     <LoaderIcon
+      data-slot="spinner"
       role="status"
       aria-label="Loading"
       className={cn(

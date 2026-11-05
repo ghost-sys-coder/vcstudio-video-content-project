@@ -2,13 +2,26 @@
 
 Last updated: 2026-11-05 (Africa/Kampala)
 
+## Release follow-up authorized (2026-11-05)
+
+- User explicitly authorized committing and pushing the remaining verified changes to `master`, superseding the earlier hold. The follow-up contains final documentation and standard spinner slot markup; the Readiness and Usage/retry implementations are already in `53d600c` and `b808b96`.
+
+## Latest work - Usage environment isolation and visible retries (2026-11-05)
+
+- User reported local Usage failure and no visible feedback from the shared “Try again” button, and initially withheld pushing; the subsequent explicit push request above supersedes that hold.
+- Local development logs show blank unused OpenAI TTS fields failing `getSceneAudioEnvironment()` while Usage reads operational defaults. Extracted a provider-independent four-limit schema/getter and reused those validators in image/audio/render schemas. Usage limit loading now avoids provider/worker credentials. Blank defaulted limits use the existing defaults; explicit invalid values are rejected. Workspace overrides and enforcement stay intact.
+- Shared `ApplicationErrorState` now refreshes the router and resets the boundary in one transition, with a shadcn Spinner, disabled pending button, “Trying again…” and visible accessible status. Failed retries allow another attempt; dashboard navigation uses a link. Added mocked browser coverage for pending/duplicate clicks, failed retry and recovery in Light/Dark at mobile/desktop widths, plus actual-schema Usage loader integration coverage.
+- Validation passed all 65 targeted unit/integration tests, 15 isolated browser checks, formatting, TypeScript, full lint (three existing warnings) and the production build. Directly validated the four-limit schema against `.env`, `.env.vercel` and `.env.trigger`; values were unchanged.
+- During verification, external commits `53d600c` (Readiness correction despite its Usage commit title) and `b808b96` (Usage and retry corrections) appeared and reached Ready production deployments. No agent push/deployment was performed. Latest deployment is `dpl_5SbCcDhX4W7y8vzTRgsN8U4ChE18`. Final documentation and spinner slot markup are included in the authorized follow-up.
+- Browser-host access was unavailable, so no signed-in live-page smoke was performed. Browser coverage used mocked data; loader integration used the actual environment schema with mocked database repositories. No migrations, environment values, dependencies or workers changed. Preserve Marketing pause, owner-only access and the closed MCP live-test round.
+
 ## Latest work - Readiness cached-render crash (2026-11-05)
 
 - User reported production `/app/readiness` falling into the error boundary after the UI release. Vercel confirmed `TypeError: a.checkedAt.toISOString is not a function` on deployment `dpl_HRjWUaxiizKQDT6N9zybCdtjjMrv`, commit `2897bf4`.
 - Cause: Next.js `unstable_cache` serializes Date objects to strings. The redesigned overview assumed a Date on a warm cache read. The Readiness view now carries an ISO string consistently; display formatting parses it explicitly and the time element uses it directly.
 - Added an integration regression with the actual Next.js cache serializer and isolated in-memory backing store, mocking database and storage. It covers fresh/cached rendering, avoiding repeated probes and workspace isolation. Both regression cases failed before the fix and now pass. The browser fixture also uses an ISO string.
 - Validation passed all nine Readiness unit/integration tests, six focused Light/Dark/mobile browser checks, formatting, TypeScript, full lint (four existing warnings) and production build. The initial sandbox build failed to download existing Google Fonts; the network-enabled rerun passed.
-- This fix is local and unreleased. No database, environment, dependency or worker changes; preserve the existing 60-second cache, Marketing pause, private access and closed MCP live test round.
+- Released externally as `53d600c`; Vercel reports deployment `dpl_AA1JXbMwMeiEBiGtWjLS6pQu4NgH` Ready. No agent push/deployment was performed. No database, environment, dependency or worker changes; preserve the existing 60-second cache, Marketing pause, private access and closed MCP live test round.
 
 ## Latest work - Readiness and Usage UI (2026-11-05)
 

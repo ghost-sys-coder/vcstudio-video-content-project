@@ -10,6 +10,10 @@ be copied to another runtime merely for convenience.
 | `.env.trigger` | Trigger.dev                     | Background tasks and scheduled workers. Synchronized during deployment. Never committed. |
 | `.env.example` | Repository                      | Key catalogue and safe defaults only; contains no real credentials.                      |
 
+## Usage and operational defaults
+
+The Usage page reads the operational-limit schema independently of provider and worker configuration. `MAX_IMAGES_PER_BATCH`, `MAX_SCENES_PER_AUDIO_BATCH`, `MAX_RENDER_DURATION_SECONDS` and `MAX_RENDER_ATTEMPTS` share their validators with the corresponding generation/render workflows. Unset or blank placeholders use the documented defaults (25 images, 25 audio scenes, 900 seconds and two attempts); explicit invalid values fail validation. Workspace overrides continue to use the existing limit policies. Each generation/render feature validates its full provider configuration when used.
+
 ## Owner-only private development
 
 `ENABLE_PRIVATE_ACCESS` and `PRIVATE_ACCESS_CLERK_USER_IDS` belong only in `.env`,

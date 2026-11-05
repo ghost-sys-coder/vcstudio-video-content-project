@@ -18,6 +18,11 @@ Loading indicators describe a real pending request. They do not replace limiting
 - Native image previews elsewhere in the application use lazy loading and async decoding. The small navbar workspace logo remains eager. Existing Next Image previews retain their default lazy behavior, and an image explicitly opened for review may load immediately. Recording metadata is fetched only for the selected recording.
 - Private signed image URLs remain private and expiring. They are not persisted or sent through a new public image cache. Original image bytes are still served; responsive thumbnail variants and measured deployment latency remain future work.
 
+## Application error recovery
+
+- The shared application error boundary retries a server view by refreshing the router and resetting the boundary in one React transition. The shadcn retry button shows a spinner and “Trying again…” while the request is pending, disables duplicate submissions, and announces a visible status message. A failed retry keeps a usable retry control with explicit feedback; a successful retry replaces the fallback with the loaded view.
+- The dashboard escape control remains a keyboard-accessible navigation link. Retry controls wrap within narrow containers and support Light/Dark themes and reduced motion.
+
 ## Verification
 
 Unit and mocked integration coverage checks query scoping, bounded signing, cursor direction, empty windows, permissions, count-free picker reads, batch query count, and safe error messages. Isolated browser checks exercise form submission/reset, grouped and numeric selects, 40px adjacent control heights, nested dialogs, left-aligned post navigation, picker pagination/retry, and the absence of video downloads before playback. No live Neon, R2, Trigger.dev, or provider call is needed for these checks.
