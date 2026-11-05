@@ -1,5 +1,10 @@
 # Project memory
 
+## Latest work — One-click configured TikTok connections (5 November 2026)
+
+- The user requested a nontechnical connect flow and explicitly named the existing `TIKTOK_API_CLIENT_KEY` and `TIKTOK_API_CLIENT_SECRET` values in the environment files. Local `.env`, `.env.vercel` and `.env.trigger` contain matching nonempty values (checked without printing them). Connect/Add TikTok now navigates directly to the existing owner-authorized `/api/tiktok/authorize` route, removing the developer-credential dialog from the normal UI. The shadcn link keeps the branded size, shows progress, blocks repeat activation and resets on browser restoration.
+- The configured route and callback use server environment credentials and the existing signed user/workspace state. Every attempt retains `disable_auto_auth=1`; selecting or switching the logged-in account remains on TikTok. A setup failure returns to account feedback instead of a blank error page. Multiple account rows remain independent. Existing custom sandbox credentials/flows stay supported for their prior connections. Workers need matching configured credentials for normal connections, but this change adds no worker code, environment key, dependency or migration. Marketing and LinkedIn Pages remain paused and Google video generation remains on hold.
+
 ## Latest work — TikTok repeated authorization (5 November 2026)
 
 - The user confirmed that TikTok reuses the browser's currently logged-in account when trying to connect additional target accounts. The shared provider URL now sends TikTok's documented `disable_auto_auth=1`, covering sandbox and standard authorization. This requires TikTok to show authorization; it does not promise account selection, automatic logout or silent switching. The dialog and setup documentation tell the user to check the displayed identity and switch/log out of TikTok if necessary, using the same sandbox credentials for all target accounts and completing flows sequentially. Existing connected accounts remain independent; reauthorizing the same `open_id` updates only that row.

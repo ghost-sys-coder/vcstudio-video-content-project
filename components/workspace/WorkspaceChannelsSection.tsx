@@ -69,7 +69,7 @@ const TIKTOK_OAUTH_MESSAGES: Record<string, string> = {
   connected: "The TikTok account is now connected to this workspace.",
   cancelled: "TikTok connection was cancelled.",
   failed:
-    "The TikTok account could not be connected. Check the sandbox credentials, target user, enabled scopes and exact callback, then connect again.",
+    "The TikTok account could not be connected. Try again with the intended TikTok account. If this continues, ask a workspace owner to check the app connection setup.",
   forbidden: "You do not have permission to connect that account.",
   invalid: "The TikTok authorization response was invalid or expired.",
 };
@@ -163,6 +163,14 @@ export function WorkspaceChannelsSection({
           ) : null}
         </div>
       </div>
+
+      {canManageConnections && initialData.enabled ? (
+        <p className="text-sm text-muted-foreground">
+          TikTok opens its own sign-in and authorization page. Check the account
+          shown before approving; switch accounts there to add another. Your
+          existing connected accounts stay available.
+        </p>
+      ) : null}
 
       {!canManageConnections ? (
         <p className="text-sm text-muted-foreground">

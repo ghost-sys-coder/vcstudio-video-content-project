@@ -70,6 +70,12 @@ describe("shared accounts page", () => {
       if (role === "owner") {
         expect(markup).toContain('href="/api/linkedin/authorize"');
         expect(markup).toContain('href="/api/youtube/authorize"');
+        expect(markup).toContain('href="/api/tiktok/authorize"');
+        expect(markup).not.toContain("Sandbox Client Secret");
+        expect(markup).not.toContain("Sandbox Client Key");
+        expect(markup).toContain(
+          "TikTok opens its own sign-in and authorization page",
+        );
         expect(markup).toContain("Disconnect</button>");
       } else {
         expect(markup).not.toContain("/authorize");

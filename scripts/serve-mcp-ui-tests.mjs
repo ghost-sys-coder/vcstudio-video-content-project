@@ -114,6 +114,12 @@ for (const [name, entry] of [
 }
 const server = createServer(async (req, res) => {
   const filename = new URL(req.url, "http://localhost").pathname;
+  if (filename === "/test-tiktok-authorization") {
+    res
+      .writeHead(200, { "Content-Type": "text/html; charset=utf-8" })
+      .end("<!doctype html><h1>TikTok authorization</h1>");
+    return;
+  }
   if (filename === "/__test_shutdown" && req.method === "POST") {
     res.writeHead(204).end();
     setImmediate(() => {

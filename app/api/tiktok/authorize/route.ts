@@ -6,6 +6,7 @@ import {
 } from "@/lib/env/server";
 import { can } from "@/lib/policies/workspace-policy";
 import { createOAuthState } from "@/lib/publishing/oauth-state";
+import { WORKSPACE_CONNECTIONS_PATH } from "@/lib/publishing/connections-navigation";
 import {
   createRedirectUri,
   createVideoPublishProvider,
@@ -36,6 +37,8 @@ export async function GET() {
       { status: 307, headers: noStore },
     );
   } catch {
-    return new NextResponse(null, { status: 500, headers: noStore });
+    const target = new URL(WORKSPACE_CONNECTIONS_PATH, web.APP_BASE_URL);
+    target.searchParams.set("tiktok", "failed");
+    return NextResponse.redirect(target, { status: 307, headers: noStore });
   }
 }

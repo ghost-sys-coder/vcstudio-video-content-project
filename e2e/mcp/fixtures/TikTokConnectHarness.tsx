@@ -7,6 +7,7 @@ export function TikTokConnectHarness() {
       <div className="flex flex-wrap gap-2">
         <ConnectLinkedInButton />
         <ConnectTikTokButton />
+        <ConnectTikTokButton label="Add another TikTok account" />
       </div>
       <ConnectTikTokButton disabled label="Disabled TikTok" />
     </main>
