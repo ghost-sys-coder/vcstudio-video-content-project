@@ -53,6 +53,7 @@ export class RemotionVideoRenderProvider implements VideoRenderProvider {
       serveUrl,
       id: input.compositionId,
       inputProps: input.input,
+      browserExecutable: input.chromiumExecutable,
     });
 
     await renderMedia({

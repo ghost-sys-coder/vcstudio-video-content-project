@@ -16,6 +16,7 @@ import { DeleteSceneButton } from "@/components/scenes/DeleteSceneButton";
 import { MergeScenesButton } from "@/components/scenes/MergeScenesButton";
 import { SceneCharacterList } from "@/components/scenes/SceneCharacterList";
 import { SceneImageWorkspace } from "@/components/scenes/SceneImageWorkspace";
+import { SceneVideoPanel } from "@/components/video/SceneVideoPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export function SceneCard({
@@ -79,6 +80,7 @@ export function SceneCard({
                 <SceneImageIndicatorBadge indicator={imageIndicator} />
               ) : null}
             </TabsTrigger>
+            <TabsTrigger value="video">Video &amp; visuals</TabsTrigger>
           </TabsList>
           <TabsContent className="space-y-5 pt-4" keepMounted value="details">
             <SceneCharacterList
@@ -149,6 +151,15 @@ export function SceneCard({
               scene={scene}
               sceneVersion={version}
               videoKind={videoKind}
+            />
+          </TabsContent>
+          <TabsContent className="pt-4" value="video">
+            <SceneVideoPanel
+              key={`${scene.id}-${scene.currentVersion}`}
+              workspaceId={scene.workspaceId}
+              projectId={scene.projectId}
+              sceneId={scene.id}
+              canEdit={canEdit}
             />
           </TabsContent>
         </Tabs>

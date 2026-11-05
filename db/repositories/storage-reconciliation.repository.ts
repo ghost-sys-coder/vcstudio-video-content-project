@@ -241,6 +241,7 @@ export async function isStorageObjectReferenced(
       union all select 1 from scene_audio_generations where asset_object_key = ${objectKey}
       union all select 1 from thumbnail_generations where asset_object_key = ${objectKey}
       union all select 1 from video_renders where asset_object_key = ${objectKey}
+      union all select 1 from scene_visual_selections where object_key = ${objectKey}
       union all select 1 from marketing_knowledge_documents where object_key = ${objectKey}
     ) as present
   `);

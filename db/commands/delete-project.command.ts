@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 import { getDatabase } from "@/db/drizzle";
 import {
@@ -14,6 +14,9 @@ import {
   shortCompositions,
   videoPublications,
   videoRenders,
+  videoGenerations,
+  usageReservations,
+  usageEvents,
 } from "@/db/schema";
 
 /**
@@ -53,7 +56,49 @@ export async function deleteProject(input: {
   const scoped = (projectId: PgColumn, workspaceId: PgColumn) =>
     and(eq(projectId, input.projectId), eq(workspaceId, input.workspaceId));
 
-  const [, , , , , , , , , deletedProjects] = await database.batch([
+  const [, , , , , , , , , , , , , , deletedProjects] = await database.batch([
+    // Separate lock and guard statements ensure the guard sees reservations
+    // committed while waiting. Never delete provider accounting to reset credit.
+    database
+      .select({
+        lock: sql`pg_advisory_xact_lock(hashtextextended(${input.workspaceId},0))`,
+      })
+      .from(projects)
+      .where(scoped(projects.id, projects.workspaceId)),
+    database
+      .select({
+        guard: sql`1 / case when exists(select 1 from usage_reservations where workspace_id=${input.workspaceId}::uuid and project_id=${input.projectId}::uuid and operation_type::text='video_generation' and status='pending') then 0 else 1 end`,
+      })
+      .from(projects)
+      .where(scoped(projects.id, projects.workspaceId)),
+    // Event project IDs are nullable first so their composite FK never dangles.
+    database
+      .update(usageEvents)
+      .set({ projectId: null })
+      .where(
+        and(
+          scoped(usageEvents.projectId, usageEvents.workspaceId),
+          eq(usageEvents.operationType, "video_generation"),
+        ),
+      ),
+    database
+      .update(usageReservations)
+      .set({ projectId: null })
+      .where(
+        and(
+          scoped(usageReservations.projectId, usageReservations.workspaceId),
+          eq(usageReservations.operationType, "video_generation"),
+        ),
+      ),
+    database
+      .update(videoGenerations)
+      .set({
+        projectId: null,
+        sceneId: null,
+        sceneVersionId: null,
+        targetDetached: true,
+      })
+      .where(scoped(videoGenerations.projectId, videoGenerations.workspaceId)),
     // Framings pin a source image with RESTRICT — the constraint that makes a
     // bare cascade abort.
     database

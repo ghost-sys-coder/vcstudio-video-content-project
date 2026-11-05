@@ -18,6 +18,24 @@ const keysByFile = new Map(
 );
 
 const rules = {
+  ...Object.fromEntries(
+    [
+      "ENABLE_VIDEO_GENERATION",
+      "GOOGLE_AI_VIDEO_GENERATION_API_KEY",
+      "RUNWAYML_API_SECRET",
+      "LUMA_AGENTS_API_KEY",
+      "VIDEO_GENERATION_MAX_COST_CENTS",
+      "VIDEO_GENERATION_DAILY_BUDGET_CENTS",
+      "VIDEO_GENERATION_LIFETIME_BUDGET_CENTS",
+      "VIDEO_GENERATION_PRICING_JSON",
+    ].map((key) => [
+      key,
+      {
+        required: [".env.example", ".env", ".env.vercel", ".env.trigger"],
+        forbidden: [],
+      },
+    ]),
+  ),
   ENABLE_PRIVATE_ACCESS: {
     required: [".env.example", ".env", ".env.vercel"],
     forbidden: [".env.trigger"],

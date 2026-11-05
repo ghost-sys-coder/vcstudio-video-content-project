@@ -10,6 +10,30 @@ be copied to another runtime merely for convenience.
 | `.env.trigger` | Trigger.dev                     | Background tasks and scheduled workers. Synchronized during deployment. Never committed. |
 | `.env.example` | Repository                      | Key catalogue and safe defaults only; contains no real credentials.                      |
 
+## Video generation configuration
+
+Video Studio uses `ENABLE_VIDEO_GENERATION` (default
+`false`) independently of legacy `ENABLE_SCENE_VIDEO_GENERATION`. The shared
+web/worker catalogue and preflight read `GOOGLE_AI_VIDEO_GENERATION_API_KEY`
+and optional `RUNWAYML_API_SECRET` and `LUMA_AGENTS_API_KEY`; only the on-demand worker submits provider
+generation requests. Keep these keys server-side in both deployed runtimes.
+
+`VIDEO_GENERATION_MAX_COST_CENTS=150`,
+`VIDEO_GENERATION_DAILY_BUDGET_CENTS=300` and
+`VIDEO_GENERATION_LIFETIME_BUDGET_CENTS=1500` limit requests and the dedicated
+video allowance across workspaces. They are application spending boundaries,
+not a live reading of the provider's credit balance. Existing workspace and
+project budgets apply too. The $15 lifetime default leaves headroom against
+the owner's reported $20 Google credit. Changing it requires an intentional
+operator configuration update. `VIDEO_GENERATION_PRICING_JSON=[]` optionally
+overrides versioned, validated model pricing; unavailable rates cannot start.
+All eight variables belong in local, web and worker configuration. Reuse the
+existing signing and token-encryption secrets; no new signing service is added.
+
+This work is not yet released. Keep generation disabled until the mixed-media
+renderer, migration verification and complete release checks pass. Marketing
+remains paused and the existing recovery schedules retain their frequency.
+
 ## Usage and operational defaults
 
 The Usage page reads the operational-limit schema independently of provider and worker configuration. `MAX_IMAGES_PER_BATCH`, `MAX_SCENES_PER_AUDIO_BATCH`, `MAX_RENDER_DURATION_SECONDS` and `MAX_RENDER_ATTEMPTS` share their validators with the corresponding generation/render workflows. Unset or blank placeholders use the documented defaults (25 images, 25 audio scenes, 900 seconds and two attempts); explicit invalid values fail validation. Workspace overrides continue to use the existing limit policies. Each generation/render feature validates its full provider configuration when used.

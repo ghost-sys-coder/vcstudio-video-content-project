@@ -17,6 +17,7 @@ for (const [name, entry] of [
   ["operations", "e2e/mcp/fixtures/operations-entry.tsx"],
   ["application-error", "e2e/mcp/fixtures/application-error-entry.tsx"],
   ["queue", "e2e/mcp/fixtures/queue-entry.tsx"],
+  ["video", "e2e/mcp/fixtures/video-entry.tsx"],
 ]) {
   const bundle = await build({
     entryPoints: [entry],
@@ -27,6 +28,19 @@ for (const [name, entry] of [
     target: "es2022",
     define: { "process.env.NODE_ENV": '"production"' },
     alias: {
+      ...(name === "video"
+        ? {
+            "next/navigation": path.resolve(
+              "e2e/mcp/fixtures/MockOperationsNavigation.ts",
+            ),
+            "@/app/(authenticated)/app/video/actions": path.resolve(
+              "e2e/mcp/fixtures/MockVideoActions.ts",
+            ),
+            "@/app/(authenticated)/app/social/library-actions": path.resolve(
+              "e2e/mcp/fixtures/MockVideoActions.ts",
+            ),
+          }
+        : {}),
       "next/link": path.resolve("e2e/mcp/fixtures/MockNextLink.tsx"),
       ...(name === "queue"
         ? {
@@ -97,6 +111,7 @@ const server = createServer(async (req, res) => {
     "/operations.html": path.join(out, "operations.html"),
     "/application-error.html": path.join(out, "application-error.html"),
     "/app/queue": path.join(out, "queue.html"),
+    "/video.html": path.join(out, "video.html"),
   };
   if (!allowed[filename]) {
     res.writeHead(404).end();

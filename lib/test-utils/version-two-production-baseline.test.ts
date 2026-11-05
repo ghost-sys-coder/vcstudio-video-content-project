@@ -11,7 +11,7 @@ describe("V2-00 synthetic production baseline", () => {
     expect(timeline.scenes).toHaveLength(40);
     expect(timeline.totalDurationMilliseconds).toBe(489_750);
     expect(timeline.totalFrames).toBe(14_693);
-    expect(timeline.scenes[2]?.image.framing?.focalPointXBps).toBe(6500);
+    expect(timeline.scenes[2]?.image?.framing?.focalPointXBps).toBe(6500);
     expect(timeline.scenes[2]?.captions[0]?.text).toBe(
       "An edited fixture caption.",
     );

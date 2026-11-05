@@ -61,6 +61,9 @@ export function buildRenderTimelineSnapshot(input: {
   const pacing =
     input.pacingProfile ?? PACING_PROFILES[DEFAULT_PACING_PROFILE_ID];
   return {
+    ...(timeline.scenes.some((scene) => scene.video)
+      ? { mediaVersion: 2 as const }
+      : {}),
     width: timeline.width,
     height: timeline.height,
     framesPerSecond: timeline.framesPerSecond,
@@ -86,7 +89,9 @@ export function buildRenderTimelineSnapshot(input: {
       // Shots are placed against the scene's caption lines even when captions
       // are not burned in. The lines are the record of where the narrator
       // paused, and turning subtitles off does not move the pauses.
-      const shotImages = [scene.image, ...scene.additionalShots];
+      const shotImages = scene.image
+        ? [scene.image, ...scene.additionalShots]
+        : [];
       const placement =
         shotImages.length > 1
           ? placeShotsOnCueBoundaries({
@@ -105,7 +110,7 @@ export function buildRenderTimelineSnapshot(input: {
       const shots =
         placement && placement.shots.length > 1
           ? placement.shots.map((slot, index) => {
-              const source = shotImages[index] ?? scene.image;
+              const source = shotImages[index]!;
               return {
                 objectKey: source.objectKey,
                 width: source.width,
@@ -135,18 +140,42 @@ export function buildRenderTimelineSnapshot(input: {
         // Show-all framing must remain show-all throughout playback. Automatic
         // pacing zooms/pans otherwise crop its edges despite 100% saved scale.
         // Only new snapshots change; historical frozen renders retain motion.
-        cameraMotion: (shots ?? [scene.image]).some(
-          (image) => image.framing?.mode === "contain",
-        )
-          ? "none"
-          : scenePacing.cameraMotion,
+        cameraMotion:
+          scene.video ||
+          (shots ?? (scene.image ? [scene.image] : [])).some(
+            (image) => image.framing?.mode === "contain",
+          )
+            ? "none"
+            : scenePacing.cameraMotion,
         transition: scenePacing.transition,
-        image: {
-          objectKey: scene.image.objectKey,
-          width: scene.image.width,
-          height: scene.image.height,
-          framing: scene.image.framing ?? DEFAULT_SCENE_FRAMING,
-        },
+        image: scene.image
+          ? {
+              objectKey: scene.image.objectKey,
+              width: scene.image.width,
+              height: scene.image.height,
+              framing: scene.image.framing ?? DEFAULT_SCENE_FRAMING,
+            }
+          : null,
+        ...(scene.video
+          ? {
+              video: {
+                selectionId: scene.video.selectionId,
+                objectKey: scene.video.objectKey,
+                width: scene.video.width,
+                height: scene.video.height,
+                durationMilliseconds: scene.video.durationMilliseconds,
+                trimStartMilliseconds: scene.video.trimStartMilliseconds,
+                loop: scene.video.loop,
+                fit: scene.video.fit,
+                ...(scene.video.sourceOffsetMilliseconds
+                  ? {
+                      sourceOffsetMilliseconds:
+                        scene.video.sourceOffsetMilliseconds,
+                    }
+                  : {}),
+              },
+            }
+          : {}),
         // Absent, not empty, for a single-image scene, so an existing frozen
         // snapshot is unchanged and re-rendering it reproduces.
         ...(shots ? { shots } : {}),

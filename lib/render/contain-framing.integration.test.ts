@@ -93,7 +93,9 @@ describe("show-all framing in new preview and render snapshots", () => {
     const frozen = snapshot(image(false))();
     expect(frozen.scenes[0]?.cameraMotion).toBe("zoomIn");
     // Conversion must never rewrite motion already stored in a historical snapshot.
-    frozen.scenes[0]!.image.framing = {
+    const frozenImage = frozen.scenes[0]?.image;
+    if (!frozenImage) throw new Error("Image fixture is missing its still.");
+    frozenImage.framing = {
       ...DEFAULT_SCENE_FRAMING,
       mode: "contain",
     };

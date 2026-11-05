@@ -57,7 +57,9 @@ describe("Money Made Clear production fixture", () => {
           (row) => row.sceneVersionId === scene.sceneVersionId,
         );
         expect(scene.audio.objectKey).toBe(source?.audio.objectKey);
-        expect(scene.image.objectKey).toBe(source?.image.objectKey);
+        if (!scene.image || !source?.image)
+          throw new Error("Still-image fixture lost its image.");
+        expect(scene.image.objectKey).toBe(source.image.objectKey);
         for (const cue of scene.captions) {
           expect(cue.startMs).toBeGreaterThanOrEqual(scene.startMilliseconds);
           expect(cue.endMs).toBeLessThanOrEqual(scene.endMilliseconds);

@@ -17,7 +17,7 @@ export type UsageReservationStatus =
 export type UsageLedgerEntry = {
   reservationId: string;
   workspaceId: string;
-  projectId: string;
+  projectId: string | null;
   operationType: UsageOperationType;
   requestedByUserId: string | null;
   requestedByName: string | null;
@@ -36,6 +36,7 @@ export type UsageLedgerEntry = {
 };
 
 export const USAGE_OPERATION_LABELS: Record<UsageOperationType, string> = {
+  video_generation: "Video generation",
   scene_analysis: "Scene analysis",
   scene_image_generation: "Scene image",
   scene_audio_generation: "Scene narration",
@@ -54,6 +55,7 @@ export const USAGE_STATUS_LABELS: Record<UsageReservationStatus, string> = {
 };
 
 export const USAGE_OPERATION_PROVIDERS: Record<UsageOperationType, string> = {
+  video_generation: "video provider",
   scene_analysis: "openai",
   scene_image_generation: "openai",
   scene_audio_generation: "openai",

@@ -119,7 +119,7 @@ describe("a scene that changes image", () => {
 
   it("keeps the scene's representative image populated", () => {
     // Anything that does not understand shots must still show the scene.
-    expect(scene().image.objectKey).toBe("scene-1-shot-0.webp");
+    expect(scene().image?.objectKey).toBe("scene-1-shot-0.webp");
     expect(scene().shots?.[0]?.objectKey).toBe("scene-1-shot-0.webp");
   });
 

@@ -78,7 +78,18 @@ const videoCompositionSceneSchema = z
     durationFrames: z.number().int().positive(),
     cameraMotion: renderCameraMotionSchema,
     transition: renderSceneTransitionSchema,
-    imageUrl: z.url(),
+    imageUrl: z.url().nullable(),
+    video: z
+      .object({
+        url: z.url(),
+        trimBeforeFrames: z.number().int().nonnegative(),
+        durationFrames: z.number().int().positive(),
+        sourceOffsetFrames: z.number().int().nonnegative().optional(),
+        loop: z.boolean(),
+        fit: z.enum(["contain", "cover"]),
+      })
+      .strict()
+      .optional(),
     imageFraming: renderImageFramingSchema.optional(),
     audioUrl: z.url(),
     audioTrimBeforeFrames: z.number().int().nonnegative().optional(),
@@ -88,6 +99,15 @@ const videoCompositionSceneSchema = z
     characters: z.array(videoCompositionSceneCharacterSchema).optional(),
   })
   .strict()
+  .refine(
+    (scene) =>
+      scene.video
+        ? scene.imageUrl === null && !scene.shots
+        : Boolean(scene.imageUrl),
+    {
+      message: "Each scene needs exactly one visual source: an image or video.",
+    },
+  )
   .refine(
     (scene) =>
       !scene.shots ||
@@ -106,6 +126,7 @@ const videoCompositionSceneSchema = z
  */
 export const videoCompositionInputSchema = z
   .object({
+    mediaVersion: z.literal(2).optional(),
     width: z.number().int().positive(),
     height: z.number().int().positive(),
     framesPerSecond: z.number().int().min(1).max(120),
@@ -137,7 +158,12 @@ export const videoCompositionInputSchema = z
       .strict()
       .optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (input) =>
+      !input.scenes.some((scene) => scene.video) || input.mediaVersion === 2,
+    { message: "Video footage requires a version 2 composition." },
+  );
 
 export type ValidatedVideoCompositionInput = z.infer<
   typeof videoCompositionInputSchema
@@ -180,11 +206,20 @@ export function buildVideoCompositionInput(input: {
   watermarkText: string;
 }): VideoCompositionInput {
   const scenes: VideoCompositionScene[] = input.snapshot.scenes.map((scene) => {
-    const imageUrl = input.imageUrlByObjectKey[scene.image.objectKey];
+    const imageUrl = scene.image
+      ? input.imageUrlByObjectKey[scene.image.objectKey]
+      : null;
+    const videoUrl = scene.video
+      ? input.imageUrlByObjectKey[scene.video.objectKey]
+      : null;
     const audioUrl = input.audioUrlByObjectKey[scene.audio.objectKey];
-    if (!imageUrl)
+    if (!scene.video && !imageUrl)
       throw new Error(
         `Missing signed image URL for scene ${scene.sceneNumber}.`,
+      );
+    if (scene.video && !videoUrl)
+      throw new Error(
+        `Missing signed video URL for scene ${scene.sceneNumber}.`,
       );
     if (!audioUrl)
       throw new Error(
@@ -197,8 +232,36 @@ export function buildVideoCompositionInput(input: {
       durationFrames: scene.durationFrames,
       cameraMotion: scene.cameraMotion,
       transition: scene.transition,
-      imageUrl,
-      imageFraming: scene.image.framing ?? DEFAULT_SCENE_FRAMING,
+      imageUrl: imageUrl ?? null,
+      imageFraming: scene.image?.framing ?? DEFAULT_SCENE_FRAMING,
+      ...(scene.video && videoUrl
+        ? {
+            video: {
+              url: videoUrl,
+              trimBeforeFrames: Math.round(
+                (scene.video.trimStartMilliseconds *
+                  input.snapshot.framesPerSecond) /
+                  1000,
+              ),
+              durationFrames: Math.max(
+                1,
+                Math.floor(
+                  ((scene.video.durationMilliseconds -
+                    scene.video.trimStartMilliseconds) *
+                    input.snapshot.framesPerSecond) /
+                    1000,
+                ),
+              ),
+              sourceOffsetFrames: Math.round(
+                ((scene.video.sourceOffsetMilliseconds ?? 0) *
+                  input.snapshot.framesPerSecond) /
+                  1000,
+              ),
+              loop: scene.video.loop,
+              fit: scene.video.fit,
+            },
+          }
+        : {}),
       audioUrl,
       audioTrimBeforeFrames: scene.audio.trimBeforeFrames ?? 0,
       ...(scene.audio.amplitudeEnvelope?.length
@@ -281,6 +344,9 @@ export function buildVideoCompositionInput(input: {
   });
 
   return {
+    ...(input.snapshot.mediaVersion
+      ? { mediaVersion: input.snapshot.mediaVersion }
+      : {}),
     width: input.snapshot.width,
     height: input.snapshot.height,
     framesPerSecond: input.snapshot.framesPerSecond,

@@ -105,11 +105,17 @@ export async function getWorkspaceUsageSummary(input: {
       committedCents: Number(row.committedCents),
       count: Number(row.count),
     })),
-    byProject: projectRows.map((row) => ({
-      projectId: row.projectId,
-      projectName: row.projectName,
-      committedCents: Number(row.committedCents),
-      count: Number(row.count),
-    })),
+    byProject: projectRows.flatMap((row) =>
+      row.projectId
+        ? [
+            {
+              projectId: row.projectId,
+              projectName: row.projectName,
+              committedCents: Number(row.committedCents),
+              count: Number(row.count),
+            },
+          ]
+        : [],
+    ),
   };
 }

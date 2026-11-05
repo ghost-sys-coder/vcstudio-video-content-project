@@ -57,7 +57,15 @@ export type VideoCompositionScene = {
   durationFrames: number;
   cameraMotion: RenderCameraMotion;
   transition: RenderSceneTransition;
-  imageUrl: string;
+  imageUrl: string | null;
+  video?: {
+    url: string;
+    trimBeforeFrames: number;
+    durationFrames: number;
+    sourceOffsetFrames?: number;
+    loop: boolean;
+    fit: "contain" | "cover";
+  };
   imageFraming?: {
     mode: "cover" | "contain" | "outpaint";
     focalPointXBps: number;
@@ -85,6 +93,7 @@ export type VideoCompositionScene = {
 // A type alias (not an interface) so it satisfies `Record<string, unknown>`,
 // which Remotion's Composition requires of its props type.
 export type VideoCompositionInput = {
+  mediaVersion?: 2;
   width: number;
   height: number;
   framesPerSecond: number;

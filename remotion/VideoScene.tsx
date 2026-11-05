@@ -8,6 +8,7 @@ import {
 import { CharacterSpriteLayer } from "@/remotion/CharacterSpriteLayer";
 import { SceneAudioTrack } from "@/remotion/SceneAudioTrack";
 import { SceneImage } from "@/remotion/SceneImage";
+import { SceneVideo } from "@/remotion/SceneVideo";
 import { SceneShotSequence } from "@/remotion/SceneShotSequence";
 import { SceneTransition } from "@/remotion/SceneTransition";
 import type { CaptionStyleData } from "@/lib/subtitles/caption-style-data";
@@ -42,22 +43,26 @@ export function VideoScene({
   return (
     <AbsoluteFill>
       <SceneTransition transition={scene.transition}>
-        <CameraMotion
-          motion={scene.cameraMotion}
-          durationInFrames={visibleDurationFrames}
-        >
-          {/* A scene that changes image partway through draws its own
+        {scene.video ? (
+          <SceneVideo video={scene.video} />
+        ) : (
+          <CameraMotion
+            motion={scene.cameraMotion}
+            durationInFrames={visibleDurationFrames}
+          >
+            {/* A scene that changes image partway through draws its own
               stack; every other scene is one still, exactly as before. */}
-          {scene.shots?.length ? (
-            <SceneShotSequence sceneId={scene.sceneId} shots={scene.shots} />
-          ) : (
-            <SceneImage
-              framing={scene.imageFraming}
-              src={scene.imageUrl}
-              sceneId={scene.sceneId}
-            />
-          )}
-        </CameraMotion>
+            {scene.shots?.length ? (
+              <SceneShotSequence sceneId={scene.sceneId} shots={scene.shots} />
+            ) : (
+              <SceneImage
+                framing={scene.imageFraming}
+                src={scene.imageUrl!}
+                sceneId={scene.sceneId}
+              />
+            )}
+          </CameraMotion>
+        )}
         {/* Over the plate but inside the transition, so a character fades in
             with its scene rather than popping. */}
         {scene.characters?.length ? (

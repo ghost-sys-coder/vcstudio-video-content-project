@@ -124,3 +124,7 @@ export type {
   CharacterReferencePromptInput,
   CharacterReferenceView,
 } from "./character-reference";
+export {
+  DIRECT_VIDEO_PROMPT_VERSION,
+  renderDirectVideoPrompt,
+} from "./direct-video";

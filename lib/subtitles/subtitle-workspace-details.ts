@@ -9,6 +9,7 @@ import {
 } from "@/db/repositories/subtitle.repository";
 import { listSucceededSceneImageGenerationsByIds } from "@/db/repositories/scene-images.repository";
 import { listCurrentScenes } from "@/db/repositories/scenes.repository";
+import { listSceneVisualSelections } from "@/db/repositories/scene-visual-selections.repository";
 import { listSceneCaptionCues } from "@/db/repositories/scene-caption-cues.repository";
 import { AMPLITUDE_ENVELOPE_SAMPLE_RATE_HZ } from "@/lib/media/amplitude-envelope";
 import type { CueTimingSource } from "@/lib/subtitles/cue-timing-source";
@@ -120,6 +121,7 @@ export async function buildSubtitleContext(input: {
     nativeImages,
     approvedAudios,
     variantImages,
+    visualSelections,
   ] = await Promise.all([
     getProjectSubtitleSettings(scope),
     listApprovedSceneImageAssets({
@@ -141,7 +143,11 @@ export async function buildSubtitleContext(input: {
         (framing) => framing.sourceImageGenerationId,
       ),
     }),
+    listSceneVisualSelections({ ...scope, sceneVersionIds }),
   ]);
+  const visualByVersion = new Map(
+    visualSelections.map((selection) => [selection.sceneVersionId, selection]),
+  );
 
   // Shot 0, explicitly: a scene may hold several approved images now, and this
   // map is "the image that represents the scene".
@@ -262,6 +268,11 @@ export async function buildSubtitleContext(input: {
       subtitleEnv.SUBTITLE_DURATION_MISMATCH_TOLERANCE_MILLISECONDS,
     captionsBySceneId,
     scenes: currentScenes.map(({ scene, version }) => {
+      const visual = visualByVersion.get(version.id);
+      const visualKind =
+        visual?.kind && visual.kind !== "inherit"
+          ? visual.kind
+          : (input.project.defaultVisualMedia ?? "image");
       const native = nativeByVersion.get(version.id) ?? null;
       const approvedImage = imageByVersion.get(version.id) ?? null;
       const storedFraming = framingByVersion.get(version.id) ?? null;
@@ -287,6 +298,25 @@ export async function buildSubtitleContext(input: {
         sceneId: scene.id,
         sceneNumber: scene.sceneNumber,
         sceneVersionId: version.id,
+        visualKind,
+        video:
+          visual?.kind === "video" &&
+          visual.objectKey &&
+          visual.width &&
+          visual.height &&
+          visual.durationMilliseconds
+            ? {
+                selectionId: visual.id,
+                objectKey: visual.objectKey,
+                width: visual.width,
+                height: visual.height,
+                durationMilliseconds: visual.durationMilliseconds,
+                trimStartMilliseconds: visual.trimStartMilliseconds,
+                loop: visual.loop,
+                fit: visual.fit,
+                approved: visual.reviewStatus === "approved",
+              }
+            : null,
         sceneApproved: scene.status === "approved",
         expectedDurationMilliseconds: version.estimatedDurationMilliseconds,
         image: resolved

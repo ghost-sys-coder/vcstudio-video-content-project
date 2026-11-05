@@ -3,6 +3,7 @@ import { ProjectDangerZone } from "@/components/projects/ProjectDangerZone";
 import { ProjectChannelSection } from "@/components/projects/ProjectChannelSection";
 import { ProjectPlannedReleaseSection } from "@/components/projects/ProjectPlannedReleaseSection";
 import { ProjectSettingsForm } from "@/components/projects/ProjectSettingsForm";
+import { ProjectVisualDefault } from "@/components/video/ProjectVisualDefault";
 import { listChannelProfiles } from "@/db/repositories/channel-profiles.repository";
 import { findProject } from "@/db/repositories/projects.repository";
 import { buildChannelProfileView } from "@/lib/channels/channel-profile-view";
@@ -40,6 +41,16 @@ export default async function ProjectSettingsPage({
           project.status !== "archived"
         }
         project={project}
+      />
+      <ProjectVisualDefault
+        workspaceId={context.activeMembership.workspaceId}
+        projectId={project.id}
+        initialKind={project.defaultVisualMedia}
+        updatedAt={project.updatedAt.toISOString()}
+        canEdit={
+          canEditProject(context.activeMembership.role) &&
+          project.status !== "archived"
+        }
       />
       <ProjectChannelSection
         canEdit={

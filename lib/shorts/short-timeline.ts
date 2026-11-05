@@ -123,6 +123,16 @@ export function buildShortTimeline(input: {
         relativeSourceStart,
         input.source.framesPerSecond,
       ),
+      ...(source.video
+        ? {
+            video: {
+              ...source.video,
+              sourceOffsetMilliseconds:
+                (source.video.sourceOffsetMilliseconds ?? 0) +
+                relativeSourceStart,
+            },
+          }
+        : {}),
       transition: clip.transition,
       captions,
     });

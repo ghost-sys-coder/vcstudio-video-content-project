@@ -46,15 +46,16 @@ export function buildPreviewAssets(
   for (const scene of scenes) {
     const startSeconds = scene.startFrame / fps;
     const endSeconds = (scene.startFrame + scene.durationFrames) / fps;
-    assets.push({
-      key: `${scene.sceneId}:image`,
-      sceneId: scene.sceneId,
-      sceneNumber: scene.sceneNumber,
-      type: "image",
-      url: scene.imageUrl,
-      startSeconds,
-      endSeconds,
-    });
+    if (scene.imageUrl)
+      assets.push({
+        key: `${scene.sceneId}:image`,
+        sceneId: scene.sceneId,
+        sceneNumber: scene.sceneNumber,
+        type: "image",
+        url: scene.imageUrl,
+        startSeconds,
+        endSeconds,
+      });
     assets.push({
       key: `${scene.sceneId}:audio`,
       sceneId: scene.sceneId,

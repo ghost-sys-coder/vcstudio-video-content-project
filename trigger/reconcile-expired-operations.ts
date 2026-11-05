@@ -12,6 +12,7 @@ import { listExpiredActiveSceneImageGenerations } from "@/db/repositories/scene-
 import { listExpiredActiveVideoRenders } from "@/db/repositories/video-render.repository";
 import { reconcileSceneImageGeneration } from "@/lib/trigger/reconcile-scene-image";
 import { recoverMcpOperations } from "@/lib/mcp/recovery";
+import { recoverVideoOperations } from "@/lib/video-generation/video-recovery";
 
 // Retain an existing Trigger.dev schedule identity so this consolidation does
 // not consume another schedule slot on the current plan.
@@ -169,7 +170,9 @@ export const reconcileExpiredOperationsTask = schedules.task({
       }
 
       const mcp = await recoverMcpOperations();
+      const video = await recoverVideoOperations();
       const result = {
+        video,
         mcp,
         imageCount,
         audioCount,

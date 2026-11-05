@@ -35,6 +35,19 @@ export interface TimelineAudioAsset {
   amplitudeEnvelope?: number[] | null;
 }
 
+export interface TimelineVideoAsset {
+  selectionId: string;
+  objectKey: string;
+  width: number;
+  height: number;
+  durationMilliseconds: number;
+  trimStartMilliseconds: number;
+  loop: boolean;
+  fit: "contain" | "cover";
+  approved: boolean;
+  sourceOffsetMilliseconds?: number;
+}
+
 export interface TimelineSceneAssetInput {
   sceneId: string;
   sceneNumber: number;
@@ -43,6 +56,8 @@ export interface TimelineSceneAssetInput {
   /** Expected duration from analysis, used only for mismatch warnings. */
   expectedDurationMilliseconds: number | null;
   image: TimelineImageAsset | null;
+  visualKind?: "image" | "video";
+  video?: TimelineVideoAsset | null;
   /**
    * Images after the first, in shot order, for a scene that changes image
    * partway through. Empty or absent for the overwhelming majority of scenes.
@@ -69,7 +84,8 @@ export interface VideoTimelineScene {
   startFrame: number;
   endFrame: number;
   durationFrames: number;
-  image: TimelineImageAsset;
+  image: TimelineImageAsset | null;
+  video?: TimelineVideoAsset;
   /** Images after the first, in shot order. Empty for a single-image scene. */
   additionalShots: TimelineImageAsset[];
   audio: Required<Pick<TimelineAudioAsset, "durationMilliseconds">> &
@@ -97,6 +113,10 @@ export type TimelineIssueCode =
   | "emptyTimeline"
   | "sceneNotApproved"
   | "missingImage"
+  | "missingVideo"
+  | "videoNotApproved"
+  | "invalidVideo"
+  | "videoTooShort"
   | "missingAudio"
   | "missingAudioDuration"
   | "invalidDuration"
@@ -180,7 +200,56 @@ export function buildVideoTimeline(input: {
         severity: "error",
         message: `Scene ${scene.sceneNumber} is not approved.`,
       });
-    if (!scene.image)
+    if (scene.visualKind === "video") {
+      const video = scene.video;
+      if (!video)
+        issues.push({
+          sceneId: scene.sceneId,
+          sceneNumber: scene.sceneNumber,
+          code: "missingVideo",
+          severity: "error",
+          message: `Scene ${scene.sceneNumber} needs selected video footage. Choose and approve a clip, or switch this scene to still images.`,
+        });
+      else {
+        if (!video.approved)
+          issues.push({
+            sceneId: scene.sceneId,
+            sceneNumber: scene.sceneNumber,
+            code: "videoNotApproved",
+            severity: "error",
+            message: `Scene ${scene.sceneNumber} footage is awaiting approval or was rejected.`,
+          });
+        const available =
+          video.durationMilliseconds - video.trimStartMilliseconds;
+        if (
+          !Number.isSafeInteger(video.durationMilliseconds) ||
+          !Number.isSafeInteger(video.trimStartMilliseconds) ||
+          video.trimStartMilliseconds < 0 ||
+          available <= 0 ||
+          video.width <= 0 ||
+          video.height <= 0
+        )
+          issues.push({
+            sceneId: scene.sceneId,
+            sceneNumber: scene.sceneNumber,
+            code: "invalidVideo",
+            severity: "error",
+            message: `Scene ${scene.sceneNumber} footage has invalid inspection or trim data.`,
+          });
+        else if (
+          !video.loop &&
+          scene.audio?.durationMilliseconds &&
+          available + 1000 / framesPerSecond < scene.audio.durationMilliseconds
+        )
+          issues.push({
+            sceneId: scene.sceneId,
+            sceneNumber: scene.sceneNumber,
+            code: "videoTooShort",
+            severity: "error",
+            message: `Scene ${scene.sceneNumber} footage is shorter than narration. Enable looping, choose a longer clip, or adjust the start time.`,
+          });
+      }
+    } else if (!scene.image)
       issues.push({
         sceneId: scene.sceneId,
         sceneNumber: scene.sceneNumber,
@@ -216,7 +285,8 @@ export function buildVideoTimeline(input: {
   const scenes: VideoTimelineScene[] = [];
   let cursor = 0;
   ordered.forEach((scene, index) => {
-    const image = scene.image!;
+    const image = scene.visualKind === "video" ? null : scene.image;
+    const video = scene.visualKind === "video" ? scene.video : null;
     const audio = scene.audio!;
     const durationMilliseconds = audio.durationMilliseconds!;
 
@@ -253,7 +323,8 @@ export function buildVideoTimeline(input: {
       endFrame,
       durationFrames: endFrame - startFrame,
       image,
-      additionalShots: scene.additionalShots ?? [],
+      ...(video ? { video } : {}),
+      additionalShots: video ? [] : (scene.additionalShots ?? []),
       audio: { ...audio, durationMilliseconds },
       cameraMotion: scene.cameraMotion ?? "none",
       transition: scene.transition ?? "cut",

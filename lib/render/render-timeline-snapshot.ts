@@ -142,7 +142,18 @@ export interface RenderSceneData {
   durationFrames: number;
   cameraMotion: RenderCameraMotion;
   transition: RenderSceneTransition;
-  image: RenderSceneImageData;
+  image: RenderSceneImageData | null;
+  video?: {
+    selectionId: string;
+    objectKey: string;
+    width: number;
+    height: number;
+    durationMilliseconds: number;
+    trimStartMilliseconds: number;
+    loop: boolean;
+    fit: "contain" | "cover";
+    sourceOffsetMilliseconds?: number;
+  };
   /**
    * Present only when the scene holds more than one image. Absent, not empty,
    * for every single-image scene — so an existing render's frozen snapshot is
@@ -164,6 +175,8 @@ export interface RenderSceneData {
 }
 
 export interface RenderTimelineSnapshot {
+  /** Absent on historical image snapshots; version 2 requires video-aware workers. */
+  mediaVersion?: 2;
   width: number;
   height: number;
   framesPerSecond: number;

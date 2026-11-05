@@ -1,4 +1,8 @@
 import "server-only";
+import { videoEnvironmentSchema } from "@/lib/video-generation/video-environment";
+export function getVideoGenerationEnvironment() {
+  return videoEnvironmentSchema.parse(process.env);
+}
 
 import { mcpEnvironmentSchema } from "@/lib/env/server-schema";
 export function getMcpEnvironment() {

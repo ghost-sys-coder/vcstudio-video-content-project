@@ -20,7 +20,8 @@ export function collectRenderAssetObjectKeys(
   // rather than to any one scene.
   if (snapshot.backgroundAudio) keys.add(snapshot.backgroundAudio.objectKey);
   for (const scene of snapshot.scenes) {
-    keys.add(scene.image.objectKey);
+    if (scene.image) keys.add(scene.image.objectKey);
+    if (scene.video) keys.add(scene.video.objectKey);
     keys.add(scene.audio.objectKey);
     // Present only on multi-image scenes. The first shot repeats
     // `scene.image`, which the set collapses.

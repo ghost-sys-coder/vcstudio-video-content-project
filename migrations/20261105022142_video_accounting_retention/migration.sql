@@ -1,0 +1,2 @@
+ALTER TABLE "video_generations" ADD COLUMN "target_detached" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "video_generations" DROP CONSTRAINT "video_generations_target_valid", ADD CONSTRAINT "video_generations_target_valid" CHECK ((("project_id" is null and "scene_id" is null and "scene_version_id" is null and ("request"->'target'->>'kind'='direct' or "target_detached")) or ("project_id" is not null and "scene_id" is not null and "scene_version_id" is not null and "request"->'target'->>'kind'='scene' and not "target_detached")) is true);

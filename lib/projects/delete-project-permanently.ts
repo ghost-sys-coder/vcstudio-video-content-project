@@ -5,6 +5,7 @@ import { deleteProject } from "@/db/commands/delete-project.command";
 import { recordAuditEvent } from "@/lib/audit/record-audit-event";
 import { cancelProjectTriggerRuns } from "@/lib/projects/cancel-project-trigger-runs";
 import { deleteProjectAssetObjects } from "@/lib/storage/project-asset-storage";
+import { hasPendingProjectVideoAccounting } from "@/db/repositories/video-generations.repository";
 
 export class ProjectDeletionError extends Error {
   constructor(message: string) {
@@ -35,6 +36,15 @@ export async function deleteProjectPermanently(input: {
   project: Project;
   actorUserId: string;
 }): Promise<{ deletedObjectCount: number; cancelledRunCount: number }> {
+  if (
+    await hasPendingProjectVideoAccounting({
+      workspaceId: input.workspaceId,
+      projectId: input.project.id,
+    })
+  )
+    throw new ProjectDeletionError(
+      "This project has a queued, running or unreconciled video request. Cancel queued work or reconcile the existing provider operation before deleting the project.",
+    );
   // First, stop anything still running: an in-flight render would otherwise
   // upload its output after the purge and immediately re-orphan storage.
   const { cancelledCount } = await cancelProjectTriggerRuns({

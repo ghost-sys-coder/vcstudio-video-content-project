@@ -10,6 +10,7 @@ import {
   Bell,
   Settings,
   UsersIcon,
+  Clapperboard,
 } from "lucide-react";
 import { SidebarLink } from "@/components/application/SidebarLink";
 import { usePathname } from "next/navigation";
@@ -164,6 +165,16 @@ export function ApplicationSidebar({
                 >
                   <FolderKanban />
                   <span>Projects</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={pathname.startsWith("/app/video")}
+                  render={<SidebarLink href="/app/video" />}
+                  tooltip="Video Studio"
+                >
+                  <Clapperboard />
+                  <span>Video Studio</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               {canManageUsage ? (

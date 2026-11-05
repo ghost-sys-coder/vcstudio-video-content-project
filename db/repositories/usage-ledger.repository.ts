@@ -13,6 +13,7 @@ import {
   usageReservations,
   users,
   videoRenders,
+  videoGenerations,
 } from "@/db/schema";
 import { calculatePagination } from "@/lib/domain/pagination";
 import {
@@ -84,7 +85,10 @@ export async function listUsageLedgerEntries(input: {
   const titleIds: string[] = [];
   const thumbnailIds: string[] = [];
   const chapterIds: string[] = [];
+  const videoIds: string[] = [];
   for (const reservation of reservations) {
+    if (reservation.videoGenerationId)
+      videoIds.push(reservation.videoGenerationId);
     if (reservation.analysisRunId) analysisIds.push(reservation.analysisRunId);
     if (reservation.imageGenerationId)
       imageIds.push(reservation.imageGenerationId);
@@ -104,6 +108,30 @@ export async function listUsageLedgerEntries(input: {
   const enrichment = new Map<string, Enrichment>();
   const database = getDatabase();
   await Promise.all([
+    videoIds.length === 0
+      ? Promise.resolve()
+      : database
+          .select()
+          .from(videoGenerations)
+          .where(
+            and(
+              eq(videoGenerations.workspaceId, input.workspaceId),
+              inArray(videoGenerations.id, videoIds),
+            ),
+          )
+          .then((rows) => {
+            for (const row of rows)
+              enrichment.set(row.id, {
+                requestedByUserId: row.requestedByUserId,
+                provider: row.modelSnapshot.provider,
+                model: row.modelSnapshot.providerModelId,
+                estimatedCostCents: row.estimatedCostCents,
+                inputUnits: row.inputUnits,
+                outputUnits: row.outputUnits,
+                providerRequestId: row.providerRequestId,
+                workflowRunId: row.triggerRunId,
+              });
+          }),
     analysisIds.length === 0
       ? Promise.resolve()
       : database
@@ -388,6 +416,7 @@ export async function listUsageLedgerEntries(input: {
       reservation.scriptGenerationId ??
       reservation.titleGenerationId ??
       reservation.thumbnailGenerationId ??
+      reservation.videoGenerationId ??
       reservation.chapterGenerationId;
     const detail = operationId ? enrichment.get(operationId) : undefined;
     return {

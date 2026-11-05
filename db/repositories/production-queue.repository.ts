@@ -14,6 +14,7 @@ import {
   videoRenders,
 } from "@/db/schema";
 import { calculatePagination } from "@/lib/domain/pagination";
+import { loadVideoProductionFacts } from "./video-production-facts.repository";
 import {
   resolveProductionReadiness,
   type ProductionReadiness,
@@ -66,6 +67,7 @@ async function loadPageFacts(input: {
     audioRows,
     renderRows,
     publicationRows,
+    visualFacts,
   ] = await Promise.all([
     database
       .selectDistinct({ projectId: projectScriptVersions.projectId })
@@ -180,6 +182,7 @@ async function loadPageFacts(input: {
         ),
       )
       .groupBy(videoPublications.projectId),
+    loadVideoProductionFacts({ workspaceId, projectIds }),
   ]);
 
   const approved = new Set(approvedScripts.map((row) => row.projectId));
@@ -197,6 +200,7 @@ async function loadPageFacts(input: {
     projectIds.map((projectId) => {
       const sceneCount = sceneBy.get(projectId)?.total ?? 0;
       const covered = coveredBy.get(projectId)?.covered ?? 0;
+      const visuals = visualFacts.get(projectId);
       return [
         projectId,
         {
@@ -209,6 +213,18 @@ async function loadPageFacts(input: {
           imagesAwaitingReview: imageBy.get(projectId)?.awaitingReview ?? 0,
           imagesFailed: imageBy.get(projectId)?.failed ?? 0,
           scenesWithoutApprovedImage: Math.max(0, sceneCount - covered),
+          ...(visuals
+            ? {
+                imagesSucceeded: visuals.imagesSucceeded,
+                imagesAwaitingReview: visuals.imagesAwaitingReview,
+                imagesFailed: visuals.imagesFailed,
+                scenesWithoutApprovedImage: visuals.imagesMissing,
+                videosSucceeded: visuals.videosSucceeded,
+                videosAwaitingReview: visuals.videosAwaitingReview,
+                videoScenesMissing: visuals.videosMissing,
+                videoScenesTooShort: visuals.videosTooShort,
+              }
+            : {}),
           audioSucceeded: audioBy.get(projectId)?.succeeded ?? 0,
           audioAwaitingReview: audioBy.get(projectId)?.awaitingReview ?? 0,
           audioFailed: audioBy.get(projectId)?.failed ?? 0,
@@ -357,9 +373,7 @@ export async function loadProjectProductionReadiness(input: {
   const factsByProject = await loadPageFacts({
     workspaceId: input.workspaceId,
     projectIds: [input.projectId],
-    plannedReleaseByProject: new Map([
-      [input.projectId, row.plannedReleaseAt],
-    ]),
+    plannedReleaseByProject: new Map([[input.projectId, row.plannedReleaseAt]]),
   });
   const facts = factsByProject.get(input.projectId);
   return facts ? resolveProductionReadiness(facts) : null;

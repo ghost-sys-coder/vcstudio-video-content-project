@@ -45,6 +45,36 @@ function finished(
 }
 
 describe("readiness is derived from evidence, never from a typed status", () => {
+  it("accepts approved video visuals without requiring an unrelated still", () => {
+    const readiness = resolveProductionReadiness(
+      finished({ imagesSucceeded: 0, videosSucceeded: 4 }),
+    );
+    expect(readiness.isComplete).toBe(true);
+    expect(readiness.blockers).toEqual([]);
+  });
+  it("reports missing, pending and short footage explicitly", () => {
+    const readiness = resolveProductionReadiness(
+      finished({
+        imagesSucceeded: 0,
+        videosSucceeded: 1,
+        videosAwaitingReview: 1,
+        videoScenesMissing: 2,
+        videoScenesTooShort: 1,
+      }),
+    );
+    expect(readiness.isComplete).toBe(false);
+    expect(readiness.blockers.map((blocker) => blocker.kind)).toContain(
+      "videos_missing",
+    );
+    expect(readiness.blockers.map((blocker) => blocker.kind)).toContain(
+      "videos_too_short",
+    );
+    expect(
+      readiness.reviews.some(
+        (review) => review.kind === "videos_awaiting_review",
+      ),
+    ).toBe(true);
+  });
   it("does not expose any input for a manually set project status", () => {
     // The guard behind "manual Settings status cannot manufacture readiness".
     // Project settings lets a creator set `projects.status` by hand, so the

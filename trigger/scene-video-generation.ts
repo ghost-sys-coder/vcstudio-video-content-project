@@ -52,7 +52,7 @@ const MAX_STILL_BYTES = 25 * 1024 * 1024;
  */
 export const sceneVideoGenerationTask = task({
   id: "scene-video-generation",
-  queue: { name: "video-generation", concurrencyLimit: 2 },
+  queue: { name: "video-generation", concurrencyLimit: 1 },
   retry: {
     maxAttempts: 2,
     minTimeoutInMs: 5_000,

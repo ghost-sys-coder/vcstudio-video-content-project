@@ -27,13 +27,18 @@ export type ProductionBlockerKind =
   | "scenes_missing"
   | "images_failed"
   | "images_missing"
+  | "videos_missing"
+  | "videos_too_short"
   | "audio_failed"
   | "audio_missing"
   | "render_failed"
   | "publication_failed";
 
 export type ProductionReviewKind =
-  "images_awaiting_review" | "audio_awaiting_review" | "scenes_awaiting_review";
+  | "images_awaiting_review"
+  | "videos_awaiting_review"
+  | "audio_awaiting_review"
+  | "scenes_awaiting_review";
 
 /** A recovery pointer. `href` is a project-relative path segment. */
 export interface ProductionAction {
@@ -72,6 +77,10 @@ export interface ProjectProductionFacts {
   imagesFailed: number;
   /** Scenes with no succeeded image yet, so a partial batch is measurable. */
   scenesWithoutApprovedImage: number;
+  videosSucceeded?: number;
+  videosAwaitingReview?: number;
+  videoScenesMissing?: number;
+  videoScenesTooShort?: number;
   audioSucceeded: number;
   audioAwaitingReview: number;
   audioFailed: number;
@@ -130,13 +139,28 @@ function resolveStage(facts: ProjectProductionFacts): ProductionStage {
   if (facts.publicationsSucceeded > 0) return "release";
   if (facts.rendersSucceeded > 0 || facts.rendersInFlight > 0) return "render";
   if (facts.audioSucceeded > 0) return "audio";
-  if (facts.imagesSucceeded > 0) return "storyboard";
+  if (facts.imagesSucceeded > 0 || (facts.videosSucceeded ?? 0) > 0)
+    return "storyboard";
   if (facts.sceneCount > 0) return "scenes";
   return "script";
 }
 
 function collectBlockers(facts: ProjectProductionFacts): ProductionBlocker[] {
   const blockers: ProductionBlocker[] = [];
+  if ((facts.videoScenesMissing ?? 0) > 0)
+    blockers.push({
+      kind: "videos_missing",
+      message: `${plural(facts.videoScenesMissing!, "scene needs", "scenes need")} video footage.`,
+      severity: "blocking",
+      action: SCENES,
+    });
+  if ((facts.videoScenesTooShort ?? 0) > 0)
+    blockers.push({
+      kind: "videos_too_short",
+      message: `${plural(facts.videoScenesTooShort!, "scene has", "scenes have")} footage shorter than its narration. Review trimming or enable looping.`,
+      severity: "blocking",
+      action: SCENES,
+    });
 
   if (!facts.hasApprovedScript)
     blockers.push({
@@ -212,6 +236,13 @@ function collectBlockers(facts: ProjectProductionFacts): ProductionBlocker[] {
 
 function collectReviews(facts: ProjectProductionFacts): ProductionReview[] {
   const reviews: ProductionReview[] = [];
+  if ((facts.videosAwaitingReview ?? 0) > 0)
+    reviews.push({
+      kind: "videos_awaiting_review",
+      count: facts.videosAwaitingReview!,
+      message: `${plural(facts.videosAwaitingReview!, "video clip", "video clips")} awaiting review`,
+      action: SCENES,
+    });
   if (facts.scenesAwaitingReview > 0)
     reviews.push({
       kind: "scenes_awaiting_review",

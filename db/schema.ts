@@ -1,5 +1,10 @@
 import { sql } from "drizzle-orm";
 import type { SceneAnalysisSegmentHint } from "@studio/prompts";
+import type {
+  VideoGenerationRequest,
+  VideoModelDescriptor,
+  VideoModelPricing,
+} from "@studio/contracts/video";
 import {
   boolean,
   check,
@@ -564,6 +569,7 @@ export const providerRequestStatusEnum = pgEnum("provider_request_status", [
 ]);
 
 export const usageOperationTypeEnum = pgEnum("usage_operation_type", [
+  "video_generation",
   "scene_analysis",
   "scene_image_generation",
   "scene_audio_generation",
@@ -1244,6 +1250,10 @@ export const projects = pgTable(
     videoKind: projectVideoKindEnum("video_kind")
       .notNull()
       .default("staticImages"),
+    defaultVisualMedia: text("default_visual_media")
+      .$type<"image" | "video">()
+      .notNull()
+      .default("image"),
     aspectRatio: projectAspectRatioEnum("aspect_ratio").notNull(),
     width: integer("width").notNull(),
     height: integer("height").notNull(),
@@ -1312,6 +1322,10 @@ export const projects = pgTable(
     check(
       "projects_pacing_profile_valid",
       sql`${table.pacingProfile} in ('documentary', 'explainer', 'short')`,
+    ),
+    check(
+      "projects_default_visual_media_valid",
+      sql`${table.defaultVisualMedia} in ('image','video')`,
     ),
     uniqueIndex("projects_id_workspace_unique").on(table.id, table.workspaceId),
     // Orders the production queue by intended release inside one workspace.
@@ -5079,6 +5093,223 @@ export const sceneVideoGenerations = pgTable(
   ],
 );
 
+/** Workspace-owned video jobs; a direct request deliberately has no project. */
+export const videoGenerations = pgTable(
+  "video_generations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id"),
+    sceneId: uuid("scene_id"),
+    sceneVersionId: uuid("scene_version_id"),
+    targetDetached: boolean("target_detached").notNull().default(false),
+    requestedByUserId: uuid("requested_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    quoteId: uuid("quote_id").notNull(),
+    idempotencyKey: text("idempotency_key").notNull(),
+    requestFingerprint: text("request_fingerprint").notNull(),
+    request: jsonb("request").$type<VideoGenerationRequest>().notNull(),
+    modelSnapshot: jsonb("model_snapshot")
+      .$type<VideoModelDescriptor>()
+      .notNull(),
+    pricingSnapshot: jsonb("pricing_snapshot")
+      .$type<VideoModelPricing>()
+      .notNull(),
+    inputAssets: jsonb("input_assets")
+      .$type<
+        Array<{
+          assetId: string;
+          source?: "library" | "scene_image";
+          objectKey: string;
+          contentType: string;
+          sizeBytes: number;
+          role: VideoGenerationRequest["inputs"][number]["role"];
+        }>
+      >()
+      .notNull()
+      .default([]),
+    finalPrompt: text("final_prompt").notNull(),
+    promptTemplateVersion: text("prompt_template_version").notNull(),
+    status: text("status")
+      .$type<
+        | "queued"
+        | "submitting"
+        | "running"
+        | "inspecting"
+        | "succeeded"
+        | "failed"
+        | "cancelled"
+        | "requires_reconciliation"
+      >()
+      .notNull()
+      .default("queued"),
+    providerJobId: text("provider_job_id"),
+    providerRequestId: text("provider_request_id"),
+    encryptedOutput: text("encrypted_output"),
+    triggerRunId: text("trigger_run_id"),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    estimatedCostCents: integer("estimated_cost_cents").notNull(),
+    actualCostCents: integer("actual_cost_cents"),
+    inputUnits: integer("input_units"),
+    outputUnits: integer("output_units"),
+    outputAssetId: uuid("output_asset_id"),
+    errorCode: text("error_code"),
+    safeErrorMessage: text("safe_error_message"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("video_generations_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    uniqueIndex("video_generations_workspace_idempotency_unique").on(
+      table.workspaceId,
+      table.idempotencyKey,
+    ),
+    uniqueIndex("video_generations_quote_unique").on(table.quoteId),
+    index("video_generations_workspace_created_index").on(
+      table.workspaceId,
+      table.createdAt,
+      table.id,
+    ),
+    index("video_generations_workspace_status_index").on(
+      table.workspaceId,
+      table.status,
+    ),
+    check(
+      "video_generations_status_valid",
+      sql`${table.status} in ('queued','submitting','running','inspecting','succeeded','failed','cancelled','requires_reconciliation')`,
+    ),
+    check(
+      "video_generations_cost_valid",
+      sql`${table.estimatedCostCents}>0 and (${table.actualCostCents} is null or ${table.actualCostCents}>=0) and ${table.attemptCount} between 0 and 1`,
+    ),
+    check(
+      "video_generations_target_valid",
+      sql`((${table.projectId} is null and ${table.sceneId} is null and ${table.sceneVersionId} is null and (${table.request}->'target'->>'kind'='direct' or ${table.targetDetached})) or (${table.projectId} is not null and ${table.sceneId} is not null and ${table.sceneVersionId} is not null and ${table.request}->'target'->>'kind'='scene' and not ${table.targetDetached})) is true`,
+    ),
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [projects.id, projects.workspaceId],
+      name: "video_generations_project_tenant_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [
+        table.sceneVersionId,
+        table.sceneId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        sceneVersions.id,
+        sceneVersions.sceneId,
+        sceneVersions.projectId,
+        sceneVersions.workspaceId,
+      ],
+      name: "video_generations_scene_tenant_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.outputAssetId, table.workspaceId],
+      foreignColumns: [mediaAssets.id, mediaAssets.workspaceId],
+      name: "video_generations_asset_tenant_fkey",
+    }),
+  ],
+);
+
+/** Append-only selection/review history. Saved renders retain earlier copies. */
+export const sceneVisualSelections = pgTable(
+  "scene_visual_selections",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").notNull(),
+    sceneId: uuid("scene_id").notNull(),
+    sceneVersionId: uuid("scene_version_id").notNull(),
+    kind: text("kind")
+      .$type<"inherit" | "image" | "video">()
+      .notNull()
+      .default("inherit"),
+    sourceAssetId: uuid("source_asset_id"),
+    objectKey: text("object_key"),
+    width: integer("width"),
+    height: integer("height"),
+    durationMilliseconds: integer("duration_milliseconds"),
+    fit: text("fit").$type<"contain" | "cover">().notNull().default("contain"),
+    trimStartMilliseconds: integer("trim_start_milliseconds")
+      .notNull()
+      .default(0),
+    loop: boolean("loop").notNull().default(false),
+    reviewStatus: text("review_status")
+      .$type<"pending" | "approved" | "rejected">()
+      .notNull()
+      .default("pending"),
+    revision: integer("revision").notNull().default(1),
+    updatedByUserId: uuid("updated_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("scene_visual_selections_version_revision_unique").on(
+      table.sceneVersionId,
+      table.workspaceId,
+      table.revision,
+    ),
+    index("scene_visual_selections_project_index").on(
+      table.workspaceId,
+      table.projectId,
+    ),
+    foreignKey({
+      columns: [
+        table.sceneVersionId,
+        table.sceneId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        sceneVersions.id,
+        sceneVersions.sceneId,
+        sceneVersions.projectId,
+        sceneVersions.workspaceId,
+      ],
+      name: "scene_visual_selections_scene_tenant_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.sourceAssetId, table.workspaceId],
+      foreignColumns: [mediaAssets.id, mediaAssets.workspaceId],
+      name: "scene_visual_selections_asset_tenant_fkey",
+    }),
+    check(
+      "scene_visual_selections_values_valid",
+      sql`${table.kind} in ('inherit','image','video') and ${table.fit} in ('contain','cover') and ${table.reviewStatus} in ('pending','approved','rejected') and ${table.revision}>0 and ${table.trimStartMilliseconds}>=0`,
+    ),
+    check(
+      "scene_visual_selections_media_valid",
+      sql`((${table.objectKey} is null and ${table.sourceAssetId} is null and ${table.kind}<>'video') or (${table.kind}='video' and ${table.objectKey} is not null and ${table.sourceAssetId} is not null and ${table.width}>0 and ${table.height}>0 and ${table.durationMilliseconds}>0)) is true`,
+    ),
+  ],
+);
+
+export type VideoGeneration = typeof videoGenerations.$inferSelect;
+export type SceneVisualSelection = typeof sceneVisualSelections.$inferSelect;
+
 export const usageReservations = pgTable(
   "usage_reservations",
   {
@@ -5086,9 +5317,9 @@ export const usageReservations = pgTable(
     workspaceId: uuid("workspace_id")
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
-    projectId: uuid("project_id")
-      .notNull()
-      .references(() => projects.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").references(() => projects.id, {
+      onDelete: "cascade",
+    }),
     operationType: usageOperationTypeEnum("operation_type")
       .notNull()
       .default("scene_analysis"),
@@ -5112,6 +5343,7 @@ export const usageReservations = pgTable(
       { onDelete: "cascade" },
     ),
     clipGenerationId: uuid("clip_generation_id"),
+    videoGenerationId: uuid("video_generation_id"),
     chapterGenerationId: uuid("chapter_generation_id").references(
       () => chapterGenerationRuns.id,
       { onDelete: "cascade" },
@@ -5134,6 +5366,19 @@ export const usageReservations = pgTable(
       table.projectId,
       table.workspaceId,
     ),
+    uniqueIndex("usage_reservations_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+      table.operationType,
+    ),
+    uniqueIndex("usage_reservations_video_generation_unique")
+      .on(table.videoGenerationId)
+      .where(sql`${table.videoGenerationId} is not null`),
+    foreignKey({
+      columns: [table.videoGenerationId, table.workspaceId],
+      foreignColumns: [videoGenerations.id, videoGenerations.workspaceId],
+      name: "usage_reservations_video_generation_tenant_fkey",
+    }).onDelete("cascade"),
     uniqueIndex("usage_reservations_analysis_unique")
       .on(table.analysisRunId)
       .where(sql`${table.analysisRunId} is not null`),
@@ -5176,7 +5421,7 @@ export const usageReservations = pgTable(
     ),
     check(
       "usage_reservations_single_operation",
-      sql`(${table.operationType}::text = 'scene_analysis' and ${table.analysisRunId} is not null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is null and ${table.chapterGenerationId} is null) or (${table.operationType}::text = 'scene_image_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is not null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is null and ${table.chapterGenerationId} is null) or (${table.operationType}::text = 'scene_audio_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is not null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is null and ${table.chapterGenerationId} is null) or (${table.operationType}::text = 'video_render' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is not null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is null and ${table.chapterGenerationId} is null) or (${table.operationType}::text = 'script_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is not null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is null and ${table.chapterGenerationId} is null) or (${table.operationType}::text = 'title_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is not null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is null and ${table.chapterGenerationId} is null) or (${table.operationType}::text = 'thumbnail_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is not null and ${table.clipGenerationId} is null and ${table.chapterGenerationId} is null) or (${table.operationType}::text = 'scene_video_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is not null and ${table.chapterGenerationId} is null) or (${table.operationType}::text = 'chapter_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is null and ${table.chapterGenerationId} is not null)`,
+      sql`(((${table.operationType}::text = 'scene_analysis' and ${table.analysisRunId} is not null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is null and ${table.chapterGenerationId} is null) or (${table.operationType}::text = 'scene_image_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is not null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is null and ${table.chapterGenerationId} is null) or (${table.operationType}::text = 'scene_audio_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is not null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is null and ${table.chapterGenerationId} is null) or (${table.operationType}::text = 'video_render' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is not null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is null and ${table.chapterGenerationId} is null) or (${table.operationType}::text = 'script_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is not null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is null and ${table.chapterGenerationId} is null) or (${table.operationType}::text = 'title_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is not null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is null and ${table.chapterGenerationId} is null) or (${table.operationType}::text = 'thumbnail_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is not null and ${table.clipGenerationId} is null and ${table.chapterGenerationId} is null) or (${table.operationType}::text = 'scene_video_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is not null and ${table.chapterGenerationId} is null) or (${table.operationType}::text = 'chapter_generation' and ${table.analysisRunId} is null and ${table.imageGenerationId} is null and ${table.audioGenerationId} is null and ${table.videoRenderId} is null and ${table.scriptGenerationId} is null and ${table.titleGenerationId} is null and ${table.thumbnailGenerationId} is null and ${table.clipGenerationId} is null and ${table.chapterGenerationId} is not null)) and ${table.videoGenerationId} is null and ${table.projectId} is not null) or (${table.operationType}::text = 'video_generation' and ${table.videoGenerationId} is not null and num_nonnulls(${table.analysisRunId}, ${table.imageGenerationId}, ${table.audioGenerationId}, ${table.videoRenderId}, ${table.scriptGenerationId}, ${table.titleGenerationId}, ${table.thumbnailGenerationId}, ${table.clipGenerationId}, ${table.chapterGenerationId}) = 0)`,
     ),
     foreignKey({
       columns: [table.imageGenerationId, table.projectId, table.workspaceId],
@@ -5224,9 +5469,9 @@ export const usageEvents = pgTable(
     workspaceId: uuid("workspace_id")
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
-    projectId: uuid("project_id")
-      .notNull()
-      .references(() => projects.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").references(() => projects.id, {
+      onDelete: "cascade",
+    }),
     reservationId: uuid("reservation_id").notNull(),
     operationType: usageOperationTypeEnum("operation_type").notNull(),
     eventType: usageEventTypeEnum("event_type").notNull(),
@@ -5241,6 +5486,15 @@ export const usageEvents = pgTable(
       .notNull(),
   },
   (table) => [
+    foreignKey({
+      columns: [table.reservationId, table.workspaceId, table.operationType],
+      foreignColumns: [
+        usageReservations.id,
+        usageReservations.workspaceId,
+        usageReservations.operationType,
+      ],
+      name: "usage_events_reservation_workspace_fkey",
+    }).onDelete("cascade"),
     uniqueIndex("usage_events_reservation_event_unique").on(
       table.reservationId,
       table.eventType,
