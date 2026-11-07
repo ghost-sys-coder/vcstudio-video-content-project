@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+export const projectVisualMediaSchema = z.enum(["image", "video"]);
+export type ProjectVisualMedia = z.infer<typeof projectVisualMediaSchema>;
+
 export const videoProviderIdSchema = z.enum([
   "google_gemini",
   "google_vertex",

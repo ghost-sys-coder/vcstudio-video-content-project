@@ -11,6 +11,7 @@ import {
 } from "./data";
 const withMedia = new URLSearchParams(location.search).has("withMedia");
 const withYouTube = new URLSearchParams(location.search).has("youtube");
+const autonomous = new URLSearchParams(location.search).has("autonomous");
 const frame = document.createElement("iframe");
 frame.title = "VCStudio review";
 frame.style.cssText = "width:100%;height:1200px;border:0";
@@ -35,7 +36,7 @@ bridge.oninitialized = async () => {
         operation: {
           id: operationId,
           workspaceId,
-          status: "requires_approval",
+          status: autonomous ? "prepared" : "requires_approval",
         },
         preview: withYouTube
           ? {
@@ -83,9 +84,10 @@ bridge.oninitialized = async () => {
       },
     },
     _meta: {
-      approvalProof: new URLSearchParams(location.search).has("noProof")
-        ? undefined
-        : "private-user-interface-proof-123456789",
+      approvalProof:
+        autonomous || new URLSearchParams(location.search).has("noProof")
+          ? undefined
+          : "private-user-interface-proof-123456789",
       mediaPreviews:
         withMedia || withYouTube
           ? [

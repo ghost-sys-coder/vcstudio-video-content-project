@@ -7,11 +7,19 @@ const m = vi.hoisted(() => ({
   memberships: vi.fn(),
   prepare: vi.fn(),
   confirm: vi.fn(),
+  execute: vi.fn(),
   previewOrigin: vi.fn(),
   mediaPreviews: vi.fn(),
 }));
 vi.mock("@/lib/mcp/context", () => ({ authorizeMcp: m.authorize }));
 vi.mock("@/lib/mcp/rate-limit", () => ({ enforceMcpRateLimit: vi.fn() }));
+vi.mock("@/lib/env/server", () => ({
+  getMcpEnvironment: () => ({
+    ENABLE_MCP: true,
+    APP_BASE_URL: "https://vcstudio.example",
+  }),
+  getPublishingEnvironment: () => ({ ENABLE_SOCIAL_POSTING: true }),
+}));
 vi.mock("@/db/repositories/mcp.repository", () => ({
   ensureMcpConnection: m.connection,
   listMcpGrants: m.grants,
@@ -22,6 +30,7 @@ vi.mock("@/db/repositories/workspaces.repository", () => ({
 vi.mock("@/lib/mcp/publishing-service", () => ({
   prepareMcpPublication: m.prepare,
   approveMcpPublication: m.confirm,
+  executeMcpPublication: m.execute,
 }));
 vi.mock("@/lib/mcp/media-previews", () => ({
   loadMcpMediaPreviews: m.mediaPreviews,
@@ -89,6 +98,61 @@ async function client() {
   return instance;
 }
 describe("real MCP SDK interoperability", () => {
+  it("advertises the effective approval mode without enabling autonomy", async () => {
+    const result = await (
+      await client()
+    ).callTool({
+      name: "get_capabilities",
+      arguments: { workspaceId: mcpIds.workspace },
+    });
+    expect(result.structuredContent).toMatchObject({
+      ok: true,
+      data: { publicationApprovalMode: "manual" },
+    });
+  });
+  it("exposes explicit agent execution with its preparation idempotency key", async () => {
+    m.execute.mockResolvedValue(
+      publicOperation(mcpOperationFixture({ status: "succeeded" })),
+    );
+    const connection = await client();
+    const args = {
+      workspaceId: mcpIds.workspace,
+      operationId: mcpIds.operation,
+      idempotencyKey: "execute-key-123",
+    };
+    const result = await connection.callTool({
+      name: "execute_publication",
+      arguments: args,
+    });
+    expect(result.structuredContent).toMatchObject({
+      ok: true,
+      data: { status: "succeeded" },
+    });
+    expect(m.authorize).toHaveBeenCalledWith(
+      ctx.principal,
+      mcpIds.workspace,
+      "vcstudio:publish",
+    );
+    expect(m.execute).toHaveBeenCalledWith(
+      ctx,
+      mcpIds.operation,
+      args.idempotencyKey,
+    );
+    m.execute.mockClear();
+    expect(
+      (
+        await connection.callTool({
+          name: "execute_publication",
+          arguments: {
+            workspaceId: mcpIds.workspace,
+            operationId: mcpIds.operation,
+            confirmed: true,
+          },
+        })
+      ).isError,
+    ).toBe(true);
+    expect(m.execute).not.toHaveBeenCalled();
+  });
   it("allows the actual signed media origin in the review resource's narrow CSP", async () => {
     const result = await (
       await client()

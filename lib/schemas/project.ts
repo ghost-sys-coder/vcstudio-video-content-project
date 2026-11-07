@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { projectVisualMediaSchema } from "@studio/contracts/video";
 
 export const projectStatusSchema = z.enum([
   "draft",
@@ -35,6 +36,7 @@ export const createProjectSchema = z.object({
   // Defaulted so every existing caller and form that omits it keeps producing
   // a static-image project exactly as before.
   videoKind: projectVideoKindSchema.default("staticImages"),
+  defaultVisualMedia: projectVisualMediaSchema.default("image"),
   framesPerSecond: z.coerce.number().int().min(1).max(120),
   language: z.string().trim().min(2).max(40),
   maximumBudgetCents: z.coerce.number().int().min(0).max(100000),
@@ -61,10 +63,12 @@ export const createProjectSchema = z.object({
     .transform((value) => (value ? value : null)),
 });
 
-export const updateProjectSchema = createProjectSchema.extend({
-  projectId: z.uuid(),
-  status: projectStatusSchema,
-});
+export const updateProjectSchema = createProjectSchema
+  .omit({ defaultVisualMedia: true })
+  .extend({
+    projectId: z.uuid(),
+    status: projectStatusSchema,
+  });
 
 export const contentPlatformSchema = z.enum([
   "youtube",

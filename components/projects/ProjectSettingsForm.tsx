@@ -69,11 +69,15 @@ export function ProjectSettingsForm({
             <SelectItem value="1:1">1:1</SelectItem>
           </FormSelect>
         </div>
-        <VideoKindSelect
-          defaultValue={project.videoKind}
-          disabled={!canEdit || pending}
-          id="settings-video-kind"
-        />
+        {project.videoKind === "animatedCharacter" ? (
+          <VideoKindSelect
+            defaultValue={project.videoKind}
+            disabled={!canEdit || pending}
+            id="settings-video-kind"
+          />
+        ) : (
+          <input type="hidden" name="videoKind" value={project.videoKind} />
+        )}
         <div className="space-y-2">
           <Label htmlFor="settings-fps">Frame rate</Label>
           <Input

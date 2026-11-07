@@ -19,6 +19,7 @@ const m = vi.hoisted(() => ({
   findKey: vi.fn(),
   update: vi.fn(),
   consume: vi.fn(),
+  consumeAutonomous: vi.fn(),
   lock: vi.fn(),
   unlock: vi.fn(),
   publish: vi.fn(),
@@ -54,6 +55,7 @@ vi.mock("@/db/repositories/mcp.repository", () => ({
   findMcpOperationByKey: m.findKey,
   updateMcpOperation: m.update,
   consumeMcpApproval: m.consume,
+  consumeMcpAutonomousPublication: m.consumeAutonomous,
 }));
 vi.mock("@/db/commands/mcp-post-lock", () => ({
   lockMcpPost: m.lock,
@@ -78,6 +80,7 @@ import {
   publicationAuthority,
   prepareMcpPublication,
   dispatchApprovedPublication,
+  executeMcpPublication,
 } from "./publishing-service";
 import {
   mcpContextFixture,
@@ -140,6 +143,191 @@ async function pendingOperation() {
     fingerprint: fingerprint({ kind: "publish_post", input: request, preview }),
   });
 }
+async function autonomousSetup(
+  input: typeof request & { scheduledAt?: string } = request,
+) {
+  const context = mcpContextFixture();
+  context.grant.publicationApprovalMode = "autonomous";
+  const preview = await buildPublicationPreview(context, input);
+  const operation = mcpOperationFixture({
+    status: "prepared",
+    approvalHash: null,
+    idempotencyKey: input.idempotencyKey,
+    input: {
+      request: input,
+      preview,
+      authority: publicationAuthority(context),
+      approvalMode: "autonomous",
+    },
+  });
+  m.find.mockResolvedValue(operation);
+  m.consumeAutonomous.mockResolvedValue({ ...operation, status: "approved" });
+  return { context, operation };
+}
+
+describe("connection-preauthorized publishing", () => {
+  it("prepares without a human proof or starting any publication", async () => {
+    const context = mcpContextFixture();
+    context.grant.publicationApprovalMode = "autonomous";
+    const result = await prepareMcpPublication(context, request);
+    expect(result).toMatchObject({
+      approvalMode: "autonomous",
+      operation: { status: "prepared" },
+    });
+    expect(result.uiProof).toBeUndefined();
+    expect(m.begin).toHaveBeenCalledWith(
+      expect.objectContaining({
+        approvalHash: null,
+        input: expect.objectContaining({ approvalMode: "autonomous" }),
+      }),
+    );
+    expect(m.publish).not.toHaveBeenCalled();
+  });
+  it("executes the frozen preview through the existing publication dispatcher", async () => {
+    const { context, operation } = await autonomousSetup();
+    const result = await executeMcpPublication(
+      context,
+      operation.id,
+      request.idempotencyKey,
+    );
+    expect(result.status).toBe("succeeded");
+    expect(m.consumeAutonomous).toHaveBeenCalledWith(
+      expect.objectContaining({
+        grantUpdatedAt: context.grant.updatedAt,
+        connectionUpdatedAt: context.connection.updatedAt,
+      }),
+    );
+    expect(m.publish).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        workspaceId: mcpIds.workspace,
+        postId: mcpIds.post,
+        requestNonce: operation.id,
+      }),
+    );
+    expect(m.consume).not.toHaveBeenCalled();
+  });
+  it("keeps manual connections behind human approval", async () => {
+    await expect(
+      executeMcpPublication(ctx, mcpIds.operation, request.idempotencyKey),
+    ).rejects.toMatchObject({ code: "approval_required" });
+    expect(m.find).not.toHaveBeenCalled();
+  });
+  it("cannot execute a manually prepared operation after changing the connection mode", async () => {
+    const { context, operation } = await autonomousSetup();
+    m.find.mockResolvedValue({
+      ...operation,
+      status: "requires_approval",
+      input: { ...operation.input, approvalMode: "manual" },
+    });
+    await expect(
+      executeMcpPublication(context, operation.id, request.idempotencyKey),
+    ).rejects.toMatchObject({ code: "approval_required" });
+    expect(m.consumeAutonomous).not.toHaveBeenCalled();
+  });
+  it("rejects altered execution keys and expired preparations", async () => {
+    const { context, operation } = await autonomousSetup();
+    await expect(
+      executeMcpPublication(context, operation.id, "different-key"),
+    ).rejects.toMatchObject({ code: "conflict" });
+    m.find.mockResolvedValue({ ...operation, expiresAt: new Date(0) });
+    await expect(
+      executeMcpPublication(context, operation.id, request.idempotencyKey),
+    ).rejects.toMatchObject({ code: "expired" });
+    expect(m.lock).not.toHaveBeenCalled();
+  });
+  it("invalidates a preview when content or permissions change", async () => {
+    const { context, operation } = await autonomousSetup();
+    context.grant.updatedAt = new Date(context.grant.updatedAt.getTime() + 1);
+    await expect(
+      executeMcpPublication(context, operation.id, request.idempotencyKey),
+    ).rejects.toMatchObject({ code: "conflict" });
+    context.grant.updatedAt = ctx.grant.updatedAt;
+    m.find.mockResolvedValue({
+      ...operation,
+      input: { ...operation.input, authority: publicationAuthority(context) },
+    });
+    m.post.mockResolvedValue({
+      id: mcpIds.post,
+      version: 2,
+      status: "draft",
+      bodyPlainText: "Changed copy",
+    });
+    await expect(
+      executeMcpPublication(context, operation.id, request.idempotencyKey),
+    ).rejects.toMatchObject({ code: "conflict" });
+    expect(m.consumeAutonomous).not.toHaveBeenCalled();
+  });
+  it.each(["revoked", "token", "grant", "demoted"] as const)(
+    "blocks execution after %s authority is lost",
+    async (loss) => {
+      const { context, operation } = await autonomousSetup();
+      if (loss === "revoked") context.connection.revokedAt = new Date();
+      if (loss === "token") context.principal.scopes = ["vcstudio:read"];
+      if (loss === "grant") context.grant.scopes = ["vcstudio:read"];
+      if (loss === "demoted") context.membership.role = "editor";
+      await expect(
+        executeMcpPublication(context, operation.id, request.idempotencyKey),
+      ).rejects.toThrow();
+      expect(m.publish).not.toHaveBeenCalled();
+    },
+  );
+  it("does not dispatch when an atomic permission recheck loses the race", async () => {
+    const { context, operation } = await autonomousSetup();
+    m.consumeAutonomous.mockResolvedValue(null);
+    await expect(
+      executeMcpPublication(context, operation.id, request.idempotencyKey),
+    ).rejects.toMatchObject({ code: "permission_denied" });
+    expect(m.unlock).toHaveBeenCalledWith(
+      mcpIds.workspace,
+      mcpIds.post,
+      operation.id,
+    );
+    expect(m.publish).not.toHaveBeenCalled();
+  });
+  it("returns a completed execution on retry without sending again", async () => {
+    const { context, operation } = await autonomousSetup();
+    await executeMcpPublication(context, operation.id, request.idempotencyKey);
+    m.find.mockResolvedValue({
+      ...operation,
+      status: "succeeded",
+      result: { postId: request.postId },
+    });
+    expect(
+      (
+        await executeMcpPublication(
+          context,
+          operation.id,
+          request.idempotencyKey,
+        )
+      ).status,
+    ).toBe("succeeded");
+    expect(m.publish).toHaveBeenCalledTimes(1);
+  });
+  it("schedules the exact frozen instant through the same dispatcher", async () => {
+    const scheduledAt = new Date(Date.now() + 86_400_000).toISOString();
+    const { context, operation } = await autonomousSetup({
+      ...request,
+      scheduledAt,
+    });
+    expect(
+      (
+        await executeMcpPublication(
+          context,
+          operation.id,
+          request.idempotencyKey,
+        )
+      ).result?.scheduled,
+    ).toBe(true);
+    expect(m.schedule).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scheduledAt: new Date(scheduledAt),
+        timezone: "UTC",
+      }),
+    );
+    expect(m.publish).not.toHaveBeenCalled();
+  });
+});
+
 describe("publication approval boundary", () => {
   function useYouTube() {
     const youtubeSettings = socialYouTubeSettingsSchema.parse({

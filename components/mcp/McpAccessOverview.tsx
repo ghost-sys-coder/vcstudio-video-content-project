@@ -17,9 +17,9 @@ const safeguards = [
   },
   {
     icon: CheckCheck,
-    title: "Publishing needs your approval",
+    title: "Choose your publishing control",
     description:
-      "Review the exact content, accounts and time before a post is published or scheduled.",
+      "Keep manual review, or explicitly authorize autonomous publishing for a connection and workspace.",
   },
   {
     icon: Unplug,

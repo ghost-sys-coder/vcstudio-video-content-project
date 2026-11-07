@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import type { SocialYouTubeSettings } from "@studio/contracts/publishing";
 import type { SceneAnalysisSegmentHint } from "@studio/prompts";
 import type {
+  ProjectVisualMedia,
   VideoGenerationRequest,
   VideoModelDescriptor,
   VideoModelPricing,
@@ -76,6 +77,10 @@ export const mcpWorkspaceGrants = pgTable(
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
     scopes: jsonb("scopes").$type<string[]>().notNull(),
+    publicationApprovalMode: text("publication_approval_mode")
+      .$type<import("@studio/contracts").McpPublicationApprovalMode>()
+      .notNull()
+      .default("manual"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -86,6 +91,14 @@ export const mcpWorkspaceGrants = pgTable(
   (t) => [
     primaryKey({ columns: [t.connectionId, t.workspaceId] }),
     index("mcp_grants_workspace_index").on(t.workspaceId),
+    check(
+      "mcp_grants_publication_approval_mode_valid",
+      sql`${t.publicationApprovalMode} in ('manual','autonomous')`,
+    ),
+    check(
+      "mcp_grants_autonomous_publish_scope",
+      sql`${t.publicationApprovalMode} <> 'autonomous' or ${t.scopes} @> '["vcstudio:publish"]'::jsonb`,
+    ),
   ],
 );
 
@@ -143,7 +156,7 @@ export const mcpOperations = pgTable(
     }),
     check(
       "mcp_operations_status_valid",
-      sql`${t.status} in ('awaiting_upload','requires_approval','queued','running','approved','succeeded','failed','cancelled','expired')`,
+      sql`${t.status} in ('awaiting_upload','requires_approval','prepared','queued','running','approved','succeeded','failed','cancelled','expired')`,
     ),
   ],
 );
@@ -1254,7 +1267,7 @@ export const projects = pgTable(
       .notNull()
       .default("staticImages"),
     defaultVisualMedia: text("default_visual_media")
-      .$type<"image" | "video">()
+      .$type<ProjectVisualMedia>()
       .notNull()
       .default("image"),
     aspectRatio: projectAspectRatioEnum("aspect_ratio").notNull(),

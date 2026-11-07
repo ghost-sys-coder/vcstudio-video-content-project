@@ -19,6 +19,19 @@ export const mcpScopeSchema = z.enum([
 ]);
 export const MCP_SCOPES = mcpScopeSchema.options;
 export type McpScope = z.infer<typeof mcpScopeSchema>;
+export const mcpPublicationApprovalModeSchema = z.enum([
+  "manual",
+  "autonomous",
+]);
+export type McpPublicationApprovalMode = z.infer<
+  typeof mcpPublicationApprovalModeSchema
+>;
+export const mcpGrantInput = z.object({
+  connectionId: z.uuid(),
+  workspaceId: z.uuid(),
+  scopes: z.array(mcpScopeSchema).max(MCP_SCOPES.length),
+  publicationApprovalMode: mcpPublicationApprovalModeSchema.default("manual"),
+});
 export const mcpWorkspaceInput = z.object({ workspaceId: z.uuid() });
 /** Persisted display framing, distinct from a scene image's storage canvas. */
 export const mcpSceneImageFramingSchema = z.object({
@@ -81,6 +94,7 @@ export const mcpPublishInput = mcpMutationInput.extend({
 export const mcpOperationStatusSchema = z.enum([
   "awaiting_upload",
   "requires_approval",
+  "prepared",
   "queued",
   "running",
   "approved",

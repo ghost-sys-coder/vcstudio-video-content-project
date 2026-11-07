@@ -1,5 +1,49 @@
 # VCStudio MCP v1 setup and verification
 
+## Optional autonomous publishing
+
+The pending `mcp_autonomous_publishing` release makes the publishing review click
+optional for an explicitly authorized connection/workspace. Every existing grant
+defaults to **Require my approval**. In AI connections, a workspace owner selects
+the connection and workspace, grants Publish, chooses **Autonomous publishing**
+and saves. This setting starts no work and cannot be enabled by an MCP tool.
+OAuth consent and current workspace permissions still apply.
+
+In autonomous mode, call `prepare_publication` first. It freezes the exact post,
+assets, destination accounts, metadata and schedule and returns `approvalMode:
+autonomous` with status `prepared`; nothing is sent. Call `execute_publication`
+with that operation ID and the preparation's **same idempotency key** within ten
+minutes. Repeating execution returns the existing result. Changes to content,
+assets, permissions or membership invalidate a pending preparation. PostgreSQL
+atomically rechecks the owner role, grant revision/mode, Publish scope and
+connection revocation before authorizing dispatch.
+
+This covers publication, scheduling, schedule cancellation and thumbnail-only
+retries. Internal script/scene/media approvals stay explicit and unchanged.
+Manual connections continue to require the private human review proof; an agent
+supplying `confirmed: true` or requesting another mode cannot bypass that gate.
+Autonomous preparations display a read-only preview instead of an approval button.
+Client applications may still apply their own independent tool confirmation rules.
+
+Switch back to manual or disconnect to block future autonomous execution. Already
+authorized schedules/outbox work remain ordinary Social work and can be cancelled
+separately. Marketing, LinkedIn Pages, generation, budgets and platform restrictions
+are unchanged. TikTok still needs completion in TikTok. No new scheduled task,
+environment variable or dependency is introduced. Apply generated migration
+`20261107223040_mcp_autonomous_publishing` before deploying matching web/worker code.
+
+Verification on 8 November 2026 passed 197 tests across 23 files, all 22 browser
+journeys, formatting, TypeScript, environment validation and the production build.
+Full lint passed with the three existing unrelated warnings; changed files are
+clean. Phone/desktop Light/Dark screenshots were inspected, including saved-mode
+persistence and an autonomous preview without a human approval button. The
+generated migration passed isolated PostgreSQL and production-clone checks on
+`br-spring-poetry-ai89in33`: all six business-table counts/fingerprints are
+unchanged and both existing grants remain manual. Production migration and
+web/worker release remain pending explicit approval. No live provider action was
+performed. Exact completion context is retained in ignored
+`.vercel/mcp-autonomy-migration-prepared.json`.
+
 YouTube Social drafts now support explicit upload metadata/disclosures and a
 separate library thumbnail, included in the human approval preview. Thumbnail
 finishing waits for video processing; `prepare_publication` with

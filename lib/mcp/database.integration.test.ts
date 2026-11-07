@@ -11,6 +11,9 @@ import {
   saveMcpGrant,
   beginMcpOperation,
   consumeMcpApproval,
+  consumeMcpAutonomousPublication,
+  findMcpConnection,
+  findMcpGrant,
   revokeMcpConnection,
   findMcpOperation,
 } from "@/db/repositories/mcp.repository";
@@ -73,6 +76,12 @@ beforeAll(async () => {
     alter table social_posts add column youtube_settings jsonb, add column youtube_thumbnail_asset_id uuid;
     alter table social_post_targets add column youtube_settings jsonb, add column youtube_thumbnail_asset_id uuid, add column youtube_thumbnail_status text, add column youtube_thumbnail_error text;
   `);
+  await pg.exec(
+    await readFile(
+      "migrations/20261107223040_mcp_autonomous_publishing/migration.sql",
+      "utf8",
+    ),
+  );
   shared.database = Object.assign(db, {
     batch: (queries: { toSQL(): { sql: string; params: unknown[] } }[]) =>
       pg.transaction(async (tx) => {
@@ -90,10 +99,138 @@ beforeAll(async () => {
     userId: mcpIds.user,
     workspaceId: mcpIds.workspace,
     scopes: ["vcstudio:read", "vcstudio:edit", "vcstudio:publish"],
+    publicationApprovalMode: "manual",
   });
 }, 30000);
 afterAll(async () => {
   await pg.close();
+});
+async function autonomousRecord() {
+  await pg.query(
+    "update workspace_members set role='owner' where workspace_id=$1 and user_id=$2",
+    [mcpIds.workspace, mcpIds.user],
+  );
+  const initial = await ensureMcpConnection(mcpIds.user, randomUUID());
+  await saveMcpGrant({
+    connectionId: initial.id,
+    workspaceId: mcpIds.workspace,
+    userId: mcpIds.user,
+    scopes: ["vcstudio:read", "vcstudio:publish"],
+    publicationApprovalMode: "autonomous",
+  });
+  const connection = await findMcpConnection(initial.id, mcpIds.user);
+  const grant = await findMcpGrant(initial.id, mcpIds.workspace);
+  if (!connection || !grant)
+    throw new Error("Missing isolated autonomy fixture");
+  const { operation } = await beginMcpOperation({
+    ...operationInput(randomUUID()),
+    connectionId: initial.id,
+    status: "prepared",
+    approvalHash: null,
+    input: { approvalMode: "autonomous" },
+  });
+  return {
+    operation,
+    connection,
+    claim: {
+      operationId: operation.id,
+      workspaceId: mcpIds.workspace,
+      connectionId: initial.id,
+      userId: mcpIds.user,
+      connectionUpdatedAt: connection.updatedAt,
+      grantUpdatedAt: grant.updatedAt,
+    },
+  };
+}
+describe("autonomous publication SQL authorization", () => {
+  it("keeps the generated migration default manual for existing connections", async () => {
+    const rows = await pg.query<{ publication_approval_mode: string }>(
+      "select publication_approval_mode from mcp_workspace_grants where connection_id=$1",
+      [connectionId],
+    );
+    expect(rows.rows[0].publication_approval_mode).toBe("manual");
+  });
+  it("atomically consumes a prepared operation only once", async () => {
+    const { claim } = await autonomousRecord();
+    const results = await Promise.all([
+      consumeMcpAutonomousPublication(claim),
+      consumeMcpAutonomousPublication(claim),
+    ]);
+    expect(results.filter(Boolean)).toHaveLength(1);
+    expect(results.find(Boolean)?.status).toBe("approved");
+  });
+  it("rejects a different user or workspace", async () => {
+    const { claim } = await autonomousRecord();
+    expect(
+      await consumeMcpAutonomousPublication({ ...claim, userId: randomUUID() }),
+    ).toBeNull();
+    expect(
+      await consumeMcpAutonomousPublication({
+        ...claim,
+        workspaceId: "88888888-8888-4888-8888-888888888888",
+      }),
+    ).toBeNull();
+  });
+  it("rechecks owner membership at consumption", async () => {
+    const { claim } = await autonomousRecord();
+    await pg.query(
+      "update workspace_members set role='editor' where workspace_id=$1 and user_id=$2",
+      [mcpIds.workspace, mcpIds.user],
+    );
+    expect(await consumeMcpAutonomousPublication(claim)).toBeNull();
+  });
+  it("invalidates a pending execution when the grant changes", async () => {
+    const { claim } = await autonomousRecord();
+    await saveMcpGrant({
+      connectionId: claim.connectionId,
+      userId: mcpIds.user,
+      workspaceId: mcpIds.workspace,
+      scopes: ["vcstudio:read", "vcstudio:publish"],
+      publicationApprovalMode: "manual",
+    });
+    expect(await consumeMcpAutonomousPublication(claim)).toBeNull();
+  });
+  it("rejects expired preparations", async () => {
+    const { claim } = await autonomousRecord();
+    await pg.query(
+      "update mcp_operations set expires_at=now()-interval '1 minute' where id=$1",
+      [claim.operationId],
+    );
+    expect(await consumeMcpAutonomousPublication(claim)).toBeNull();
+  });
+  it("cancels prepared work on revocation while preserving authorized outbox work", async () => {
+    const pending = await autonomousRecord();
+    await revokeMcpConnection(pending.connection.id, mcpIds.user);
+    expect(await consumeMcpAutonomousPublication(pending.claim)).toBeNull();
+    expect(
+      (
+        await findMcpOperation({
+          workspaceId: mcpIds.workspace,
+          operationId: pending.operation.id,
+        })
+      )?.status,
+    ).toBe("cancelled");
+    const approved = await autonomousRecord();
+    await consumeMcpAutonomousPublication(approved.claim);
+    await revokeMcpConnection(approved.connection.id, mcpIds.user);
+    expect(
+      (
+        await findMcpOperation({
+          workspaceId: mcpIds.workspace,
+          operationId: approved.operation.id,
+        })
+      )?.status,
+    ).toBe("approved");
+  });
+  it("enforces autonomous Publish scope in PostgreSQL", async () => {
+    const { connection } = await autonomousRecord();
+    await expect(
+      pg.query(
+        "update mcp_workspace_grants set scopes='[\"vcstudio:read\"]'::jsonb where connection_id=$1",
+        [connection.id],
+      ),
+    ).rejects.toThrow();
+  });
 });
 function operationInput(
   key: string,
@@ -470,6 +607,7 @@ describe("MCP SQL and migration behavior", () => {
       userId: mcpIds.user,
       workspaceId: mcpIds.workspace,
       scopes: ["vcstudio:read"],
+      publicationApprovalMode: "manual",
     });
     expect(await consumeMcpApproval(proof)).toBeNull();
     await saveMcpGrant({
@@ -477,6 +615,7 @@ describe("MCP SQL and migration behavior", () => {
       userId: mcpIds.user,
       workspaceId: mcpIds.workspace,
       scopes: ["vcstudio:read", "vcstudio:publish"],
+      publicationApprovalMode: "manual",
     });
     expect((await consumeMcpApproval(proof))?.status).toBe("approved");
   });

@@ -6,30 +6,40 @@ export function PublicationReview({
   preview,
   actions,
   mediaPreviews = [],
+  autonomous = false,
 }: {
   preview: PublicationPreview;
   actions?: ReactNode;
   mediaPreviews?: McpMediaPreview[];
+  autonomous?: boolean;
 }) {
   return (
     <section className="app-section min-w-0">
       <div className="app-heading">
         <h2 className="text-xl font-semibold">
-          {preview.action === "retry_thumbnail"
-            ? "Review YouTube thumbnail retry"
-            : preview.action === "cancel_schedule"
-              ? "Review schedule cancellation"
-              : preview.scheduledAt
-                ? "Review scheduled publication"
-                : "Review publication"}
+          {autonomous
+            ? "Prepared autonomous operation"
+            : preview.action === "retry_thumbnail"
+              ? "Review YouTube thumbnail retry"
+              : preview.action === "cancel_schedule"
+                ? "Review schedule cancellation"
+                : preview.scheduledAt
+                  ? "Review scheduled publication"
+                  : "Review publication"}
         </h2>
         <p className="text-sm text-muted-foreground">
-          {preview.action === "retry_thumbnail"
-            ? "Approve applying the saved thumbnail to the existing YouTube video."
-            : preview.action === "cancel_schedule"
-              ? "Approve removing this post from the calendar. Its content and media will remain."
-              : "Confirm the exact content and destination accounts."}{" "}
-          This approval is valid for ten minutes.
+          {autonomous ? (
+            "This connection is authorized to execute this exact preview without a review click. The preparation is valid for ten minutes."
+          ) : (
+            <>
+              {preview.action === "retry_thumbnail"
+                ? "Approve applying the saved thumbnail to the existing YouTube video."
+                : preview.action === "cancel_schedule"
+                  ? "Approve removing this post from the calendar. Its content and media will remain."
+                  : "Confirm the exact content and destination accounts."}{" "}
+              This approval is valid for ten minutes.
+            </>
+          )}
         </p>
       </div>
       <div className="app-panel">

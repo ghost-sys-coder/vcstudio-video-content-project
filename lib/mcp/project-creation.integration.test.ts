@@ -92,6 +92,20 @@ async function connect() {
 }
 
 describe("MCP project creation through the SDK and application service", () => {
+  it("saves the requested video-footage default through the SDK", async () => {
+    const client = await connect();
+    const result = await client.callTool({
+      name: "create_project",
+      arguments: { ...request, defaultVisualMedia: "video" },
+    });
+    expect(result.isError, JSON.stringify(result)).not.toBe(true);
+    expect(mocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        defaultVisualMedia: "video",
+        videoKind: "staticImages",
+      }),
+    );
+  });
   it.each([0, 200])(
     "creates a project with a %i-cent budget and omitted reference selectors",
     async (budget) => {

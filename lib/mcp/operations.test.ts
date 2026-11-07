@@ -33,6 +33,7 @@ const context: McpContext = {
     updatedAt: new Date(),
   },
   grant: {
+    publicationApprovalMode: "manual",
     connectionId: "connection",
     workspaceId: "workspace",
     scopes: ["vcstudio:edit"],

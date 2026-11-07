@@ -1,0 +1,4 @@
+ALTER TABLE "mcp_workspace_grants" ADD COLUMN "publication_approval_mode" text DEFAULT 'manual' NOT NULL;--> statement-breakpoint
+ALTER TABLE "mcp_workspace_grants" ADD CONSTRAINT "mcp_grants_publication_approval_mode_valid" CHECK ("publication_approval_mode" in ('manual','autonomous'));--> statement-breakpoint
+ALTER TABLE "mcp_workspace_grants" ADD CONSTRAINT "mcp_grants_autonomous_publish_scope" CHECK ("publication_approval_mode" <> 'autonomous' or "scopes" @> '["vcstudio:publish"]'::jsonb);--> statement-breakpoint
+ALTER TABLE "mcp_operations" DROP CONSTRAINT "mcp_operations_status_valid", ADD CONSTRAINT "mcp_operations_status_valid" CHECK ("status" in ('awaiting_upload','requires_approval','prepared','queued','running','approved','succeeded','failed','cancelled','expired'));

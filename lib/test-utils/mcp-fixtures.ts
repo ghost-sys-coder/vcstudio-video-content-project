@@ -37,6 +37,7 @@ export function mcpContextFixture(): McpContext {
     grant: {
       connectionId: mcpIds.connection,
       workspaceId: mcpIds.workspace,
+      publicationApprovalMode: "manual",
       scopes: [...MCP_SCOPES],
       createdAt: now,
       updatedAt: now,

@@ -16,7 +16,7 @@ import { ProjectStyleField } from "@/components/projects/ProjectStyleField";
 import type { FormatChoice } from "@/lib/formats/format-choice";
 import { resolveFormatInheritance } from "@/lib/formats/format-inheritance";
 import { Textarea } from "@/components/ui/textarea";
-import { VideoKindSelect } from "@/components/projects/VideoKindSelect";
+import { ProjectVisualMediaSelect } from "@/components/projects/ProjectVisualMediaSelect";
 import type { ProjectAspectRatio } from "@/db/schema";
 import type { IdeaNicheGroup, SavedIdeaView } from "@/lib/ideas/ideas-view";
 import type { SceneImageStylePresetView } from "@/lib/scenes/scene-image-view";
@@ -195,7 +195,7 @@ export function CreateProjectForm({
           maxLength={2000}
         />
       </div>
-      <VideoKindSelect defaultValue="staticImages" id="project-video-kind" />
+      <ProjectVisualMediaSelect />
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="project-ratio">Aspect ratio</Label>

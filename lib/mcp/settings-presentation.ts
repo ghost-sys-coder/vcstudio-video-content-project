@@ -42,6 +42,7 @@ export const MCP_ACTIVITY_STATUSES: Record<
 > = {
   awaiting_upload: { label: "Awaiting upload", className: waiting },
   requires_approval: { label: "Awaiting approval", className: waiting },
+  prepared: { label: "Prepared for agent execution", className: neutral },
   queued: { label: "Queued", className: neutral },
   running: {
     label: "In progress",

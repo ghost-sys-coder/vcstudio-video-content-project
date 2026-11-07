@@ -15,6 +15,24 @@ const validProject = {
 };
 
 describe("project validation", () => {
+  it("defaults legacy callers to stills and accepts footage without changing the production mode", () => {
+    expect(createProjectSchema.parse(validProject)).toMatchObject({
+      defaultVisualMedia: "image",
+      videoKind: "staticImages",
+    });
+    expect(
+      createProjectSchema.parse({
+        ...validProject,
+        defaultVisualMedia: "video",
+      }),
+    ).toMatchObject({ defaultVisualMedia: "video", videoKind: "staticImages" });
+    expect(
+      createProjectSchema.safeParse({
+        ...validProject,
+        defaultVisualMedia: "animatedCharacter",
+      }).success,
+    ).toBe(false);
+  });
   it("accepts a valid project budget", () => {
     expect(createProjectSchema.safeParse(validProject).success).toBe(true);
   });

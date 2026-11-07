@@ -1,6 +1,6 @@
 "use client";
 import { useActionState, useState } from "react";
-import { MCP_SCOPES } from "@studio/contracts";
+import { MCP_SCOPES, type McpPublicationApprovalMode } from "@studio/contracts";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { FormSelect } from "@/components/ui/FormSelect";
@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { saveMcpGrantAction } from "@/app/(authenticated)/app/settings/mcp/actions";
 import type { McpSettingsView } from "@/lib/mcp/settings-view";
 import { MCP_SCOPE_LABELS, MCP_SCOPE_TITLES } from "@/lib/mcp/scope-labels";
+import { McpPublicationApprovalField } from "./McpPublicationApprovalField";
+import { canConfigureAutonomousPublishing } from "@/lib/mcp/publication-approval-policy";
 export function McpGrantForm({
   connection,
   workspaces,
@@ -24,8 +26,14 @@ export function McpGrantForm({
     message: "",
   });
   const selected = workspaces.find((w) => w.workspaceId === workspaceId);
-  const saved = connection.grants.find((g) => g.workspaceId === workspaceId)
-    ?.scopes ?? ["vcstudio:read"];
+  const savedGrant = connection.grants.find(
+    (g) => g.workspaceId === workspaceId,
+  );
+  const saved = savedGrant?.scopes ?? ["vcstudio:read"];
+  const [publicationApprovalMode, setPublicationApprovalMode] =
+    useState<McpPublicationApprovalMode>(
+      savedGrant?.publicationApprovalMode ?? "manual",
+    );
   return (
     <form action={action} className="app-section">
       <input type="hidden" name="connectionId" value={connection.id} />
@@ -35,7 +43,13 @@ export function McpGrantForm({
           id={`workspace-${connection.id}`}
           name="workspaceId"
           value={workspaceId}
-          onValueChange={setWorkspaceId}
+          onValueChange={(id) => {
+            setWorkspaceId(id);
+            setPublicationApprovalMode(
+              connection.grants.find((g) => g.workspaceId === id)
+                ?.publicationApprovalMode ?? "manual",
+            );
+          }}
         >
           {workspaces.map((w) => (
             <SelectItem key={w.workspaceId} value={w.workspaceId}>
@@ -68,6 +82,13 @@ export function McpGrantForm({
             </span>
           </Label>
         ))}
+        <McpPublicationApprovalField
+          id={`publication-approval-${connection.id}`}
+          value={publicationApprovalMode}
+          onChange={setPublicationApprovalMode}
+          owner={canConfigureAutonomousPublishing(selected?.role)}
+          disabled={pending}
+        />
       </fieldset>
       <p className="text-xs leading-relaxed text-muted-foreground">
         Permissions apply to this workspace. Your workspace role and the

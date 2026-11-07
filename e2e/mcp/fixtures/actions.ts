@@ -1,4 +1,14 @@
-export async function saveMcpGrantAction() {
+export async function saveMcpGrantAction(
+  _previous: { ok: boolean; message: string },
+  form: FormData,
+) {
+  sessionStorage.setItem(
+    "saved-mcp-grant",
+    JSON.stringify({
+      ...Object.fromEntries(form),
+      scopes: form.getAll("scopes"),
+    }),
+  );
   return { ok: true, message: "Workspace permissions saved." };
 }
 export async function revokeMcpConnectionAction() {

@@ -130,7 +130,9 @@ test("settings endpoint copies by keyboard and viewer scopes stay disabled", asy
   const chatgpt = page.locator('[data-slot="card"][aria-labelledby]').filter({
     has: page.getByRole("heading", { name: "ChatGPT", exact: true }),
   });
-  await chatgpt.getByRole("combobox").click();
+  await chatgpt
+    .getByRole("combobox", { name: "Workspace", exact: true })
+    .click();
   await page.getByRole("option", { name: /Reference workspace/ }).click();
   await expect(
     chatgpt.getByRole("checkbox", { name: /Read content/ }),

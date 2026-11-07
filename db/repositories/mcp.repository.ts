@@ -8,7 +8,11 @@ import {
   mcpOperations,
   mcpAssetOrigins,
 } from "@/db/schema";
-import type { McpOperationStatus, McpScope } from "@studio/contracts";
+import type {
+  McpOperationStatus,
+  McpScope,
+  McpPublicationApprovalMode,
+} from "@studio/contracts";
 
 export type McpOperation = typeof mcpOperations.$inferSelect;
 export async function ensureMcpConnection(userId: string, clientId: string) {
@@ -70,6 +74,7 @@ export async function saveMcpGrant(input: {
   userId: string;
   workspaceId: string;
   scopes: McpScope[];
+  publicationApprovalMode: McpPublicationApprovalMode;
 }) {
   // Reconnection is an explicit signed-in action, never an effect of seeing a token.
   const owned = await findMcpConnection(input.connectionId, input.userId);
@@ -83,7 +88,11 @@ export async function saveMcpGrant(input: {
           mcpWorkspaceGrants.connectionId,
           mcpWorkspaceGrants.workspaceId,
         ],
-        set: { scopes: input.scopes, updatedAt: new Date() },
+        set: {
+          scopes: input.scopes,
+          publicationApprovalMode: input.publicationApprovalMode,
+          updatedAt: new Date(),
+        },
       }),
     getDatabase()
       .update(mcpConnections)
@@ -123,6 +132,7 @@ export async function revokeMcpConnection(
           eq(mcpOperations.userId, userId),
           inArray(mcpOperations.status, [
             "requires_approval",
+            "prepared",
             "awaiting_upload",
             "queued",
           ]),
@@ -251,6 +261,35 @@ export async function consumeMcpApproval(input: {
     .returning();
   return row ?? null;
 }
+export async function consumeMcpAutonomousPublication(input: {
+  operationId: string;
+  workspaceId: string;
+  connectionId: string;
+  userId: string;
+  grantUpdatedAt: Date;
+  connectionUpdatedAt: Date;
+}) {
+  const [row] = await getDatabase()
+    .update(mcpOperations)
+    .set({ status: "approved", approvalHash: null, updatedAt: new Date() })
+    .where(
+      and(
+        eq(mcpOperations.id, input.operationId),
+        eq(mcpOperations.workspaceId, input.workspaceId),
+        eq(mcpOperations.connectionId, input.connectionId),
+        eq(mcpOperations.userId, input.userId),
+        eq(mcpOperations.kind, "publish_post"),
+        eq(mcpOperations.status, "prepared"),
+        sql`${mcpOperations.expiresAt} > now()`,
+        sql`${mcpOperations.input}->>'approvalMode' = 'autonomous'`,
+        sql`exists (select 1 from mcp_connections c where c.id = ${mcpOperations.connectionId} and c.revoked_at is null and c.updated_at = ${input.connectionUpdatedAt.toISOString()}::timestamptz)`,
+        sql`exists (select 1 from workspace_members m where m.workspace_id = ${mcpOperations.workspaceId} and m.user_id = ${mcpOperations.userId} and m.role = 'owner')`,
+        sql`exists (select 1 from mcp_workspace_grants g where g.connection_id = ${mcpOperations.connectionId} and g.workspace_id = ${mcpOperations.workspaceId} and g.publication_approval_mode = 'autonomous' and g.updated_at = ${input.grantUpdatedAt.toISOString()}::timestamptz and g.scopes @> '["vcstudio:publish"]'::jsonb)`,
+      ),
+    )
+    .returning();
+  return row ?? null;
+}
 export async function listMcpActivity(
   userId: string,
   workspaceId: string,
@@ -317,6 +356,7 @@ export async function revokeExpiredMcpSecrets() {
         lt(mcpOperations.expiresAt, new Date()),
         inArray(mcpOperations.status, [
           "requires_approval",
+          "prepared",
           "awaiting_upload",
           "queued",
         ]),

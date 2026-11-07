@@ -4,6 +4,7 @@ import {
   type McpPublicOperation,
 } from "@studio/contracts";
 import { McpBrowserApproval } from "./McpBrowserApproval";
+import { PublicationReview } from "./PublicationReview";
 import { McpUploadPanel } from "./McpUploadPanel";
 import type { McpMediaPreview } from "@/lib/mcp/media-previews";
 export function McpOperationPage({
@@ -35,6 +36,23 @@ export function McpOperationPage({
           preview={parsed.data}
           mediaPreviews={mediaPreviews}
           expired={new Date(operation.expiresAt) <= new Date()}
+        />
+      ) : operation.kind === "publish_post" &&
+        operation.status === "prepared" &&
+        parsed.success ? (
+        <PublicationReview
+          preview={parsed.data}
+          mediaPreviews={mediaPreviews}
+          autonomous
+          actions={
+            <p role="status">
+              Nothing has been sent. The authorized agent can execute this
+              preparation.{" "}
+              <Link className="underline" href="/app/settings/mcp">
+                Manage publishing approval
+              </Link>
+            </p>
+          }
         />
       ) : operation.status === "awaiting_upload" ? (
         <McpUploadPanel

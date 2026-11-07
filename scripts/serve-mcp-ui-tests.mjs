@@ -29,6 +29,7 @@ for (const [name, entry] of [
   ["queue", "e2e/mcp/fixtures/queue-entry.tsx"],
   ["video", "e2e/mcp/fixtures/video-entry.tsx"],
   ["tiktok-connect", "e2e/mcp/fixtures/tiktok-connect-entry.tsx"],
+  ["project-creation", "e2e/mcp/fixtures/project-creation-entry.tsx"],
 ]) {
   const bundle = await build({
     entryPoints: [entry],
@@ -39,6 +40,13 @@ for (const [name, entry] of [
     target: "es2022",
     define: { "process.env.NODE_ENV": '"production"' },
     alias: {
+      ...(name === "project-creation"
+        ? {
+            "@/app/(authenticated)/app/projects/actions": path.resolve(
+              "e2e/mcp/fixtures/MockProjectActions.ts",
+            ),
+          }
+        : {}),
       ...(name === "tiktok-connect"
         ? {
             "@/app/(authenticated)/app/social/accounts/tiktok-actions":
@@ -109,7 +117,7 @@ for (const [name, entry] of [
   });
   await writeFile(
     path.join(out, `${name}.html`),
-    `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${name === "post-composer" || name === "tiktok-connect" ? applicationCss : css}</style><style>body{margin:0;padding:16px;min-width:0}</style></head><body><div id="root"></div><script type="module">${bundle.outputFiles[0].text.replace(/<\/script/gi, "<\\/script")}</script></body></html>`,
+    `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${name === "post-composer" || name === "tiktok-connect" || name === "project-creation" ? applicationCss : css}</style><style>body{margin:0;padding:16px;min-width:0}</style></head><body><div id="root"></div><script type="module">${bundle.outputFiles[0].text.replace(/<\/script/gi, "<\\/script")}</script></body></html>`,
   );
 }
 const server = createServer(async (req, res) => {
@@ -139,6 +147,7 @@ const server = createServer(async (req, res) => {
     "/app/queue": path.join(out, "queue.html"),
     "/video.html": path.join(out, "video.html"),
     "/tiktok-connect.html": path.join(out, "tiktok-connect.html"),
+    "/project-creation.html": path.join(out, "project-creation.html"),
   };
   if (!allowed[filename]) {
     res.writeHead(404).end();

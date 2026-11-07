@@ -9,6 +9,13 @@ failed operation remains reserved until its charge outcome is reconciled.
 
 ## Using the application
 
+New projects select **Default scene visuals**: **Still images** or **Video footage**.
+The choice is saved during creation and individual scenes can override it.
+Animated-character creation is removed from this initial media choice; existing
+animated-character projects retain their settings and rendering behavior.
+Choosing footage creates no generation job or provider charge. Uploaded, inspected
+library videos remain reusable while live Google generation is on hold.
+
 Open **Video Studio** in the application sidebar to create a clip without a
 project. Choose a configured model, enter a prompt, attach ready library stills
 when supported, and select the model's available output controls. Review the

@@ -65,6 +65,7 @@ export const populatedSettings: McpSettingsView = {
           connectionId: operationId,
           workspaceId,
           scopes: [...MCP_SCOPES],
+          publicationApprovalMode: "manual",
           createdAt: new Date("2026-11-05T08:00:00Z"),
           updatedAt: new Date("2026-11-05T08:00:00Z"),
         },

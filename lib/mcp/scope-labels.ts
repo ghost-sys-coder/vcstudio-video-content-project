@@ -11,5 +11,6 @@ export const MCP_SCOPE_LABELS: Record<McpScope, string> = {
   "vcstudio:edit": "Create and edit project content and Social drafts",
   "vcstudio:media": "Import assets and assign scene images",
   "vcstudio:review": "Review and approve scripts, scenes and images",
-  "vcstudio:publish": "Prepare publishing, schedules and cancellations",
+  "vcstudio:publish":
+    "Publish, schedule and cancel using the selected approval mode",
 };

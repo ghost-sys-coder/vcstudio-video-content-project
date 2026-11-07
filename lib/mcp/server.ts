@@ -12,6 +12,7 @@ import {
   MCP_SCOPES,
   mcpPublishInput,
   mcpWorkspaceInput,
+  mcpMutationInput,
   type McpPrincipal,
 } from "@studio/contracts";
 import {
@@ -23,6 +24,7 @@ import { authorizeMcp } from "./context";
 import {
   prepareMcpPublication,
   approveMcpPublication,
+  executeMcpPublication,
 } from "./publishing-service";
 import { createToolRegistrar, toolError, toolResult } from "./register-tool";
 import { registerContentTools } from "./register-content-tools";
@@ -36,6 +38,7 @@ import {
 } from "./media-previews";
 import { getPublishingEnvironment } from "@/lib/env/server";
 import { roleAllowsScope } from "./policy";
+import { effectivePublicationApprovalMode } from "./publication-approval-policy";
 
 const REVIEW_URI = "ui://vcstudio/publication-review.html";
 export function createVcStudioMcpServer(principal: McpPrincipal) {
@@ -43,7 +46,7 @@ export function createVcStudioMcpServer(principal: McpPrincipal) {
     { name: "VCStudio", version: "1.0.0" },
     {
       instructions:
-        "Use get_connection first and an explicitly granted workspaceId on every action. Read current revisions before edits. Imports never approve media or publish. Only prepare_publication prepares public posting; the human must approve the review panel. Never fabricate file access, approval proof, success or a supported platform. Marketing is paused. AI generation and administration are unavailable. Reuse idempotency keys when retrying the same action.",
+        "Use get_connection first and an explicitly granted workspaceId on every action. Read current revisions before edits. Imports never approve media or publish. Check get_capabilities for publicationApprovalMode. prepare_publication only prepares an immutable preview. Manual connections require human review; owner-authorized autonomous connections may call execute_publication with the prepared operation ID and the same idempotency key. Never fabricate file access, approval proof, success or a supported platform. Internal approvals stay explicit. Marketing is paused. AI generation and administration are unavailable. Reuse idempotency keys when retrying the same action.",
     },
   );
   const register = createToolRegistrar(server, principal);
@@ -164,16 +167,28 @@ export function createVcStudioMcpServer(principal: McpPrincipal) {
         "signed_in_upload_handoff",
       ],
       approval: ["mcp_app_when_supported", "signed_in_browser"],
+      publicationApprovalMode: effectivePublicationApprovalMode({
+        publicationApprovalMode: ctx.grant.publicationApprovalMode,
+        role: ctx.membership.role,
+      }),
     }),
   );
   registerAssetTools(register);
   registerSocialTools(register);
+  register(
+    "execute_publication",
+    "Execute an exact prepared publication, schedule, cancellation or thumbnail retry ONLY when this connection/workspace has owner-enabled autonomous publishing. First call prepare_publication; supply that operationId and its SAME idempotencyKey. Manual connections require human review and cannot use this tool. Retries return the existing operation; content or permission changes require a fresh preparation. This cannot enable autonomy or change internal approvals.",
+    "vcstudio:publish",
+    mcpMutationInput.extend({ operationId: z.uuid() }),
+    false,
+    (ctx, p) => executeMcpPublication(ctx, p.operationId, p.idempotencyKey),
+  );
   registerAppTool(
     server,
     "prepare_publication",
     {
       description:
-        "Save chosen destination accounts and prepare an immutable publish/schedule preview for human approval, including saved YouTube metadata, explicit creator disclosures and a separately selected thumbnail. Save these with save_post first. TikTok is inbox-only: the creator chooses a cover and completes posting inside TikTok; it cannot be scheduled here. This can advance the draft revision. To cancel a schedule use action=cancel_schedule with current version and exact destination IDs. To retry only a saved YouTube thumbnail on an existing uploaded video, use action=retry_thumbnail, one connectionId and current post version, without scheduledAt. Every action requires human review; never upload the video again to fix a thumbnail.",
+        "Save chosen destination accounts and prepare an immutable publish/schedule preview; this never publishes by itself. The returned approvalMode determines the next step: manual needs human review, autonomous permits execute_publication using this operation ID and the same idempotency key. Includes saved YouTube metadata, explicit creator disclosures and a separate thumbnail; save these with save_post first. TikTok is inbox-only: finish caption, cover and posting in TikTok; it cannot be scheduled here. This can advance the draft revision. cancel_schedule requires current version and exact destination IDs. retry_thumbnail requires one existing YouTube destination, current version and no scheduledAt; never upload the video again to fix a thumbnail.",
       inputSchema: mcpPublishInput,
       annotations: {
         readOnlyHint: false,
@@ -196,6 +211,7 @@ export function createVcStudioMcpServer(principal: McpPrincipal) {
           ...toolResult({
             operation: prepared.operation,
             preview: prepared.preview,
+            approvalMode: prepared.approvalMode ?? "manual",
             approvalUrl: `${mcpBaseUrl()}${prepared.operation.href}`,
           }),
           _meta: {

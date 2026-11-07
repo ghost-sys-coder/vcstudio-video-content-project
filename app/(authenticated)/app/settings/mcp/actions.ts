@@ -1,7 +1,7 @@
 "use server";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { MCP_SCOPES, mcpScopeSchema } from "@studio/contracts";
+import { mcpGrantInput } from "@studio/contracts";
 import { requireAuthenticatedUser } from "@/lib/auth/require-authenticated-user";
 import { requireWorkspaceMembership } from "@/lib/auth/workspace-context";
 import {
@@ -13,6 +13,8 @@ import {
 import { recordAuditEvent } from "@/lib/audit/record-audit-event";
 import { requireMcpEnabled } from "@/lib/mcp/context";
 import { roleAllowsScope } from "@/lib/mcp/policy";
+import { assertPublicationApprovalGrant } from "@/lib/mcp/publication-approval-policy";
+import { McpError } from "@/lib/mcp/errors";
 export type McpFormState = { ok: boolean; message: string };
 export async function saveMcpGrantAction(
   _previous: McpFormState,
@@ -21,17 +23,12 @@ export async function saveMcpGrantAction(
   try {
     requireMcpEnabled();
     const user = await requireAuthenticatedUser();
-    const p = z
-      .object({
-        connectionId: z.uuid(),
-        workspaceId: z.uuid(),
-        scopes: z.array(mcpScopeSchema).max(MCP_SCOPES.length),
-      })
-      .parse({
-        connectionId: form.get("connectionId"),
-        workspaceId: form.get("workspaceId"),
-        scopes: form.getAll("scopes"),
-      });
+    const p = mcpGrantInput.parse({
+      connectionId: form.get("connectionId"),
+      workspaceId: form.get("workspaceId"),
+      scopes: form.getAll("scopes"),
+      publicationApprovalMode: form.get("publicationApprovalMode") ?? "manual",
+    });
     const membership = await requireWorkspaceMembership({
       userId: user.id,
       workspaceId: p.workspaceId,
@@ -41,6 +38,7 @@ export async function saveMcpGrantAction(
         ok: false,
         message: "Your current role does not allow those permissions.",
       };
+    assertPublicationApprovalGrant({ ...p, role: membership.role });
     await saveMcpGrant({ ...p, userId: user.id });
     await recordAuditEvent({
       workspaceId: p.workspaceId,
@@ -48,7 +46,11 @@ export async function saveMcpGrantAction(
       action: "mcp_connection_changed",
       targetType: "mcp_connection",
       targetId: p.connectionId,
-      metadata: { event: "workspace_grant_saved", scopes: p.scopes },
+      metadata: {
+        event: "workspace_grant_saved",
+        scopes: p.scopes,
+        publicationApprovalMode: p.publicationApprovalMode,
+      },
     });
     revalidatePath("/app/settings/mcp");
     return {
@@ -56,11 +58,13 @@ export async function saveMcpGrantAction(
       message:
         "Workspace permissions saved. The client must also authorize the matching OAuth scopes.",
     };
-  } catch {
+  } catch (error) {
     return {
       ok: false,
       message:
-        "Permissions could not be saved. Check your membership and try again.",
+        error instanceof McpError
+          ? error.message
+          : "Permissions could not be saved. Check your membership and try again.",
     };
   }
 }

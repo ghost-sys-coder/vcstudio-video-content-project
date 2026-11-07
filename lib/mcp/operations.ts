@@ -12,9 +12,13 @@ import { recordAuditEvent } from "@/lib/audit/record-audit-event";
 export function publicOperation(row: McpOperation): McpPublicOperation {
   const expired =
     row.expiresAt <= new Date() &&
-    ["awaiting_upload", "requires_approval", "queued", "running"].includes(
-      row.status,
-    );
+    [
+      "awaiting_upload",
+      "requires_approval",
+      "prepared",
+      "queued",
+      "running",
+    ].includes(row.status);
   return {
     id: row.id,
     workspaceId: row.workspaceId,

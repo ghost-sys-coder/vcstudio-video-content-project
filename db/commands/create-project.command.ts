@@ -1,4 +1,5 @@
 import "server-only";
+import type { ProjectVisualMedia } from "@studio/contracts/video";
 
 import { getDatabase } from "@/db/drizzle";
 import {
@@ -19,6 +20,7 @@ export async function createProject(input: {
   description: string;
   aspectRatio: ProjectAspectRatio;
   videoKind?: ProjectVideoKind;
+  defaultVisualMedia?: ProjectVisualMedia;
   framesPerSecond: number;
   language: string;
   maximumBudgetCents: number;
@@ -70,6 +72,7 @@ export async function createProject(input: {
         description: input.description,
         aspectRatio: input.aspectRatio,
         ...(input.videoKind ? { videoKind: input.videoKind } : {}),
+        defaultVisualMedia: input.defaultVisualMedia ?? "image",
         width: dimensions.width,
         height: dimensions.height,
         framesPerSecond: input.framesPerSecond,

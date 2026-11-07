@@ -16,6 +16,7 @@ import { findReadyMediaAssets } from "@/db/repositories/media-assets.repository"
 import {
   beginMcpOperation,
   consumeMcpApproval,
+  consumeMcpAutonomousPublication,
   findMcpOperation,
   findMcpOperationByKey,
   updateMcpOperation,
@@ -51,6 +52,8 @@ import {
   YouTubePostSettingsError,
 } from "@/lib/social/validate-youtube-post";
 import { retrySocialYouTubeThumbnail } from "@/lib/social/retry-youtube-thumbnail";
+import { effectivePublicationApprovalMode } from "./publication-approval-policy";
+import { assertMcpAccess } from "./policy";
 
 export function publicationAuthority(context: McpContext) {
   return fingerprint({
@@ -414,6 +417,10 @@ export async function prepareMcpPublication(
     );
     return {
       operation: publicOperation(previous),
+      approvalMode:
+        previous.input.approvalMode === "autonomous"
+          ? ("autonomous" as const)
+          : ("manual" as const),
       preview: publicationPreviewSchema.parse(previous.input.preview),
       uiProof: undefined,
     };
@@ -436,6 +443,10 @@ export async function prepareMcpPublication(
     : input;
   const preview = { ...validatedPreview, version: request.expectedVersion };
   const proof = randomBytes(32).toString("base64url");
+  const approvalMode = effectivePublicationApprovalMode({
+    publicationApprovalMode: context.grant.publicationApprovalMode,
+    role: context.membership.role,
+  });
   const authority = publicationAuthority(context);
   const digest = fingerprint({
     kind: "publish_post",
@@ -450,9 +461,18 @@ export async function prepareMcpPublication(
     kind: "publish_post",
     idempotencyKey: input.idempotencyKey,
     fingerprint: digest,
-    input: { request, originalRequest: input, preview, authority },
-    status: "requires_approval" as const,
-    approvalHash: fingerprint(proof),
+    input: {
+      request,
+      originalRequest: input,
+      preview,
+      authority,
+      approvalMode,
+    },
+    status:
+      approvalMode === "autonomous"
+        ? ("prepared" as const)
+        : ("requires_approval" as const),
+    approvalHash: approvalMode === "manual" ? fingerprint(proof) : null,
     expiresAt: new Date(Date.now() + 600_000),
   };
   let started;
@@ -484,6 +504,10 @@ export async function prepareMcpPublication(
     );
     return {
       operation: publicOperation(existing),
+      approvalMode:
+        existing.input.approvalMode === "autonomous"
+          ? ("autonomous" as const)
+          : ("manual" as const),
       preview: publicationPreviewSchema.parse(existing.input.preview),
       uiProof: undefined,
     };
@@ -505,6 +529,10 @@ export async function prepareMcpPublication(
       );
       return {
         operation: publicOperation(existing),
+        approvalMode:
+          existing.input.approvalMode === "autonomous"
+            ? ("autonomous" as const)
+            : ("manual" as const),
         preview: publicationPreviewSchema.parse(existing.input.preview),
         uiProof: undefined,
       };
@@ -523,8 +551,9 @@ export async function prepareMcpPublication(
   // browser approval remains available after a client reload.
   return {
     operation: publicOperation(started.operation),
+    approvalMode,
     preview,
-    uiProof: started.created ? proof : undefined,
+    uiProof: started.created && approvalMode === "manual" ? proof : undefined,
   };
 }
 export async function approveMcpPublication(
@@ -599,13 +628,100 @@ export async function approveMcpPublication(
   }
   return dispatchApprovedPublication(approved);
 }
+export async function executeMcpPublication(
+  context: McpContext,
+  operationId: string,
+  idempotencyKey: string,
+) {
+  assertMcpAccess({
+    role: context.membership.role,
+    tokenScopes: context.principal.scopes,
+    grantedScopes: context.grant.scopes,
+    scope: "vcstudio:publish",
+    revoked: !!context.connection.revokedAt,
+  });
+  requireMcp(
+    effectivePublicationApprovalMode({
+      publicationApprovalMode: context.grant.publicationApprovalMode,
+      role: context.membership.role,
+    }) === "autonomous",
+    "approval_required",
+    "This connection requires human approval. Enable autonomous publishing in its workspace settings to use this tool.",
+  );
+  const op = await findMcpOperation({
+    workspaceId: context.workspaceId,
+    operationId,
+    userId: context.principal.userId,
+    connectionId: context.connection.id,
+  });
+  requireMcp(
+    op?.kind === "publish_post" && op.input.approvalMode === "autonomous",
+    "approval_required",
+    "Prepare an autonomous publication using this connection first.",
+  );
+  requireMcp(
+    op.idempotencyKey === idempotencyKey,
+    "conflict",
+    "Use the same idempotency key as the prepared publication.",
+  );
+  requireMcp(
+    op.input.authority === publicationAuthority(context),
+    "conflict",
+    "Connection permissions changed. Prepare a fresh preview.",
+  );
+  if (op.status === "succeeded" || op.status === "failed")
+    return publicOperation(op);
+  if (op.status === "approved") return dispatchApprovedPublication(op);
+  requireMcp(
+    op.status === "prepared" && op.expiresAt > new Date(),
+    "expired",
+    "This preparation expired or is no longer available. Prepare a fresh preview.",
+  );
+  const request = mcpPublishInput.parse(op.input.request);
+  const expected = publicationPreviewSchema.parse(op.input.preview);
+  const current = await buildPublicationPreview(context, request);
+  requireMcp(
+    fingerprint(current) === fingerprint(expected),
+    "conflict",
+    "The post, media or account changed. Prepare a fresh preview.",
+  );
+  const locked = await lockMcpPost({
+    workspaceId: context.workspaceId,
+    postId: request.postId,
+    expectedVersion: request.expectedVersion,
+    operationId,
+    cancellation: request.action === "cancel_schedule",
+    finishing: request.action === "retry_thumbnail",
+  });
+  requireMcp(
+    locked,
+    "conflict",
+    "The post changed or has another publication in progress.",
+  );
+  const approved = await consumeMcpAutonomousPublication({
+    workspaceId: context.workspaceId,
+    operationId,
+    userId: context.principal.userId,
+    connectionId: context.connection.id,
+    grantUpdatedAt: context.grant.updatedAt,
+    connectionUpdatedAt: context.connection.updatedAt,
+  });
+  if (!approved) {
+    await unlockMcpPost(context.workspaceId, request.postId, operationId);
+    throw new McpError(
+      "permission_denied",
+      "Autonomous publishing permission changed or this operation was already claimed.",
+    );
+  }
+  return dispatchApprovedPublication(approved);
+}
 export async function dispatchApprovedPublication(op: McpOperation) {
   requireMcp(
     op.status === "approved",
     "invalid_state",
     "Publication has not been approved.",
   );
-  // A committed human approval is a durable outbox entry. Disconnecting the AI
+  // A committed human or owner-preauthorized approval is a durable outbox entry. Disconnecting the AI
   // client must not revoke content already approved for the Social calendar.
   const context = { workspaceId: op.workspaceId };
   const request = mcpPublishInput.parse(op.input.request);
@@ -699,7 +815,10 @@ export async function dispatchApprovedPublication(op: McpOperation) {
       action: "mcp_action_completed",
       targetType: "mcp_operation",
       targetId: op.id,
-      metadata: { kind: op.kind },
+      metadata: {
+        kind: op.kind,
+        approvalMode: op.input.approvalMode ?? "manual",
+      },
     });
     return publicOperation(row ?? op);
   } catch (error) {
@@ -722,7 +841,10 @@ export async function dispatchApprovedPublication(op: McpOperation) {
       action: "mcp_action_failed",
       targetType: "mcp_operation",
       targetId: op.id,
-      metadata: { kind: op.kind },
+      metadata: {
+        kind: op.kind,
+        approvalMode: op.input.approvalMode ?? "manual",
+      },
     });
     return publicOperation(row ?? op);
   }
