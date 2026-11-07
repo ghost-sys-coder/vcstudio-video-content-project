@@ -91,7 +91,7 @@ LinkedIn Pages stays on hold, and Google video generation remains on hold.
 Verification uses mocked platform requests/workers and isolated database/browser
 fixtures, without uploading to real channels or generating media.
 
-### Verification and pending rollout — 8 November 2026
+### Verification and production rollout — 8 November 2026
 
 - The publishing, Social, MCP, schema and isolated PostgreSQL regression suite
   passed 634 tests across 82 files. This includes real adapter/provider wiring,
@@ -106,8 +106,21 @@ fixtures, without uploading to real channels or generating media.
 - Production-clone verification applied the generated migration to
   `br-dry-moon-ai9if1il` and recorded its original Drizzle hash. Post, target,
   media and connection counts/fingerprints stayed identical to production.
-- Production migration and web/worker rollout await explicit approval. The local
-  `.env` also points to production, so apply the migration before running the
-  updated Social code against that database. Migration completion must remove
-  only the temporary branch above. Exact context is retained in the ignored
-  `.vercel/social-video-migration-prepared.json` for the approved rollout.
+- After explicit user approval, the migration was applied to production branch
+  `br-orange-fog-aiank0jx`; its original Drizzle hash/timestamp were recorded.
+  Existing business-table fingerprints remained unchanged, all six columns are
+  nullable and the four tenant/status constraints were verified. Only temporary
+  branch `br-dry-moon-ai9if1il` was deleted.
+- Web commit `b83350e` is READY in production as
+  `dpl_69uBjLUzL5XsioquAoJqRQeXyLHR`, serving `vcstudio.veilcode.studio`.
+  Matching Trigger.dev production worker `20261107.1` deployed successfully
+  (deployment `jv8itzvk`). Environment synchronization was explicitly skipped;
+  existing production configuration and recovery frequencies remain unchanged.
+- Production landing, sign-in and waitlist returned 200; private Social access
+  redirected to sign-in; MCP discovery returned 200 and an unauthenticated MCP
+  request returned its expected 401 OAuth challenge. Existing authenticated MCP
+  connection/workspace reads succeeded and advertised the new YouTube features
+  and TikTok inbox-only restrictions. An immediate production error/fatal log
+  scan returned no groups. No real video was uploaded or published,
+  so channel-specific thumbnail permission and live upload acceptance remain
+  subject to a deliberate creator-approved publication.
