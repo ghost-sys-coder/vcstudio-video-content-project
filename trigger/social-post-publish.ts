@@ -10,6 +10,7 @@ import {
   markSocialPostTargetPublishing,
   recordSocialPostTargetOperation,
   reconcileSocialPostStatus,
+  recordSocialYouTubeThumbnail,
 } from "@/db/commands/social-post-target-commands";
 import { findPlatformConnectionWithTokens } from "@/db/repositories/publishing.repository";
 import {
@@ -23,7 +24,16 @@ import {
   PublishProviderError,
   type PublishFailure,
 } from "@/lib/publishing/video-publish-provider";
-import { PlatformNotConfiguredError } from "@/lib/publishing/provider-registry";
+import {
+  PlatformNotConfiguredError,
+  createVideoPublishProvider,
+} from "@/lib/publishing/provider-registry";
+import { supportsFinishing } from "@/lib/publishing/video-finishing-provider";
+import { finishSocialYouTubeThumbnail } from "@/lib/social/finish-youtube-thumbnail";
+import {
+  validateYouTubePost,
+  YouTubePostSettingsError,
+} from "@/lib/social/validate-youtube-post";
 import {
   createConnectionOAuthProvider,
   createSocialPostProvider,
@@ -68,8 +78,24 @@ export const socialPostPublishTask = task({
   maxDuration: 3000,
   run: async (payload: z.infer<typeof socialPostPublishTaskPayloadSchema>) => {
     const input = socialPostPublishTaskPayloadSchema.parse(payload);
+    let uploadedYouTube = false;
+    let hasYouTubeThumbnail = false;
 
     const settleFailed = async (category: string, message: string) => {
+      if (uploadedYouTube) {
+        if (hasYouTubeThumbnail)
+          await recordSocialYouTubeThumbnail({
+            workspaceId: input.workspaceId,
+            targetId: input.targetId,
+            state: "failed",
+            detail: message,
+          });
+        await reconcileSocialPostStatus({
+          workspaceId: input.workspaceId,
+          postId: input.postId,
+        });
+        return;
+      }
       // Without this the run reports only `status: "failed"` and the reason is
       // reachable solely by querying the database, which is a poor position to
       // debug a live posting failure from.
@@ -91,11 +117,34 @@ export const socialPostPublishTask = task({
     };
 
     try {
-      const target = await findSocialPostTargetById(input.targetId);
-      if (!target || target.workspaceId !== input.workspaceId)
-        throw new Error("Social post target not found.");
-      if (target.status === "published" || target.status === "cancelled")
+      const target = await findSocialPostTargetById(input);
+      if (
+        !target ||
+        target.workspaceId !== input.workspaceId ||
+        target.postId !== input.postId
+      )
+        return { targetId: input.targetId, status: "failed" as const };
+      uploadedYouTube =
+        target.platform === "youtube" && target.status === "published";
+      hasYouTubeThumbnail =
+        target.platform === "youtube" &&
+        Boolean(target.youtubeThumbnailAssetId);
+      const needsThumbnail =
+        uploadedYouTube &&
+        target.youtubeThumbnailAssetId &&
+        target.youtubeThumbnailStatus !== "succeeded";
+      if (
+        (target.status === "published" && !needsThumbnail) ||
+        target.status === "cancelled" ||
+        target.status === "inbox_delivered"
+      ) {
+        if (target.status !== "cancelled")
+          await reconcileSocialPostStatus({
+            workspaceId: input.workspaceId,
+            postId: input.postId,
+          });
         return { targetId: target.id, status: target.status };
+      }
 
       const post = await findSocialPost({
         workspaceId: input.workspaceId,
@@ -176,6 +225,48 @@ export const socialPostPublishTask = task({
         return { targetId: target.id, status: "failed" as const };
       }
 
+      const finishThumbnail = async (videoId: string) => {
+        if (target.platform !== "youtube" || !target.youtubeThumbnailAssetId)
+          return;
+        const finishing = createVideoPublishProvider("youtube");
+        if (!supportsFinishing(finishing))
+          throw new Error("YouTube thumbnail finishing is unavailable.");
+        await finishSocialYouTubeThumbnail({
+          target,
+          videoId,
+          accessToken,
+          provider: finishing,
+          waitForProcessing: async (milliseconds) => {
+            await wait.for({ seconds: Math.ceil(milliseconds / 1000) });
+          },
+        });
+      };
+      if (uploadedYouTube && target.externalPostId) {
+        await finishThumbnail(target.externalPostId);
+        await reconcileSocialPostStatus({
+          workspaceId: input.workspaceId,
+          postId: input.postId,
+        });
+        return { targetId: target.id, status: "published" as const };
+      }
+      if (target.platform === "youtube") {
+        try {
+          await validateYouTubePost({
+            workspaceId: input.workspaceId,
+            settings: target.youtubeSettings,
+            thumbnailAssetId: target.youtubeThumbnailAssetId,
+            text: target.overrideBodyPlainText ?? post.bodyPlainText,
+          });
+        } catch (error) {
+          await settleFailed(
+            "invalid_metadata",
+            error instanceof YouTubePostSettingsError
+              ? error.message
+              : "The saved YouTube settings or thumbnail are unavailable. Check the draft before publishing.",
+          );
+          return { targetId: target.id, status: "failed" as const };
+        }
+      }
       await markSocialPostTargetPublishing({ targetId: target.id });
 
       const media = await listSocialPostMedia({
@@ -212,6 +303,7 @@ export const socialPostPublishTask = task({
 
       const provider = createSocialPostProvider(target.platform, connection);
       const result = await provider.publishPost({
+        youtubeSettings: target.youtubeSettings,
         tokens: { accessToken },
         account: { externalAccountId: connection.externalAccountId },
         // The per-target override wins when someone tailored this platform's
@@ -229,6 +321,20 @@ export const socialPostPublishTask = task({
           providerOperationId,
           providerOperationSecret,
         ) => {
+          if (
+            target.platform === "youtube" &&
+            providerOperationId.startsWith("youtube:video:")
+          ) {
+            const videoId = providerOperationId.slice("youtube:video:".length);
+            await markSocialPostTargetPublished({
+              targetId: target.id,
+              externalPostId: videoId,
+              externalPostUrl: `https://www.youtube.com/watch?v=${videoId}`,
+              providerOperationId,
+            });
+            uploadedYouTube = true;
+            return;
+          }
           await recordSocialPostTargetOperation({
             targetId: target.id,
             providerOperationId,
@@ -245,16 +351,29 @@ export const socialPostPublishTask = task({
         },
       });
 
+      uploadedYouTube =
+        target.platform === "youtube" && result.completionStage === "published";
       await markSocialPostTargetPublished({
         targetId: target.id,
         externalPostId: result.externalPostId,
-        externalPostUrl: result.externalPostUrl,
+        externalPostUrl:
+          result.completionStage === "inbox_delivered"
+            ? null
+            : result.externalPostUrl,
+        completionStage: result.completionStage,
       });
+      await finishThumbnail(result.externalPostId);
       await reconcileSocialPostStatus({
         workspaceId: input.workspaceId,
         postId: input.postId,
       });
-      return { targetId: target.id, status: "published" as const };
+      return {
+        targetId: target.id,
+        status:
+          result.completionStage === "inbox_delivered"
+            ? ("inbox_delivered" as const)
+            : ("published" as const),
+      };
     } catch (error) {
       if (error instanceof PublishProviderError) {
         const { failure } = error;

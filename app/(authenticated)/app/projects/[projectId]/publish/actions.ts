@@ -1,4 +1,13 @@
 "use server";
+import { tasks } from "@trigger.dev/sdk";
+import { findVideoPublication } from "@/db/repositories/publishing.repository";
+import {
+  listFinishingSteps,
+  recordFinishingStep,
+} from "@/db/commands/publication-finishing-commands";
+import type { videoPublishTask } from "@/trigger/video-publish";
+import { getPublishingEnvironment } from "@/lib/env/server";
+import { enforceRateLimit } from "@/lib/rate-limit/enforce-rate-limit";
 
 import { revalidatePath } from "next/cache";
 import {
@@ -563,6 +572,94 @@ export async function cancelPublicationAction(
     return { success: true, error: null };
   } catch {
     return { success: false, error: "The upload could not be cancelled." };
+  }
+}
+
+export async function retryProjectThumbnailAction(
+  formData: FormData,
+): Promise<PublishActionResult> {
+  const parsed = cancelPublicationSchema.safeParse({
+    projectId: formData.get("projectId"),
+    publicationId: formData.get("publicationId"),
+  });
+  if (!parsed.success)
+    return { success: false, error: "The thumbnail retry is invalid." };
+  try {
+    const { context } = await requirePublishMutation(parsed.data.projectId);
+    requireCapability(context.activeMembership.role, "publishPosts");
+    if (!getPublishingEnvironment().ENABLE_VIDEO_PUBLISHING)
+      return { success: false, error: "Video publishing is paused." };
+    const workspaceId = context.activeMembership.workspaceId;
+    await enforceRateLimit({ workspaceId, operation: "video_publication" });
+    const publication = await findVideoPublication({
+      ...parsed.data,
+      workspaceId,
+    });
+    const steps = await listFinishingSteps({
+      workspaceId,
+      publicationId: parsed.data.publicationId,
+    });
+    if (
+      !publication ||
+      publication.platform !== "youtube" ||
+      publication.status !== "succeeded" ||
+      !publication.externalVideoId ||
+      !steps.some(
+        (step) =>
+          step.step === "thumbnail" &&
+          (step.state === "failed" || step.state === "unsupported"),
+      )
+    )
+      return {
+        success: false,
+        error: "This publication has no unfinished thumbnail to retry.",
+      };
+    await recordFinishingStep({
+      workspaceId,
+      publicationId: publication.id,
+      step: "thumbnail",
+      state: "pending",
+      detail: null,
+    });
+    try {
+      await tasks.trigger<typeof videoPublishTask>(
+        "video-publish",
+        {
+          workspaceId,
+          projectId: parsed.data.projectId,
+          publicationId: publication.id,
+          thumbnailOnly: true,
+        },
+        {
+          idempotencyKey: `project-thumbnail:${publication.id}:${crypto.randomUUID()}`,
+        },
+      );
+    } catch {
+      await recordFinishingStep({
+        workspaceId,
+        publicationId: publication.id,
+        step: "thumbnail",
+        state: "failed",
+        detail: "The thumbnail retry could not be queued. Try again.",
+      });
+      throw new Error("dispatch failed");
+    }
+    await recordAuditEvent({
+      workspaceId,
+      actorUserId: context.user.id,
+      action: "video_published",
+      targetType: "video_publication",
+      targetId: publication.id,
+      metadata: { operation: "retry_thumbnail" },
+    });
+    revalidatePath(`/app/projects/${parsed.data.projectId}/publish`);
+    return { success: true, error: null };
+  } catch {
+    return {
+      success: false,
+      error:
+        "The thumbnail retry could not be queued. Reconnect the channel if needed and try again.",
+    };
   }
 }
 

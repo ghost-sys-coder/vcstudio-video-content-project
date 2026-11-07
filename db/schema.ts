@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import type { SocialYouTubeSettings } from "@studio/contracts/publishing";
 import type { SceneAnalysisSegmentHint } from "@studio/prompts";
 import type {
   VideoGenerationRequest,
@@ -235,6 +236,7 @@ export const socialPostStatusEnum = pgEnum("social_post_status", [
   "partially_failed",
   "failed",
   "cancelled",
+  "awaiting_completion",
 ]);
 
 export const socialPostTargetStatusEnum = pgEnum("social_post_target_status", [
@@ -244,6 +246,7 @@ export const socialPostTargetStatusEnum = pgEnum("social_post_target_status", [
   "published",
   "failed",
   "cancelled",
+  "inbox_delivered",
 ]);
 
 export const characterStatusEnum = pgEnum("character_status", [
@@ -4536,6 +4539,8 @@ export const socialPosts = pgTable(
      * already-published post was sent with.
      */
     bodyPlainText: text("body_plain_text").notNull().default(""),
+    youtubeSettings: jsonb("youtube_settings").$type<SocialYouTubeSettings>(),
+    youtubeThumbnailAssetId: uuid("youtube_thumbnail_asset_id"),
     status: socialPostStatusEnum("status").notNull().default("draft"),
     /** Absolute instant the scheduler may claim this post. */
     scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
@@ -4574,6 +4579,11 @@ export const socialPosts = pgTable(
     // The scheduler sweeper's claim query: due, scheduled, oldest first. Not
     // workspace-scoped, because the sweep is global by design.
     index("social_posts_due_index").on(table.status, table.scheduledAt),
+    foreignKey({
+      name: "social_posts_youtube_thumbnail_workspace_fk",
+      columns: [table.youtubeThumbnailAssetId, table.workspaceId],
+      foreignColumns: [mediaAssets.id, mediaAssets.workspaceId],
+    }).onDelete("restrict"),
     check(
       "social_posts_scheduled_requires_time",
       sql`${table.status} <> 'scheduled' or ${table.scheduledAt} is not null`,
@@ -4694,6 +4704,13 @@ export const socialPostTargets = pgTable(
     status: socialPostTargetStatusEnum("status").notNull().default("pending"),
     /** Set when this platform's copy was edited away from the shared body. */
     overrideBodyPlainText: text("override_body_plain_text"),
+    /** Immutable upload metadata captured when the destination is prepared. */
+    youtubeSettings: jsonb("youtube_settings").$type<SocialYouTubeSettings>(),
+    youtubeThumbnailAssetId: uuid("youtube_thumbnail_asset_id"),
+    youtubeThumbnailStatus: text("youtube_thumbnail_status").$type<
+      "pending" | "succeeded" | "failed" | "unsupported"
+    >(),
+    youtubeThumbnailError: text("youtube_thumbnail_error"),
     externalPostId: text("external_post_id"),
     externalPostUrl: text("external_post_url"),
     /** Resumable provider operation, e.g. an Instagram media container. */
@@ -4731,6 +4748,19 @@ export const socialPostTargets = pgTable(
     index("social_post_targets_workspace_status_index").on(
       table.workspaceId,
       table.status,
+    ),
+    foreignKey({
+      name: "social_post_targets_youtube_thumbnail_workspace_fk",
+      columns: [table.youtubeThumbnailAssetId, table.workspaceId],
+      foreignColumns: [mediaAssets.id, mediaAssets.workspaceId],
+    }).onDelete("restrict"),
+    check(
+      "social_post_targets_youtube_thumbnail_status_check",
+      sql`${table.youtubeThumbnailStatus} is null or (${table.platform}::text = 'youtube' and ${table.youtubeThumbnailAssetId} is not null and ${table.youtubeThumbnailStatus} in ('pending','succeeded','failed','unsupported'))`,
+    ),
+    check(
+      "social_post_targets_inbox_platform_check",
+      sql`${table.status}::text <> 'inbox_delivered' or ${table.platform}::text = 'tiktok'`,
     ),
   ],
 );

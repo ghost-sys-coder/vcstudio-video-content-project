@@ -133,8 +133,16 @@ export function checkPlatformEligibility(input: {
 export function selectEligiblePlatforms(input: {
   attachments: PostAttachmentSummary;
   plainTextLength: number;
+  youtubeDescriptionLength?: number;
 }): PlatformEligibility[] {
   return SOCIAL_POST_PLATFORMS.map((platform) =>
-    checkPlatformEligibility({ ...input, platform }),
+    checkPlatformEligibility({
+      ...input,
+      platform,
+      plainTextLength:
+        platform === "youtube"
+          ? (input.youtubeDescriptionLength ?? input.plainTextLength)
+          : input.plainTextLength,
+    }),
   );
 }

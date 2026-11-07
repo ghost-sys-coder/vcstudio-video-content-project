@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { socialYouTubeSettingsSchema } from "@studio/contracts/publishing";
 import {
   MAX_SOCIAL_POST_DESTINATIONS,
   socialPostConnectionIdsSchema,
@@ -37,6 +38,8 @@ export const saveSocialPostSchema = z.object({
   bodyDocument: portableDocumentSchema,
   // Omission preserves destinations for older callers; [] explicitly clears them.
   connectionIds: socialPostConnectionIdsSchema.optional(),
+  youtubeSettings: socialYouTubeSettingsSchema.nullable().optional(),
+  youtubeThumbnailAssetId: z.uuid().nullable().optional(),
   attachments: z
     .array(socialPostAttachmentRefSchema)
     .max(MAX_MEDIA_ASSETS_PER_POST)

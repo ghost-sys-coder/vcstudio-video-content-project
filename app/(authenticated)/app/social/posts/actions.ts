@@ -30,6 +30,12 @@ import {
 import { saveAuthorizedSocialDraft } from "@/lib/social/save-social-draft";
 import { SocialDraftDestinationError } from "@/lib/social/social-draft-error";
 import { renderPortableDocumentToPlainText } from "@/lib/social/render-plain-text";
+import { YouTubePostSettingsError } from "@/lib/social/validate-youtube-post";
+import {
+  retrySocialYouTubeThumbnail,
+  YouTubeThumbnailRetryError,
+} from "@/lib/social/retry-youtube-thumbnail";
+import { z } from "zod";
 
 export type SaveSocialPostResult =
   | { ok: true; version: number; plainText: string }
@@ -88,11 +94,15 @@ export async function saveSocialPostAction(
 ): Promise<SaveSocialPostResult> {
   let bodyDocument: unknown;
   let connectionIds: unknown;
+  let youtubeSettings: unknown;
   try {
     bodyDocument = JSON.parse(String(formData.get("bodyDocument") ?? "null"));
     const destinations = formData.get("connectionIds");
     connectionIds =
       destinations === null ? undefined : JSON.parse(String(destinations));
+    const youtube = formData.get("youtubeSettings");
+    youtubeSettings =
+      youtube === null ? undefined : JSON.parse(String(youtube));
   } catch {
     return {
       ok: false,
@@ -106,6 +116,10 @@ export async function saveSocialPostAction(
     name: formData.get("name") ?? "",
     bodyDocument,
     connectionIds,
+    youtubeSettings,
+    youtubeThumbnailAssetId: formData.has("youtubeThumbnailAssetId")
+      ? formData.get("youtubeThumbnailAssetId") || null
+      : undefined,
     // Sent as `source:id` pairs so one repeated field carries both, matching how
     // the rest of this form is encoded.
     attachments: formData
@@ -160,9 +174,57 @@ export async function saveSocialPostAction(
     return {
       ok: false,
       error:
-        error instanceof SocialDraftDestinationError
+        error instanceof SocialDraftDestinationError ||
+        error instanceof YouTubePostSettingsError
           ? error.message
           : "That post could not be saved.",
+    };
+  }
+}
+
+export async function retryYouTubeThumbnailAction(
+  formData: FormData,
+): Promise<{ ok: boolean; error?: string }> {
+  const parsed = z
+    .object({
+      postId: z.uuid(),
+      connectionId: z.uuid(),
+      expectedVersion: z.coerce.number().int().positive(),
+      requestNonce: z.uuid(),
+    })
+    .safeParse(Object.fromEntries(formData));
+  if (!parsed.success)
+    return { ok: false, error: "That thumbnail retry is invalid." };
+  try {
+    const context = await getAuthenticatedWorkspaceContext();
+    if (!context)
+      return { ok: false, error: "Sign in again to retry the thumbnail." };
+    requireCapability(context.activeMembership.role, "publishPosts");
+    await retrySocialYouTubeThumbnail({
+      ...parsed.data,
+      workspaceId: context.activeMembership.workspaceId,
+    });
+    await recordAuditEvent({
+      workspaceId: context.activeMembership.workspaceId,
+      actorUserId: context.user.id,
+      action: "social_post_published",
+      targetType: "social_post",
+      targetId: parsed.data.postId,
+      metadata: {
+        operation: "retry_youtube_thumbnail",
+        connectionId: parsed.data.connectionId,
+      },
+    });
+    revalidatePath(`/app/social/posts/${parsed.data.postId}`);
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error:
+        error instanceof YouTubeThumbnailRetryError ||
+        error instanceof YouTubePostSettingsError
+          ? error.message
+          : "The thumbnail retry could not be queued.",
     };
   }
 }

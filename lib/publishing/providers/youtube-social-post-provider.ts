@@ -8,6 +8,11 @@ import type {
 } from "@/lib/publishing/social-post-provider";
 import { toVideoPublishRequest } from "@/lib/publishing/providers/video-post-adapter";
 import type { VideoPublishProvider } from "@/lib/publishing/video-publish-provider";
+import { PublishProviderError } from "@/lib/publishing/video-publish-provider";
+import {
+  resolveYouTubePostSettings,
+  youTubeSettingsProblem,
+} from "@/lib/social/youtube-post-settings";
 
 /**
  * A YouTube "post" is a video upload.
@@ -25,9 +30,32 @@ export class YouTubeSocialPostProvider implements SocialPostProvider {
   constructor(private readonly videoProvider: VideoPublishProvider) {}
 
   async publishPost(request: PublishPostRequest): Promise<PublishPostResult> {
-    const result = await this.videoProvider.publishVideo(
-      toVideoPublishRequest(request),
+    const problem = youTubeSettingsProblem(
+      request.youtubeSettings,
+      request.text,
     );
+    if (problem)
+      throw new PublishProviderError({
+        category: "invalid_metadata",
+        safeMessage: problem,
+        retriable: false,
+        mayHavePublished: false,
+      });
+    const youtube = resolveYouTubePostSettings(
+      request.youtubeSettings,
+      request.text,
+    );
+    const result = await this.videoProvider.publishVideo({
+      ...toVideoPublishRequest(request),
+      title: youtube.title,
+      description: youtube.description ?? request.text,
+      tags: youtube.tags,
+      visibility: youtube.visibility,
+      disclosures: {
+        madeForKids: youtube.madeForKids,
+        containsSyntheticMedia: youtube.containsSyntheticMedia,
+      },
+    });
     return {
       externalPostId: result.externalVideoId,
       externalPostUrl: result.externalVideoUrl,

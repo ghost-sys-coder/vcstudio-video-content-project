@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { socialYouTubeSettingsSchema } from "./publishing";
 
 export const MAX_SOCIAL_POST_DESTINATIONS = 20;
 export const socialPostConnectionIdsSchema = z
@@ -67,7 +68,7 @@ export const mcpImportInput = mcpMutationInput.extend({
     .default({}),
 });
 export const mcpPublishInput = mcpMutationInput.extend({
-  action: z.enum(["publish", "cancel_schedule"]).optional(),
+  action: z.enum(["publish", "cancel_schedule", "retry_thumbnail"]).optional(),
   postId: z.uuid(),
   expectedVersion: z.number().int().positive(),
   connectionIds: socialPostConnectionIdsSchema.refine(
@@ -90,7 +91,7 @@ export const mcpOperationStatusSchema = z.enum([
 ]);
 export type McpOperationStatus = z.infer<typeof mcpOperationStatusSchema>;
 export const publicationPreviewSchema = z.object({
-  action: z.enum(["publish", "cancel_schedule"]).optional(),
+  action: z.enum(["publish", "cancel_schedule", "retry_thumbnail"]).optional(),
   postId: z.uuid(),
   version: z.number().int(),
   text: z.string(),
@@ -110,6 +111,20 @@ export const publicationPreviewSchema = z.object({
       platform: z.string(),
       name: z.string(),
       text: z.string(),
+      youtube: socialYouTubeSettingsSchema
+        .extend({
+          thumbnail: z
+            .object({
+              id: z.uuid(),
+              name: z.string(),
+              contentType: z.string(),
+              sizeBytes: z.number(),
+              etag: z.string().nullable(),
+            })
+            .nullable(),
+        })
+        .optional(),
+      existingVideoId: z.string().optional(),
     }),
   ),
   scheduledAt: z.string().nullable(),

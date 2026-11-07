@@ -69,6 +69,10 @@ beforeAll(async () => {
       "utf8",
     ),
   );
+  await pg.exec(`
+    alter table social_posts add column youtube_settings jsonb, add column youtube_thumbnail_asset_id uuid;
+    alter table social_post_targets add column youtube_settings jsonb, add column youtube_thumbnail_asset_id uuid, add column youtube_thumbnail_status text, add column youtube_thumbnail_error text;
+  `);
   shared.database = Object.assign(db, {
     batch: (queries: { toSQL(): { sql: string; params: unknown[] } }[]) =>
       pg.transaction(async (tx) => {

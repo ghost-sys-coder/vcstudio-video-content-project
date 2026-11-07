@@ -269,15 +269,22 @@ export async function listSocialPostTargets(input: {
     .orderBy(asc(socialPostTargets.createdAt));
 }
 
-/** One target, for the publish worker. Not workspace-scoped by argument because
- * the caller supplies the workspace from its own payload and compares. */
-export async function findSocialPostTargetById(
-  targetId: string,
-): Promise<SocialPostTarget | null> {
+/** One target, scoped to the worker's authorized workspace and exact parent post. */
+export async function findSocialPostTargetById(input: {
+  targetId: string;
+  workspaceId: string;
+  postId: string;
+}): Promise<SocialPostTarget | null> {
   const [target] = await getDatabase()
     .select()
     .from(socialPostTargets)
-    .where(eq(socialPostTargets.id, targetId))
+    .where(
+      and(
+        eq(socialPostTargets.id, input.targetId),
+        eq(socialPostTargets.workspaceId, input.workspaceId),
+        eq(socialPostTargets.postId, input.postId),
+      ),
+    )
     .limit(1);
   return target ?? null;
 }

@@ -9,6 +9,9 @@ import type { WorkspaceRole } from "@/db/schema";
 import { findSocialPostDestinationConnections } from "@/db/repositories/social-post-destinations.repository";
 import { isSocialPostPlatform } from "./platform-post-capabilities";
 import { SocialDraftDestinationError } from "./social-draft-error";
+import { youTubeThumbnailProblem } from "./youtube-post-settings";
+import { YouTubePostSettingsError } from "./validate-youtube-post";
+import { findReadyMediaAssets } from "@/db/repositories/media-assets.repository";
 
 /** Shared web/MCP save boundary; callers resolve the user's membership first. */
 export async function saveAuthorizedSocialDraft(
@@ -17,6 +20,14 @@ export async function saveAuthorizedSocialDraft(
 ) {
   requireCapability(context.role, "composePosts");
   const input = saveSocialPostSchema.parse(raw);
+  if (input.youtubeThumbnailAssetId) {
+    const [thumbnail] = await findReadyMediaAssets({
+      workspaceId: context.workspaceId,
+      mediaAssetIds: [input.youtubeThumbnailAssetId],
+    });
+    const problem = youTubeThumbnailProblem(thumbnail);
+    if (problem) throw new YouTubePostSettingsError(problem);
+  }
   if (input.connectionIds !== undefined) {
     const connections = await findSocialPostDestinationConnections({
       workspaceId: context.workspaceId,

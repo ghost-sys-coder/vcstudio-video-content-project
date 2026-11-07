@@ -6,6 +6,7 @@ import type {
   SocialPostTargetStatus,
 } from "@/db/schema";
 import type { MediaAssetView } from "@/lib/media/media-asset-view";
+import type { SocialYouTubeSettings } from "@studio/contracts/publishing";
 import type { PortableDocument } from "@/lib/social/portable-document";
 import type { SocialPostAttachment } from "@/lib/social/post-attachment";
 
@@ -28,6 +29,9 @@ export type SocialPostTargetView = {
   safeErrorMessage: string | null;
   publishedAt: string | null;
   overrideBodyPlainText: string | null;
+  youtubeThumbnailStatus?:
+    "pending" | "succeeded" | "failed" | "unsupported" | null;
+  youtubeThumbnailError?: string | null;
 };
 
 export type SocialPostSummaryView = {
@@ -58,6 +62,8 @@ export type SocialPostSummarySource = Pick<
 >;
 
 export type SocialPostComposerView = {
+  youtubeSettings?: SocialYouTubeSettings | null;
+  youtubeThumbnail?: MediaAssetView | null;
   id: string;
   name: string;
   status: SocialPostStatus;
@@ -151,6 +157,8 @@ export function toSocialPostTargetView(input: {
     safeErrorMessage: input.target.safeErrorMessage,
     publishedAt: input.target.publishedAt?.toISOString() ?? null,
     overrideBodyPlainText: input.target.overrideBodyPlainText,
+    youtubeThumbnailStatus: input.target.youtubeThumbnailStatus,
+    youtubeThumbnailError: input.target.youtubeThumbnailError,
   };
 }
 

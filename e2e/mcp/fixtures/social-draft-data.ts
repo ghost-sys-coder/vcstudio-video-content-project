@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { SocialPostComposerView } from "@/lib/social/social-post-view";
 import type { MediaAssetView } from "@/lib/media/media-asset-view";
 import { socialPostConnectionIdsSchema } from "@studio/contracts";
+import { socialYouTubeSettingsSchema } from "@studio/contracts/publishing";
 import {
   portableDocumentSchema,
   type PortableDocument,
@@ -78,6 +79,8 @@ export const draftStateSchema = z.object({
   connectionIds: socialPostConnectionIdsSchema,
   attachmentIds: z.array(z.string()).default([]),
   bodyDocument: portableDocumentSchema.default(() => fixtureDocument),
+  youtubeSettings: socialYouTubeSettingsSchema.nullable().default(null),
+  youtubeThumbnailAssetId: z.string().nullable().default(null),
 });
 export function composerFixture(): SocialPostComposerView {
   const raw = localStorage.getItem(draftKey);
@@ -91,10 +94,16 @@ export function composerFixture(): SocialPostComposerView {
           : [],
         attachmentIds: [],
         bodyDocument: fixtureDocument,
+        youtubeSettings: null,
+        youtubeThumbnailAssetId: null,
       };
   return {
     id: "33333333-3333-4333-8333-333333333333",
     ...state,
+    youtubeThumbnail:
+      fixtureAssets().find(
+        (asset) => asset.id === state.youtubeThumbnailAssetId,
+      ) ?? null,
     status: "draft",
     bodyDocument: state.bodyDocument,
     bodyPlainText: renderPortableDocumentToPlainText(state.bodyDocument),
@@ -117,6 +126,17 @@ export function composerFixture(): SocialPostComposerView {
     }),
     targets: [],
     availableConnections: [
+      ...(new URLSearchParams(location.search).has("youtube")
+        ? [
+            {
+              id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+              platform: "youtube" as const,
+              platformLabel: "YouTube",
+              accountName: "Fixture channel",
+              status: "active" as const,
+            },
+          ]
+        : []),
       {
         id: personalId,
         platform: "linkedin",

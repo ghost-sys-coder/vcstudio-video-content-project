@@ -111,15 +111,24 @@ export async function recordSocialPostTargetOperation(input: {
 export async function markSocialPostTargetPublished(input: {
   targetId: string;
   externalPostId: string;
-  externalPostUrl: string;
+  externalPostUrl: string | null;
+  completionStage?: "published" | "inbox_delivered";
+  providerOperationId?: string;
 }): Promise<void> {
   await getDatabase()
     .update(socialPostTargets)
     .set({
-      status: "published",
+      status:
+        input.completionStage === "inbox_delivered"
+          ? "inbox_delivered"
+          : "published",
       externalPostId: input.externalPostId,
+      ...(input.providerOperationId
+        ? { providerOperationId: input.providerOperationId }
+        : {}),
       externalPostUrl: input.externalPostUrl,
-      publishedAt: new Date(),
+      publishedAt:
+        input.completionStage === "inbox_delivered" ? null : new Date(),
       errorCategory: null,
       safeErrorMessage: null,
       // The checkpoint credential has served its purpose; keeping a decryptable
@@ -173,6 +182,7 @@ export async function reconcileSocialPostStatus(input: {
   const settled = targets.every(
     (target) =>
       target.status === "published" ||
+      target.status === "inbox_delivered" ||
       target.status === "failed" ||
       target.status === "cancelled",
   );
@@ -182,15 +192,18 @@ export async function reconcileSocialPostStatus(input: {
     (target) => target.status === "published",
   ).length;
   const failed = targets.filter((target) => target.status === "failed").length;
+  const inbox = targets.some((target) => target.status === "inbox_delivered");
 
   const status =
-    published > 0 && failed > 0
+    (published > 0 || inbox) && failed > 0
       ? "partially_failed"
-      : published > 0
-        ? "published"
-        : failed > 0
-          ? "failed"
-          : "cancelled";
+      : inbox
+        ? "awaiting_completion"
+        : published > 0
+          ? "published"
+          : failed > 0
+            ? "failed"
+            : "cancelled";
 
   await database
     .update(socialPosts)
@@ -199,6 +212,28 @@ export async function reconcileSocialPostStatus(input: {
       and(
         eq(socialPosts.id, input.postId),
         eq(socialPosts.workspaceId, input.workspaceId),
+      ),
+    );
+}
+
+export async function recordSocialYouTubeThumbnail(input: {
+  workspaceId: string;
+  targetId: string;
+  state: "pending" | "succeeded" | "failed" | "unsupported";
+  detail: string | null;
+}) {
+  await getDatabase()
+    .update(socialPostTargets)
+    .set({
+      youtubeThumbnailStatus: input.state,
+      youtubeThumbnailError: input.detail,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(socialPostTargets.id, input.targetId),
+        eq(socialPostTargets.workspaceId, input.workspaceId),
+        eq(socialPostTargets.platform, "youtube"),
       ),
     );
 }

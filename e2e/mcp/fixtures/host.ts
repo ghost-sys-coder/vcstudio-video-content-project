@@ -10,6 +10,7 @@ import {
   mediaOrigin,
 } from "./data";
 const withMedia = new URLSearchParams(location.search).has("withMedia");
+const withYouTube = new URLSearchParams(location.search).has("youtube");
 const frame = document.createElement("iframe");
 frame.title = "VCStudio review";
 frame.style.cssText = "width:100%;height:1200px;border:0";
@@ -36,21 +37,48 @@ bridge.oninitialized = async () => {
           workspaceId,
           status: "requires_approval",
         },
-        preview: withMedia
+        preview: withYouTube
           ? {
               ...preview,
-              media: [
+              destinations: [
                 {
-                  id: mediaId,
-                  name: "Imported portrait",
-                  kind: "image",
-                  contentType: "image/png",
-                  sizeBytes: 100,
-                  etag: "etag",
+                  id: preview.destinations[0].id,
+                  platform: "youtube",
+                  name: "Fixture channel",
+                  text: "The approved YouTube description.",
+                  youtube: {
+                    title: "Exact YouTube title",
+                    description: "The approved YouTube description.",
+                    visibility: "unlisted",
+                    tags: ["VCStudio"],
+                    madeForKids: false,
+                    containsSyntheticMedia: true,
+                    thumbnail: {
+                      id: mediaId,
+                      name: "YouTube cover",
+                      contentType: "image/png",
+                      sizeBytes: 100,
+                      etag: "thumb-etag",
+                    },
+                  },
                 },
               ],
             }
-          : preview,
+          : withMedia
+            ? {
+                ...preview,
+                media: [
+                  {
+                    id: mediaId,
+                    name: "Imported portrait",
+                    kind: "image",
+                    contentType: "image/png",
+                    sizeBytes: 100,
+                    etag: "etag",
+                  },
+                ],
+              }
+            : preview,
         approvalUrl: `https://vcstudio.example/app/mcp/operations/${operationId}`,
       },
     },
@@ -58,15 +86,16 @@ bridge.oninitialized = async () => {
       approvalProof: new URLSearchParams(location.search).has("noProof")
         ? undefined
         : "private-user-interface-proof-123456789",
-      mediaPreviews: withMedia
-        ? [
-            {
-              id: mediaId,
-              kind: "image",
-              url: `${mediaOrigin}/preview.png?X-Amz-Signature=fixture-only`,
-            },
-          ]
-        : [],
+      mediaPreviews:
+        withMedia || withYouTube
+          ? [
+              {
+                id: mediaId,
+                kind: "image",
+                url: `${mediaOrigin}/preview.png?X-Amz-Signature=fixture-only`,
+              },
+            ]
+          : [],
     },
   });
 };

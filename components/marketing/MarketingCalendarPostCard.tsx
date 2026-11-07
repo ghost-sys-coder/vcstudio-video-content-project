@@ -9,6 +9,7 @@ const STATUS_LABELS = {
   publishing: "PUBLISHING",
   published: "PUBLISHED",
   partially_failed: "PARTIAL",
+  awaiting_completion: "FINISH IN TIKTOK",
   failed: "FAILED",
   cancelled: "CANCELLED",
   intent: "INTENT ONLY",

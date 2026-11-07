@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { PublicationPreview } from "@studio/contracts";
 import type { McpMediaPreview } from "@/lib/mcp/media-previews";
+import { YouTubePublicationDetails } from "./YouTubePublicationDetails";
 export function PublicationReview({
   preview,
   actions,
@@ -14,16 +15,20 @@ export function PublicationReview({
     <section className="app-section min-w-0">
       <div className="app-heading">
         <h2 className="text-xl font-semibold">
-          {preview.action === "cancel_schedule"
-            ? "Review schedule cancellation"
-            : preview.scheduledAt
-              ? "Review scheduled publication"
-              : "Review publication"}
+          {preview.action === "retry_thumbnail"
+            ? "Review YouTube thumbnail retry"
+            : preview.action === "cancel_schedule"
+              ? "Review schedule cancellation"
+              : preview.scheduledAt
+                ? "Review scheduled publication"
+                : "Review publication"}
         </h2>
         <p className="text-sm text-muted-foreground">
-          {preview.action === "cancel_schedule"
-            ? "Approve removing this post from the calendar. Its content and media will remain."
-            : "Confirm the exact content and destination accounts."}{" "}
+          {preview.action === "retry_thumbnail"
+            ? "Approve applying the saved thumbnail to the existing YouTube video."
+            : preview.action === "cancel_schedule"
+              ? "Approve removing this post from the calendar. Its content and media will remain."
+              : "Confirm the exact content and destination accounts."}{" "}
           This approval is valid for ten minutes.
         </p>
       </div>
@@ -59,8 +64,17 @@ export function PublicationReview({
               </span>
               {d.platform === "tiktok" && (
                 <p className="text-sm">
-                  Send to TikTok inbox; finish posting in TikTok.
+                  Send to TikTok inbox; finish posting in TikTok. Add the
+                  caption and choose the cover frame inside TikTok before
+                  posting. Cover selection through VCStudio is unavailable with
+                  current permissions.
                 </p>
+              )}
+              {d.youtube && (
+                <YouTubePublicationDetails
+                  youtube={d.youtube}
+                  videoId={d.existingVideoId}
+                />
               )}
             </li>
           ))}
@@ -92,7 +106,11 @@ export function PublicationReview({
                 key={m.id}
                 src={m.url}
                 alt={
-                  preview.media.find((p) => p.id === m.id)?.name || "Post image"
+                  preview.destinations.find(
+                    (d) => d.youtube?.thumbnail?.id === m.id,
+                  )?.youtube?.thumbnail?.name ||
+                  preview.media.find((p) => p.id === m.id)?.name ||
+                  "Post image"
                 }
                 loading="lazy"
                 className="max-h-80 w-full rounded-xl border bg-muted object-contain"

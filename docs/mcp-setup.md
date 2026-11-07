@@ -1,5 +1,12 @@
 # VCStudio MCP v1 setup and verification
 
+YouTube Social drafts now support explicit upload metadata/disclosures and a
+separate library thumbnail, included in the human approval preview. Thumbnail
+finishing waits for video processing; `prepare_publication` with
+`action: retry_thumbnail` retries the original thumbnail on an existing uploaded
+video after approval. TikTok remains inbox-only, with final cover selection and
+posting in TikTok. See [video publishing and release requirements](social-video-publishing.md).
+
 Connection, import/reuse and publication milestones are deployed for controlled
 owner-only production use. Production web and worker MCP are enabled; local and
 Preview defaults remain disabled. User verification covers ChatGPT connection,

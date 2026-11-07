@@ -22,11 +22,13 @@ export function VideoPublicationRow({
   canManage,
   busy,
   onCancel,
+  onRetryThumbnail,
 }: {
   publication: PublicationView;
   canManage: boolean;
   busy: boolean;
   onCancel: (publicationId: string) => void;
+  onRetryThumbnail?: (publicationId: string) => void;
 }) {
   const isUploading =
     publication.status === "uploading" || publication.status === "processing";
@@ -120,6 +122,25 @@ export function VideoPublicationRow({
       </div>
 
       <PublicationFinishingList steps={publication.finishingSteps} />
+      {canManage &&
+        onRetryThumbnail &&
+        publication.platform === "youtube" &&
+        publication.status === "succeeded" &&
+        publication.finishingSteps.some(
+          (step) =>
+            step.step === "thumbnail" &&
+            (step.state === "failed" || step.state === "unsupported"),
+        ) && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={() => onRetryThumbnail(publication.id)}
+          >
+            {busy ? "Queuing…" : "Retry thumbnail only"}
+          </Button>
+        )}
     </li>
   );
 }

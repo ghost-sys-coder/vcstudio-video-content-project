@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { socialYouTubeSettingsSchema } from "@studio/contracts/publishing";
+import { mcpObjectEtag } from "./storage-integrity";
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/audit/record-audit-event", () => ({
   recordAuditEvent: vi.fn(),
@@ -24,6 +26,10 @@ const m = vi.hoisted(() => ({
   cancel: vi.fn(),
   draftDestinations: vi.fn(),
   prepareDestinations: vi.fn(),
+  retryThumbnail: vi.fn(),
+}));
+vi.mock("@/lib/social/retry-youtube-thumbnail", () => ({
+  retrySocialYouTubeThumbnail: m.retryThumbnail,
 }));
 vi.mock("@/db/repositories/social-post-destinations.repository", () => ({
   listSocialPostDraftConnectionIds: m.draftDestinations,
@@ -90,6 +96,7 @@ const request = {
 };
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(mcpObjectEtag).mockResolvedValue("etag-1");
   m.findKey.mockResolvedValue(null);
   m.draftDestinations.mockResolvedValue([mcpIds.destination]);
   m.prepareDestinations.mockImplementation(async (input) => ({
@@ -134,6 +141,142 @@ async function pendingOperation() {
   });
 }
 describe("publication approval boundary", () => {
+  function useYouTube() {
+    const youtubeSettings = socialYouTubeSettingsSchema.parse({
+      title: "Exact title",
+      description: "Exact YouTube description",
+      madeForKids: false,
+      containsSyntheticMedia: true,
+      visibility: "unlisted",
+      tags: ["VCStudio"],
+    });
+    m.post.mockResolvedValue({
+      id: mcpIds.post,
+      version: 2,
+      status: "draft",
+      bodyPlainText: "Approved exact copy",
+      youtubeSettings,
+      youtubeThumbnailAssetId: mcpIds.asset,
+    });
+    m.connection.mockResolvedValue({
+      id: mcpIds.destination,
+      platform: "youtube",
+      status: "active",
+      externalAccountName: "My channel",
+      externalAccountId: "channel123",
+    });
+    m.media.mockResolvedValue([
+      {
+        source: "render",
+        sourceId: "render-id",
+        kind: "video",
+        title: "Video",
+        contentType: "video/mp4",
+        sizeBytes: 1000,
+        objectKey: `workspaces/${mcpIds.workspace}/video.mp4`,
+        unavailable: false,
+      },
+    ]);
+    m.assets.mockImplementation(async (input: { mediaAssetIds: string[] }) =>
+      input.mediaAssetIds.includes(mcpIds.asset)
+        ? [
+            {
+              id: mcpIds.asset,
+              kind: "image",
+              title: "Approved thumbnail",
+              originalFileName: "thumbnail.png",
+              contentType: "image/png",
+              sizeBytes: 100,
+              width: 1080,
+              height: 1920,
+              objectKey: `workspaces/${mcpIds.workspace}/thumbnail.png`,
+            },
+          ]
+        : [],
+    );
+    return youtubeSettings;
+  }
+  it("previews exact YouTube metadata and a separate thumbnail without publishing", async () => {
+    const settings = useYouTube();
+    const prepared = await prepareMcpPublication(ctx, request);
+    expect(prepared.preview.media).toHaveLength(1);
+    expect(prepared.preview.media[0].kind).toBe("video");
+    expect(prepared.preview.destinations[0]).toMatchObject({
+      text: "Exact YouTube description",
+      youtube: {
+        ...settings,
+        thumbnail: {
+          id: mcpIds.asset,
+          name: "Approved thumbnail",
+          etag: expect.any(String),
+        },
+      },
+    });
+    expect(m.publish).not.toHaveBeenCalled();
+    expect(m.assets).toHaveBeenCalledWith({
+      workspaceId: mcpIds.workspace,
+      mediaAssetIds: [mcpIds.asset],
+    });
+  });
+  it("invalidates an approved preview when the thumbnail bytes change", async () => {
+    useYouTube();
+    const op = await pendingOperation();
+    m.find.mockResolvedValue(op);
+    vi.mocked(mcpObjectEtag).mockResolvedValue("different-thumbnail-bytes");
+    await expect(
+      approveMcpPublication(ctx, op.id, "proof"),
+    ).rejects.toMatchObject({ code: "conflict" });
+    expect(m.consume).not.toHaveBeenCalled();
+  });
+  it("requires a human proof for a thumbnail-only retry and never dispatches another upload", async () => {
+    const settings = useYouTube();
+    m.post.mockResolvedValue({
+      id: mcpIds.post,
+      version: 2,
+      status: "published",
+      bodyPlainText: "Approved exact copy",
+    });
+    m.targets.mockResolvedValue([
+      {
+        id: "target123",
+        connectionId: mcpIds.destination,
+        platform: "youtube",
+        status: "published",
+        externalPostId: "video123",
+        youtubeSettings: settings,
+        youtubeThumbnailAssetId: mcpIds.asset,
+        youtubeThumbnailStatus: "failed",
+      },
+    ]);
+    const retry = { ...request, action: "retry_thumbnail" as const };
+    const prepared = await prepareMcpPublication(ctx, retry);
+    expect(prepared.preview.destinations[0].existingVideoId).toBe("video123");
+    expect(m.prepareDestinations).not.toHaveBeenCalled();
+    const op = mcpOperationFixture({
+      input: {
+        request: retry,
+        preview: prepared.preview,
+        authority: publicationAuthority(ctx),
+      },
+      approvalHash: fingerprint("proof"),
+    });
+    m.find.mockResolvedValue(op);
+    m.consume.mockResolvedValue({ ...op, status: "approved" });
+    await expect(approveMcpPublication(ctx, op.id)).rejects.toMatchObject({
+      code: "approval_required",
+    });
+    expect(m.retryThumbnail).not.toHaveBeenCalled();
+    await approveMcpPublication(ctx, op.id, "proof");
+    expect(m.retryThumbnail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        postId: mcpIds.post,
+        connectionId: mcpIds.destination,
+        requestNonce: op.id,
+      }),
+    );
+    expect(m.publish).not.toHaveBeenCalled();
+    expect(m.schedule).not.toHaveBeenCalled();
+  });
   it("persists MCP-chosen draft accounts and advances the exact preview revision without dispatch", async () => {
     m.draftDestinations.mockResolvedValue([]);
     const result = await prepareMcpPublication(ctx, request);

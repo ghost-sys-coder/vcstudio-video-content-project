@@ -6,6 +6,7 @@ const m = vi.hoisted(() => ({
   post: vi.fn(),
   ids: vi.fn(),
   mutate: vi.fn(),
+  media: vi.fn(),
 }));
 vi.mock("./context", () => ({ authorizeMcp: m.authorize }));
 vi.mock("./rate-limit", () => ({ enforceMcpRateLimit: vi.fn() }));
@@ -18,7 +19,7 @@ vi.mock("@/db/repositories/social-post-destinations.repository", () => ({
 }));
 vi.mock("@/db/repositories/social-posts.repository", () => ({
   findSocialPost: m.post,
-  listSocialPostMedia: vi.fn().mockResolvedValue([]),
+  listSocialPostMedia: m.media,
   listSocialPostTargets: vi.fn().mockResolvedValue([]),
 }));
 import { Client } from "@modelcontextprotocol/client";
@@ -46,6 +47,7 @@ beforeEach(() => {
     ) => ({ result: await run() }),
   );
   m.ids.mockResolvedValue([mcpIds.destination]);
+  m.media.mockResolvedValue([]);
   m.post.mockResolvedValue({
     id: mcpIds.post,
     name: "Draft",
@@ -82,6 +84,58 @@ const request = {
   mediaAssetIds: [],
 };
 describe("MCP Social draft destination contract", () => {
+  it("preserves an existing render attachment when saving only YouTube settings", async () => {
+    m.media.mockResolvedValue([{ source: "render", sourceId: mcpIds.asset }]);
+    const c = await client();
+    const result = await c.callTool({
+      name: "save_post",
+      arguments: {
+        ...request,
+        mediaAssetIds: undefined,
+        youtubeSettings: { madeForKids: false, containsSyntheticMedia: false },
+      },
+    });
+    expect(result.isError).not.toBe(true);
+    expect(m.save).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        attachments: [{ source: "render", id: mcpIds.asset }],
+      }),
+    );
+  });
+  it("exposes YouTube settings and a separate thumbnail through the actual MCP SDK contract", async () => {
+    const c = await client();
+    const tools = await c.listTools();
+    expect(
+      tools.tools.find((tool) => tool.name === "save_post")?.inputSchema
+        .properties,
+    ).toHaveProperty("youtubeSettings");
+    const youtubeSettings = {
+      title: "A real video",
+      description: "Exact description",
+      tags: ["VCStudio"],
+      visibility: "unlisted",
+      madeForKids: false,
+      containsSyntheticMedia: true,
+    };
+    const result = await c.callTool({
+      name: "save_post",
+      arguments: {
+        ...request,
+        youtubeSettings,
+        youtubeThumbnailAssetId: mcpIds.asset,
+      },
+    });
+    expect(result.isError).not.toBe(true);
+    expect(m.save).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        youtubeSettings,
+        youtubeThumbnailAssetId: mcpIds.asset,
+        attachments: [],
+      }),
+    );
+  });
   it.each([{ connectionIds: [mcpIds.destination] }, { connectionIds: [] }])(
     "passes explicit account selection %j through SDK validation to the shared save",
     async ({ connectionIds }) => {

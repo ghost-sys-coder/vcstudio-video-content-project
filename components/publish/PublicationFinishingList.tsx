@@ -1,4 +1,9 @@
-import { AlertTriangleIcon, CheckIcon, CircleIcon } from "lucide-react";
+import {
+  AlertTriangleIcon,
+  CheckIcon,
+  CircleIcon,
+  Loader2Icon,
+} from "lucide-react";
 import type { FinishingStepView } from "@/lib/publishing/youtube-finishing-steps";
 import { describeOutstandingFinishing } from "@/lib/publishing/youtube-finishing-steps";
 
@@ -30,7 +35,12 @@ export function PublicationFinishingList({
       <ul className="space-y-1.5">
         {shown.map((step) => (
           <li className="flex items-start gap-2 text-xs" key={step.step}>
-            {step.state === "succeeded" ? (
+            {step.state === "pending" ? (
+              <Loader2Icon
+                aria-hidden
+                className="mt-0.5 size-3.5 shrink-0 animate-spin text-muted-foreground"
+              />
+            ) : step.state === "succeeded" ? (
               <CheckIcon
                 aria-hidden
                 className="mt-0.5 size-3.5 shrink-0 text-emerald-600"

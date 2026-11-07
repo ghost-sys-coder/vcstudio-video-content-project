@@ -9,6 +9,7 @@ export async function lockMcpPost(input: {
   expectedVersion: number;
   operationId: string;
   cancellation?: boolean;
+  finishing?: boolean;
 }) {
   const [row] = await getDatabase()
     .update(socialPosts)
@@ -21,9 +22,16 @@ export async function lockMcpPost(input: {
         isNull(socialPosts.mcpOperationId),
         inArray(
           socialPosts.status,
-          input.cancellation
-            ? ["scheduled"]
-            : [...REPUBLISHABLE_SOCIAL_POST_STATUSES],
+          input.finishing
+            ? [
+                "published",
+                "partially_failed",
+                "awaiting_completion",
+                "publishing",
+              ]
+            : input.cancellation
+              ? ["scheduled"]
+              : [...REPUBLISHABLE_SOCIAL_POST_STATUSES],
         ),
       ),
     )

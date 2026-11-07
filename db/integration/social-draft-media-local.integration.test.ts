@@ -33,6 +33,9 @@ beforeAll(async () => {
   create table social_post_media(id uuid primary key default gen_random_uuid(), post_id uuid not null, workspace_id uuid not null, media_asset_id uuid, render_id uuid, position int not null, unique(post_id,position), unique(post_id,media_asset_id));
   create table video_renders(id uuid primary key, workspace_id uuid, status text, asset_object_key text, asset_content_type text, asset_size_bytes int, width int, height int, duration_milliseconds int, output_duration_milliseconds int, created_at timestamptz);
   `);
+  await pg.exec(
+    "alter table social_posts add column youtube_settings jsonb, add column youtube_thumbnail_asset_id uuid;",
+  );
   const rows = [
     [ids[0], workspace, "image", "ready", null, null],
     [ids[1], workspace, "video", "ready", "succeeded", null],

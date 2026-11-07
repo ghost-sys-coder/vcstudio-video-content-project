@@ -26,11 +26,13 @@ export function McpReviewWidget() {
               >
                 {review.pending
                   ? "Processing…"
-                  : review.data.preview.action === "cancel_schedule"
-                    ? "Approve cancellation"
-                    : review.data.preview.scheduledAt
-                      ? "Approve schedule"
-                      : "Approve publication"}
+                  : review.data.preview.action === "retry_thumbnail"
+                    ? "Approve thumbnail retry"
+                    : review.data.preview.action === "cancel_schedule"
+                      ? "Approve cancellation"
+                      : review.data.preview.scheduledAt
+                        ? "Approve schedule"
+                        : "Approve publication"}
               </Button>
               <a
                 className="underline"

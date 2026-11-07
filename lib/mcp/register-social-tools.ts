@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { socialYouTubeSettingsSchema } from "@studio/contracts/publishing";
 import { socialPostConnectionIdsSchema } from "@studio/contracts";
 import { listSocialPostDraftConnectionIds } from "@/db/repositories/social-post-destinations.repository";
 import {
@@ -19,6 +20,7 @@ import { portableDocumentSchema } from "@/lib/social/portable-document";
 import { requireMcpProject } from "./project-access";
 import { requireMcp, McpError } from "./errors";
 import { SocialDraftDestinationError } from "@/lib/social/social-draft-error";
+import { YouTubePostSettingsError } from "@/lib/social/validate-youtube-post";
 import { mutateOnce } from "./operations";
 import type { McpToolRegistrar } from "./register-tool";
 
@@ -114,6 +116,8 @@ export function registerSocialTools(register: McpToolRegistrar) {
         status: post.status,
         scheduledAt: post.scheduledAt,
         timezone: post.scheduledTimezone,
+        youtubeSettings: post.youtubeSettings,
+        youtubeThumbnailAssetId: post.youtubeThumbnailAssetId,
         connectionIds,
         attachments: media.map((a) => ({
           source: a.source,
@@ -129,6 +133,9 @@ export function registerSocialTools(register: McpToolRegistrar) {
           status: t.status,
           error: t.safeErrorMessage,
           externalPostUrl: t.externalPostUrl,
+          youtubeThumbnailStatus: t.youtubeThumbnailStatus,
+          youtubeThumbnailError: t.youtubeThumbnailError,
+          requiresTikTokCompletion: t.status === "inbox_delivered",
         })),
       };
     },
@@ -158,7 +165,7 @@ export function registerSocialTools(register: McpToolRegistrar) {
   );
   register(
     "save_post",
-    "Save exact post copy, library assets and selected destination connectionIds on the draft. Omit connectionIds to preserve them; [] clears them. Requires the current version. Does not publish or schedule.",
+    "Save exact post copy, library assets, destinations and optional youtubeSettings (title, description, tags, visibility, explicit madeForKids and containsSyntheticMedia). youtubeThumbnailAssetId selects a ready JPEG/PNG library image separately from the video attachment. Omit mediaAssetIds to preserve all current attachments, including project renders; [] clears attachments. Omit YouTube fields or connectionIds to preserve them; null clears YouTube settings/thumbnail and [] clears destinations. Never invent audience or AI declarations: ask the creator. Requires current version. Does not publish or schedule.",
     "vcstudio:edit",
     mcpMutationInput.extend({
       postId: z.uuid(),
@@ -166,11 +173,13 @@ export function registerSocialTools(register: McpToolRegistrar) {
       name: z.string().max(120),
       text: z.string().max(20000),
       connectionIds: socialPostConnectionIdsSchema.optional(),
+      youtubeSettings: socialYouTubeSettingsSchema.nullable().optional(),
+      youtubeThumbnailAssetId: z.uuid().nullable().optional(),
       mediaAssetIds: z
         .array(z.uuid())
         .max(20)
         .refine((v) => new Set(v).size === v.length)
-        .default([]),
+        .optional(),
     }),
     false,
     async (ctx, p) =>
@@ -188,16 +197,28 @@ export function registerSocialTools(register: McpToolRegistrar) {
             postId: p.postId,
             expectedVersion: p.expectedVersion,
             connectionIds: p.connectionIds,
+            youtubeSettings: p.youtubeSettings,
+            youtubeThumbnailAssetId: p.youtubeThumbnailAssetId,
             name: p.name,
             bodyDocument,
-            attachments: p.mediaAssetIds.map((id) => ({
-              source: "library",
-              id,
-            })),
+            attachments:
+              p.mediaAssetIds === undefined
+                ? (
+                    await listSocialPostMedia({
+                      workspaceId: ctx.workspaceId,
+                      postId: p.postId,
+                    })
+                  ).map((a) => ({ source: a.source, id: a.sourceId }))
+                : p.mediaAssetIds.map((id) => ({
+                    source: "library",
+                    id,
+                  })),
           },
         ).catch((error: unknown) => {
           if (error instanceof SocialDraftDestinationError)
             throw new McpError("destination_unavailable", error.message);
+          if (error instanceof YouTubePostSettingsError)
+            throw new McpError("invalid_media", error.message);
           throw error;
         });
         requireMcp(

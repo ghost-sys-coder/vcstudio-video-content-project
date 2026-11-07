@@ -12,11 +12,10 @@ export interface FinishingStepOutcome {
   detail: string | null;
 }
 
-/** YouTube's 2MB limit for a custom thumbnail, from the thumbnails.set reference. */
-export const YOUTUBE_THUMBNAIL_MAX_BYTES = 2 * 1024 * 1024;
-
-/** The image types thumbnails.set accepts. */
-export const YOUTUBE_THUMBNAIL_CONTENT_TYPES = ["image/jpeg", "image/png"];
+export {
+  YOUTUBE_THUMBNAIL_MAX_BYTES,
+  YOUTUBE_THUMBNAIL_CONTENT_TYPES,
+} from "@studio/contracts/publishing";
 
 /**
  * The steps that finish a release after its video is uploaded.
@@ -33,6 +32,7 @@ export interface VideoFinishingProvider {
     imageUrl: string;
     contentType: string;
     sizeBytes: number;
+    waitForProcessing?: (milliseconds: number) => Promise<void>;
   }): Promise<FinishingStepOutcome>;
 
   insertCaptions(input: {

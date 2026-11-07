@@ -31,11 +31,13 @@ import { supportsFinishing } from "@/lib/publishing/video-finishing-provider";
 import { buildSubtitleContext } from "@/lib/subtitles/subtitle-workspace-details";
 import { formatSrt } from "@/lib/subtitles/subtitle-srt";
 import { findProject } from "@/db/repositories/projects.repository";
+import { finishProjectYouTubeThumbnail } from "@/lib/publishing/finish-project-youtube-thumbnail";
 
 export const videoPublishTaskPayloadSchema = z.object({
   publicationId: z.uuid(),
   workspaceId: z.uuid(),
   projectId: z.uuid(),
+  thumbnailOnly: z.boolean().optional(),
 });
 
 /** Refresh slightly early so a token cannot expire mid-upload. */
@@ -60,6 +62,10 @@ export const videoPublishTask = task({
     { ctx },
   ) => {
     const input = videoPublishTaskPayloadSchema.parse(payload);
+    if (input.thumbnailOnly)
+      return finishProjectYouTubeThumbnail(input, async (milliseconds) => {
+        await wait.for({ seconds: Math.ceil(milliseconds / 1000) });
+      });
     // Scoped from the payload (not the fetched row) so the publication can still
     // be marked failed even if a very early step throws.
     const scope = {
@@ -303,6 +309,9 @@ export const videoPublishTask = task({
                 : [],
               provider,
               captions,
+              waitForProcessing: async (milliseconds) => {
+                await wait.for({ seconds: Math.ceil(milliseconds / 1000) });
+              },
             });
           } catch (finishingError) {
             console.error("youtube finishing failed", {

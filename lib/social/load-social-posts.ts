@@ -1,4 +1,6 @@
 import "server-only";
+import { findMediaAsset } from "@/db/repositories/media-assets.repository";
+import { toMediaAssetView } from "@/lib/media/media-asset-view";
 import { listSocialPostDraftConnectionIds } from "@/db/repositories/social-post-destinations.repository";
 
 import type { SocialPostTarget } from "@/db/schema";
@@ -133,18 +135,25 @@ export async function loadSocialPostComposerView(input: {
   });
   if (!post) return null;
 
-  const [media, targets, connections, connectionIds] = await Promise.all([
-    listSocialPostMedia({
-      workspaceId: input.workspaceId,
-      postId: post.id,
-    }),
-    listSocialPostTargets({
-      workspaceId: input.workspaceId,
-      postId: post.id,
-    }),
-    loadConnectionsByIdAndList(input.workspaceId),
-    listSocialPostDraftConnectionIds(input),
-  ]);
+  const [media, targets, connections, connectionIds, thumbnail] =
+    await Promise.all([
+      listSocialPostMedia({
+        workspaceId: input.workspaceId,
+        postId: post.id,
+      }),
+      listSocialPostTargets({
+        workspaceId: input.workspaceId,
+        postId: post.id,
+      }),
+      loadConnectionsByIdAndList(input.workspaceId),
+      listSocialPostDraftConnectionIds(input),
+      post.youtubeThumbnailAssetId
+        ? findMediaAsset({
+            workspaceId: input.workspaceId,
+            mediaAssetId: post.youtubeThumbnailAssetId,
+          })
+        : null,
+    ]);
 
   const attachments = await Promise.all(
     media.map(async (attachment) =>
@@ -168,6 +177,14 @@ export async function loadSocialPostComposerView(input: {
     version: post.version,
     bodyDocument: post.bodyDocument,
     bodyPlainText: post.bodyPlainText,
+    youtubeSettings: post.youtubeSettings,
+    youtubeThumbnail:
+      thumbnail && !thumbnail.deletedAt
+        ? toMediaAssetView(
+            thumbnail,
+            await createMediaAssetDownloadUrl(thumbnail.objectKey),
+          )
+        : null,
     scheduledAt: post.scheduledAt?.toISOString() ?? null,
     scheduledTimezone: post.scheduledTimezone,
     attachments,

@@ -1,4 +1,5 @@
 import "server-only";
+import { z } from "zod";
 
 import type { ContentPlatform } from "@/db/schema";
 import {
@@ -238,6 +239,16 @@ export class YouTubeVideoPublishProvider
   async publishVideo(
     request: PublishVideoRequest,
   ): Promise<PublishVideoResult> {
+    if (request.providerOperationId?.startsWith("youtube:video:")) {
+      const id = request.providerOperationId.slice("youtube:video:".length);
+      if (/^[a-zA-Z0-9_-]+$/.test(id))
+        return {
+          externalVideoId: id,
+          externalVideoUrl: `https://www.youtube.com/watch?v=${id}`,
+          uploadedBytes: request.sizeBytes,
+          completionStage: "published",
+        };
+    }
     const uploadUrl = await this.startResumableSession(request);
     return this.uploadInChunks(request, uploadUrl);
   }
@@ -352,6 +363,19 @@ export class YouTubeVideoPublishProvider
             mayHavePublished: true,
           });
         await request.onProgress?.(100);
+        try {
+          await request.onProviderOperationCreated?.(
+            `youtube:video:${payload.id}`,
+          );
+        } catch {
+          fail({
+            category: "transport_ambiguous",
+            safeMessage:
+              "YouTube accepted the video but its confirmation could not be saved. Check the channel before retrying.",
+            retriable: false,
+            mayHavePublished: true,
+          });
+        }
         return {
           externalVideoId: payload.id,
           externalVideoUrl: `https://www.youtube.com/watch?v=${payload.id}`,
@@ -391,19 +415,29 @@ export class YouTubeVideoPublishProvider
     imageUrl: string;
     contentType: string;
     sizeBytes: number;
+    waitForProcessing?: (milliseconds: number) => Promise<void>;
   }): Promise<FinishingStepOutcome> {
     if (input.sizeBytes > YOUTUBE_THUMBNAIL_MAX_BYTES)
       return {
         state: "failed",
-        detail: `That thumbnail is ${Math.round(input.sizeBytes / 1024)}KB. YouTube's limit is 2MB. Choose or re-generate a smaller image.`,
+        detail:
+          "The thumbnail exceeds YouTube's 50 MB limit. Choose a smaller JPEG or PNG image.",
       };
-    if (!YOUTUBE_THUMBNAIL_CONTENT_TYPES.includes(input.contentType))
+    if (
+      !(YOUTUBE_THUMBNAIL_CONTENT_TYPES as readonly string[]).includes(
+        input.contentType,
+      )
+    )
       return {
         state: "failed",
         detail: `YouTube accepts JPEG and PNG thumbnails, not ${input.contentType}.`,
       };
 
     try {
+      // Shorts can silently ignore a thumbnail set before processing succeeds.
+      // Apply this owner-status check to every video, using bounded durable waits.
+      const processing = await this.waitForVideoProcessing(input);
+      if (processing) return processing;
       const source = await fetch(input.imageUrl);
       if (!source.ok)
         return {
@@ -411,6 +445,11 @@ export class YouTubeVideoPublishProvider
           detail: "The thumbnail image could not be read from storage.",
         };
       const bytes = new Uint8Array(await source.arrayBuffer());
+      if (bytes.byteLength > YOUTUBE_THUMBNAIL_MAX_BYTES)
+        return {
+          state: "failed",
+          detail: "The stored thumbnail exceeds YouTube's 50 MB limit.",
+        };
 
       const url = new URL(THUMBNAIL_SET_ENDPOINT);
       url.searchParams.set("videoId", input.videoId);
@@ -440,6 +479,69 @@ export class YouTubeVideoPublishProvider
         detail: "The thumbnail could not be sent to YouTube.",
       };
     }
+  }
+
+  private async waitForVideoProcessing(input: {
+    accessToken: string;
+    videoId: string;
+    waitForProcessing?: (milliseconds: number) => Promise<void>;
+  }): Promise<FinishingStepOutcome | null> {
+    const schema = z.object({
+      items: z.array(
+        z.object({
+          id: z.string(),
+          processingDetails: z
+            .object({
+              processingStatus: z.enum([
+                "processing",
+                "succeeded",
+                "failed",
+                "terminated",
+              ]),
+            })
+            .optional(),
+        }),
+      ),
+    });
+    const url = new URL("https://www.googleapis.com/youtube/v3/videos");
+    url.searchParams.set("part", "processingDetails");
+    url.searchParams.set("id", input.videoId);
+    for (let attempt = 0; attempt < 30; attempt++) {
+      if (attempt > 0) {
+        if (!input.waitForProcessing) break;
+        await input.waitForProcessing(10_000);
+      }
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${input.accessToken}` },
+      });
+      if (!response.ok)
+        return {
+          state: response.status === 403 ? "unsupported" : "failed",
+          detail:
+            "YouTube processing could not be checked. Reconnect the channel if permissions are missing, then retry the thumbnail only.",
+        };
+      const parsed = schema.safeParse(await response.json());
+      if (!parsed.success)
+        return {
+          state: "failed",
+          detail:
+            "YouTube returned an unreadable processing status. Retry the thumbnail only.",
+        };
+      const status = parsed.data.items.find((item) => item.id === input.videoId)
+        ?.processingDetails?.processingStatus;
+      if (status === "succeeded") return null;
+      if (status === "failed" || status === "terminated")
+        return {
+          state: "failed",
+          detail:
+            "YouTube could not process this video. Inspect it in YouTube Studio before retrying the thumbnail.",
+        };
+    }
+    return {
+      state: "failed",
+      detail:
+        "YouTube is still processing the video. Retry the thumbnail later; the video will not be uploaded again.",
+    };
   }
 
   /**

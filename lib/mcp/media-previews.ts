@@ -3,6 +3,7 @@ import type { PublicationPreview } from "@studio/contracts";
 import { listSocialPostMedia } from "@/db/repositories/social-posts.repository";
 import { createMediaAssetDownloadUrl } from "@/lib/storage/media-asset-storage";
 import { requireMcp } from "./errors";
+import { findReadyMediaAssets } from "@/db/repositories/media-assets.repository";
 export type McpMediaPreview = { id: string; kind: string; url: string };
 /** Resolve bucket-host/path-style addressing through the same signer as previews.
  * Signing is local: no object is fetched and the temporary URL is never returned.
@@ -21,21 +22,36 @@ export async function loadMcpMediaPreviews(
     workspaceId,
     postId: preview.postId,
   });
+  const thumbnailIds = [
+    ...new Set(
+      preview.destinations.flatMap((d) =>
+        d.youtube?.thumbnail ? [d.youtube.thumbnail.id] : [],
+      ),
+    ),
+  ];
+  const thumbnails = thumbnailIds.length
+    ? await findReadyMediaAssets({ workspaceId, mediaAssetIds: thumbnailIds })
+    : [];
+  requireMcp(
+    thumbnails.length === thumbnailIds.length,
+    "invalid_media",
+    "The chosen YouTube thumbnail is unavailable.",
+  );
   return Promise.all(
-    media
-      .filter((a) => preview.media.some((m) => m.id === a.sourceId))
-      .map(async (a) => {
-        requireMcp(
-          a.objectKey.startsWith(`workspaces/${workspaceId}/`) &&
-            !a.unavailable,
-          "invalid_media",
-          "This preview asset is unavailable.",
-        );
-        return {
-          id: a.sourceId,
-          kind: a.kind,
-          url: await createMediaAssetDownloadUrl(a.objectKey, 600),
-        };
-      }),
+    [
+      ...media.filter((a) => preview.media.some((m) => m.id === a.sourceId)),
+      ...thumbnails.map((a) => ({ ...a, sourceId: a.id, unavailable: false })),
+    ].map(async (a) => {
+      requireMcp(
+        a.objectKey.startsWith(`workspaces/${workspaceId}/`) && !a.unavailable,
+        "invalid_media",
+        "This preview asset is unavailable.",
+      );
+      return {
+        id: a.sourceId,
+        kind: a.kind,
+        url: await createMediaAssetDownloadUrl(a.objectKey, 600),
+      };
+    }),
   );
 }

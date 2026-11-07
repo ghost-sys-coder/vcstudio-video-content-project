@@ -46,6 +46,11 @@ import { mcpObjectEtag } from "./storage-integrity";
 import { recordAuditEvent } from "@/lib/audit/record-audit-event";
 import { listSocialPostDraftConnectionIds } from "@/db/repositories/social-post-destinations.repository";
 import { beginMcpPublicationWithDestinations } from "@/db/commands/mcp-publication-destinations";
+import {
+  validateYouTubePost,
+  YouTubePostSettingsError,
+} from "@/lib/social/validate-youtube-post";
+import { retrySocialYouTubeThumbnail } from "@/lib/social/retry-youtube-thumbnail";
 
 export function publicationAuthority(context: McpContext) {
   return fingerprint({
@@ -74,6 +79,93 @@ export async function buildPublicationPreview(
       postId: input.postId,
     }),
   ]);
+  if (input.action === "retry_thumbnail") {
+    requireMcp(
+      post &&
+        post.version === input.expectedVersion &&
+        input.connectionIds.length === 1 &&
+        !input.scheduledAt,
+      "conflict",
+      "Choose one uploaded YouTube destination at the current post version, without a schedule.",
+    );
+    const target = (
+      await listSocialPostTargets({
+        workspaceId: context.workspaceId,
+        postId: post.id,
+      })
+    ).find((t) => t.connectionId === input.connectionIds[0]);
+    requireMcp(
+      target?.platform === "youtube" &&
+        target.status === "published" &&
+        target.externalPostId &&
+        target.youtubeThumbnailAssetId &&
+        target.youtubeThumbnailStatus !== "succeeded",
+      "invalid_state",
+      "That destination has no unfinished YouTube thumbnail.",
+    );
+    const connection = await findPlatformConnectionSummary({
+      workspaceId: context.workspaceId,
+      connectionId: target.connectionId,
+    });
+    requireMcp(
+      connection?.status === "active" &&
+        isSocialPostPlatformConfigured("youtube", connection),
+      "destination_unavailable",
+      "Reconnect the YouTube channel before retrying its thumbnail.",
+    );
+    const validated = await validateYouTubePost({
+      workspaceId: context.workspaceId,
+      settings: target.youtubeSettings,
+      thumbnailAssetId: target.youtubeThumbnailAssetId,
+      text: post.bodyPlainText,
+    }).catch((error: unknown) => {
+      throw new McpError(
+        "invalid_media",
+        error instanceof YouTubePostSettingsError
+          ? error.message
+          : "The selected YouTube thumbnail is unavailable.",
+      );
+    });
+    const thumb = validated.thumbnail;
+    requireMcp(
+      thumb,
+      "invalid_media",
+      "The selected YouTube thumbnail is unavailable.",
+    );
+    return {
+      action: "retry_thumbnail",
+      postId: post.id,
+      version: post.version,
+      text: post.bodyPlainText,
+      media: [],
+      destinations: [
+        {
+          id: connection.id,
+          name: connection.externalAccountName,
+          platform: "youtube",
+          text: validated.settings.description ?? post.bodyPlainText,
+          existingVideoId: target.externalPostId,
+          youtube: {
+            ...validated.settings,
+            thumbnail: {
+              id: thumb.id,
+              name: thumb.title || thumb.originalFileName,
+              contentType: thumb.contentType,
+              sizeBytes: thumb.sizeBytes,
+              etag: fingerprint({
+                objectKey: thumb.objectKey,
+                etag: await mcpObjectEtag(thumb.objectKey),
+                size: thumb.sizeBytes,
+                title: thumb.title,
+              }),
+            },
+          },
+        },
+      ],
+      scheduledAt: null,
+      timezone: input.timezone,
+    };
+  }
   if (input.action === "cancel_schedule") {
     requireMcp(
       post?.status === "scheduled" &&
@@ -156,7 +248,9 @@ export async function buildPublicationPreview(
   for (const connectionId of input.connectionIds) {
     requireMcp(
       !previousTargets.some(
-        (t) => t.connectionId === connectionId && t.status === "published",
+        (t) =>
+          t.connectionId === connectionId &&
+          (t.status === "published" || t.status === "inbox_delivered"),
       ),
       "already_published",
       "A selected account already received this post. Choose only the failed or unsent destinations.",
@@ -187,7 +281,10 @@ export async function buildPublicationPreview(
     const eligibility = checkPlatformEligibility({
       platform: connection.platform,
       attachments: summarizeAttachments(media.map((a) => a.kind)),
-      plainTextLength: post.bodyPlainText.length,
+      plainTextLength:
+        connection.platform === "youtube"
+          ? (post.youtubeSettings?.description ?? post.bodyPlainText).length
+          : post.bodyPlainText.length,
     });
     requireMcp(
       eligibility.eligible,
@@ -210,11 +307,48 @@ export async function buildPublicationPreview(
       "incompatible_destination",
       "TikTok inbox delivery requires consent at send time and cannot be scheduled through MCP.",
     );
+    let youtube;
+    if (connection.platform === "youtube") {
+      const validated = await validateYouTubePost({
+        workspaceId: context.workspaceId,
+        settings: post.youtubeSettings,
+        thumbnailAssetId: post.youtubeThumbnailAssetId,
+        text: post.bodyPlainText,
+      }).catch((error: unknown) => {
+        throw new McpError(
+          "invalid_input",
+          error instanceof YouTubePostSettingsError
+            ? error.message
+            : "Complete YouTube settings first.",
+        );
+      });
+      const thumb = validated.thumbnail;
+      youtube = {
+        ...validated.settings,
+        thumbnail: thumb
+          ? {
+              id: thumb.id,
+              name: thumb.title || thumb.originalFileName,
+              contentType: thumb.contentType,
+              sizeBytes: thumb.sizeBytes,
+              etag: fingerprint({
+                objectKey: thumb.objectKey,
+                etag: await mcpObjectEtag(thumb.objectKey),
+                size: thumb.sizeBytes,
+                title: thumb.title,
+              }),
+            }
+          : null,
+      };
+    }
     destinations.push({
       id: connection.id,
       platform: connection.platform,
       name: connection.externalAccountName,
       text: post.bodyPlainText,
+      ...(youtube
+        ? { youtube, text: youtube.description ?? post.bodyPlainText }
+        : {}),
     });
   }
   if (input.scheduledAt) {
@@ -286,7 +420,7 @@ export async function prepareMcpPublication(
   }
   const validatedPreview = await buildPublicationPreview(context, input);
   const savedIds =
-    input.action === "cancel_schedule"
+    input.action === "cancel_schedule" || input.action === "retry_thumbnail"
       ? []
       : await listSocialPostDraftConnectionIds({
           workspaceId: context.workspaceId,
@@ -294,6 +428,7 @@ export async function prepareMcpPublication(
         });
   const saveDestinations =
     input.action !== "cancel_schedule" &&
+    input.action !== "retry_thumbnail" &&
     fingerprint([...savedIds].sort()) !==
       fingerprint([...input.connectionIds].sort());
   const request = saveDestinations
@@ -441,6 +576,7 @@ export async function approveMcpPublication(
     expectedVersion: request.expectedVersion,
     operationId,
     cancellation: request.action === "cancel_schedule",
+    finishing: request.action === "retry_thumbnail",
   });
   requireMcp(
     locked,
@@ -490,15 +626,21 @@ export async function dispatchApprovedPublication(op: McpOperation) {
       post.status === "draft" &&
       !post.scheduledAt;
     const alreadyStarted =
-      cancellationCompleted ||
-      (request.action !== "cancel_schedule" &&
-        post?.mcpOperationId === op.id &&
-        (post.status === "scheduled" ||
-          existing.some(
+      request.action === "retry_thumbnail"
+        ? existing.some(
             (t) =>
-              request.connectionIds.includes(t.connectionId) &&
-              ["queued", "publishing", "published"].includes(t.status),
-          )));
+              t.connectionId === request.connectionIds[0] &&
+              t.youtubeThumbnailStatus === "succeeded",
+          )
+        : cancellationCompleted ||
+          (request.action !== "cancel_schedule" &&
+            post?.mcpOperationId === op.id &&
+            (post.status === "scheduled" ||
+              existing.some(
+                (t) =>
+                  request.connectionIds.includes(t.connectionId) &&
+                  ["queued", "publishing", "published"].includes(t.status),
+              )));
     if (!alreadyStarted) {
       const preview = await buildPublicationPreview(context, request);
       requireMcp(
@@ -513,7 +655,13 @@ export async function dispatchApprovedPublication(op: McpOperation) {
         requestNonce: op.id,
         mcpOperationId: op.id,
       };
-      if (request.action === "cancel_schedule")
+      if (request.action === "retry_thumbnail")
+        await retrySocialYouTubeThumbnail({
+          ...common,
+          connectionId: request.connectionIds[0],
+          expectedVersion: request.expectedVersion,
+        });
+      else if (request.action === "cancel_schedule")
         await cancelSocialPostPublication({
           ...common,
           expectedVersion: request.expectedVersion,
@@ -537,6 +685,9 @@ export async function dispatchApprovedPublication(op: McpOperation) {
           scheduled:
             request.action !== "cancel_schedule" && !!request.scheduledAt,
           cancelled: request.action === "cancel_schedule",
+          ...(request.action === "retry_thumbnail"
+            ? { thumbnailRetry: true }
+            : {}),
           href: `/app/social/posts/${request.postId}`,
         },
       },

@@ -1,4 +1,9 @@
 import "server-only";
+import {
+  validateYouTubePost,
+  YouTubePostSettingsError,
+} from "./validate-youtube-post";
+import type { SocialYouTubeSettings } from "@studio/contracts/publishing";
 
 import { createHash } from "node:crypto";
 import {
@@ -132,6 +137,10 @@ export async function scheduleSocialPostPublication(input: {
       throw new SocialPostScheduleError(
         "Posting to that platform is not available yet.",
       );
+    if (connection.platform === "tiktok")
+      throw new SocialPostScheduleError(
+        "TikTok inbox uploads need your consent at send time. Send now, then choose the cover and finish posting in TikTok.",
+      );
     if (!isSocialPostPlatformConfigured(connection.platform, connection))
       throw new SocialPostScheduleError(
         "That platform isn't configured on the server yet. Contact an administrator.",
@@ -139,10 +148,29 @@ export async function scheduleSocialPostPublication(input: {
 
     const override = captionOverrides.get(connection.platform);
     const platformText = override ?? post.bodyPlainText;
+    let youtubeSettings: SocialYouTubeSettings | null = null;
+    if (connection.platform === "youtube") {
+      try {
+        youtubeSettings = (
+          await validateYouTubePost({
+            workspaceId: input.workspaceId,
+            settings: post.youtubeSettings,
+            thumbnailAssetId: post.youtubeThumbnailAssetId,
+            text: platformText,
+          })
+        ).settings;
+      } catch (error) {
+        throw new SocialPostScheduleError(
+          error instanceof YouTubePostSettingsError
+            ? error.message
+            : "Check YouTube settings before scheduling.",
+        );
+      }
+    }
     const eligibility = checkPlatformEligibility({
       platform: connection.platform,
       attachments,
-      plainTextLength: platformText.length,
+      plainTextLength: (youtubeSettings?.description ?? platformText).length,
     });
     if (!eligibility.eligible)
       throw new SocialPostScheduleError(eligibility.reason);
@@ -162,6 +190,9 @@ export async function scheduleSocialPostPublication(input: {
         override !== undefined && override !== post.bodyPlainText
           ? override
           : null,
+      youtubeSettings,
+      youtubeThumbnailAssetId:
+        connection.platform === "youtube" ? post.youtubeThumbnailAssetId : null,
       idempotencyKey: createSocialPostTargetIdempotencyKey({
         secret: getSceneAnalysisEnvironment().IDEMPOTENCY_HASH_SECRET,
         workspaceId: input.workspaceId,
@@ -171,6 +202,15 @@ export async function scheduleSocialPostPublication(input: {
         bodyFingerprint: createHash("sha256")
           .update(bodyFingerprint)
           .update(platformText)
+          .update(
+            JSON.stringify({
+              youtubeSettings,
+              thumbnail:
+                connection.platform === "youtube"
+                  ? post.youtubeThumbnailAssetId
+                  : null,
+            }),
+          )
           .digest("hex"),
         requestNonce: input.requestNonce,
       }),
@@ -183,7 +223,10 @@ export async function scheduleSocialPostPublication(input: {
   });
   const alreadyPublished = new Set(
     existing
-      .filter((target) => target.status === "published")
+      .filter(
+        (target) =>
+          target.status === "published" || target.status === "inbox_delivered",
+      )
       .map((target) => target.connectionId),
   );
   const targets = resolved.filter(

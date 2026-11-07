@@ -39,11 +39,13 @@ export function McpBrowserApproval({
             >
               {pending
                 ? "Processing…"
-                : preview.action === "cancel_schedule"
-                  ? "Approve cancellation"
-                  : preview.scheduledAt
-                    ? "Approve schedule"
-                    : "Approve publication"}
+                : preview.action === "retry_thumbnail"
+                  ? "Approve thumbnail retry"
+                  : preview.action === "cancel_schedule"
+                    ? "Approve cancellation"
+                    : preview.scheduledAt
+                      ? "Approve schedule"
+                      : "Approve publication"}
             </Button>
             <Button
               name="decision"

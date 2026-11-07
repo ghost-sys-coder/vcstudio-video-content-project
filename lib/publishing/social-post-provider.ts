@@ -1,4 +1,5 @@
 import type { ContentPlatform, MediaAssetKind } from "@/db/schema";
+import type { SocialYouTubeSettings } from "@studio/contracts/publishing";
 import type { PlatformTokens } from "@/lib/publishing/platform-oauth-provider";
 import type { PublishFailure } from "@/lib/publishing/video-publish-provider";
 
@@ -28,6 +29,7 @@ export type SocialPostMediaItem = {
 };
 
 export type PublishPostRequest = {
+  youtubeSettings?: SocialYouTubeSettings | null;
   tokens: Pick<PlatformTokens, "accessToken">;
   /** Destination account selected by the authorized workspace member. */
   account: { externalAccountId: string };

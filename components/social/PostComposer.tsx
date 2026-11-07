@@ -32,6 +32,8 @@ import type {
 } from "@/lib/social/social-post-view";
 import { MAX_POST_NAME_LENGTH } from "@/lib/schemas/social-post";
 import { appendLibraryAttachments } from "@/lib/social/append-library-attachments";
+import { socialYouTubeSettingsSchema } from "@studio/contracts/publishing";
+import { YouTubePostSettingsPanel } from "./YouTubePostSettingsPanel";
 
 /**
  * The post composer.
@@ -64,12 +66,21 @@ export function PostComposer({
   );
   const [libraryAssets, setLibraryAssets] = useState<MediaAssetView[]>([]);
   const [version, setVersion] = useState(view.version);
+  const [youtubeSettings, setYouTubeSettings] = useState(() =>
+    socialYouTubeSettingsSchema.parse(view.youtubeSettings ?? {}),
+  );
+  const [youtubeThumbnail, setYouTubeThumbnail] =
+    useState<MediaAssetView | null>(view.youtubeThumbnail ?? null);
   const [selectedConnectionIds, setSelectedConnectionIds] = useState(
     view.connectionIds,
   );
   const [savedSnapshot, setSavedSnapshot] = useState(() => ({
     plainText: view.bodyPlainText,
     name: view.name,
+    youtubeKey: JSON.stringify({
+      settings: socialYouTubeSettingsSchema.parse(view.youtubeSettings ?? {}),
+      thumbnail: view.youtubeThumbnail?.id ?? null,
+    }),
     connectionKey: [...view.connectionIds].sort().join(":"),
     attachmentKey: view.attachments
       .map((attachment) => `${attachment.source}:${attachment.asset.id}`)
@@ -94,8 +105,10 @@ export function PostComposer({
           attachments.map((attachment) => attachment.asset.kind),
         ),
         plainTextLength: plainText.length,
+        youtubeDescriptionLength: (youtubeSettings.description ?? plainText)
+          .length,
       }),
-    [attachments, plainText.length],
+    [attachments, plainText, youtubeSettings.description],
   );
   const attachmentSummary = useMemo(
     () =>
@@ -110,12 +123,18 @@ export function PostComposer({
     .map((attachment) => `${attachment.source}:${attachment.asset.id}`)
     .join(":");
   const hasUnsavedMedia = attachmentKey !== savedSnapshot.attachmentKey;
+  const youtubeKey = JSON.stringify({
+    settings: youtubeSettings,
+    thumbnail: youtubeThumbnail?.id ?? null,
+  });
+  const hasUnsavedYouTube = youtubeKey !== savedSnapshot.youtubeKey;
   const hasUnsavedChanges =
     [...selectedConnectionIds].sort().join(":") !==
       savedSnapshot.connectionKey ||
     plainText !== savedSnapshot.plainText ||
     name !== savedSnapshot.name ||
-    hasUnsavedMedia;
+    hasUnsavedMedia ||
+    hasUnsavedYouTube;
 
   async function save(
     nextAttachments = attachments,
@@ -136,6 +155,10 @@ export function PostComposer({
       data.set("name", name);
       data.set("bodyDocument", JSON.stringify(document));
       data.set("connectionIds", JSON.stringify(selectedConnectionIds));
+      if (view.status !== "scheduled") {
+        data.set("youtubeSettings", JSON.stringify(youtubeSettings));
+        data.set("youtubeThumbnailAssetId", youtubeThumbnail?.id ?? "");
+      }
       for (const attachment of nextAttachments)
         data.append(
           "attachments",
@@ -148,6 +171,7 @@ export function PostComposer({
         setSavedSnapshot({
           plainText,
           name,
+          youtubeKey,
           attachmentKey: nextAttachments
             .map((item) => `${item.source}:${item.asset.id}`)
             .join(":"),
@@ -416,6 +440,8 @@ export function PostComposer({
             selectedIds={selectedConnectionIds}
             onSelectedIdsChange={setSelectedConnectionIds}
             saving={pending}
+            youtubeSettings={youtubeSettings}
+            version={view.editable ? version : view.version}
           />
 
           <div>
@@ -429,11 +455,30 @@ export function PostComposer({
             <PlatformPreviewCard
               eligibility={entry}
               key={entry.platform}
-              plainText={plainText}
+              plainText={
+                entry.platform === "youtube"
+                  ? (youtubeSettings.description ?? plainText)
+                  : plainText
+              }
             />
           ))}
         </aside>
       </div>
+      {view.availableConnections.some((c) => c.platform === "youtube") ||
+      view.youtubeSettings ||
+      youtubeThumbnail ? (
+        <YouTubePostSettingsPanel
+          value={youtubeSettings}
+          onChange={setYouTubeSettings}
+          thumbnail={youtubeThumbnail}
+          onThumbnailChange={setYouTubeThumbnail}
+          disabled={!view.editable || pending || view.status === "scheduled"}
+          unsaved={hasUnsavedYouTube}
+          onSave={() => void save()}
+          saving={pending}
+          scheduled={view.status === "scheduled"}
+        />
+      ) : null}
     </div>
   );
 }

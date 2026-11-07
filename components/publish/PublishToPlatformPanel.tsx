@@ -8,6 +8,7 @@ import {
   loadPublishingViewAction,
   publishVideoAction,
   saveReleasePackageAction,
+  retryProjectThumbnailAction,
 } from "@/app/(authenticated)/app/projects/[projectId]/publish/actions";
 import { ConnectYouTubeButton } from "@/components/publish/ConnectYouTubeButton";
 import { ConnectFacebookButton } from "@/components/publish/ConnectFacebookButton";
@@ -141,8 +142,10 @@ export function PublishToPlatformPanel({
   );
   const hasActivePublications = useMemo(
     () =>
-      data.publications.some((entry) =>
-        isActivePublicationStatus(entry.status),
+      data.publications.some(
+        (entry) =>
+          isActivePublicationStatus(entry.status) ||
+          entry.finishingSteps.some((step) => step.state === "pending"),
       ),
     [data.publications],
   );
@@ -367,6 +370,24 @@ export function PublishToPlatformPanel({
       const result = await cancelPublicationAction(formData);
       if (!result.success) setError(result.error);
       await refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function retryThumbnail(publicationId: string) {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const form = new FormData();
+      form.set("projectId", projectId);
+      form.set("publicationId", publicationId);
+      const result = await retryProjectThumbnailAction(form);
+      if (!result.success) setError(result.error);
+      await refresh();
+    } catch {
+      setError("The thumbnail retry could not be queued. Try again.");
     } finally {
       setBusy(false);
     }
@@ -1037,6 +1058,7 @@ export function PublishToPlatformPanel({
                 canManage={canPublish}
                 key={publication.id}
                 onCancel={cancel}
+                onRetryThumbnail={retryThumbnail}
                 publication={publication}
               />
             ))}

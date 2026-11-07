@@ -21,6 +21,8 @@ export async function saveSocialPostAction(form: FormData) {
     name: form.get("name"),
     bodyDocument: JSON.parse(String(form.get("bodyDocument"))),
     connectionIds: JSON.parse(String(form.get("connectionIds"))),
+    youtubeSettings: JSON.parse(String(form.get("youtubeSettings") ?? "null")),
+    youtubeThumbnailAssetId: form.get("youtubeThumbnailAssetId") || null,
     attachmentIds: form
       .getAll("attachments")
       .map((value) => String(value).split(":")[1]),
@@ -50,6 +52,9 @@ export async function scheduleSocialPostAction() {
   return noDispatch();
 }
 export async function cancelSocialPostScheduleAction() {
+  return noDispatch();
+}
+export async function retryYouTubeThumbnailAction() {
   return noDispatch();
 }
 export async function getMediaLibraryPageAction() {

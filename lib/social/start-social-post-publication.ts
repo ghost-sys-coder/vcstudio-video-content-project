@@ -1,4 +1,9 @@
 import "server-only";
+import type { SocialYouTubeSettings } from "@studio/contracts/publishing";
+import {
+  validateYouTubePost,
+  YouTubePostSettingsError,
+} from "./validate-youtube-post";
 
 import { createHash } from "node:crypto";
 import { tasks } from "@trigger.dev/sdk";
@@ -121,6 +126,8 @@ export async function startSocialPostPublication(input: {
     connectionId: string;
     idempotencyKey: string;
     overrideBodyPlainText: string | null;
+    youtubeSettings: SocialYouTubeSettings | null;
+    youtubeThumbnailAssetId: string | null;
   }[] = [];
 
   const captionOverrides = new Map(
@@ -159,10 +166,29 @@ export async function startSocialPostPublication(input: {
 
     const override = captionOverrides.get(connection.platform);
     const platformText = override ?? post.bodyPlainText;
+    let youtubeSettings: SocialYouTubeSettings | null = null;
+    if (connection.platform === "youtube") {
+      try {
+        youtubeSettings = (
+          await validateYouTubePost({
+            workspaceId: input.workspaceId,
+            settings: post.youtubeSettings,
+            thumbnailAssetId: post.youtubeThumbnailAssetId,
+            text: platformText,
+          })
+        ).settings;
+      } catch (error) {
+        throw new SocialPostPublicationError(
+          error instanceof YouTubePostSettingsError
+            ? error.message
+            : "Check YouTube settings before publishing.",
+        );
+      }
+    }
     const eligibility = checkPlatformEligibility({
       platform: connection.platform,
       attachments,
-      plainTextLength: platformText.length,
+      plainTextLength: (youtubeSettings?.description ?? platformText).length,
     });
     if (!eligibility.eligible)
       throw new SocialPostPublicationError(eligibility.reason);
@@ -182,6 +208,9 @@ export async function startSocialPostPublication(input: {
         override !== undefined && override !== post.bodyPlainText
           ? override
           : null,
+      youtubeSettings,
+      youtubeThumbnailAssetId:
+        connection.platform === "youtube" ? post.youtubeThumbnailAssetId : null,
       idempotencyKey: createSocialPostTargetIdempotencyKey({
         secret: getSceneAnalysisEnvironment().IDEMPOTENCY_HASH_SECRET,
         workspaceId: input.workspaceId,
@@ -191,6 +220,15 @@ export async function startSocialPostPublication(input: {
         bodyFingerprint: createHash("sha256")
           .update(bodyFingerprint)
           .update(platformText)
+          .update(
+            JSON.stringify({
+              youtubeSettings,
+              thumbnail:
+                connection.platform === "youtube"
+                  ? post.youtubeThumbnailAssetId
+                  : null,
+            }),
+          )
           .digest("hex"),
         requestNonce: input.requestNonce,
       }),
@@ -207,7 +245,10 @@ export async function startSocialPostPublication(input: {
   // (post, connection) unique index would reject the duplicate row anyway.
   const alreadyPublished = new Set(
     existing
-      .filter((target) => target.status === "published")
+      .filter(
+        (target) =>
+          target.status === "published" || target.status === "inbox_delivered",
+      )
       .map((target) => target.connectionId),
   );
   const pendingTargets = resolved.filter(

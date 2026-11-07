@@ -9,6 +9,8 @@ import { PlatformCaptionEditor } from "@/components/social/PlatformCaptionEditor
 import { SchedulePostDialog } from "@/components/social/SchedulePostDialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import type { SocialYouTubeSettings } from "@studio/contracts/publishing";
+import { youTubeSettingsProblem } from "@/lib/social/youtube-post-settings";
 import { toneContainerClassName } from "@/lib/social/eligibility-tone";
 import {
   checkPlatformEligibility,
@@ -48,6 +50,8 @@ export function PublishPostPanel({
   selectedIds,
   onSelectedIdsChange,
   saving,
+  youtubeSettings,
+  version,
 }: {
   canPublish: boolean;
   attachmentSummary: PostAttachmentSummary;
@@ -61,6 +65,8 @@ export function PublishPostPanel({
   selectedIds: string[];
   onSelectedIdsChange: (ids: string[]) => void;
   saving: boolean;
+  youtubeSettings?: SocialYouTubeSettings | null;
+  version?: number;
 }) {
   const router = useRouter();
   const [captionOverrides, setCaptionOverrides] = useState<
@@ -79,7 +85,10 @@ export function PublishPostPanel({
   const [pending, startTransition] = useTransition();
 
   const inFlight = targets.some(
-    (target) => target.status === "queued" || target.status === "publishing",
+    (target) =>
+      target.status === "queued" ||
+      target.status === "publishing" ||
+      target.youtubeThumbnailStatus === "pending",
   );
 
   // A publish runs in a background worker, so the page has to ask again rather
@@ -101,6 +110,13 @@ export function PublishPostPanel({
   const requestCaptionOverrides = selectedPlatforms
     .filter((platform) => captionOverrides[platform] !== undefined)
     .map((platform) => ({ platform, text: captionOverrides[platform] ?? "" }));
+  const youtubeProblem = selectedPlatforms.includes("youtube")
+    ? youTubeSettingsProblem(
+        youtubeSettings,
+        captionOverrides.youtube ?? basePlainText,
+      )
+    : null;
+  const tiktokSelected = selectedPlatforms.includes("tiktok");
 
   function publish() {
     setError(null);
@@ -133,7 +149,11 @@ export function PublishPostPanel({
                   platform: connection.platform,
                   attachments: attachmentSummary,
                   plainTextLength: (
-                    captionOverrides[connection.platform] ?? basePlainText
+                    (connection.platform === "youtube"
+                      ? youtubeSettings?.description
+                      : null) ??
+                    captionOverrides[connection.platform] ??
+                    basePlainText
                   ).length,
                 })
               : undefined;
@@ -141,7 +161,8 @@ export function PublishPostPanel({
             const alreadySent = targets.some(
               (target) =>
                 target.connectionId === connection.id &&
-                target.status === "published",
+                (target.status === "published" ||
+                  target.status === "inbox_delivered"),
             );
             const selected = selectedIds.includes(connection.id);
             const disabled =
@@ -259,6 +280,19 @@ export function PublishPostPanel({
           Check or remove unavailable media before publishing or scheduling.
         </p>
       ) : null}
+      {youtubeProblem && (
+        <p role="status" className="text-sm text-amber-700 dark:text-amber-400">
+          {youtubeProblem} Complete and save YouTube upload settings below.
+        </p>
+      )}
+      {tiktokSelected && (
+        <p className="rounded-lg border bg-muted/30 p-3 text-sm">
+          TikTok receives this video in your inbox. Add the caption, choose the
+          cover frame and finish posting in TikTok. Cover selection from
+          VCStudio and scheduled inbox uploads are unavailable with the current
+          app permissions.
+        </p>
+      )}
 
       {error ? (
         <p aria-live="polite" className="text-sm text-destructive">
@@ -274,7 +308,9 @@ export function PublishPostPanel({
               selectedIds.length === 0 ||
               pending ||
               hasUnsavedChanges ||
-              mediaUnavailable
+              mediaUnavailable ||
+              Boolean(youtubeProblem) ||
+              tiktokSelected
             }
             postId={postId}
             scheduledAt={scheduledAt}
@@ -286,7 +322,8 @@ export function PublishPostPanel({
               selectedIds.length === 0 ||
               pending ||
               hasUnsavedChanges ||
-              mediaUnavailable
+              mediaUnavailable ||
+              Boolean(youtubeProblem)
             }
             onClick={publish}
             type="button"
@@ -299,7 +336,9 @@ export function PublishPostPanel({
             ) : (
               <>
                 <SendIcon />
-                Publish now
+                {tiktokSelected && selectedPlatforms.length === 1
+                  ? "Send to TikTok inbox"
+                  : "Publish now"}
               </>
             )}
           </Button>
@@ -311,7 +350,13 @@ export function PublishPostPanel({
           <h3 className="text-sm font-medium">Outcome</h3>
           <ul aria-live="polite" className="space-y-1.5">
             {targets.map((target) => (
-              <PostTargetRow key={target.id} target={target} />
+              <PostTargetRow
+                key={target.id}
+                target={target}
+                postId={postId}
+                version={version}
+                canPublish={canPublish}
+              />
             ))}
           </ul>
         </div>

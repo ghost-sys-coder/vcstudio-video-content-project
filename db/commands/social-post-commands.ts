@@ -1,4 +1,5 @@
 import "server-only";
+import type { SocialYouTubeSettings } from "@studio/contracts/publishing";
 
 import { and, eq, sql } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
@@ -144,6 +145,8 @@ export async function createSocialPostForContentItem(input: {
     scheduledTimezone: "UTC",
     version: 1,
     mcpOperationId: null,
+    youtubeSettings: null,
+    youtubeThumbnailAssetId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -170,6 +173,8 @@ export async function updateSocialPostDraft(input: {
    */
   attachments: SocialPostAttachmentRef[];
   connectionIds?: string[];
+  youtubeSettings?: SocialYouTubeSettings | null;
+  youtubeThumbnailAssetId?: string | null;
 }): Promise<
   | { outcome: "updated"; post: SocialPost }
   | { outcome: "conflict" }
@@ -183,9 +188,16 @@ export async function updateSocialPostDraft(input: {
     with claimed as (
       update social_posts set name = ${input.name},
         body_document = ${JSON.stringify(input.bodyDocument)}::jsonb,
-        body_plain_text = ${input.bodyPlainText}, version = version + 1, updated_at = now()
+        body_plain_text = ${input.bodyPlainText},
+        youtube_settings = case when ${input.youtubeSettings !== undefined} then ${input.youtubeSettings == null ? null : JSON.stringify(input.youtubeSettings)}::jsonb else youtube_settings end,
+        youtube_thumbnail_asset_id = case when ${input.youtubeThumbnailAssetId !== undefined} then ${input.youtubeThumbnailAssetId ?? null}::uuid else youtube_thumbnail_asset_id end,
+        version = version + 1, updated_at = now()
       where id = ${input.postId}::uuid and workspace_id = ${input.workspaceId}::uuid
         and version = ${input.expectedVersion} and status in ('draft','scheduled','failed')
+        and (status <> 'scheduled' or (
+          (not ${input.youtubeSettings !== undefined} or youtube_settings is not distinct from ${input.youtubeSettings == null ? null : JSON.stringify(input.youtubeSettings)}::jsonb)
+          and (not ${input.youtubeThumbnailAssetId !== undefined} or youtube_thumbnail_asset_id is not distinct from ${input.youtubeThumbnailAssetId ?? null}::uuid)
+        ))
         and mcp_operation_id is null returning id
     ), removed as (
       delete from social_post_media using claimed

@@ -1,4 +1,5 @@
 import "server-only";
+import type { SocialYouTubeSettings } from "@studio/contracts/publishing";
 
 import { and, eq, exists, inArray, sql } from "drizzle-orm";
 import { REPUBLISHABLE_SOCIAL_POST_STATUSES } from "@/db/commands/social-post-commands";
@@ -23,6 +24,8 @@ export async function scheduleSocialPost(input: {
     connectionId: string;
     idempotencyKey: string;
     overrideBodyPlainText: string | null;
+    youtubeSettings?: SocialYouTubeSettings | null;
+    youtubeThumbnailAssetId?: string | null;
   }[];
 }): Promise<SocialPost | null> {
   const database = getDatabase();
@@ -91,6 +94,8 @@ export async function scheduleSocialPost(input: {
       connection_id: target.connectionId,
       override_body_plain_text: target.overrideBodyPlainText,
       idempotency_key: target.idempotencyKey,
+      youtube_settings: target.youtubeSettings ?? null,
+      youtube_thumbnail_asset_id: target.youtubeThumbnailAssetId ?? null,
     }));
     const insertTargets = database.insert(socialPostTargets).select(
       database
@@ -109,10 +114,24 @@ export async function scheduleSocialPost(input: {
           idempotencyKey: sql<string>`target.idempotency_key`.as(
             "idempotency_key",
           ),
+          youtubeSettings:
+            sql<SocialYouTubeSettings | null>`target.youtube_settings`.as(
+              "youtube_settings",
+            ),
+          youtubeThumbnailAssetId: sql<
+            string | null
+          >`target.youtube_thumbnail_asset_id::uuid`.as(
+            "youtube_thumbnail_asset_id",
+          ),
+          youtubeThumbnailStatus: sql<
+            "pending" | null
+          >`case when target.youtube_thumbnail_asset_id is not null then 'pending' end`.as(
+            "youtube_thumbnail_status",
+          ),
         })
         .from(socialPosts)
         .innerJoin(
-          sql`jsonb_to_recordset(${JSON.stringify(targetPayload)}::jsonb) as target(platform text, connection_id text, override_body_plain_text text, idempotency_key text)`,
+          sql`jsonb_to_recordset(${JSON.stringify(targetPayload)}::jsonb) as target(platform text, connection_id text, override_body_plain_text text, idempotency_key text, youtube_settings jsonb, youtube_thumbnail_asset_id text)`,
           sql`true`,
         )
         .where(

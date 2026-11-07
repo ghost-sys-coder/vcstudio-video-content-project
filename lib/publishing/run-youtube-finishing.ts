@@ -40,6 +40,8 @@ export async function runYouTubeFinishing(input: {
   provider: VideoFinishingProvider;
   /** The caption track to upload, already serialized. Null when there is none. */
   captions: { language: string; name: string; body: string } | null;
+  waitForProcessing?: (milliseconds: number) => Promise<void>;
+  onlyStep?: YouTubeFinishingStep;
 }): Promise<void> {
   const releasePackage = input.releasePackageId
     ? await findReleasePackage({
@@ -60,13 +62,18 @@ export async function runYouTubeFinishing(input: {
     (step) => !wanted.includes(step),
   );
 
+  const steps = input.onlyStep
+    ? wanted.filter((step) => step === input.onlyStep)
+    : wanted;
   await initialiseFinishingSteps({
     workspaceId: input.workspaceId,
     publicationId: input.publicationId,
-    steps: wanted,
+    steps,
   });
 
-  for (const step of skipped)
+  for (const step of skipped.filter(
+    (step) => !input.onlyStep || step === input.onlyStep,
+  ))
     await recordFinishingStep({
       workspaceId: input.workspaceId,
       publicationId: input.publicationId,
@@ -75,7 +82,7 @@ export async function runYouTubeFinishing(input: {
       detail: null,
     });
 
-  for (const step of wanted) {
+  for (const step of steps) {
     if (!isStepScopeGranted({ step, grantedScopes: input.grantedScopes })) {
       await recordFinishingStep({
         workspaceId: input.workspaceId,
@@ -121,6 +128,7 @@ async function runStep(input: {
     thumbnailGenerationId: string | null;
     youtubePlaylistId: string | null;
   } | null;
+  waitForProcessing?: (milliseconds: number) => Promise<void>;
 }) {
   if (input.step === "thumbnail") {
     const thumbnailId = input.releasePackage?.thumbnailGenerationId;
@@ -142,6 +150,7 @@ async function runStep(input: {
       contentType:
         thumbnail.outputFormat === "png" ? "image/png" : "image/jpeg",
       sizeBytes: thumbnail.assetSizeBytes ?? 0,
+      waitForProcessing: input.waitForProcessing,
     });
   }
 

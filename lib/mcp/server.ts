@@ -150,6 +150,13 @@ export function createVcStudioMcpServer(principal: McpPrincipal) {
         linkedinPages: false,
         generation: false,
         administration: false,
+        youtubeUploadMetadata: true,
+        youtubeCustomThumbnails: true,
+        youtubeThumbnailRetry: true,
+        tiktokDelivery: "inbox_only",
+        tiktokCoverSelection: "finish_in_tiktok",
+        tiktokCaptions: "finish_in_tiktok",
+        tiktokDirectPost: false,
       },
       transfers: [
         "client_file_reference_when_supported",
@@ -166,7 +173,7 @@ export function createVcStudioMcpServer(principal: McpPrincipal) {
     "prepare_publication",
     {
       description:
-        "Save chosen destination accounts to the draft and prepare an immutable publish/schedule preview for human approval. This can advance the draft revision and returns its current version. No publication or scheduling executes until human review. To cancel an existing schedule use action=cancel_schedule with its current version and exact destination IDs.",
+        "Save chosen destination accounts and prepare an immutable publish/schedule preview for human approval, including saved YouTube metadata, explicit creator disclosures and a separately selected thumbnail. Save these with save_post first. TikTok is inbox-only: the creator chooses a cover and completes posting inside TikTok; it cannot be scheduled here. This can advance the draft revision. To cancel a schedule use action=cancel_schedule with current version and exact destination IDs. To retry only a saved YouTube thumbnail on an existing uploaded video, use action=retry_thumbnail, one connectionId and current post version, without scheduledAt. Every action requires human review; never upload the video again to fix a thumbnail.",
       inputSchema: mcpPublishInput,
       annotations: {
         readOnlyHint: false,

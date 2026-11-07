@@ -32,20 +32,37 @@ export function MediaPickerDialog({
   disabled = false,
   recentAssets,
   onConfirm,
+  kind,
+  selectionLimit,
+  triggerLabel = "Attach media",
+  title = "Attach from the media library",
+  description = "Select images or videos in the order you want them to appear, then save them to this post.",
+  confirmLabel = "Save to post",
+  confirmDescription = "Saves your selection and current draft changes.",
 }: {
   attachedIds: string[];
   disabled?: boolean;
   recentAssets: MediaAssetView[];
   onConfirm: (assets: MediaAssetView[]) => Promise<MediaPickerSaveResult>;
+  kind?: "image" | "video";
+  selectionLimit?: 1;
+  triggerLabel?: string;
+  title?: string;
+  description?: string;
+  confirmLabel?: string;
+  confirmDescription?: string;
 }) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const saveInFlight = useRef(false);
-  const pages = useMediaLibraryPages();
+  const pages = useMediaLibraryPages(kind);
   const library = mergeMediaAssets(recentAssets, pages.assets);
-  const available = library.filter((asset) => !attachedIds.includes(asset.id));
+  const available = library.filter(
+    (asset) =>
+      !attachedIds.includes(asset.id) && (!kind || asset.kind === kind),
+  );
 
   function toggle(assetId: string) {
     if (saveInFlight.current) return;
@@ -53,7 +70,9 @@ export function MediaPickerDialog({
     setSelectedIds((current) =>
       current.includes(assetId)
         ? current.filter((id) => id !== assetId)
-        : [...current, assetId],
+        : selectionLimit === 1
+          ? [assetId]
+          : [...current, assetId],
     );
   }
 
@@ -109,18 +128,15 @@ export function MediaPickerDialog({
         render={<Button size="sm" variant="outline" />}
       >
         <ImagePlusIcon />
-        Attach media
+        {triggerLabel}
       </DialogTrigger>
       <DialogContent
         className="flex flex-col overflow-hidden sm:max-w-3xl"
         showCloseButton={!saving}
       >
         <DialogHeader className="shrink-0">
-          <DialogTitle>Attach from the media library</DialogTitle>
-          <DialogDescription>
-            Select images or videos in the order you want them to appear, then
-            save them to this post.
-          </DialogDescription>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
         <div className="min-h-0 overflow-y-auto space-y-3">
@@ -201,7 +217,7 @@ export function MediaPickerDialog({
                   : "Select media to attach"}
             </p>
             <p className="text-xs text-muted-foreground">
-              Saves your selection and current draft changes.
+              {confirmDescription}
             </p>
             {saveError ? (
               <p role="alert" className="text-sm text-destructive">
@@ -226,7 +242,7 @@ export function MediaPickerDialog({
               ) : null}
               {saving
                 ? "Saving…"
-                : `Save to post${selectedIds.length > 0 ? ` (${selectedIds.length})` : ""}`}
+                : `${confirmLabel}${selectedIds.length > 0 ? ` (${selectedIds.length})` : ""}`}
             </Button>
           </div>
         </DialogFooter>

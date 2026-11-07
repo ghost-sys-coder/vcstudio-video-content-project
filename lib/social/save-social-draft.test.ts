@@ -4,6 +4,7 @@ const m = vi.hoisted(() => ({
   connections: vi.fn(),
   save: vi.fn(),
   assets: vi.fn(),
+  ready: vi.fn(),
 }));
 vi.mock("@/db/repositories/social-post-destinations.repository", () => ({
   findSocialPostDestinationConnections: m.connections,
@@ -13,6 +14,7 @@ vi.mock("@/db/commands/social-post-commands", () => ({
 }));
 vi.mock("@/db/repositories/media-assets.repository", () => ({
   findDraftAttachableMediaAssets: m.assets,
+  findReadyMediaAssets: m.ready,
 }));
 vi.mock("@/db/repositories/video-render.repository", () => ({
   findPublishableRenders: vi.fn().mockResolvedValue([]),
@@ -34,8 +36,33 @@ beforeEach(() => {
   ]);
   m.save.mockResolvedValue({ outcome: "updated" });
   m.assets.mockResolvedValue([]);
+  m.ready.mockResolvedValue([]);
 });
 describe("shared Social draft destinations", () => {
+  it("rejects foreign, undecoded or unsupported YouTube thumbnail files before saving", async () => {
+    await expect(
+      saveAuthorizedSocialDraft(context, {
+        ...request,
+        youtubeThumbnailAssetId: mcpIds.asset,
+      }),
+    ).rejects.toThrow("ready");
+    m.ready.mockResolvedValue([
+      {
+        kind: "image",
+        contentType: "image/webp",
+        width: 100,
+        height: 100,
+        sizeBytes: 100,
+      },
+    ]);
+    await expect(
+      saveAuthorizedSocialDraft(context, {
+        ...request,
+        youtubeThumbnailAssetId: mcpIds.asset,
+      }),
+    ).rejects.toThrow("JPEG or PNG");
+    expect(m.save).not.toHaveBeenCalled();
+  });
   it("accepts only workspace-validated draft media, including a pending video", async () => {
     m.assets.mockResolvedValue([
       {
