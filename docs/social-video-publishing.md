@@ -46,15 +46,18 @@ Omit `mediaAssetIds` when changing upload details to preserve existing attachmen
 including project renders. An explicit empty array clears the attachments.
 
 `prepare_publication` validates the saved metadata and thumbnail, binds the
-exact metadata and image ETag into the immutable preview, and requires the same
-single-use human approval as other publication. Changes invalidate old previews.
+exact metadata and image ETag into the immutable preview. Manual connections
+require single-use human approval. Owner-enabled autonomous connections use
+`execute_publication` with that operation ID and the same preparation idempotency
+key. Changes invalidate old previews. See [approval settings](mcp-setup.md#optional-autonomous-publishing).
 `get_post` reports the settings, thumbnail ID and per-destination thumbnail outcome.
 
 For an unfinished thumbnail on an uploaded YouTube destination, prepare
 `action: retry_thumbnail` for the current post version and exactly one existing
 connection ID, without a scheduled time. The review shows the existing video ID
-and original selected thumbnail. Approval dispatches finishing only. A model's
-ordinary arguments cannot replace human UI approval.
+and original selected thumbnail. Execution dispatches finishing only and follows
+the connection's saved approval mode. A model's ordinary arguments cannot replace
+human UI approval on a manual connection or enable autonomous permission.
 
 ## TikTok during sandbox/inbox access
 

@@ -2,7 +2,7 @@
 
 ## Optional autonomous publishing
 
-The pending `mcp_autonomous_publishing` release makes the publishing review click
+The `mcp_autonomous_publishing` release makes the publishing review click
 optional for an explicitly authorized connection/workspace. Every existing grant
 defaults to **Require my approval**. In AI connections, a workspace owner selects
 the connection and workspace, grants Publish, chooses **Autonomous publishing**
@@ -39,16 +39,28 @@ clean. Phone/desktop Light/Dark screenshots were inspected, including saved-mode
 persistence and an autonomous preview without a human approval button. The
 generated migration passed isolated PostgreSQL and production-clone checks on
 `br-spring-poetry-ai89in33`: all six business-table counts/fingerprints are
-unchanged and both existing grants remain manual. Production migration and
-web/worker release remain pending explicit approval. No live provider action was
-performed. Exact completion context is retained in ignored
-`.vercel/mcp-autonomy-migration-prepared.json`.
+unchanged and both existing grants remain manual.
+
+After explicit user approval, the generated migration and its original Drizzle
+hash/timestamp were applied to production, and only temporary branch
+`br-spring-poetry-ai89in33` was deleted. The six production record fingerprints
+remained unchanged and both existing grants were verified as manual. Web commit
+`cc4d56c` is READY as `dpl_rQAc8JGCwatNpPE9u3UThXtYRr4H`, serving
+`vcstudio.veilcode.studio`; matching production Trigger.dev worker `20261107.2`
+deployed successfully as `ay5l2nz6` with environment synchronization skipped.
+Seven live checks passed for public pages, private redirects and MCP OAuth
+discovery/authentication. The existing authenticated MCP connection still works
+and reports `publicationApprovalMode: manual`; the immediate error/fatal log
+scan returned no groups. No connection was switched to autonomy, no live provider
+action was performed and no new scheduled job was added. Refresh client tool
+discovery before using the new execution tool. Exact completion context is
+retained in ignored `.vercel/mcp-autonomy-migration-prepared.json`.
 
 YouTube Social drafts now support explicit upload metadata/disclosures and a
-separate library thumbnail, included in the human approval preview. Thumbnail
+separate library thumbnail, included in the publication preview. Thumbnail
 finishing waits for video processing; `prepare_publication` with
 `action: retry_thumbnail` retries the original thumbnail on an existing uploaded
-video after approval. TikTok remains inbox-only, with final cover selection and
+video using the connection's selected approval mode. TikTok remains inbox-only, with final cover selection and
 posting in TikTok. See [video publishing and release requirements](social-video-publishing.md).
 
 Connection, import/reuse and publication milestones are deployed for controlled
