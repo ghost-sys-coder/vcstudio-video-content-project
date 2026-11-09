@@ -15,8 +15,15 @@ import {
 import { inspectMediaFile } from "@/lib/media/inspect-media-file";
 import { downloadMediaAssetBytes } from "@/lib/storage/media-asset-storage";
 import { downloadSceneAudioBytes } from "@/lib/storage/scene-audio-storage";
+import { storeVideoThumbnail } from "@/lib/media/store-video-thumbnail";
+import { runMediaAssetThumbnail } from "@/lib/media/run-media-asset-thumbnail";
 
 const payloadSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("video_thumbnail"),
+    workspaceId: z.uuid(),
+    mediaAssetId: z.uuid(),
+  }),
   z.object({
     kind: z.literal("media_asset"),
     workspaceId: z.uuid(),
@@ -49,6 +56,7 @@ export const mediaInspectionTask = task({
   run: async (payload: z.infer<typeof payloadSchema>) => {
     const input = payloadSchema.parse(payload);
     const environment = getSceneAudioEnvironment();
+    if (input.kind === "video_thumbnail") return runMediaAssetThumbnail(input);
     if (input.kind === "media_asset") {
       const asset = await findMediaAsset(input);
       if (!asset) throw new Error("MEDIA_ASSET_NOT_FOUND");
@@ -61,6 +69,7 @@ export const mediaInspectionTask = task({
           expectedKind: "video",
           ffprobePath: environment.FFPROBE_PATH,
           ffmpegPath: environment.FFMPEG_PATH,
+          createThumbnail: true,
         });
         if (
           result.metadata.kind !== "video" ||
@@ -68,9 +77,20 @@ export const mediaInspectionTask = task({
             getMediaLibraryEnvironment().MAX_MEDIA_VIDEO_DURATION_SECONDS * 1000
         )
           throw new Error("VIDEO_DURATION_LIMIT_EXCEEDED");
+        let thumbnail;
+        if (result.thumbnail) {
+          try {
+            thumbnail = await storeVideoThumbnail({
+              ...input,
+              thumbnail: result.thumbnail,
+            });
+          } catch {
+            console.warn("Video preview thumbnail could not be stored.");
+          }
+        }
         await completeMediaAssetInspection({
           ...input,
-          metadata: result.metadata,
+          metadata: { ...result.metadata, ...(thumbnail ? { thumbnail } : {}) },
           warnings: result.warnings,
         });
         return { status: "succeeded" as const, warnings: result.warnings };

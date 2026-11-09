@@ -56,6 +56,7 @@ export async function prepareVideoOutput(input: {
     expectedKind: "video",
     ffprobePath: environment.FFPROBE_PATH,
     ffmpegPath: environment.FFMPEG_PATH,
+    createThumbnail: true,
   });
   const metadata = result.metadata;
   if (
@@ -75,6 +76,7 @@ export async function prepareVideoOutput(input: {
   return {
     bytes,
     metadata,
+    thumbnail: result.thumbnail,
     warnings: result.warnings.filter(
       (warning) => !(input.mute && warning === "The video has no audio track."),
     ),

@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { z } from "zod";
+import { extractVideoThumbnail } from "@/lib/media/extract-video-thumbnail";
 import { computeAmplitudeEnvelopeFromPcm } from "@/lib/media/audio-amplitude";
 import { AMPLITUDE_ENVELOPE_SAMPLE_RATE_HZ } from "@/lib/media/amplitude-envelope";
 import {
@@ -86,6 +87,7 @@ export async function inspectMediaFile(input: {
   expectedKind: "audio" | "video";
   ffprobePath: string;
   ffmpegPath: string;
+  createThumbnail?: boolean;
 }): Promise<MediaInspectionResult> {
   const directory = await mkdtemp(join(tmpdir(), "vcstudio-inspection-"));
   const extension = input.extension.replace(/[^a-z0-9]/gi, "") || "bin";
@@ -101,6 +103,8 @@ export async function inspectMediaFile(input: {
         "json",
         "-show_format",
         "-show_streams",
+        "-protocol_whitelist",
+        "file,pipe",
         source,
       ],
       { timeout: 30_000, maxBuffer: 8 * 1024 * 1024, windowsHide: true },
@@ -129,6 +133,20 @@ export async function inspectMediaFile(input: {
         warnings.push(
           "The video uses a variable frame rate; transcode to constant frame rate if a destination rejects it.",
         );
+      let thumbnail: MediaInspectionResult["thumbnail"];
+      if (input.createThumbnail) {
+        try {
+          thumbnail = await extractVideoThumbnail({
+            source,
+            directory,
+            ffmpegPath: input.ffmpegPath,
+            durationMilliseconds: duration,
+          });
+        } catch {
+          // An optional preview must not make a verified video unusable.
+          console.warn("Video preview thumbnail extraction failed.");
+        }
+      }
       return {
         metadata: {
           kind: "video",
@@ -148,6 +166,7 @@ export async function inspectMediaFile(input: {
         },
         warnings,
         amplitudeEnvelope: null,
+        ...(thumbnail ? { thumbnail } : {}),
       };
     }
 

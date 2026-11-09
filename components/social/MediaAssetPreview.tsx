@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 import type { MediaAssetView } from "@/lib/media/media-asset-view";
-import { FilmIcon, Music2Icon } from "lucide-react";
+import { Music2Icon } from "lucide-react";
+import { VideoMediaThumbnail } from "@/components/social/VideoMediaThumbnail";
 
 /**
  * The visual for one library asset, on a checkered swatch so a transparent PNG
@@ -42,17 +43,19 @@ export function MediaAssetPreview({
           height={asset.height ?? undefined}
           src={asset.previewUrl}
         />
+      ) : !controls && asset.kind === "video" ? (
+        <VideoMediaThumbnail
+          key={asset.thumbnailUrl}
+          title={asset.title}
+          thumbnailUrl={asset.thumbnailUrl}
+        />
       ) : !controls ? (
         <div
           aria-label={`${asset.kind === "audio" ? "Audio" : "Video"}: ${asset.title}`}
           className="flex size-full flex-col items-center justify-center gap-2 text-muted-foreground"
           role="img"
         >
-          {asset.kind === "audio" ? (
-            <Music2Icon aria-hidden className="size-8" />
-          ) : (
-            <FilmIcon aria-hidden className="size-8" />
-          )}
+          <Music2Icon aria-hidden className="size-8" />
           <span className="text-xs">
             {asset.kind === "audio" ? "Audio" : "Video"}
           </span>
@@ -70,6 +73,7 @@ export function MediaAssetPreview({
           className="size-full object-contain"
           controls={controls}
           preload="none"
+          poster={asset.thumbnailUrl}
           src={asset.previewUrl}
         >
           <track kind="captions" />

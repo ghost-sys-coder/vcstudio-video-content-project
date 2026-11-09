@@ -27,6 +27,8 @@ export type MediaAssetView = {
   createdAt: string;
   /** Short-lived signed R2 URL. Regenerated on every page load; never stored. */
   previewUrl: string;
+  /** Private JPEG preview; never the video URL disguised as an image. */
+  thumbnailUrl?: string;
   /** A video can be saved in a draft while server-side inspection finishes. */
   inspectionPending?: boolean;
   inspectionFailed?: boolean;
@@ -35,6 +37,7 @@ export type MediaAssetView = {
 export function toMediaAssetView(
   asset: MediaAsset,
   previewUrl: string,
+  thumbnailUrl?: string,
 ): MediaAssetView {
   const availability = mediaAvailability(asset);
   return {
@@ -53,6 +56,7 @@ export function toMediaAssetView(
     originalFileName: asset.originalFileName,
     createdAt: asset.createdAt.toISOString(),
     previewUrl,
+    ...(thumbnailUrl ? { thumbnailUrl } : {}),
     ...(availability.inspectionPending ? { inspectionPending: true } : {}),
     ...(availability.inspectionFailed ? { inspectionFailed: true } : {}),
   };

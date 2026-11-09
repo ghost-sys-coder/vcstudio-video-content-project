@@ -1,5 +1,17 @@
 import { z } from "zod";
 
+export const videoThumbnailSchema = z.object({
+  version: z.literal(1),
+  width: z.number().int().positive().max(640),
+  height: z.number().int().positive().max(640),
+  timestampMilliseconds: z.number().int().nonnegative(),
+});
+export type VideoThumbnail = z.infer<typeof videoThumbnailSchema>;
+export const requestVideoThumbnailSchema = z.object({
+  mediaAssetId: z.uuid(),
+  requestId: z.uuid(),
+});
+
 export const projectVisualMediaSchema = z.enum(["image", "video"]);
 export type ProjectVisualMedia = z.infer<typeof projectVisualMediaSchema>;
 

@@ -108,6 +108,7 @@ export type PostAttachmentView = {
 export function toPostAttachmentView(
   attachment: SocialPostAttachment,
   previewUrl: string,
+  thumbnailUrl?: string,
 ): PostAttachmentView {
   return {
     asset: {
@@ -124,6 +125,7 @@ export function toPostAttachmentView(
       originalFileName: attachment.originalFileName,
       createdAt: attachment.createdAt.toISOString(),
       previewUrl,
+      ...(thumbnailUrl ? { thumbnailUrl } : {}),
       ...(attachment.inspectionPending ? { inspectionPending: true } : {}),
       ...(attachment.inspectionFailed ? { inspectionFailed: true } : {}),
     },

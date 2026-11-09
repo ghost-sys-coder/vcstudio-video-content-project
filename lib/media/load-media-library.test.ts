@@ -15,6 +15,7 @@ vi.mock("@/lib/storage/media-asset-storage", () => ({
 }));
 import { loadMediaLibrary, loadMediaLibraryPage } from "./load-media-library";
 import { decodeLibraryCursor, encodeLibraryCursor } from "./library-cursor";
+import { verifiedVideoMetadataSchema } from "./media-inspection";
 
 function asset(index: number): MediaAsset {
   return {
@@ -52,6 +53,42 @@ beforeEach(() => {
   mocks.sign.mockImplementation(async (key: string) => `signed:${key}`);
 });
 describe("bounded media library loading", () => {
+  it("signs a separate JPEG only for ready videos with a persisted thumbnail", async () => {
+    const video = {
+      ...asset(1),
+      kind: "video" as const,
+      verifiedMetadata: verifiedVideoMetadataSchema.parse({
+        kind: "video",
+        durationMilliseconds: 8000,
+        container: "mp4",
+        codec: "h264",
+        width: 1920,
+        height: 1080,
+        displayWidth: 1920,
+        displayHeight: 1080,
+        rotationDegrees: 0,
+        averageFrameRate: 30,
+        variableFrameRate: false,
+        hasAudio: false,
+        audioCodec: null,
+        thumbnail: {
+          version: 1,
+          width: 640,
+          height: 360,
+          timestampMilliseconds: 1000,
+        },
+      }),
+    };
+    mocks.window.mockResolvedValue([video]);
+    const page = await loadMediaLibraryPage({ workspaceId: video.workspaceId });
+    expect(page.assets[0]).toMatchObject({
+      previewUrl: "signed:private/1.png",
+      thumbnailUrl: `signed:workspaces/${video.workspaceId}/library/${video.id}/poster-v1.jpg`,
+    });
+    expect(mocks.sign).toHaveBeenCalledTimes(2);
+    expect(page.assets[0]).not.toHaveProperty("objectKey");
+    expect(page.assets[0]?.verifiedMetadata).not.toHaveProperty("objectKey");
+  });
   it("avoids a total-count query for picker pages", async () => {
     mocks.window.mockResolvedValue([asset(1)]);
     expect(

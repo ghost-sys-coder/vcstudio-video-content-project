@@ -15,6 +15,7 @@ import {
   encodeLibraryCursor,
 } from "@/lib/media/library-cursor";
 import { MEDIA_LIBRARY_PAGE_SIZE } from "@/lib/media/library-navigation";
+import { mediaAssetThumbnailKey } from "@/lib/media/video-thumbnail";
 
 export type MediaLibraryPageView = {
   assets: MediaAssetView[];
@@ -72,12 +73,16 @@ export async function loadMediaLibraryPage(
   if (cursor?.direction === "previous") assets.reverse();
 
   const views = await Promise.all(
-    assets.map(async (asset) =>
-      toMediaAssetView(
+    assets.map(async (asset) => {
+      const thumbnailKey = mediaAssetThumbnailKey(asset);
+      return toMediaAssetView(
         asset,
         await createMediaAssetDownloadUrl(asset.objectKey),
-      ),
-    ),
+        thumbnailKey
+          ? await createMediaAssetDownloadUrl(thumbnailKey)
+          : undefined,
+      );
+    }),
   );
 
   return {

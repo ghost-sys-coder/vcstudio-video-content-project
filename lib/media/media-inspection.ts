@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { videoThumbnailSchema } from "@studio/contracts/video";
 
 const commonMetadataSchema = z.object({
   durationMilliseconds: z.number().int().positive(),
@@ -26,6 +27,7 @@ export const verifiedVideoMetadataSchema = commonMetadataSchema.extend({
   variableFrameRate: z.boolean(),
   hasAudio: z.boolean(),
   audioCodec: z.string().min(1).nullable(),
+  thumbnail: videoThumbnailSchema.optional(),
 });
 
 export const verifiedMediaMetadataSchema = z.discriminatedUnion("kind", [
@@ -39,6 +41,12 @@ export type MediaInspectionResult = {
   metadata: VerifiedMediaMetadata;
   warnings: string[];
   amplitudeEnvelope: number[] | null;
+  thumbnail?: {
+    bytes: Buffer;
+    width: number;
+    height: number;
+    timestampMilliseconds: number;
+  };
 };
 
 export function analyzePcmQuality(pcm: Buffer): {

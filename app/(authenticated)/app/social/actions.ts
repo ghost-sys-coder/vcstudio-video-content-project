@@ -17,6 +17,7 @@ import {
   updateMediaAssetSchema,
 } from "@/lib/schemas/media-asset";
 import { createMediaAssetDownloadUrl } from "@/lib/storage/media-asset-storage";
+import { mediaAssetThumbnailKey } from "@/lib/media/video-thumbnail";
 
 export type UpdateMediaAssetResult =
   { ok: true; asset: MediaAssetView } | { ok: false; error: string };
@@ -59,7 +60,17 @@ export async function updateMediaAssetAction(
 
     revalidatePath("/app/social/library");
     const previewUrl = await createMediaAssetDownloadUrl(asset.objectKey);
-    return { ok: true, asset: toMediaAssetView(asset, previewUrl) };
+    const thumbnailKey = mediaAssetThumbnailKey(asset);
+    return {
+      ok: true,
+      asset: toMediaAssetView(
+        asset,
+        previewUrl,
+        thumbnailKey
+          ? await createMediaAssetDownloadUrl(thumbnailKey)
+          : undefined,
+      ),
+    };
   } catch {
     return { ok: false, error: "Those details could not be saved." };
   }

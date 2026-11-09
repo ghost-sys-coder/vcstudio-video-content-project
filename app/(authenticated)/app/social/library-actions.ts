@@ -9,6 +9,7 @@ import {
 } from "@/lib/media/media-asset-view";
 import { createMediaAssetDownloadUrl } from "@/lib/storage/media-asset-storage";
 import { mediaAvailability } from "@/lib/media/media-availability";
+import { mediaAssetThumbnailKey } from "@/lib/media/video-thumbnail";
 import {
   loadMediaLibraryPage,
   type MediaLibraryPageView,
@@ -86,7 +87,17 @@ export async function getPostMediaStatusAction(
     const previewUrl = mediaAvailability(asset).ready
       ? await createMediaAssetDownloadUrl(asset.objectKey)
       : "";
-    return { ok: true, asset: toMediaAssetView(asset, previewUrl) };
+    const thumbnailKey = mediaAssetThumbnailKey(asset);
+    return {
+      ok: true,
+      asset: toMediaAssetView(
+        asset,
+        previewUrl,
+        thumbnailKey
+          ? await createMediaAssetDownloadUrl(thumbnailKey)
+          : undefined,
+      ),
+    };
   } catch {
     return {
       ok: false,

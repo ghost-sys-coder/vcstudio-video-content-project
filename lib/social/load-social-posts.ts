@@ -166,6 +166,11 @@ export async function loadSocialPostComposerView(input: {
           attachment.inspectionFailed
           ? ""
           : await createMediaAssetDownloadUrl(attachment.objectKey),
+        attachment.thumbnailObjectKey &&
+          !attachment.inspectionPending &&
+          !attachment.inspectionFailed
+          ? await createMediaAssetDownloadUrl(attachment.thumbnailObjectKey)
+          : undefined,
       ),
     ),
   );

@@ -90,6 +90,7 @@ export async function listSocialPostMedia(input: {
         kind: mediaAssets.kind,
         status: mediaAssets.status,
         inspectionStatus: mediaAssets.inspectionStatus,
+        verifiedMetadata: mediaAssets.verifiedMetadata,
         objectKey: mediaAssets.objectKey,
         contentType: mediaAssets.contentType,
         sizeBytes: mediaAssets.sizeBytes,
@@ -143,6 +144,7 @@ export async function listSocialPostMedia(input: {
     if (row.asset)
       attachments.push(
         toLibraryAttachment({
+          workspaceId: input.workspaceId,
           linkId: row.link.id,
           position: row.link.position,
           asset: row.asset,

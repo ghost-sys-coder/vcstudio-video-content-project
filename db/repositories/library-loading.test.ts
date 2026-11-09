@@ -103,6 +103,8 @@ describe("post media batch query", () => {
       postId: "post",
       assetId: "asset",
       assetKind: "image",
+      assetStatus: "ready",
+      assetInspectionStatus: null,
       assetDeletedAt: null,
       assetObjectKey: "private/first.png",
       renderId: null,

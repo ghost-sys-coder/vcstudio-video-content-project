@@ -1,9 +1,46 @@
 import "server-only";
 
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import {
+  videoThumbnailSchema,
+  type VideoThumbnail,
+} from "@studio/contracts/video";
 import { getDatabase } from "@/db/drizzle";
 import { mediaAssets, sceneAudioGenerations } from "@/db/schema";
 import type { VerifiedMediaMetadata } from "@/lib/media/media-inspection";
+
+/** Atomically add a derived preview, preserving current inspection metadata and asset state. */
+export async function saveMediaAssetThumbnail(input: {
+  workspaceId: string;
+  mediaAssetId: string;
+  metadata: VerifiedMediaMetadata;
+  thumbnail: VideoThumbnail;
+}) {
+  if (input.metadata.kind !== "video")
+    throw new Error("VIDEO_METADATA_REQUIRED");
+  const thumbnail = videoThumbnailSchema.parse(input.thumbnail);
+  const result = await getDatabase()
+    .update(mediaAssets)
+    .set({
+      verifiedMetadata: sql`coalesce(${mediaAssets.verifiedMetadata}, ${JSON.stringify(input.metadata)}::jsonb) || ${JSON.stringify({ thumbnail })}::jsonb`,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(mediaAssets.id, input.mediaAssetId),
+        eq(mediaAssets.workspaceId, input.workspaceId),
+        eq(mediaAssets.kind, "video"),
+        eq(mediaAssets.status, "ready"),
+        isNull(mediaAssets.deletedAt),
+        or(
+          isNull(mediaAssets.inspectionStatus),
+          eq(mediaAssets.inspectionStatus, "succeeded"),
+        ),
+      ),
+    )
+    .returning({ id: mediaAssets.id });
+  return result.length === 1;
+}
 
 export async function prepareMediaAssetInspection(input: {
   workspaceId: string;

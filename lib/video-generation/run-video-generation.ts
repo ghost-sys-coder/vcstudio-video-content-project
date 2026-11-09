@@ -1,4 +1,5 @@
 import "server-only";
+import { storeVideoThumbnail } from "@/lib/media/store-video-thumbnail";
 import { createHash } from "node:crypto";
 import { prepareVideoReference } from "./prepare-video-reference";
 import { findVideoGeneration } from "@/db/repositories/video-generations.repository";
@@ -270,6 +271,18 @@ export async function runVideoGeneration(
       durationMilliseconds: output.metadata.durationMilliseconds,
       maximumBytes: MAX_VIDEO_BYTES,
     });
+    let thumbnail;
+    if (output.thumbnail) {
+      try {
+        thumbnail = await storeVideoThumbnail({
+          workspaceId: job.workspaceId,
+          mediaAssetId: assetId,
+          thumbnail: output.thumbnail,
+        });
+      } catch {
+        console.warn("Generated video preview thumbnail could not be stored.");
+      }
+    }
     await saveGeneratedVideoAsset({
       ...input,
       assetId,
@@ -277,7 +290,7 @@ export async function runVideoGeneration(
       sizeBytes: output.bytes.byteLength,
       title: job.request.title,
       userId: job.requestedByUserId,
-      metadata: output.metadata,
+      metadata: { ...output.metadata, ...(thumbnail ? { thumbnail } : {}) },
       warnings: output.warnings,
       actualCostCents,
     });

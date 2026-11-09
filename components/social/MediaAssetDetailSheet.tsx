@@ -5,6 +5,7 @@ import { Loader2Icon } from "lucide-react";
 import { updateMediaAssetAction } from "@/app/(authenticated)/app/social/actions";
 import { MediaAssetDeleteDialog } from "@/components/social/MediaAssetDeleteDialog";
 import { MediaAssetPreview } from "@/components/social/MediaAssetPreview";
+import { VideoThumbnailAction } from "@/components/social/VideoThumbnailAction";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -98,6 +99,16 @@ export function MediaAssetDetailSheet({
             asset={asset}
             className="flex max-h-64 items-center justify-center overflow-hidden rounded-lg border bg-muted"
           />
+          {asset.kind === "video" &&
+          canEdit &&
+          !asset.inspectionPending &&
+          !asset.inspectionFailed ? (
+            <VideoThumbnailAction
+              key={asset.id}
+              asset={asset}
+              onUpdated={onUpdated}
+            />
+          ) : null}
 
           {(asset.inspectionWarnings?.length ?? 0) > 0 ? (
             <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">

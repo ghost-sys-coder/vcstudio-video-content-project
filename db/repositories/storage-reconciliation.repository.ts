@@ -1,4 +1,5 @@
 import "server-only";
+import { videoThumbnailReference } from "@/lib/media/video-thumbnail";
 
 import { and, asc, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
@@ -232,10 +233,12 @@ export async function listSuccessfulAssetHealthCandidates(input: {
 export async function isStorageObjectReferenced(
   objectKey: string,
 ): Promise<boolean> {
+  const thumbnail = videoThumbnailReference(objectKey);
   const result = await getDatabase().execute<{ present: boolean }>(sql`
     select exists (
       select 1 from storage_objects where object_key = ${objectKey}
       union all select 1 from media_assets where object_key = ${objectKey}
+      union all select 1 from media_assets where workspace_id = ${thumbnail?.workspaceId ?? null}::uuid and id = ${thumbnail?.mediaAssetId ?? null}::uuid and kind = 'video' and verified_metadata->'thumbnail'->>'version' = '1'
       union all select 1 from character_reference_assets where object_key = ${objectKey}
       union all select 1 from scene_image_generations where asset_object_key = ${objectKey}
       union all select 1 from scene_audio_generations where asset_object_key = ${objectKey}

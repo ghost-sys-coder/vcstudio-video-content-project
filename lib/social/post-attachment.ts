@@ -1,5 +1,6 @@
 import type { MediaAsset, MediaAssetKind, VideoRender } from "@/db/schema";
 import { mediaAvailability } from "@/lib/media/media-availability";
+import { mediaAssetThumbnailKey } from "@/lib/media/video-thumbnail";
 
 type LibraryAttachmentAsset = Pick<
   MediaAsset,
@@ -18,7 +19,8 @@ type LibraryAttachmentAsset = Pick<
   | "originalFileName"
   | "createdAt"
   | "deletedAt"
->;
+> &
+  Partial<Pick<MediaAsset, "verifiedMetadata">>;
 type RenderAttachmentAsset = Pick<
   VideoRender,
   | "id"
@@ -71,6 +73,7 @@ export type SocialPostAttachment = {
   unavailable: boolean;
   inspectionPending?: boolean;
   inspectionFailed?: boolean;
+  thumbnailObjectKey?: string;
 };
 
 /**
@@ -117,11 +120,19 @@ export function buildRenderAttachmentTitle(
 }
 
 export function toLibraryAttachment(input: {
+  workspaceId?: string;
   linkId: string;
   position: number;
   asset: LibraryAttachmentAsset;
 }): SocialPostAttachment {
   const availability = mediaAvailability(input.asset);
+  const thumbnailKey = input.workspaceId
+    ? mediaAssetThumbnailKey({
+        ...input.asset,
+        workspaceId: input.workspaceId,
+        verifiedMetadata: input.asset.verifiedMetadata ?? null,
+      })
+    : null;
   return {
     linkId: input.linkId,
     position: input.position,
@@ -142,6 +153,7 @@ export function toLibraryAttachment(input: {
     originalFileName: input.asset.originalFileName,
     createdAt: input.asset.createdAt,
     unavailable: input.asset.deletedAt !== null || !availability.ready,
+    ...(thumbnailKey ? { thumbnailObjectKey: thumbnailKey } : {}),
     ...(availability.inspectionPending ? { inspectionPending: true } : {}),
     ...(availability.inspectionFailed ? { inspectionFailed: true } : {}),
   };
