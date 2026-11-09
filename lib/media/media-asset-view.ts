@@ -32,6 +32,7 @@ export type MediaAssetView = {
   /** A video can be saved in a draft while server-side inspection finishes. */
   inspectionPending?: boolean;
   inspectionFailed?: boolean;
+  inspectionError?: string | null;
 };
 
 export function toMediaAssetView(
@@ -59,5 +60,8 @@ export function toMediaAssetView(
     ...(thumbnailUrl ? { thumbnailUrl } : {}),
     ...(availability.inspectionPending ? { inspectionPending: true } : {}),
     ...(availability.inspectionFailed ? { inspectionFailed: true } : {}),
+    ...(availability.inspectionFailed
+      ? { inspectionError: asset.inspectionError }
+      : {}),
   };
 }

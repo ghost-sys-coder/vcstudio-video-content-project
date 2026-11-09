@@ -17,6 +17,7 @@ import {
 import { can } from "@/lib/policies/workspace-policy";
 import { decodeLibraryCursor } from "@/lib/media/library-cursor";
 import { mediaPickerQuerySchema } from "@/lib/schemas/media-library";
+import { reconcileMediaInspection } from "@/lib/media/reconcile-media-inspection";
 
 export async function getMediaLibraryPageAction(
   input: unknown,
@@ -66,12 +67,20 @@ export async function getPostMediaStatusAction(
   if (!context || !can(context.activeMembership.role, "composePosts"))
     return { ok: false, error: "You cannot check media in this workspace." };
   try {
-    const asset = await findMediaAsset({
+    let asset = await findMediaAsset({
       workspaceId: context.activeMembership.workspaceId,
       mediaAssetId: parsed.data,
     });
     if (!asset || asset.deletedAt)
       return { ok: false, error: "That media is no longer available." };
+    if (asset.status === "pending" && asset.inspectionTriggerRunId) {
+      asset = await reconcileMediaInspection({
+        workspaceId: context.activeMembership.workspaceId,
+        mediaAssetId: asset.id,
+      });
+      if (!asset || asset.deletedAt)
+        return { ok: false, error: "That media is no longer available." };
+    }
     if (
       asset.status === "pending" &&
       (asset.kind !== "video" ||

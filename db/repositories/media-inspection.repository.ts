@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { getDatabase } from "@/db/drizzle";
 import { mediaAssets, sceneAudioGenerations } from "@/db/schema";
 
@@ -18,6 +18,7 @@ export async function listPendingMediaInspections(limit = 25) {
           eq(mediaAssets.kind, "video"),
           eq(mediaAssets.status, "pending"),
           eq(mediaAssets.inspectionStatus, "pending"),
+          isNull(mediaAssets.deletedAt),
         ),
       )
       .limit(bounded),

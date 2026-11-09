@@ -19,8 +19,8 @@ vi.mock("@/lib/media/inspect-media-file", () => ({
 vi.mock("@/lib/media/store-video-thumbnail", () => ({
   storeVideoThumbnail: m.store,
 }));
-vi.mock("@/lib/storage/media-asset-storage", () => ({
-  downloadMediaAssetBytes: m.download,
+vi.mock("@/lib/storage/with-media-asset-file", () => ({
+  withMediaAssetFile: m.download,
 }));
 vi.mock("@/lib/env/server", () => ({
   getMediaLibraryEnvironment: () => ({ MAX_MEDIA_VIDEO_BYTES: 10000 }),
@@ -53,7 +53,10 @@ const thumbnail = {
 beforeEach(() => {
   vi.clearAllMocks();
   m.find.mockResolvedValue(asset);
-  m.download.mockResolvedValue(Buffer.from("video"));
+  m.download.mockImplementation(
+    async (_input: unknown, useFile: (source: string) => Promise<unknown>) =>
+      useFile("/temporary/source.mp4"),
+  );
   m.inspect.mockResolvedValue({
     metadata: { kind: "video", codec: "h264" },
     thumbnail: { bytes: Buffer.from("jpg"), ...thumbnail },

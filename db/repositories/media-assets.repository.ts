@@ -21,6 +21,26 @@ import { MEDIA_LIBRARY_PAGE_SIZE } from "@/lib/media/library-navigation";
 /** Cap on one page of the library grid, so a large workspace cannot fan out. */
 export const MEDIA_ASSET_PAGE_SIZE = 60;
 
+/** Keep transferred but not-yet-usable videos separate from ready picker pages. */
+export async function listOutstandingMediaAssets(input: {
+  workspaceId: string;
+}) {
+  return getDatabase()
+    .select()
+    .from(mediaAssets)
+    .where(
+      and(
+        eq(mediaAssets.workspaceId, input.workspaceId),
+        eq(mediaAssets.kind, "video"),
+        isNull(mediaAssets.deletedAt),
+        inArray(mediaAssets.status, ["pending", "failed"]),
+        inArray(mediaAssets.inspectionStatus, ["pending", "running", "failed"]),
+      ),
+    )
+    .orderBy(desc(mediaAssets.createdAt), desc(mediaAssets.id))
+    .limit(12);
+}
+
 /** Explicit pending or failed video inspections are not ready; legacy null states remain usable. */
 function isReadyMediaAsset() {
   return and(

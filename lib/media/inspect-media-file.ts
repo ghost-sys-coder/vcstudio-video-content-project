@@ -3,7 +3,7 @@ import "server-only";
 import { execFile } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { z } from "zod";
 import { extractVideoThumbnail } from "@/lib/media/extract-video-thumbnail";
@@ -81,19 +81,27 @@ function rotation(stream: z.infer<typeof streamSchema>): number {
   return ((Math.round(value) % 360) + 360) % 360;
 }
 
-export async function inspectMediaFile(input: {
-  bytes: Buffer;
-  extension: string;
-  expectedKind: "audio" | "video";
-  ffprobePath: string;
-  ffmpegPath: string;
-  createThumbnail?: boolean;
-}): Promise<MediaInspectionResult> {
-  const directory = await mkdtemp(join(tmpdir(), "vcstudio-inspection-"));
-  const extension = input.extension.replace(/[^a-z0-9]/gi, "") || "bin";
-  const source = join(directory, `source.${extension}`);
+export async function inspectMediaFile(
+  input: {
+    expectedKind: "audio" | "video";
+    ffprobePath: string;
+    ffmpegPath: string;
+    createThumbnail?: boolean;
+  } & ({ bytes: Buffer; extension: string } | { sourcePath: string }),
+): Promise<MediaInspectionResult> {
+  const directory =
+    "bytes" in input
+      ? await mkdtemp(join(tmpdir(), "vcstudio-inspection-"))
+      : dirname(input.sourcePath);
+  const source =
+    "bytes" in input
+      ? join(
+          directory,
+          `source.${input.extension.replace(/[^a-z0-9]/gi, "") || "bin"}`,
+        )
+      : input.sourcePath;
   try {
-    await writeFile(source, input.bytes);
+    if ("bytes" in input) await writeFile(source, input.bytes);
     const { stdout } = await execFileAsync(
       input.ffprobePath,
       [
@@ -223,8 +231,15 @@ export async function inspectMediaFile(input: {
       amplitudeEnvelope: envelope,
     };
   } finally {
-    await rm(directory, { recursive: true, force: true }).catch(
-      () => undefined,
-    );
+    if ("bytes" in input) {
+      if (
+        dirname(resolve(directory)) !== resolve(tmpdir()) ||
+        !basename(directory).startsWith("vcstudio-inspection-")
+      )
+        throw new Error("TEMPORARY_MEDIA_PATH_INVALID");
+      await rm(directory, { recursive: true, force: true }).catch(() =>
+        console.warn("Temporary inspection file cleanup failed."),
+      );
+    }
   }
 }

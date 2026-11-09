@@ -9,6 +9,7 @@ import {
 } from "@studio/contracts";
 import { listMcpAssets } from "@/db/repositories/mcp-content.repository";
 import { findMediaAsset } from "@/db/repositories/media-assets.repository";
+import { reconcileMediaInspection } from "@/lib/media/reconcile-media-inspection";
 import { findMcpOperation } from "@/db/repositories/mcp.repository";
 import { updateMediaAssetDetails } from "@/db/commands/media-asset-commands";
 import { updateMediaAssetSchema } from "@/lib/schemas/media-asset";
@@ -53,7 +54,7 @@ export function registerAssetTools(register: McpToolRegistrar) {
     mcpWorkspaceInput.extend({ mediaAssetId: z.uuid() }),
     true,
     async (ctx, p) => {
-      const asset = await findMediaAsset({
+      const asset = await reconcileMediaInspection({
         workspaceId: ctx.workspaceId,
         mediaAssetId: p.mediaAssetId,
       });
@@ -70,6 +71,7 @@ export function registerAssetTools(register: McpToolRegistrar) {
         contentType: asset.contentType,
         status: asset.status,
         inspectionStatus: asset.inspectionStatus,
+        inspectionError: asset.inspectionError,
         warnings: asset.inspectionWarnings,
         width: asset.width,
         height: asset.height,

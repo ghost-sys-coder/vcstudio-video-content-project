@@ -10,6 +10,7 @@ import {
 } from "@/lib/rate-limit/rate-limit";
 
 export type RateLimitedOperation =
+  | "media_inspection"
   | "media_thumbnail"
   | "video_generation"
   | "scene_analysis"

@@ -4,6 +4,7 @@ import type { MediaAssetKind } from "@/db/schema";
 import {
   countMediaAssets,
   listMediaAssetWindow,
+  listOutstandingMediaAssets,
 } from "@/db/repositories/media-assets.repository";
 import { createMediaAssetDownloadUrl } from "@/lib/storage/media-asset-storage";
 import {
@@ -25,7 +26,10 @@ export type MediaLibraryPageView = {
   previousCursor?: string | null;
 };
 
-export type MediaLibraryView = MediaLibraryPageView & { total: number };
+export type MediaLibraryView = MediaLibraryPageView & {
+  total: number;
+  processingAssets?: MediaAssetView[];
+};
 
 type MediaLibraryInput = {
   workspaceId: string;
@@ -38,15 +42,22 @@ type MediaLibraryInput = {
 export async function loadMediaLibrary(
   input: MediaLibraryInput,
 ): Promise<MediaLibraryView> {
-  const [page, total] = await Promise.all([
+  const [page, total, processing] = await Promise.all([
     loadMediaLibraryPage(input),
     countMediaAssets({
       workspaceId: input.workspaceId,
       kind: input.kind,
       visualOnly: input.visualOnly,
     }),
+    !input.kind || input.kind === "video"
+      ? listOutstandingMediaAssets({ workspaceId: input.workspaceId })
+      : Promise.resolve([]),
   ]);
-  return { ...page, total };
+  return {
+    ...page,
+    total,
+    processingAssets: processing.map((asset) => toMediaAssetView(asset, "")),
+  };
 }
 
 /**

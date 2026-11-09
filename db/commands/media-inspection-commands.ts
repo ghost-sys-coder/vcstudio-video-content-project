@@ -75,7 +75,7 @@ export async function attachMediaAssetInspectionRun(input: {
   mediaAssetId: string;
   triggerRunId: string;
 }) {
-  await getDatabase()
+  const rows = await getDatabase()
     .update(mediaAssets)
     .set({ inspectionTriggerRunId: input.triggerRunId, updatedAt: new Date() })
     .where(
@@ -83,8 +83,46 @@ export async function attachMediaAssetInspectionRun(input: {
         eq(mediaAssets.workspaceId, input.workspaceId),
         eq(mediaAssets.id, input.mediaAssetId),
         eq(mediaAssets.inspectionStatus, "pending"),
+        or(
+          isNull(mediaAssets.inspectionTriggerRunId),
+          eq(mediaAssets.inspectionTriggerRunId, input.triggerRunId),
+        ),
       ),
-    );
+    )
+    .returning({ id: mediaAssets.id });
+  return rows.length === 1;
+}
+
+/** Claim a failed original for an explicit retry, retaining its file and asset ID. */
+export async function claimMediaAssetInspectionRetry(input: {
+  workspaceId: string;
+  mediaAssetId: string;
+  previousRunId: string | null;
+}) {
+  const [asset] = await getDatabase()
+    .update(mediaAssets)
+    .set({
+      status: "pending",
+      inspectionStatus: "pending",
+      inspectionTriggerRunId: null,
+      inspectionError: null,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(mediaAssets.workspaceId, input.workspaceId),
+        eq(mediaAssets.id, input.mediaAssetId),
+        eq(mediaAssets.kind, "video"),
+        eq(mediaAssets.status, "failed"),
+        eq(mediaAssets.inspectionStatus, "failed"),
+        isNull(mediaAssets.deletedAt),
+        input.previousRunId === null
+          ? isNull(mediaAssets.inspectionTriggerRunId)
+          : eq(mediaAssets.inspectionTriggerRunId, input.previousRunId),
+      ),
+    )
+    .returning();
+  return asset ?? null;
 }
 
 export async function completeMediaAssetInspection(input: {
@@ -126,6 +164,7 @@ export async function failMediaAssetInspection(input: {
   workspaceId: string;
   mediaAssetId: string;
   message: string;
+  expectedRunId?: string | null;
 }) {
   await getDatabase()
     .update(mediaAssets)
@@ -140,6 +179,11 @@ export async function failMediaAssetInspection(input: {
         eq(mediaAssets.workspaceId, input.workspaceId),
         eq(mediaAssets.id, input.mediaAssetId),
         eq(mediaAssets.status, "pending"),
+        input.expectedRunId === undefined
+          ? undefined
+          : input.expectedRunId === null
+            ? isNull(mediaAssets.inspectionTriggerRunId)
+            : eq(mediaAssets.inspectionTriggerRunId, input.expectedRunId),
       ),
     );
 }
@@ -234,6 +278,7 @@ export async function failRecordedAudioInspection(input: {
   projectId: string;
   generationId: string;
   message: string;
+  expectedRunId?: string;
 }) {
   await getDatabase()
     .update(sceneAudioGenerations)
@@ -249,6 +294,13 @@ export async function failRecordedAudioInspection(input: {
         eq(sceneAudioGenerations.projectId, input.projectId),
         eq(sceneAudioGenerations.id, input.generationId),
         eq(sceneAudioGenerations.source, "user_recorded"),
+        inArray(sceneAudioGenerations.inspectionStatus, ["pending", "running"]),
+        input.expectedRunId
+          ? eq(
+              sceneAudioGenerations.inspectionTriggerRunId,
+              input.expectedRunId,
+            )
+          : undefined,
       ),
     );
 }

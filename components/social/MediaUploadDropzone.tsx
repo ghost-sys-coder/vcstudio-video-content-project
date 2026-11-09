@@ -31,12 +31,14 @@ export function MediaUploadDropzone({
   onUploaded,
   onProcessing,
   workspaceId,
+  destination,
 }: {
   maxImageBytes: number;
   maxVideoBytes: number;
   onUploaded: (assets: MediaAssetView[]) => void;
   onProcessing?: (assets: MediaAssetView[]) => void;
   workspaceId: string;
+  destination?: "library" | "post";
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -64,7 +66,7 @@ export function MediaUploadDropzone({
         <UploadCloudIcon aria-hidden className="size-6 text-muted-foreground" />
         <div className="space-y-1">
           <p className="text-sm font-medium">
-            {onProcessing
+            {(destination ?? (onProcessing ? "post" : "library")) === "post"
               ? "Drop images or videos here to add them to this post"
               : "Drop images or videos here to add them to the library"}
           </p>

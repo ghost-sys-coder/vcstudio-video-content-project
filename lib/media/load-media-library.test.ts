@@ -5,10 +5,12 @@ const mocks = vi.hoisted(() => ({
   window: vi.fn(),
   count: vi.fn(),
   sign: vi.fn(),
+  outstanding: vi.fn(),
 }));
 vi.mock("@/db/repositories/media-assets.repository", () => ({
   listMediaAssetWindow: mocks.window,
   countMediaAssets: mocks.count,
+  listOutstandingMediaAssets: mocks.outstanding,
 }));
 vi.mock("@/lib/storage/media-asset-storage", () => ({
   createMediaAssetDownloadUrl: mocks.sign,
@@ -50,9 +52,29 @@ function asset(index: number): MediaAsset {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.count.mockResolvedValue(80);
+  mocks.outstanding.mockResolvedValue([]);
   mocks.sign.mockImplementation(async (key: string) => `signed:${key}`);
 });
 describe("bounded media library loading", () => {
+  it("keeps transferred videos visible without signing their unverified source", async () => {
+    mocks.window.mockResolvedValue([asset(1)]);
+    mocks.outstanding.mockResolvedValue([
+      {
+        ...asset(2),
+        kind: "video",
+        status: "pending",
+        inspectionStatus: "pending",
+      },
+    ]);
+    const view = await loadMediaLibrary({ workspaceId: "authorized" });
+    expect(mocks.outstanding).toHaveBeenCalledExactlyOnceWith({
+      workspaceId: "authorized",
+    });
+    expect(view.processingAssets).toMatchObject([
+      { id: asset(2).id, inspectionPending: true, previewUrl: "" },
+    ]);
+    expect(mocks.sign).toHaveBeenCalledExactlyOnceWith("private/1.png");
+  });
   it("signs a separate JPEG only for ready videos with a persisted thumbnail", async () => {
     const video = {
       ...asset(1),

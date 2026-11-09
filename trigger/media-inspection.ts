@@ -1,10 +1,13 @@
 import { task } from "@trigger.dev/sdk";
 import { z } from "zod";
+import { dirname } from "node:path";
 import {
   completeMediaAssetInspection,
   completeRecordedAudioInspection,
   failMediaAssetInspection,
   failRecordedAudioInspection,
+  saveMediaAssetThumbnail,
+  attachMediaAssetInspectionRun,
 } from "@/db/commands/media-inspection-commands";
 import { findMediaAsset } from "@/db/repositories/media-assets.repository";
 import { findSceneAudioGeneration } from "@/db/repositories/scene-audio.repository";
@@ -13,7 +16,8 @@ import {
   getSceneAudioEnvironment,
 } from "@/lib/env/server";
 import { inspectMediaFile } from "@/lib/media/inspect-media-file";
-import { downloadMediaAssetBytes } from "@/lib/storage/media-asset-storage";
+import { withMediaAssetFile } from "@/lib/storage/with-media-asset-file";
+import { extractVideoThumbnail } from "@/lib/media/extract-video-thumbnail";
 import { downloadSceneAudioBytes } from "@/lib/storage/scene-audio-storage";
 import { storeVideoThumbnail } from "@/lib/media/store-video-thumbnail";
 import { runMediaAssetThumbnail } from "@/lib/media/run-media-asset-thumbnail";
@@ -53,7 +57,31 @@ export const mediaInspectionTask = task({
   queue: { name: "media-processing", concurrencyLimit: 2 },
   retry: { maxAttempts: 2, minTimeoutInMs: 2_000, maxTimeoutInMs: 10_000 },
   maxDuration: 300,
-  run: async (payload: z.infer<typeof payloadSchema>) => {
+  onFailure: async ({
+    payload,
+    ctx,
+  }: {
+    payload: z.infer<typeof payloadSchema>;
+    ctx: { run: { id: string } };
+  }) => {
+    const parsed = payloadSchema.safeParse(payload);
+    if (!parsed.success || parsed.data.kind === "video_thumbnail") return;
+    const message =
+      "Verification stopped unexpectedly. Check the upload status and retry verification.";
+    if (parsed.data.kind === "media_asset")
+      await failMediaAssetInspection({
+        ...parsed.data,
+        message,
+        expectedRunId: ctx.run.id,
+      });
+    else
+      await failRecordedAudioInspection({
+        ...parsed.data,
+        message,
+        expectedRunId: ctx.run.id,
+      });
+  },
+  run: async (payload: z.infer<typeof payloadSchema>, { ctx }) => {
     const input = payloadSchema.parse(payload);
     const environment = getSceneAudioEnvironment();
     if (input.kind === "video_thumbnail") return runMediaAssetThumbnail(input);
@@ -62,41 +90,70 @@ export const mediaInspectionTask = task({
       if (!asset) throw new Error("MEDIA_ASSET_NOT_FOUND");
       if (asset.inspectionStatus === "succeeded")
         return { status: "succeeded" as const };
-      try {
-        const result = await inspectMediaFile({
-          bytes: await downloadMediaAssetBytes(asset.objectKey),
-          extension: extension(asset.contentType),
-          expectedKind: "video",
-          ffprobePath: environment.FFPROBE_PATH,
-          ffmpegPath: environment.FFMPEG_PATH,
-          createThumbnail: true,
-        });
-        if (
-          result.metadata.kind !== "video" ||
-          result.metadata.durationMilliseconds >
-            getMediaLibraryEnvironment().MAX_MEDIA_VIDEO_DURATION_SECONDS * 1000
-        )
-          throw new Error("VIDEO_DURATION_LIMIT_EXCEEDED");
-        let thumbnail;
-        if (result.thumbnail) {
-          try {
-            thumbnail = await storeVideoThumbnail({
-              ...input,
-              thumbnail: result.thumbnail,
-            });
-          } catch {
-            console.warn("Video preview thumbnail could not be stored.");
-          }
-        }
-        await completeMediaAssetInspection({
+      if (asset.deletedAt || asset.status !== "pending")
+        return { status: "failed" as const };
+      if (
+        !(await attachMediaAssetInspectionRun({
           ...input,
-          metadata: { ...result.metadata, ...(thumbnail ? { thumbnail } : {}) },
-          warnings: result.warnings,
-        });
-        return { status: "succeeded" as const, warnings: result.warnings };
+          triggerRunId: ctx.run.id,
+        }))
+      )
+        return { status: "failed" as const };
+      try {
+        return await withMediaAssetFile(
+          {
+            objectKey: asset.objectKey,
+            sizeBytes: asset.sizeBytes,
+            maxBytes: getMediaLibraryEnvironment().MAX_MEDIA_VIDEO_BYTES,
+            contentType: asset.contentType,
+          },
+          async (sourcePath) => {
+            const result = await inspectMediaFile({
+              sourcePath,
+              expectedKind: "video",
+              ffprobePath: environment.FFPROBE_PATH,
+              ffmpegPath: environment.FFMPEG_PATH,
+            });
+            if (
+              result.metadata.kind !== "video" ||
+              result.metadata.durationMilliseconds >
+                getMediaLibraryEnvironment().MAX_MEDIA_VIDEO_DURATION_SECONDS *
+                  1000
+            )
+              throw new Error("VIDEO_DURATION_LIMIT_EXCEEDED");
+            await completeMediaAssetInspection({
+              ...input,
+              metadata: result.metadata,
+              warnings: result.warnings,
+            });
+            // Readiness is committed before optional thumbnail work begins.
+            try {
+              const thumbnail = await storeVideoThumbnail({
+                ...input,
+                thumbnail: await extractVideoThumbnail({
+                  source: sourcePath,
+                  directory: dirname(sourcePath),
+                  ffmpegPath: environment.FFMPEG_PATH,
+                  durationMilliseconds: result.metadata.durationMilliseconds,
+                }),
+              });
+              await saveMediaAssetThumbnail({
+                ...input,
+                metadata: result.metadata,
+                thumbnail,
+              });
+            } catch {
+              console.warn(
+                "Video is ready; optional preview thumbnail could not be created.",
+              );
+            }
+            return { status: "succeeded" as const, warnings: result.warnings };
+          },
+        );
       } catch {
         await failMediaAssetInspection({
           ...input,
+          expectedRunId: ctx.run.id,
           message:
             "The uploaded video is malformed or uses an unsupported container or codec.",
         });

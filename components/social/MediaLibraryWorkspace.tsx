@@ -7,6 +7,8 @@ import { MediaKindFilter } from "@/components/social/MediaKindFilter";
 import { MediaLibraryGrid } from "@/components/social/MediaLibraryGrid";
 import { MediaLibraryPagination } from "@/components/social/MediaLibraryPagination";
 import { MediaUploadDropzone } from "@/components/social/MediaUploadDropzone";
+import { MediaInspectionQueue } from "@/components/social/MediaInspectionQueue";
+import { useLibraryInspectionQueue } from "@/hooks/useLibraryInspectionQueue";
 import type { MediaAssetView } from "@/lib/media/media-asset-view";
 import type { MediaLibraryView } from "@/lib/media/load-media-library";
 
@@ -33,6 +35,18 @@ export function MediaLibraryWorkspace({
 }) {
   const [assets, setAssets] = useState<MediaAssetView[]>(view.assets);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const inspections = useLibraryInspectionQueue({
+    initialAssets: view.processingAssets ?? [],
+    onReady: (ready) =>
+      setAssets((current) => [
+        ...ready.filter(
+          (asset) =>
+            (view.kind === null || asset.kind === view.kind) &&
+            !current.some((item) => item.id === asset.id),
+        ),
+        ...current,
+      ]),
+  });
 
   const selected = assets.find((asset) => asset.id === selectedId) ?? null;
   const hiddenCount = Math.max(view.total - assets.length, 0);
@@ -52,6 +66,8 @@ export function MediaLibraryWorkspace({
 
       {canEdit ? (
         <MediaUploadDropzone
+          destination="library"
+          onProcessing={inspections.add}
           maxImageBytes={maxImageBytes}
           maxVideoBytes={maxVideoBytes}
           onUploaded={(uploaded) =>
@@ -68,8 +84,22 @@ export function MediaLibraryWorkspace({
         />
       ) : null}
 
+      <MediaInspectionQueue
+        items={inspections.items}
+        error={inspections.error}
+        busyId={inspections.busyId}
+        onCheck={inspections.check}
+        onRetry={inspections.retry}
+      />
+
       {assets.length === 0 ? (
-        <EmptyMediaLibraryState filtered={view.kind !== null} />
+        inspections.items.length > 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Verified videos will appear here when ready.
+          </p>
+        ) : (
+          <EmptyMediaLibraryState filtered={view.kind !== null} />
+        )
       ) : (
         <>
           <MediaLibraryGrid
