@@ -50,6 +50,7 @@ import { setMcpPendingAssetSize } from "@/db/repositories/mcp.repository";
 import { freezeMcpUpload } from "./storage-integrity";
 import { recordAuditEvent } from "@/lib/audit/record-audit-event";
 import { updateMediaAssetDetails } from "@/db/commands/media-asset-commands";
+import { runMcpChunkImport } from "./chunk-upload-worker";
 
 export async function startMcpImport(
   context: McpContext,
@@ -125,7 +126,7 @@ export async function startMcpImport(
       });
       throw new McpError(
         "worker_unavailable",
-        "The import worker is unavailable. Use the upload handoff instead.",
+        "The import worker is unavailable. Use the MCP upload panel or retry later.",
       );
     }
   }
@@ -149,6 +150,7 @@ export async function authorizeMcpUpload(
   });
   requireMcp(
     op?.kind === "import_asset" &&
+      op.input.sourceKind === "upload" &&
       op.status === "awaiting_upload" &&
       op.expiresAt > new Date(),
     "expired",
@@ -399,8 +401,19 @@ export async function runMcpImport(workspaceId: string, operationId: string) {
     from: ["queued"],
     values: { status: "running" },
   });
-  if (!claimed?.sealedSource) return;
+  if (!claimed) return;
   try {
+    if (claimed.input.sourceKind === "mcp_upload") {
+      await runMcpChunkImport(context, claimed, () =>
+        finishMcpImport(context, claimed.id),
+      );
+      return;
+    }
+    requireMcp(
+      claimed.sealedSource,
+      "invalid_file",
+      "This import has no download source.",
+    );
     const source = openSecret({
       sealed: claimed.sealedSource,
       key: getPublishingEnvironment().PLATFORM_TOKEN_ENCRYPTION_KEY,

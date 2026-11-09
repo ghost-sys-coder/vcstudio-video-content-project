@@ -22,6 +22,7 @@ const applicationCss = (
 for (const [name, entry] of [
   ["harness", "e2e/mcp/fixtures/entry.tsx"],
   ["host", "e2e/mcp/fixtures/host.ts"],
+  ["upload-host", "e2e/mcp/fixtures/upload-host.ts"],
   ["waitlist", "e2e/mcp/fixtures/waitlist-entry.tsx"],
   ["post-composer", "e2e/mcp/fixtures/post-composer-entry.tsx"],
   ["operations", "e2e/mcp/fixtures/operations-entry.tsx"],
@@ -159,6 +160,8 @@ const server = createServer(async (req, res) => {
   }
   const allowed = {
     "/host.html": path.join(out, "host.html"),
+    "/upload-host.html": path.join(out, "upload-host.html"),
+    "/upload.html": path.resolve("public/mcp/upload.html"),
     "/harness.html": path.join(out, "harness.html"),
     "/review.html": path.resolve("public/mcp/review.html"),
     "/waitlist.html": path.join(out, "waitlist.html"),

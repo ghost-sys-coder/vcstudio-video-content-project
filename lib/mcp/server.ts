@@ -39,14 +39,16 @@ import {
 import { getPublishingEnvironment } from "@/lib/env/server";
 import { roleAllowsScope } from "./policy";
 import { effectivePublicationApprovalMode } from "./publication-approval-policy";
+import { MCP_SERVER_VERSION } from "@studio/contracts/mcp-upload";
+import { registerUploadTools } from "./register-upload-tools";
 
 const REVIEW_URI = "ui://vcstudio/publication-review.html";
 export function createVcStudioMcpServer(principal: McpPrincipal) {
   const server = new McpServer(
-    { name: "VCStudio", version: "1.0.0" },
+    { name: "VCStudio", version: MCP_SERVER_VERSION },
     {
       instructions:
-        "Use get_connection first and an explicitly granted workspaceId on every action. Read current revisions before edits. Imports never approve media or publish. Check get_capabilities for publicationApprovalMode. prepare_publication only prepares an immutable preview. Manual connections require human review; owner-authorized autonomous connections may call execute_publication with the prepared operation ID and the same idempotency key. Never fabricate file access, approval proof, success or a supported platform. Internal approvals stay explicit. Marketing is paused. AI generation and administration are unavailable. Reuse idempotency keys when retrying the same action.",
+        "Use get_connection first and an explicitly granted workspaceId on every action. Prefer MCP tools for application work; never replace available MCP upload, edit, publish or schedule actions with browser automation. For files use import_chat_file when a real native reference is available, import_asset for authorized HTTPS downloads, or open_media_upload for an in-chat picker; programmatic clients can use start_media_upload, append_media_upload, complete_media_upload. A remote server cannot read local/sandbox paths; do not fabricate file bytes or paste large base64 strings into reasoning. Imports never approve media or publish. Check get_capabilities for publicationApprovalMode. prepare_publication only prepares an immutable preview. Manual connections require human review; owner-authorized autonomous connections may call execute_publication with the prepared operation ID and the same idempotency key. If required tools are missing, refresh connector discovery rather than using Chrome. Internal approvals stay explicit. Marketing is paused. AI generation and administration are unavailable. Reuse idempotency keys when retrying the same action.",
     },
   );
   const register = createToolRegistrar(server, principal);
@@ -74,6 +76,20 @@ export function createVcStudioMcpServer(principal: McpPrincipal) {
           setupUrl: `${mcpBaseUrl()}/app/settings/mcp`,
           marketing: "paused",
           generation: "not_exposed",
+          serverVersion: MCP_SERVER_VERSION,
+          requiredTransferTools: [
+            "import_chat_file",
+            "open_media_upload",
+            "start_media_upload",
+            "append_media_upload",
+            "complete_media_upload",
+          ],
+          requiredPublicationTools: [
+            "prepare_publication",
+            "execute_publication",
+          ],
+          discovery:
+            "If these tools are missing from this client's tool list, refresh the connector and start a new conversation. Do not use browser automation as a substitute.",
         });
       } catch (e) {
         return toolError(e);
@@ -162,6 +178,8 @@ export function createVcStudioMcpServer(principal: McpPrincipal) {
         tiktokDirectPost: false,
       },
       transfers: [
+        "mcp_chunk_upload",
+        "in_chat_upload_when_supported",
         "client_file_reference_when_supported",
         "public_https_download",
         "signed_in_upload_handoff",
@@ -171,6 +189,9 @@ export function createVcStudioMcpServer(principal: McpPrincipal) {
         publicationApprovalMode: ctx.grant.publicationApprovalMode,
         role: ctx.membership.role,
       }),
+      serverVersion: MCP_SERVER_VERSION,
+      publicationExecution:
+        "prepare_publication_then_execute_publication_for_autonomous_grants",
     }),
   );
   registerAssetTools(register);
@@ -294,5 +315,6 @@ export function createVcStudioMcpServer(principal: McpPrincipal) {
       ],
     }),
   );
+  registerUploadTools(server, register, principal);
   return server;
 }

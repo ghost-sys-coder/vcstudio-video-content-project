@@ -1,5 +1,77 @@
 # VCStudio MCP v1 setup and verification
 
+## Browser-free upload implementation — 9 November 2026
+
+The follow-up release adds an in-chat MCP upload panel and focused
+start/append/status/complete/cancel tools, with bounded immutable R2 chunks and the
+existing import/inspection worker. It addresses the earlier transfer gap without
+requiring Claude network access to R2 or browser automation. Server version `1.1.0`
+and fresh discovery instructions distinguish the new tools from older cached
+connectors. Native file references and HTTPS imports remain supported.
+
+See [the upload protocol, security model and client instructions](mcp-media-upload.md).
+Opening the panel is read-only; the user selects the original inside chat, while a
+programmatic client with actual file access can use the chunk tools directly.
+This does not grant a remote server arbitrary access to an unshared local folder.
+The original assessment below is a dated pre-implementation record. Deployment
+and actual-client acceptance are recorded separately from local verification.
+
+## Video transfer and autonomous publication check — 9 November 2026
+
+A read-only production check confirmed that the owner's active ChatGPT and Claude
+connections both grant Read/Edit/Media/Review/Publish in VeilCode Studio and both
+save `publicationApprovalMode: autonomous`. The live ChatGPT `get_capabilities`
+response independently confirms autonomous mode. No approval setting was changed.
+For eligible destinations, `prepare_publication` followed by
+`execute_publication` with the operation ID and the same idempotency key does not
+require VCStudio's human review panel. Client-side tool permissions remain
+independent. TikTok is still inbox-only, with final publication in TikTok.
+
+The ChatGPT tool definitions exposed to the checking session were older than the
+deployed server: they retained manual-only instructions and omitted
+`execute_publication`. The live capabilities and deployed server support autonomy;
+refresh/reconnect tool discovery before using it. Do not use browser automation as
+a substitute for an available MCP publication or scheduling tool. This check did
+not execute any real publication or schedule.
+
+A tiny local synthetic MP4 was transferred successfully using
+`import_chat_file` with an absolute workspace path through this session's native
+file adapter. Operation/asset `156b23c0-3b47-46bb-82e8-127dcaf5c1ff` succeeded.
+`get_operation`, `get_asset` and a bounded verification query confirmed a ready
+H.264 video, 320 × 180, 1,000 ms and 2,266 bytes, with background inspection
+`succeeded`. Its saved transfer path is `file`, and temporary download credentials
+were erased. The intentional lack of audio produces one harmless inspection
+warning. The asset is titled **MCP native video transfer check — synthetic
+1-second clip** and remains in the library as evidence. No browser upload page,
+browser automation, AI generation or new worker deployment was used. The existing
+on-demand import and inspection workers processed only this small test asset.
+
+This proves the current connected ChatGPT session's file adapter, not universal
+filesystem access in ordinary ChatGPT web/desktop chats, every chat-generated
+video, or large-file limits. The client must expose the original file/reference.
+MCP carries that reference; authorized HTTPS transfers carry the video bytes to
+private storage without putting the binary into model context. OpenAI documents
+file parameters and optional file helpers in its
+[file interfaces](https://developers.openai.com/plugins/reference#file-apis).
+
+Claude can use `import_asset` for a usable authorized HTTPS video URL without a
+browser, but native Claude chat-file/local-folder transfer has not been proven.
+The present upload handoff uses signed-in browser routes; it is not an
+OAuth-authenticated MCP upload-session tool. A plain `C:\\...` or `sandbox:/...`
+path is not remotely downloadable. A complete local-folder workflow needs a
+permitted local uploader/bridge plus MCP upload authorization/completion, or a
+client-supplied real downloadable file reference. No Claude-specific local uploader
+is implemented in this repository. Anthropic distinguishes remote connectors from
+local filesystem extensions in its
+[connector guidance](https://support.claude.com/en/articles/11725091-when-to-use-desktop-and-web-connectors).
+
+All 89 focused MCP protocol/import/streaming/SSRF/publication/approval/draft tests
+passed during this check. The synthetic clip was encoded locally with the
+existing Remotion FFmpeg binary; its trimmed build required PNG input rather than
+lavfi/rawvideo. Application code, environment values, migrations and deployment
+were unchanged. Do not treat this as a live autonomous video-publication test or
+as verification of Claude's local transfer.
+
 ## Optional autonomous publishing
 
 The `mcp_autonomous_publishing` release makes the publishing review click

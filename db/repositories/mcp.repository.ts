@@ -422,6 +422,51 @@ export async function listMcpAbandonedImports(limit: number) {
     .limit(Math.min(limit, 25));
 }
 
+export async function listMcpUploadChunkCleanup() {
+  return getDatabase()
+    .select()
+    .from(mcpOperations)
+    .where(
+      and(
+        eq(mcpOperations.kind, "import_asset"),
+        sql`${mcpOperations.input}->>'sourceKind' = 'mcp_upload'`,
+        inArray(mcpOperations.status, [
+          "failed",
+          "cancelled",
+          "expired",
+          "succeeded",
+        ]),
+        sql`${mcpOperations.result}->>'uploadChunksCleaned' is distinct from 'true'`,
+        lt(mcpOperations.updatedAt, new Date(Date.now() - 10 * 60_000)),
+      ),
+    )
+    .orderBy(mcpOperations.updatedAt)
+    .limit(25);
+}
+export async function markMcpUploadChunksCleaned(
+  workspaceId: string,
+  operationId: string,
+) {
+  await getDatabase()
+    .update(mcpOperations)
+    .set({
+      result: sql`coalesce(${mcpOperations.result},'{}'::jsonb) || '{"uploadChunksCleaned":true}'::jsonb`,
+    })
+    .where(
+      and(
+        eq(mcpOperations.id, operationId),
+        eq(mcpOperations.workspaceId, workspaceId),
+        sql`${mcpOperations.input}->>'sourceKind' = 'mcp_upload'`,
+        inArray(mcpOperations.status, [
+          "failed",
+          "cancelled",
+          "expired",
+          "succeeded",
+        ]),
+      ),
+    );
+}
+
 export async function releaseAbandonedMcpPostLocks() {
   await getDatabase().execute(sql`
     update social_posts p set mcp_operation_id = null

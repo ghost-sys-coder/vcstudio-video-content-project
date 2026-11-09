@@ -155,7 +155,9 @@ describe("asset transfer application service", () => {
         fileName: "file.png",
       },
     });
-    await expect(startMcpImport(ctx, input)).rejects.toThrow("upload handoff");
+    await expect(startMcpImport(ctx, input)).rejects.toThrow(
+      "MCP upload panel",
+    );
     expect(m.update).toHaveBeenLastCalledWith(
       expect.objectContaining({
         values: expect.objectContaining({
@@ -239,6 +241,23 @@ describe("asset transfer application service", () => {
         sizeBytes: 100,
       }),
     ).rejects.toThrow("expired");
+    expect(m.upload).not.toHaveBeenCalled();
+  });
+  it("never issues browser-write credentials for an immutable MCP chunk upload", async () => {
+    m.find.mockResolvedValue(
+      mcpOperationFixture({
+        kind: "import_asset",
+        status: "awaiting_upload",
+        input: { sourceKind: "mcp_upload" },
+      }),
+    );
+    await expect(
+      authorizeMcpUpload(ctx, mcpIds.operation, {
+        fileName: "clip.mp4",
+        contentType: "video/mp4",
+        sizeBytes: 100,
+      }),
+    ).rejects.toThrow("unavailable");
     expect(m.upload).not.toHaveBeenCalled();
   });
 });

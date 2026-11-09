@@ -6,6 +6,8 @@ import {
   updateMcpOperation,
   listMcpAbandonedImports,
   releaseAbandonedMcpPostLocks,
+  listMcpUploadChunkCleanup,
+  markMcpUploadChunksCleaned,
 } from "@/db/repositories/mcp.repository";
 import { findMediaAsset } from "@/db/repositories/media-assets.repository";
 import { markMediaAssetFailed } from "@/db/commands/media-asset-commands";
@@ -13,6 +15,7 @@ import { deleteMediaAssetObject } from "@/lib/storage/media-asset-storage";
 import { dispatchApprovedPublication } from "./publishing-service";
 import { mediaContentTypeSchema } from "@/lib/schemas/media-asset";
 import { createMediaLibraryObjectKey } from "@/lib/storage/object-key";
+import { removeMcpChunks } from "./chunk-upload-storage";
 export async function recoverMcpOperations() {
   if (!getMcpEnvironment().ENABLE_MCP) return { recovered: 0 };
   const rows = await listMcpRecoveryOperations();
@@ -57,6 +60,17 @@ export async function recoverMcpOperations() {
 export async function cleanMcpImports(dryRun: boolean) {
   if (!getMcpEnvironment().ENABLE_MCP) return { cleaned: 0, dryRun };
   let cleaned = 0;
+  for (const op of await listMcpUploadChunkCleanup()) {
+    try {
+      if (!dryRun) {
+        await removeMcpChunks(op.workspaceId, op.id);
+        await markMcpUploadChunksCleaned(op.workspaceId, op.id);
+      }
+      cleaned++;
+    } catch {
+      console.error("MCP staged upload cleanup deferred", { uploadId: op.id });
+    }
+  }
   for (const { asset, operationId } of await listMcpAbandonedImports(25)) {
     const type = mediaContentTypeSchema.parse(asset.contentType);
     if (

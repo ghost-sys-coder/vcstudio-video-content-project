@@ -85,7 +85,14 @@ export function createToolRegistrar(
             .object({ workspaceId: z.uuid() })
             .parse(parsed).workspaceId;
           const context = await authorizeMcp(principal, workspaceId, scope);
-          await enforceMcpRateLimit(context, readOnly ? "read" : "write");
+          await enforceMcpRateLimit(
+            context,
+            name === "append_media_upload"
+              ? "upload_chunk"
+              : readOnly
+                ? "read"
+                : "write",
+          );
           return toolResult(await handler(context, parsed));
         } catch (error) {
           return toolError(error);

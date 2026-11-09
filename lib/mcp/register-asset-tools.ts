@@ -91,7 +91,7 @@ export function registerAssetTools(register: McpToolRegistrar) {
   );
   register(
     "import_chat_file",
-    "Save an original file exposed by ChatGPT to VCStudio. Use only when this client supplies a real file reference; otherwise use the upload handoff.",
+    "Save an original file exposed by ChatGPT to VCStudio. Use only when this client supplies a real file reference; otherwise use open_media_upload to select the original inside chat, or the programmatic MCP chunk upload tools. Do not use Chrome as a substitute.",
     "vcstudio:media",
     mcpMutationInput.extend({
       file: mcpFileSchema,

@@ -19,6 +19,10 @@ vi.mock("@/lib/env/server", () => ({
     APP_BASE_URL: "https://vcstudio.example",
   }),
   getPublishingEnvironment: () => ({ ENABLE_SOCIAL_POSTING: true }),
+  getMediaLibraryEnvironment: () => ({
+    MAX_MEDIA_IMAGE_BYTES: 25 * 1024 * 1024,
+    MAX_MEDIA_VIDEO_BYTES: 512 * 1024 * 1024,
+  }),
 }));
 vi.mock("@/db/repositories/mcp.repository", () => ({
   ensureMcpConnection: m.connection,
@@ -98,6 +102,44 @@ async function client() {
   return instance;
 }
 describe("real MCP SDK interoperability", () => {
+  it("advertises the new transfer/version tools and serves an upload app with no network origins", async () => {
+    const connection = await client(),
+      tools = await connection.listTools();
+    expect(tools.tools.map((t) => t.name)).toEqual(
+      expect.arrayContaining([
+        "open_media_upload",
+        "start_media_upload",
+        "append_media_upload",
+        "complete_media_upload",
+        "get_media_upload",
+        "cancel_media_upload",
+        "execute_publication",
+      ]),
+    );
+    const opened = await connection.callTool({
+      name: "open_media_upload",
+      arguments: { workspaceId: mcpIds.workspace },
+    });
+    expect(opened.structuredContent).toMatchObject({
+      ok: true,
+      data: {
+        workspaceId: mcpIds.workspace,
+        serverVersion: "1.1.0",
+        limits: { chunkBytes: 512 * 1024 },
+      },
+    });
+    expect(m.authorize).toHaveBeenCalledWith(
+      ctx.principal,
+      mcpIds.workspace,
+      "vcstudio:media",
+    );
+    const resource = await connection.readResource({
+      uri: "ui://vcstudio/media-upload.html",
+    });
+    expect(resource.contents[0]._meta).toMatchObject({
+      ui: { csp: { connectDomains: [], resourceDomains: [] } },
+    });
+  });
   it("advertises the effective approval mode without enabling autonomy", async () => {
     const result = await (
       await client()
