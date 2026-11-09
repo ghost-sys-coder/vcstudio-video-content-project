@@ -24,6 +24,8 @@ Discovery, lookup and connection resolve current owner capability and check the 
 
 The direct lookup follows [Meta's official Page-token example](https://www.postman.com/meta/facebook/request/tass6hw/get-specific-page-access-token). Regression verification uses mocked provider/authentication calls and a real-CSS browser fixture; no real account is connected or posted to as a test. No schema migration, new variable or worker deployment is needed.
 
+Released on 9 November 2026 as `54d9687`, production web deployment `dpl_GvqH6Bx38YXotgyK8tKzUVEEteGu` (READY). Verification passed 404 publishing regression tests, six browser journeys, formatting, lint, TypeScript, environment placement and the production build. Four read-only production smoke checks passed, and the immediate error scan was clear. The exact missing Page's live authorization still requires a fresh owner connection attempt; no test bypasses Meta's permissions or saves a production account automatically.
+
 ## TikTok sandbox connections
 
 Connect/Add TikTok is a branded shadcn link that opens TikTok authorization directly. A server route reads `TIKTOK_API_CLIENT_KEY` and `TIKTOK_API_CLIENT_SECRET`; users do not enter developer credentials, account passwords or access tokens in VCStudio. The action shows connection progress, prevents repeated activation during navigation and resets when returning from TikTok.
