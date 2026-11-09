@@ -116,6 +116,18 @@ describe("real MCP SDK interoperability", () => {
         "execute_publication",
       ]),
     );
+    for (const name of [
+      "start_media_upload",
+      "append_media_upload",
+      "complete_media_upload",
+    ])
+      expect(
+        tools.tools.find((tool) => tool.name === name)?.annotations,
+      ).toMatchObject({ readOnlyHint: false, destructiveHint: false });
+    expect(
+      tools.tools.find((tool) => tool.name === "cancel_media_upload")
+        ?.annotations?.destructiveHint,
+    ).toBe(true);
     const opened = await connection.callTool({
       name: "open_media_upload",
       arguments: { workspaceId: mcpIds.workspace },

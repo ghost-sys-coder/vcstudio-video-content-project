@@ -72,7 +72,13 @@ export function createToolRegistrar(
             : undefined,
         annotations: {
           readOnlyHint: readOnly,
-          destructiveHint: !readOnly,
+          destructiveHint:
+            !readOnly &&
+            ![
+              "start_media_upload",
+              "append_media_upload",
+              "complete_media_upload",
+            ].includes(name),
           openWorldHint:
             scope === "vcstudio:publish" || name === "import_asset",
         },

@@ -1,8 +1,8 @@
 # VCStudio MCP v1 setup and verification
 
-## Browser-free upload implementation — 9 November 2026
+## Browser-free upload release — 9 November 2026
 
-The follow-up release adds an in-chat MCP upload panel and focused
+The deployed follow-up release adds an in-chat MCP upload panel and focused
 start/append/status/complete/cancel tools, with bounded immutable R2 chunks and the
 existing import/inspection worker. It addresses the earlier transfer gap without
 requiring Claude network access to R2 or browser automation. Server version `1.1.0`
@@ -15,6 +15,12 @@ programmatic client with actual file access can use the chunk tools directly.
 This does not grant a remote server arbitrary access to an unshared local folder.
 The original assessment below is a dated pre-implementation record. Deployment
 and actual-client acceptance are recorded separately from local verification.
+Worker `20261109.2` deployed before web implementation `338376b`; live connection
+and capability reads confirm version `1.1.0`, the new transfer tools and unchanged
+autonomous publishing. Refresh connector discovery and use `open_media_upload`.
+SDK/local browser checks pass; actual file selection inside Claude/ChatGPT for this
+new panel remains a separate user acceptance check. No browser automation is needed
+by the implemented transfer path.
 
 ## Video transfer and autonomous publication check — 9 November 2026
 
