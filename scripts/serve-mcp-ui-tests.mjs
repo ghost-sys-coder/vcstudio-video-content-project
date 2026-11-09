@@ -33,6 +33,7 @@ for (const [name, entry] of [
   ["project-creation", "e2e/mcp/fixtures/project-creation-entry.tsx"],
   ["facebook-selection", "e2e/mcp/fixtures/facebook-selection-entry.tsx"],
   ["video-media", "e2e/mcp/fixtures/video-media-entry.tsx"],
+  ["media-upload", "e2e/mcp/fixtures/media-upload-entry.tsx"],
 ]) {
   const bundle = await build({
     entryPoints: [entry],
@@ -101,7 +102,7 @@ for (const [name, entry] of [
             ),
           }
         : {}),
-      ...(name === "post-composer"
+      ...(name === "post-composer" || name === "media-upload"
         ? {
             "@/lib/media/read-video-duration.client": path.resolve(
               "e2e/mcp/fixtures/MockVideoDuration.ts",
@@ -133,11 +134,16 @@ for (const [name, entry] of [
   });
   await writeFile(
     path.join(out, `${name}.html`),
-    `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${name === "post-composer" || name === "tiktok-connect" || name === "project-creation" || name === "facebook-selection" || name === "video-media" ? applicationCss : css}</style><style>body{margin:0;padding:16px;min-width:0}</style></head><body><div id="root"></div><script type="module">${bundle.outputFiles[0].text.replace(/<\/script/gi, "<\\/script")}</script></body></html>`,
+    `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${name === "post-composer" || name === "tiktok-connect" || name === "project-creation" || name === "facebook-selection" || name === "video-media" || name === "media-upload" ? applicationCss : css}</style><style>body{margin:0;padding:16px;min-width:0}</style></head><body><div id="root"></div><script type="module">${bundle.outputFiles[0].text.replace(/<\/script/gi, "<\\/script")}</script></body></html>`,
   );
 }
 const server = createServer(async (req, res) => {
   const filename = new URL(req.url, "http://localhost").pathname;
+  if (filename === "/test-media-storage" && req.method === "PUT") {
+    req.resume();
+    req.on("end", () => res.writeHead(200).end());
+    return;
+  }
   if (filename === "/test-facebook-connected") {
     res
       .writeHead(200, { "Content-Type": "text/html; charset=utf-8" })
@@ -174,6 +180,7 @@ const server = createServer(async (req, res) => {
     "/project-creation.html": path.join(out, "project-creation.html"),
     "/facebook-selection.html": path.join(out, "facebook-selection.html"),
     "/video-media.html": path.join(out, "video-media.html"),
+    "/media-upload.html": path.join(out, "media-upload.html"),
   };
   if (!allowed[filename]) {
     res.writeHead(404).end();

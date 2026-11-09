@@ -1,5 +1,11 @@
 # Project memory
 
+## Latest update — Browser upload progress (10 November 2026)
+
+- Library and Social composer uploads now share a shadcn progress display with filename, actual transferred bytes, percentage and sequential batch position. Uploads use native XHR upload events on the same signed direct-to-R2 PUT; no fake progress timer, extra server upload hop or whole-file buffering. Preparation is indeterminate; finalization remains visible after 100% transfer until the completion request returns. Existing video inspection stays separate and continues blocking publication.
+- Queue handling lives in `useMediaUploadQueue`; a synchronous guard prevents competing batches, failures restore the chooser and successful files survive partial batch failure. Uploads still require keeping the page open; web resume/background uploads were not added. Existing MCP resumable uploads are unchanged.
+- Verification passed 17 focused client/upload-limit/completion tests, all 13 slow-upload/attachment browser journeys, full lint (three existing warnings only), TypeScript, environment placement and the production build. Light desktop and 320px Dark screenshots were inspected. Browser progress checks use a real throttled XHR to an isolated local storage endpoint; no live Neon/R2/provider/worker call. Release is web-only: no schema/migration, dependency, environment variable, polling or worker change. Marketing and generation holds remain intact.
+
 ## Latest release — Browser-free MCP uploads (9 November 2026)
 
 - User confirmed Claude cannot transfer its video through the current MCP and falls back to Chrome, and authorized fixing ChatGPT/Claude gaps ASAP using the best architecture. Implemented MCP-native start/append/status/complete/cancel tools and a shadcn MCP Apps file picker. Native ChatGPT references remain preferred; the embedded picker sends binary chunks programmatically over the host MCP channel rather than model context or direct R2 requests. No organization R2 allowlist is required. Files must be selected inside chat or accessible to a programmatic client; no remote arbitrary-folder access or new desktop extension is implied.

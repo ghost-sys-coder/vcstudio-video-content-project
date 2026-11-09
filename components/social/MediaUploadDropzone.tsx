@@ -3,20 +3,19 @@
 import { useRef, useState } from "react";
 import { Loader2Icon, UploadCloudIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MediaUploadProgress } from "@/components/social/MediaUploadProgress";
+import { useMediaUploadQueue } from "@/hooks/useMediaUploadQueue";
 import { formatBytes } from "@/lib/format/bytes";
 import type { MediaAssetView } from "@/lib/media/media-asset-view";
 import {
   MEDIA_IMAGE_CONTENT_TYPES,
   MEDIA_VIDEO_CONTENT_TYPES,
 } from "@/lib/schemas/media-asset";
-import { uploadMediaAsset } from "@/lib/storage/upload-media-asset.client";
 
 const ACCEPTED = [
   ...MEDIA_IMAGE_CONTENT_TYPES,
   ...MEDIA_VIDEO_CONTENT_TYPES,
 ].join(",");
-
-type UploadFailure = { fileName: string; message: string };
 
 /**
  * Drop target for library uploads.
@@ -41,47 +40,14 @@ export function MediaUploadDropzone({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [pendingFileName, setPendingFileName] = useState<string | null>(null);
-  const [failures, setFailures] = useState<UploadFailure[]>([]);
-  const [processingCount, setProcessingCount] = useState(0);
-
-  const isUploading = pendingFileName !== null;
-
-  async function uploadAll(files: File[]) {
-    if (files.length === 0 || isUploading) return;
-    setFailures([]);
-    const uploaded: MediaAssetView[] = [];
-    const failed: UploadFailure[] = [];
-    const processing: MediaAssetView[] = [];
-
-    for (const file of files) {
-      setPendingFileName(file.name);
-      try {
-        const asset = await uploadMediaAsset({ workspaceId, file });
-        if (asset.inspectionPending) processing.push(asset);
-        else uploaded.push(asset);
-      } catch (error) {
-        failed.push({
-          fileName: file.name,
-          message:
-            error instanceof Error
-              ? error.message
-              : "That file could not be uploaded.",
-        });
-      }
-    }
-
-    setPendingFileName(null);
-    setFailures(failed);
-    setProcessingCount(processing.length);
-    if (uploaded.length > 0) onUploaded(uploaded);
-    if (processing.length > 0) onProcessing?.(processing);
-  }
+  const { active, failures, processingCount, uploadedCount, uploadAll } =
+    useMediaUploadQueue({ workspaceId, onUploaded, onProcessing });
+  const isUploading = active !== null;
 
   return (
-    <div className="space-y-2">
+    <div className="min-w-0 space-y-2">
       <div
-        className={`flex flex-col items-center gap-3 rounded-xl border border-dashed p-8 text-center transition-colors ${
+        className={`flex min-w-0 flex-col items-center gap-3 rounded-xl border border-dashed p-4 text-center transition-colors sm:p-8 ${
           isDragging ? "border-primary bg-primary/5" : "bg-muted/30"
         }`}
         onDragLeave={() => setIsDragging(false)}
@@ -117,7 +83,7 @@ export function MediaUploadDropzone({
           {isUploading ? (
             <>
               <Loader2Icon aria-hidden className="animate-spin" />
-              Uploading {pendingFileName}
+              Upload in progress
             </>
           ) : (
             "Choose files"
@@ -126,6 +92,7 @@ export function MediaUploadDropzone({
         <input
           accept={ACCEPTED}
           className="sr-only"
+          disabled={isUploading}
           multiple
           onChange={(event) => {
             const files = Array.from(event.target.files ?? []);
@@ -135,9 +102,15 @@ export function MediaUploadDropzone({
           ref={inputRef}
           type="file"
         />
+        {active ? <MediaUploadProgress upload={active} /> : null}
       </div>
 
       <div aria-live="polite">
+        {uploadedCount > 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {uploadedCount} file{uploadedCount === 1 ? "" : "s"} uploaded.
+          </p>
+        ) : null}
         {processingCount > 0 && !onProcessing ? (
           <p className="rounded-xl border bg-muted/40 p-3 text-sm text-muted-foreground">
             {processingCount} video{processingCount === 1 ? " is" : "s are"}{" "}
@@ -148,9 +121,11 @@ export function MediaUploadDropzone({
         {failures.length > 0 ? (
           <ul className="space-y-1 rounded-xl border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
             {failures.map((failure) => (
-              <li key={failure.fileName}>
-                <span className="font-medium">{failure.fileName}</span> —{" "}
-                {failure.message}
+              <li className="break-words" key={failure.fileName}>
+                <span className="break-all font-medium">
+                  {failure.fileName}
+                </span>{" "}
+                — {failure.message}
               </li>
             ))}
           </ul>

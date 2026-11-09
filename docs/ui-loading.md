@@ -4,6 +4,8 @@ Loading indicators describe a real pending request. They do not replace limiting
 
 ## Media library and pickers
 
+- Library and Social composer file uploads show a shared shadcn progress bar with actual transferred bytes, percentage, filename and position in a sequential batch. The browser streams the original file directly to the existing signed storage URL using upload progress events; no buffering, extra application upload route or artificial timer is used. Preparation is indeterminate, transfer reaches 100% only as bytes are sent, and a separate finishing state remains until the completion request succeeds. Background video verification is reported separately and still blocks use/publication. Failures leave an actionable message and restore the file chooser, preserving successful files from the rest of the batch. Keep the page open until transfer/finalization finishes; this does not add resumable web uploads or background polling.
+
 - The library reads 24 ready, non-deleted workspace assets plus one pagination sentinel. Only the visible 24 receive signed preview URLs. Previous/Next links preserve the kind filter and do not prefetch another data page. Audio has its own filter.
 - Cursor boundaries order by creation time and ID. The database resolves the anchor's exact timestamp to preserve sub-millisecond precision, with the serialized timestamp as a fallback if it was removed. An emptied page retains a route back to the populated part of the library.
 - Only the full library requests a total count. Post and brand asset pickers load a count-free page when opened, then load another page on explicit request. Opening a post or the brand assets page does not preload their picker libraries.
@@ -29,6 +31,8 @@ Loading indicators describe a real pending request. They do not replace limiting
 - The dashboard escape control remains a keyboard-accessible navigation link. Retry controls wrap within narrow containers and support Light/Dark themes and reduced motion.
 
 ## Verification
+
+The 10 November browser-upload progress update passed 17 focused upload/client/completion tests, 13 browser journeys, TypeScript, environment placement and the production build. Browser checks throttle a real XHR to a local streaming endpoint and distinguish partial bytes, full transfer, pending finalization and later video inspection. They cover Light/Dark layouts down to 320px, retrying the same file, partial batch failure and existing post-save/attachment behavior. Changed files pass formatting; full lint retains three existing warnings. No live storage, database, provider or worker invocation is needed for this verification.
 
 Video thumbnail release `a878fb9` passed 359 regression tests (three existing opt-in tests skipped), 23 distinct browser journeys, formatting, lint, TypeScript, environment validation and the production build. Local PostgreSQL checks verify metadata merge/tenant guards; real-CSS browser checks confirm responsive Light/Dark previews, missing-image fallback, explicit retries and no video requests before playback. Production web deployment `dpl_FYyZsW7xzzLS4Td2a7gMGdeA124L` is READY, with matching inspection worker `20261109.1` deployed first. Four read-only production smoke checks passed; no live media processing was used for verification, and worker environment synchronization remained disabled.
 

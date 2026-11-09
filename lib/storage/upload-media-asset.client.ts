@@ -5,8 +5,61 @@ import {
   type MediaContentType,
 } from "@/lib/schemas/media-asset";
 
+export type MediaUploadProgress = {
+  phase: "preparing" | "uploading" | "finalizing";
+  uploadedBytes: number;
+  totalBytes: number;
+};
+
 function isSupportedContentType(value: string): value is MediaContentType {
   return value in MEDIA_ASSET_KIND_BY_CONTENT_TYPE;
+}
+
+/** XHR exposes real upload progress while still streaming the File direct to R2. */
+function uploadToStorage(input: {
+  url: string;
+  file: File;
+  onProgress?: (progress: MediaUploadProgress) => void;
+}): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    let uploadedBytes = 0;
+    // Register before open/send for consistent browser upload-event support.
+    request.upload.addEventListener("progress", (event) => {
+      if (!Number.isFinite(event.loaded)) return;
+      uploadedBytes = Math.min(
+        input.file.size,
+        Math.max(uploadedBytes, event.loaded),
+      );
+      input.onProgress?.({
+        phase: "uploading",
+        uploadedBytes,
+        totalBytes: input.file.size,
+      });
+    });
+    request.addEventListener("load", () => {
+      if (request.status >= 200 && request.status < 300) resolve();
+      else
+        reject(
+          new Error(
+            `The storage service rejected the upload (HTTP ${request.status}).`,
+          ),
+        );
+    });
+    request.addEventListener("error", () =>
+      reject(
+        new Error(
+          "The storage service blocked the upload. Check your connection and verify that this site is allowed by the bucket CORS policy.",
+        ),
+      ),
+    );
+    request.addEventListener("abort", () =>
+      reject(new Error("The upload was interrupted. Please try again.")),
+    );
+    request.open("PUT", input.url);
+    request.setRequestHeader("content-type", input.file.type);
+    request.send(input.file);
+  });
 }
 
 /**
@@ -20,6 +73,7 @@ function isSupportedContentType(value: string): value is MediaContentType {
 export async function uploadMediaAsset(input: {
   workspaceId: string;
   file: File;
+  onProgress?: (progress: MediaUploadProgress) => void;
 }): Promise<MediaAssetView> {
   if (!isSupportedContentType(input.file.type))
     throw new Error(
@@ -27,6 +81,11 @@ export async function uploadMediaAsset(input: {
     );
   const contentType = input.file.type;
   const kind = MEDIA_ASSET_KIND_BY_CONTENT_TYPE[contentType];
+  input.onProgress?.({
+    phase: "preparing",
+    uploadedBytes: 0,
+    totalBytes: input.file.size,
+  });
   const durationMilliseconds =
     kind === "video" ? await readVideoDurationMilliseconds(input.file) : null;
 
@@ -51,22 +110,21 @@ export async function uploadMediaAsset(input: {
     uploadUrl: string;
   };
 
-  let uploaded: Response;
-  try {
-    uploaded = await fetch(upload.uploadUrl, {
-      method: "PUT",
-      headers: { "content-type": contentType },
-      body: input.file,
-    });
-  } catch {
-    throw new Error(
-      "The storage service blocked the upload. Verify that this site is allowed by the bucket CORS policy.",
-    );
-  }
-  if (!uploaded.ok)
-    throw new Error(
-      `The storage service rejected the upload (HTTP ${uploaded.status}).`,
-    );
+  input.onProgress?.({
+    phase: "uploading",
+    uploadedBytes: 0,
+    totalBytes: input.file.size,
+  });
+  await uploadToStorage({
+    url: upload.uploadUrl,
+    file: input.file,
+    onProgress: input.onProgress,
+  });
+  input.onProgress?.({
+    phase: "finalizing",
+    uploadedBytes: input.file.size,
+    totalBytes: input.file.size,
+  });
 
   const completion = await fetch(`${base}/complete`, {
     method: "POST",
