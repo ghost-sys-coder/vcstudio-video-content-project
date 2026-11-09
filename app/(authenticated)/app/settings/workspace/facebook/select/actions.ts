@@ -1,61 +1,61 @@
 "use server";
 
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { z } from "zod";
+import {
+  facebookPageIdSchema,
+  type FacebookPageLookupState,
+} from "@studio/contracts/publishing";
 import { upsertPlatformConnection } from "@/db/commands/platform-connection-commands";
 import { recordAuditEvent } from "@/lib/audit/record-audit-event";
-import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
-import { getPublishingEnvironment } from "@/lib/env/server";
-import { requireCapability } from "@/lib/policies/workspace-policy";
-import {
-  FACEBOOK_OAUTH_SESSION_COOKIE,
-  readFacebookOAuthSession,
-  type FacebookOAuthSession,
-} from "@/lib/publishing/facebook-oauth-session";
-import {
-  FacebookVideoPublishProvider,
-  type FacebookPage,
-} from "@/lib/publishing/providers/facebook-video-publish-provider";
+import { FACEBOOK_OAUTH_SESSION_COOKIE } from "@/lib/publishing/facebook-oauth-session";
+import { loadFacebookPageSelection } from "@/lib/publishing/facebook-page-selection";
+import { PublishProviderError } from "@/lib/publishing/video-publish-provider";
 
-const selectionSchema = z.object({ pageId: z.string().min(1).max(128) });
+export async function findFacebookPageAction(
+  _previous: FacebookPageLookupState,
+  formData: FormData,
+): Promise<FacebookPageLookupState> {
+  const { session, provider } = await loadFacebookPageSelection();
+  const parsed = facebookPageIdSchema.safeParse(formData.get("pageId"));
+  if (!parsed.success)
+    return { page: null, error: "Enter the numeric Facebook Page ID." };
+  try {
+    const page = await provider.getPage({
+      userAccessToken: session.userAccessToken,
+      pageId: parsed.data,
+    });
+    return {
+      page: {
+        externalAccountId: page.externalAccountId,
+        externalAccountName: page.externalAccountName,
+      },
+      error: null,
+    };
+  } catch (error) {
+    return {
+      page: null,
+      error:
+        error instanceof PublishProviderError
+          ? error.failure.safeMessage
+          : "Facebook could not be reached. Your Page ID is still here; try again shortly.",
+    };
+  }
+}
 
 export async function connectFacebookPageAction(
   formData: FormData,
 ): Promise<void> {
-  const parsed = selectionSchema.safeParse({ pageId: formData.get("pageId") });
+  const parsed = facebookPageIdSchema.safeParse(formData.get("pageId"));
   if (!parsed.success) redirect("/app/social/accounts?facebook=invalid");
-  const context = await getAuthenticatedWorkspaceContext();
-  if (!context) redirect("/app/social/accounts?facebook=forbidden");
-  requireCapability(context.activeMembership.role, "manageSettings");
-  const environment = getPublishingEnvironment();
-  const cookieStore = await cookies();
-  const sealed = cookieStore.get(FACEBOOK_OAUTH_SESSION_COOKIE)?.value;
-  if (!sealed) redirect("/app/social/accounts?facebook=expired");
-  let session: FacebookOAuthSession;
-  let pages: FacebookPage[];
+  const { context, session, provider, cookieStore } =
+    await loadFacebookPageSelection();
   try {
-    session = readFacebookOAuthSession({
-      sealed,
-      key: environment.PLATFORM_TOKEN_ENCRYPTION_KEY,
+    // Recheck the exact Page on confirmation, including direct-lookup results.
+    // A submitted Page name, token, or workspace identifier is never trusted.
+    const page = await provider.getPage({
+      userAccessToken: session.userAccessToken,
+      pageId: parsed.data,
     });
-    const provider = new FacebookVideoPublishProvider({
-      apiVersion: environment.FACEBOOK_GRAPH_API_VERSION,
-    });
-    pages = await provider.listPages(session.userAccessToken);
-  } catch {
-    redirect("/app/social/accounts?facebook=failed");
-  }
-  if (
-    session.workspaceId !== context.activeMembership.workspaceId ||
-    session.userId !== context.user.id
-  )
-    redirect("/app/social/accounts?facebook=forbidden");
-  const page = pages.find(
-    (item) => item.externalAccountId === parsed.data.pageId,
-  );
-  if (!page) redirect("/app/social/accounts?facebook=invalid");
-  try {
     const connection = await upsertPlatformConnection({
       workspaceId: session.workspaceId,
       platform: "facebook",

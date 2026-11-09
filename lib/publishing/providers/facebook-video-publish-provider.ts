@@ -1,6 +1,7 @@
 import "server-only";
 
 import { z } from "zod";
+import { facebookPageIdSchema } from "@studio/contracts/publishing";
 import type { ContentPlatform } from "@/db/schema";
 import {
   PublishProviderError,
@@ -31,18 +32,35 @@ const graphErrorSchema = z.object({
     })
     .optional(),
 });
+const pageResponseSchema = z.object({
+  id: facebookPageIdSchema,
+  name: z.string().min(1),
+  access_token: z.string().min(1),
+  tasks: z.array(z.string()).optional().default([]),
+});
 const pagesResponseSchema = z.object({
-  data: z.array(
-    z.object({
-      id: z.string().min(1),
-      name: z.string().min(1),
-      access_token: z.string().min(1),
-      tasks: z.array(z.string()).optional().default([]),
-    }),
-  ),
+  data: z.array(pageResponseSchema),
   paging: z
-    .object({ cursors: z.object({ after: z.string().optional() }).optional() })
+    .object({
+      cursors: z.object({ after: z.string().optional() }).optional(),
+      next: z.string().optional(),
+    })
     .optional(),
+});
+const grantedPagesSchema = z.object({
+  data: z.object({
+    app_id: z.string(),
+    is_valid: z.literal(true),
+    granular_scopes: z
+      .array(
+        z.object({
+          scope: z.string(),
+          target_ids: z.array(facebookPageIdSchema).optional(),
+        }),
+      )
+      .optional()
+      .default([]),
+  }),
 });
 const uploadStartSchema = z.object({
   upload_session_id: z.string().min(1),
@@ -60,6 +78,18 @@ export type FacebookPage = PlatformAccount & {
   pageAccessToken: string;
   tasks: string[];
 };
+
+function toFacebookPage(
+  item: z.infer<typeof pageResponseSchema>,
+): FacebookPage {
+  return {
+    externalAccountId: item.id,
+    externalAccountName: item.name,
+    externalAccountUrl: `https://www.facebook.com/${item.id}`,
+    pageAccessToken: item.access_token,
+    tasks: item.tasks,
+  };
+}
 
 function fail(failure: PublishFailure): never {
   throw new PublishProviderError(failure);
@@ -96,7 +126,7 @@ function failureForResponse(
   if (response.status === 429 || [4, 17, 32, 613].includes(code ?? -1))
     return {
       category: "rate_limited",
-      safeMessage: "Facebook is rate limiting uploads. Try again shortly.",
+      safeMessage: "Facebook is rate limiting requests. Try again shortly.",
       retriable: !mayHavePublished,
       mayHavePublished,
     };
@@ -203,7 +233,8 @@ export class FacebookVideoPublishProvider implements VideoPublishProvider {
   }
 
   async listPages(userAccessToken: string): Promise<FacebookPage[]> {
-    const pages: FacebookPage[] = [];
+    const pages = new Map<string, FacebookPage>();
+    const cursors = new Set<string>();
     let after: string | undefined;
     for (let page = 0; page < 10; page += 1) {
       const url = this.graphUrl("me/accounts");
@@ -212,24 +243,106 @@ export class FacebookVideoPublishProvider implements VideoPublishProvider {
       if (after) url.searchParams.set("after", after);
       const response = await fetch(url, {
         headers: { Authorization: `Bearer ${userAccessToken}` },
+        cache: "no-store",
+        signal: AbortSignal.timeout(10_000),
       });
       const payload = await readJson(response);
       const parsed = pagesResponseSchema.safeParse(payload);
       if (!response.ok || !parsed.success)
         fail(failureForResponse(response, payload));
-      pages.push(
-        ...parsed.data.data.map((item) => ({
-          externalAccountId: item.id,
-          externalAccountName: item.name,
-          externalAccountUrl: `https://www.facebook.com/${item.id}`,
-          pageAccessToken: item.access_token,
-          tasks: item.tasks,
-        })),
-      );
+      for (const item of parsed.data.data)
+        pages.set(item.id, toFacebookPage(item));
       after = parsed.data.paging?.cursors?.after;
-      if (!after) break;
+      // A cursor can exist on the final page. Never follow paging.next itself:
+      // rebuild the fixed Graph URL instead of trusting a token-bearing URL.
+      if (!parsed.data.paging?.next || !after || cursors.has(after)) break;
+      cursors.add(after);
     }
-    return pages;
+
+    // Business Login's consent targets can include Pages omitted by /me/accounts.
+    // They are hints, not authority: each still needs its own Page token lookup.
+    const grantedIds = await this.grantedPageIds(userAccessToken);
+    const missingIds = grantedIds.filter((id) => !pages.has(id)).slice(0, 20);
+    for (let start = 0; start < missingIds.length; start += 4) {
+      const results = await Promise.allSettled(
+        missingIds
+          .slice(start, start + 4)
+          .map((pageId) => this.getPage({ userAccessToken, pageId })),
+      );
+      for (const result of results) {
+        if (result.status === "fulfilled")
+          pages.set(result.value.externalAccountId, result.value);
+        else console.warn("A consented Facebook Page could not be verified.");
+      }
+    }
+    return [...pages.values()];
+  }
+
+  private async grantedPageIds(userAccessToken: string): Promise<string[]> {
+    if (!this.input.appId || !this.input.appSecret) return [];
+    try {
+      const url = this.graphUrl("debug_token");
+      url.searchParams.set("input_token", userAccessToken);
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${this.input.appId}|${this.input.appSecret}`,
+        },
+        cache: "no-store",
+        signal: AbortSignal.timeout(10_000),
+      });
+      const parsed = grantedPagesSchema.safeParse(await readJson(response));
+      if (
+        !response.ok ||
+        !parsed.success ||
+        parsed.data.data.app_id !== this.input.appId
+      )
+        throw new Error("FACEBOOK_PAGE_GRANTS_UNAVAILABLE");
+      return [
+        ...new Set(
+          parsed.data.data.granular_scopes
+            .filter((grant) => grant.scope === "pages_show_list")
+            .flatMap((grant) => grant.target_ids ?? []),
+        ),
+      ];
+    } catch {
+      // Keep already-verified Pages usable and offer direct lookup in the UI.
+      // Do not log a fetch error: its URL can contain the user token.
+      console.warn("Facebook Page grant discovery is unavailable.");
+      return [];
+    }
+  }
+
+  async getPage(input: {
+    userAccessToken: string;
+    pageId: string;
+  }): Promise<FacebookPage> {
+    const pageId = facebookPageIdSchema.parse(input.pageId);
+    const url = this.graphUrl(pageId);
+    url.searchParams.set("fields", "id,name,access_token");
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${input.userAccessToken}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+    });
+    const payload = await readJson(response);
+    const parsed = pageResponseSchema.safeParse(payload);
+    if (!response.ok || !parsed.success || parsed.data.id !== pageId) {
+      const failure = failureForResponse(response, payload);
+      if (
+        failure.category === "authorization_expired" ||
+        failure.category === "rate_limited" ||
+        failure.category === "provider_server_error"
+      )
+        fail(failure);
+      fail({
+        category: "insufficient_permissions",
+        safeMessage:
+          "Facebook did not grant access to this Page. Check its Page ID, select it in Facebook's Edit settings, and confirm your account has permission to create Page content. Then reconnect and try again.",
+        retriable: false,
+        mayHavePublished: false,
+      });
+    }
+    return toFacebookPage(parsed.data);
   }
 
   async exchangeCode(input: {

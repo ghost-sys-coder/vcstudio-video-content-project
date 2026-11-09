@@ -1,12 +1,21 @@
-import { Button } from "@/components/ui/button";
-import type { FacebookPage } from "@/lib/publishing/providers/facebook-video-publish-provider";
+import type {
+  FacebookPageLookupState,
+  FacebookPageOption,
+} from "@studio/contracts/publishing";
+import { FacebookPageConnectButton } from "@/components/publish/FacebookPageConnectButton";
+import { FacebookPageLookup } from "@/components/publish/FacebookPageLookup";
 
 export function FacebookPageSelector({
   action,
+  findAction,
   pages,
 }: {
   action: (formData: FormData) => void | Promise<void>;
-  pages: FacebookPage[];
+  findAction: (
+    previous: FacebookPageLookupState,
+    formData: FormData,
+  ) => Promise<FacebookPageLookupState>;
+  pages: FacebookPageOption[];
 }) {
   return (
     <section className="app-page app-form-page">
@@ -16,7 +25,7 @@ export function FacebookPageSelector({
         </p>
         <h1 className="text-3xl font-semibold tracking-tight">Choose a Page</h1>
         <p className="text-muted-foreground">
-          Select the Facebook Page this workspace may publish videos to.
+          Select the Facebook Page to connect for social posts and videos.
         </p>
       </header>
       <ul className="app-section">
@@ -27,7 +36,9 @@ export function FacebookPageSelector({
           >
             <div className="min-w-0">
               <p className="truncate font-medium">{page.externalAccountName}</p>
-              <p className="text-sm text-muted-foreground">Facebook Page</p>
+              <p className="break-all text-sm text-muted-foreground">
+                Page ID: {page.externalAccountId}
+              </p>
             </div>
             <form action={action}>
               <input
@@ -35,7 +46,7 @@ export function FacebookPageSelector({
                 type="hidden"
                 value={page.externalAccountId}
               />
-              <Button type="submit">Connect Page</Button>
+              <FacebookPageConnectButton />
             </form>
           </li>
         ))}
@@ -46,6 +57,7 @@ export function FacebookPageSelector({
           grant all requested permissions.
         </p>
       ) : null}
+      <FacebookPageLookup action={findAction} connectAction={action} />
     </section>
   );
 }

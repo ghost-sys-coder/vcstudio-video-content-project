@@ -1,5 +1,21 @@
 import { z } from "zod";
 
+export const facebookPageIdSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{1,32}$/, "Enter the numeric Facebook Page ID.");
+
+/** Safe for client props and action results; never include Page tokens. */
+export type FacebookPageOption = {
+  externalAccountId: string;
+  externalAccountName: string;
+};
+
+export type FacebookPageLookupState = {
+  page: FacebookPageOption | null;
+  error: string | null;
+};
+
 export const socialYouTubeSettingsSchema = z.object({
   title: z.string().trim().max(100).default(""),
   description: z.string().max(5000).nullable().default(null),
