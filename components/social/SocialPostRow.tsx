@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ImageIcon } from "lucide-react";
-import { DeleteDraftPostDialog } from "@/components/social/DeleteDraftPostDialog";
+import { DeletePostDialog } from "@/components/social/DeletePostDialog";
 import { PostStatusBadge } from "@/components/social/PostStatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardFooter } from "@/components/ui/card";
@@ -10,11 +10,11 @@ import { SOCIAL_SWEEP_WINDOW_MINUTES } from "@/lib/social/schedule-window";
 import type { SocialPostSummaryView } from "@/lib/social/social-post-view";
 
 export function SocialPostRow({
-  canDeleteDraft = false,
+  canDelete = false,
   composerBasePath = "/app/social/posts",
   post,
 }: {
-  canDeleteDraft?: boolean;
+  canDelete?: boolean;
   composerBasePath?: string;
   post: SocialPostSummaryView;
 }) {
@@ -72,9 +72,9 @@ export function SocialPostRow({
             </div>
           </div>
         </Link>
-        {canDeleteDraft && post.status === "draft" ? (
+        {canDelete ? (
           <CardFooter className="justify-end py-2">
-            <DeleteDraftPostDialog postId={post.id} postName={post.name} />
+            <DeletePostDialog postId={post.id} postName={post.name} />
           </CardFooter>
         ) : null}
       </Card>

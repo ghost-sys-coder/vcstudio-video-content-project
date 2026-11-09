@@ -13,8 +13,10 @@ import type { SocialPostSummaryView } from "@/lib/social/social-post-view";
  */
 export function ScheduleCalendar({
   posts,
+  canDelete = false,
 }: {
   posts: SocialPostSummaryView[];
+  canDelete?: boolean;
 }) {
   const days = useMemo(() => groupPostsByDay({ posts }), [posts]);
 
@@ -41,7 +43,7 @@ export function ScheduleCalendar({
           </h2>
           <ul className="app-grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))]">
             {day.posts.map((post) => (
-              <SocialPostRow key={post.id} post={post} />
+              <SocialPostRow key={post.id} post={post} canDelete={canDelete} />
             ))}
           </ul>
         </section>

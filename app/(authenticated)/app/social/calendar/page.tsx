@@ -23,7 +23,7 @@ export default async function SocialCalendarPage() {
           timezone.
         </p>
       </header>
-      <ScheduleCalendar posts={posts} />
+      <ScheduleCalendar posts={posts} canDelete />
     </div>
   );
 }

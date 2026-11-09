@@ -2,10 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import {
-  createSocialPost,
-  deleteSocialPostDraft,
-} from "@/db/commands/social-post-commands";
+import { createSocialPost } from "@/db/commands/social-post-commands";
 import { recordAuditEvent } from "@/lib/audit/record-audit-event";
 import { RateLimitExceededError } from "@/lib/domain/errors";
 import {
@@ -36,13 +33,45 @@ import {
   YouTubeThumbnailRetryError,
 } from "@/lib/social/retry-youtube-thumbnail";
 import { z } from "zod";
+import {
+  getPostDeletionPreview,
+  deleteSocialPostWithMedia,
+} from "@/db/repositories/post-deletion.repository";
+import type { PostDeletionPreview } from "@studio/contracts/publishing";
 
 export type SaveSocialPostResult =
   | { ok: true; version: number; plainText: string }
   | { ok: false; error: string };
 
 export type DeleteSocialPostResult =
-  { ok: true } | { ok: false; error: string };
+  { ok: true; removedMediaCount: number } | { ok: false; error: string };
+
+export async function getPostDeletionPreviewAction(
+  input: unknown,
+): Promise<
+  { ok: true; preview: PostDeletionPreview } | { ok: false; error: string }
+> {
+  const parsed = z.uuid().safeParse(input);
+  if (!parsed.success) return { ok: false, error: "That post is invalid." };
+  try {
+    const context = await getAuthenticatedWorkspaceContext();
+    if (!context)
+      return { ok: false, error: "Workspace context is unavailable." };
+    requireCapability(context.activeMembership.role, "composePosts");
+    const preview = await getPostDeletionPreview({
+      workspaceId: context.activeMembership.workspaceId,
+      postId: parsed.data,
+    });
+    return preview
+      ? { ok: true, preview }
+      : { ok: false, error: "That post is no longer available." };
+  } catch {
+    return {
+      ok: false,
+      error: "The deletion details could not be loaded. Try again.",
+    };
+  }
+}
 
 export async function createSocialPostAction(
   formData: FormData,
@@ -409,6 +438,8 @@ export async function deleteSocialPostAction(
 ): Promise<DeleteSocialPostResult> {
   const parsed = deleteSocialPostSchema.safeParse({
     postId: formData.get("postId"),
+    expectedVersion: Number(formData.get("expectedVersion")),
+    deleteMedia: formData.get("deleteMedia") === "true",
   });
   if (!parsed.success)
     return { ok: false, error: "That post could not be removed." };
@@ -419,14 +450,17 @@ export async function deleteSocialPostAction(
       return { ok: false, error: "Workspace context is unavailable." };
     requireCapability(context.activeMembership.role, "composePosts");
 
-    const result = await deleteSocialPostDraft({
+    if (parsed.data.deleteMedia)
+      requireCapability(context.activeMembership.role, "manageMediaLibrary");
+    const result = await deleteSocialPostWithMedia({
       workspaceId: context.activeMembership.workspaceId,
-      postId: parsed.data.postId,
+      ...parsed.data,
     });
     if (!result.deleted)
       return {
         ok: false,
-        error: "Only a draft can be deleted — a post that went out is history.",
+        error:
+          "The post changed, was removed, or has publishing work in progress. Reload its deletion details before trying again.",
       };
 
     await recordAuditEvent({
@@ -435,13 +469,27 @@ export async function deleteSocialPostAction(
       action: "social_post_deleted",
       targetType: "social_post",
       targetId: parsed.data.postId,
-      metadata: { status: "draft" },
+      metadata: {
+        status: result.status,
+        deleteMediaRequested: parsed.data.deleteMedia,
+        removedMediaCount: result.removedMediaIds.length,
+        // Audit metadata deliberately accepts scalars only; arrays are dropped.
+        ...Object.fromEntries(
+          result.removedMediaIds.map((id, index) => [
+            `removedMediaId${index + 1}`,
+            id,
+          ]),
+        ),
+      },
     });
 
     revalidatePath("/app/social/posts");
+    revalidatePath("/app/social/calendar");
+    revalidatePath("/app/social/library");
+    revalidatePath(`/app/social/posts/${parsed.data.postId}`);
     revalidatePath("/app/marketing/publish");
     revalidatePath("/app/marketing/calendar");
-    return { ok: true };
+    return { ok: true, removedMediaCount: result.removedMediaIds.length };
   } catch {
     return { ok: false, error: "That post could not be removed." };
   }

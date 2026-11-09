@@ -1,5 +1,20 @@
 import { z } from "zod";
 
+export const deleteSocialPostRequestSchema = z.object({
+  postId: z.uuid(),
+  expectedVersion: z.number().int().positive(),
+  deleteMedia: z.boolean().default(false),
+});
+export type PostDeletionPreview = {
+  postId: string;
+  name: string;
+  version: number;
+  status: string;
+  mediaCount: number;
+  removableMediaCount: number;
+  canDelete: boolean;
+};
+
 export const facebookPageIdSchema = z
   .string()
   .trim()

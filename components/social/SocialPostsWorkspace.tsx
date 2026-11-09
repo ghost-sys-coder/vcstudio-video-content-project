@@ -32,7 +32,7 @@ export function SocialPostsWorkspace({
         <ul className="app-grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))]">
           {posts.map((post) => (
             <SocialPostRow
-              canDeleteDraft={canCompose}
+              canDelete={canCompose}
               composerBasePath={composerBasePath}
               key={post.id}
               post={post}

@@ -290,24 +290,3 @@ export async function renameSocialPost(input: {
     .returning({ id: socialPosts.id });
   return { updated: result.length === 1 };
 }
-
-/**
- * Deletes a post. Only ever a draft: once a post has gone out, its targets carry
- * the external ids that are the only record of what was published.
- */
-export async function deleteSocialPostDraft(input: {
-  workspaceId: string;
-  postId: string;
-}): Promise<{ deleted: boolean }> {
-  const result = await getDatabase()
-    .delete(socialPosts)
-    .where(
-      and(
-        eq(socialPosts.id, input.postId),
-        eq(socialPosts.workspaceId, input.workspaceId),
-        eq(socialPosts.status, "draft"),
-      ),
-    )
-    .returning({ id: socialPosts.id });
-  return { deleted: result.length === 1 };
-}

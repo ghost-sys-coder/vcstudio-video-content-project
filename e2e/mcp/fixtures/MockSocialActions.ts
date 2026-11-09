@@ -4,6 +4,40 @@ import {
   fixtureAssets,
   libraryPageAssets,
 } from "./social-draft-data";
+import { z } from "zod";
+const previewResult = z.union([
+  z.object({
+    ok: z.literal(true),
+    preview: z.object({
+      postId: z.string(),
+      name: z.string(),
+      version: z.number(),
+      status: z.string(),
+      mediaCount: z.number(),
+      removableMediaCount: z.number(),
+      canDelete: z.boolean(),
+    }),
+  }),
+  z.object({ ok: z.literal(false), error: z.string() }),
+]);
+const deleteResult = z.union([
+  z.object({ ok: z.literal(true), removedMediaCount: z.number() }),
+  z.object({ ok: z.literal(false), error: z.string() }),
+]);
+export async function getPostDeletionPreviewAction(postId: unknown) {
+  const response = await fetch(
+    `/test-post-deletion-preview?postId=${encodeURIComponent(String(postId))}`,
+  );
+  return previewResult.parse(await response.json());
+}
+export async function deleteSocialPostAction(data: FormData) {
+  const response = await fetch("/test-delete-post", {
+    method: "POST",
+    body: JSON.stringify(Object.fromEntries(data)),
+    headers: { "content-type": "application/json" },
+  });
+  return deleteResult.parse(await response.json());
+}
 export async function saveSocialPostAction(form: FormData) {
   const delay = Number(localStorage.getItem("fixture-save-delay") ?? 0);
   if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));

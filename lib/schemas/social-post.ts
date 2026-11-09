@@ -113,7 +113,7 @@ export const createPostFromRenderSchema = z.object({
 
 export const cancelSocialPostScheduleSchema = z.object({ postId: z.uuid() });
 
-export const deleteSocialPostSchema = z.object({ postId: z.uuid() });
+export { deleteSocialPostRequestSchema as deleteSocialPostSchema } from "@studio/contracts/publishing";
 
 export type CreateSocialPostInput = z.infer<typeof createSocialPostSchema>;
 export type SaveSocialPostInput = z.infer<typeof saveSocialPostSchema>;

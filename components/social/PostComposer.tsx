@@ -14,6 +14,7 @@ import { PlatformPreviewCard } from "@/components/social/PlatformPreviewCard";
 import { PostBodyEditor } from "@/components/social/PostBodyEditor";
 import { PostMediaAttachments } from "@/components/social/PostMediaAttachments";
 import { PostStatusBadge } from "@/components/social/PostStatusBadge";
+import { DeletePostDialog } from "@/components/social/DeletePostDialog";
 import { ScheduledPostBanner } from "@/components/social/ScheduledPostBanner";
 import { PublishPostPanel } from "@/components/social/PublishPostPanel";
 import { Button } from "@/components/ui/button";
@@ -273,27 +274,36 @@ export function PostComposer({
             <PostStatusBadge status={view.status} />
           </div>
         </div>
-        {view.editable ? (
-          <div className="flex items-center gap-3">
-            <p aria-live="polite" className="text-xs text-muted-foreground">
-              {savedAt ? `Saved at ${savedAt}` : null}
-            </p>
-            <Button
-              disabled={pending}
-              onClick={() => void save()}
-              type="button"
-            >
-              {pending ? (
-                <>
-                  <Loader2Icon aria-hidden className="animate-spin" />
-                  Saving…
-                </>
-              ) : (
-                "Save draft"
-              )}
-            </Button>
-          </div>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-3">
+          <DeletePostDialog
+            postId={view.id}
+            postName={name}
+            redirectTo={composerBasePath}
+            showLabel
+            disabled={pending}
+          />
+          {view.editable ? (
+            <>
+              <p aria-live="polite" className="text-xs text-muted-foreground">
+                {savedAt ? `Saved at ${savedAt}` : null}
+              </p>
+              <Button
+                disabled={pending}
+                onClick={() => void save()}
+                type="button"
+              >
+                {pending ? (
+                  <>
+                    <Loader2Icon aria-hidden className="animate-spin" />
+                    Saving…
+                  </>
+                ) : (
+                  "Save draft"
+                )}
+              </Button>
+            </>
+          ) : null}
+        </div>
       </header>
 
       {view.status === "scheduled" && view.scheduledAt ? (
