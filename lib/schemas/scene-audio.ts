@@ -1,25 +1,14 @@
 import { z } from "zod";
 
-export const AUDIO_FORMATS = [
-  "mp3",
-  "opus",
-  "aac",
-  "flac",
-  "wav",
-  "pcm",
-] as const;
-
-export const audioFormatSchema = z.enum(AUDIO_FORMATS);
-
-export const voicePresetInputSchema = z.object({
-  name: z.string().trim().min(1).max(80),
-  voice: z.string().trim().min(1).max(64),
-  model: z.string().trim().min(1).max(64),
-  instructions: z.string().trim().max(2000).default(""),
-  speedScaledPercent: z.coerce.number().int().min(25).max(400).default(100),
-  format: audioFormatSchema.default("mp3"),
-  isDefault: z.coerce.boolean().default(false),
-});
+import {
+  voicePresetInputSchema,
+  audioFormatSchema,
+} from "@studio/contracts/voice-preset";
+export {
+  AUDIO_FORMATS,
+  audioFormatSchema,
+  voicePresetInputSchema,
+} from "@studio/contracts/voice-preset";
 
 export const CUSTOM_VOICE_CONSENT_PHRASE =
   "I am the owner of this voice and I consent to OpenAI using this recording to create a synthetic voice.";

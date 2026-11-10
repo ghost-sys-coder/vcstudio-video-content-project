@@ -1,5 +1,9 @@
 # VCStudio MCP v1 setup and verification
 
+## ElevenLabs extension — prepared, awaiting release approval
+
+The 1.3.0 implementation adds voice discovery/preset creation and scene-video assignment/review: 53 registered tools, 51 assistant-callable. Generation keeps the existing Generate scope and manual/autonomous modes. Image/video API access remains disabled on the current Creator plan. Apply the tested nullable video/MCP ownership migration before matching worker/web deployment; production stays on the prior release until approved. See [ElevenLabs controls](elevenlabs-integration.md).
+
 ## ChatGPT incremental consent compatibility — 10 November 2026
 
 Protocol `1.2.1` adds explicit per-tool OAuth metadata, incremental missing-scope challenges and connection OAuth diagnostics. All 49 tools remain discoverable regardless of token scope; every invocation still enforces scopes, workspace grants, roles and revocation. The count includes two UI-only approvals, leaving 47 assistant-callable tools. ChatGPT's previous 43-tool catalogue requires a plugin **tool refresh**, followed by OAuth reconnect for Generate and a new conversation. See [the exact refresh and verification steps](mcp-generation.md#chatgpt-tool-discovery-and-scope-upgrades). No database, worker, dependency or environment changes.

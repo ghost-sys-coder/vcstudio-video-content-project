@@ -5,7 +5,7 @@ import {
 } from "./video-environment";
 describe("video runtime configuration", () => {
   it("defaults to disabled, optional providers and conservative independent limits", () => {
-    expect(videoEnvironmentSchema.parse({})).toEqual({
+    expect(videoEnvironmentSchema.parse({})).toMatchObject({
       ENABLE_VIDEO_GENERATION: false,
       VIDEO_GENERATION_MAX_COST_CENTS: 150,
       VIDEO_GENERATION_DAILY_BUDGET_CENTS: 300,

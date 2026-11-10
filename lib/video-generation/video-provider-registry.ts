@@ -1,10 +1,16 @@
 import "server-only";
+import { ElevenLabsVideoProvider } from "@/lib/elevenlabs/video-provider";
+import { requireElevenLabs } from "@/lib/elevenlabs/configuration";
 import { getVideoGenerationEnvironment } from "@/lib/env/server";
 import { GoogleVideoProvider } from "./providers/google-video-provider";
 import { RunwayVideoProvider } from "./providers/runway-video-provider";
 import { LumaVideoProvider } from "./providers/luma-video-provider";
 import { VideoProviderError, type VideoProvider } from "./video-provider";
 export function createVideoProvider(provider: string): VideoProvider {
+  if (provider === "elevenlabs") {
+    requireElevenLabs(true);
+    return new ElevenLabsVideoProvider();
+  }
   const environment = getVideoGenerationEnvironment();
   if (
     provider === "google_gemini" &&

@@ -1,0 +1,3 @@
+ALTER TABLE "video_generations" ADD COLUMN "mcp_operation_id" uuid;--> statement-breakpoint
+CREATE UNIQUE INDEX "video_generations_mcp_operation_unique" ON "video_generations" ("mcp_operation_id") WHERE "mcp_operation_id" is not null;--> statement-breakpoint
+ALTER TABLE "video_generations" ADD CONSTRAINT "video_generations_tenant_mcp_operation_fkey" FOREIGN KEY ("mcp_operation_id","workspace_id") REFERENCES "mcp_operations"("id","workspace_id") ON DELETE RESTRICT;

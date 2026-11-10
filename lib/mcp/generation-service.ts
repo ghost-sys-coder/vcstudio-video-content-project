@@ -1,4 +1,12 @@
+import { buildMcpVideoPlan } from "./video-generation";
+import {
+  planAuthorizedVideoRequest,
+  startAuthorizedVideoGeneration,
+} from "@/lib/video-generation/video-generation-service";
+import { createVideoQuote } from "@/lib/video-generation/video-generation-quote";
+import { findVideoGenerationByKey } from "@/db/repositories/video-generations.repository";
 import "server-only";
+import { VideoOperationError } from "@/db/commands/video-generation-commands";
 import { randomBytes } from "node:crypto";
 import { tasks } from "@trigger.dev/sdk";
 import { z } from "zod";
@@ -70,7 +78,8 @@ async function buildGenerationPlan(
     if (
       error instanceof SceneImageGenerationRequestError ||
       error instanceof SceneAudioGenerationRequestError ||
-      error instanceof NarrationInputError
+      error instanceof NarrationInputError ||
+      error instanceof VideoOperationError
     )
       throw new McpError("invalid_generation", error.message);
     throw error;
@@ -81,6 +90,7 @@ async function loadGenerationPlan(
   request: McpGenerationRequest,
   operationId: string,
 ) {
+  if (request.kind === "video") return buildMcpVideoPlan(ctx, request);
   if (request.kind === "image" || request.kind === "audio") {
     requireMcp(
       can(ctx.membership.role, "manageMediaLibrary") &&
@@ -146,9 +156,9 @@ async function loadGenerationPlan(
   );
   if ("provider" in plan) {
     requireMcp(
-      ["openai", "gemini"].includes(plan.provider),
+      ["openai", "gemini", "elevenlabs"].includes(plan.provider),
       "feature_unavailable",
-      "MCP scene narration currently supports OpenAI and Gemini voice presets.",
+      "MCP scene narration currently supports OpenAI, Gemini and ElevenLabs voice presets.",
     );
     if (plan.provider === "gemini")
       requireMcp(
@@ -163,6 +173,38 @@ function previewFor(
   request: McpGenerationRequest,
   plan: Awaited<ReturnType<typeof buildGenerationPlan>>,
 ): GenerationPreview {
+  if (request.kind === "video" && "kind" in plan && plan.kind === "video")
+    return generationPreviewSchema.parse({
+      kind: "video",
+      title: request.video.title,
+      text: request.video.prompt,
+      model: plan.model,
+      provider: plan.provider,
+      estimatedCostCents: plan.estimatedCostCents,
+      maximumCostCents: request.maximumCostCents,
+      projectId:
+        request.video.target.kind === "scene"
+          ? request.video.target.projectId
+          : null,
+      sceneId:
+        request.video.target.kind === "scene"
+          ? request.video.target.sceneId
+          : null,
+      settings: [
+        {
+          label: "Output",
+          value: `${request.video.aspectRatio} · ${request.video.resolution} · ${request.video.durationSeconds}s`,
+        },
+        { label: "Audio", value: request.video.audio },
+        {
+          label: "Use",
+          value:
+            request.video.target.kind === "scene"
+              ? "Project scene, awaiting review"
+              : "Library video",
+        },
+      ],
+    });
   const image = "configuration" in plan;
   const text = image
     ? plan.configuration.prompt
@@ -174,7 +216,13 @@ function previewFor(
     : "model" in plan
       ? plan.model
       : "";
-  const provider = image ? "openai" : "provider" in plan ? plan.provider : "";
+  const provider = image
+    ? plan.configuration.model.startsWith("elevenlabs/")
+      ? "elevenlabs"
+      : "openai"
+    : "provider" in plan
+      ? plan.provider
+      : "";
   return generationPreviewSchema.parse({
     kind: request.kind,
     title:
@@ -456,6 +504,41 @@ async function dispatchGeneration(op: McpOperation) {
     "Generation authorization changed before dispatch.",
   );
   const request = saved.request;
+  if (request.kind === "video") {
+    const plan = await buildMcpVideoPlan(ctx, request);
+    requireMcp(
+      fingerprint(plan) === saved.planHash,
+      "conflict",
+      "The video inputs or pricing changed after preparation.",
+    );
+    const planned = await planAuthorizedVideoRequest(
+      { workspaceId: ctx.workspaceId, userId: op.userId },
+      request.video,
+    );
+    const quote = createVideoQuote(planned.quoteContext);
+    const job = await startAuthorizedVideoGeneration(
+      { workspaceId: ctx.workspaceId, userId: op.userId },
+      {
+        request: request.video,
+        quoteToken: quote.token,
+        idempotencyKey: `mcp-video:${op.id}`,
+      },
+      op.id,
+    );
+    await updateMcpOperation({
+      workspaceId: op.workspaceId,
+      operationId: op.id,
+      from: ["approved"],
+      values: {
+        status: "running",
+        result: { generationId: job.id },
+        error: job.dispatched
+          ? null
+          : "Video is reserved; retry execution with the same operation and key to confirm worker dispatch.",
+      },
+    });
+    return getMcpGenerationStatus(ctx, op.id);
+  }
   if (request.kind === "image" || request.kind === "audio") {
     const budget = await loadEffectiveWorkspaceBudget({
       workspaceId: op.workspaceId,
@@ -548,6 +631,42 @@ async function dispatchGeneration(op: McpOperation) {
 }
 export async function getMcpGenerationStatus(ctx: McpContext, id: string) {
   let op = await ownedGeneration(ctx, id);
+  const saved = savedInputSchema.parse(op.input);
+  if (saved.request.kind === "video") {
+    const job = await findVideoGenerationByKey({
+      workspaceId: ctx.workspaceId,
+      idempotencyKey: `mcp-video:${id}`,
+    });
+    requireMcp(
+      !job ||
+        (job.mcpOperationId === op.id && job.requestedByUserId === op.userId),
+      "permission_denied",
+      "Video authorization does not match.",
+    );
+    const result = job
+      ? {
+          generationId: job.id,
+          assetId: job.outputAssetId,
+          status: job.status,
+          actualCostCents: job.actualCostCents,
+          providerJobId: job.providerJobId,
+          href: "/app/video",
+        }
+      : null;
+    if (job && ["succeeded", "failed", "cancelled"].includes(job.status))
+      op =
+        (await updateMcpOperation({
+          workspaceId: ctx.workspaceId,
+          operationId: id,
+          from: ["approved", "running", "queued"],
+          values: {
+            status: job.status === "succeeded" ? "succeeded" : "failed",
+            result,
+            error: job.safeErrorMessage,
+          },
+        })) ?? op;
+    return { ...publicOperation(op), jobs: result ? [result] : [] };
+  }
   const jobs = await listMcpGenerationJobs(ctx.workspaceId, id);
   const job = jobs[0];
   if (!job) op = await reconcileMcpGenerationWorker(op);
@@ -601,6 +720,8 @@ export async function assertMcpGenerationWorkerAccess(
     "permission_denied",
     "The generation grant changed before provider submission.",
   );
+  if (saved.request.kind === "video")
+    await buildMcpVideoPlan(ctx, saved.request);
   if (
     saved.request.kind === "scene_image" ||
     saved.request.kind === "scene_audio"

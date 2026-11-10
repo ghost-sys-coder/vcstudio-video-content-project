@@ -17,7 +17,7 @@ import {
 import { getSceneImageEnvironment } from "@/lib/env/server";
 import { classifyImageGenerationError } from "@/lib/openai/image-generation-error";
 import type { ImageGenerationReference } from "@/lib/openai/image-generation-provider";
-import { OpenAiImageGenerationProvider } from "@/lib/openai/openai-image-generation-provider";
+import { createImageProvider } from "@/lib/elevenlabs/create-image-provider";
 import { createCharacterReferenceObjectKey } from "@/lib/storage/object-key";
 import {
   deleteCharacterReferenceObject,
@@ -185,9 +185,10 @@ export const characterReferenceGenerationTask = task({
       maximumTotalBytes: environment.MAX_REFERENCE_BYTES_PER_GENERATION,
     });
 
-    const provider = new OpenAiImageGenerationProvider({
-      apiKey: environment.OPENAI_API_KEY,
-      timeoutMilliseconds: environment.OPENAI_REQUEST_TIMEOUT_SECONDS * 1_000,
+    const provider = createImageProvider(generation.model, {
+      kind: "character",
+      workspaceId: generation.workspaceId,
+      generationId: generation.id,
     });
     let result: Awaited<ReturnType<typeof provider.generate>>;
     try {

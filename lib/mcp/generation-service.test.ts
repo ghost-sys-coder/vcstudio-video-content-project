@@ -8,6 +8,10 @@ import {
 } from "@/lib/test-utils/mcp-fixtures";
 vi.mock("server-only", () => ({}));
 const m = vi.hoisted(() => ({
+  videoPlan: vi.fn(),
+  videoQuote: vi.fn(),
+  videoStart: vi.fn(),
+  videoJob: vi.fn(),
   begin: vi.fn(),
   find: vi.fn(),
   findKey: vi.fn(),
@@ -23,6 +27,17 @@ const m = vi.hoisted(() => ({
   scene: vi.fn(),
   image: vi.fn(),
   audio: vi.fn(),
+}));
+vi.mock("./video-generation", () => ({ buildMcpVideoPlan: m.videoPlan }));
+vi.mock("@/lib/video-generation/video-generation-service", () => ({
+  planAuthorizedVideoRequest: m.videoQuote,
+  startAuthorizedVideoGeneration: m.videoStart,
+}));
+vi.mock("@/lib/video-generation/video-generation-quote", () => ({
+  createVideoQuote: () => ({ token: "prepared-exact-video-quote-token" }),
+}));
+vi.mock("@/db/repositories/video-generations.repository", () => ({
+  findVideoGenerationByKey: m.videoJob,
 }));
 vi.mock("@trigger.dev/sdk", () => ({ tasks: { trigger: m.trigger } }));
 vi.mock("@/db/repositories/mcp.repository", () => ({
@@ -403,5 +418,107 @@ describe("MCP exact-cost generation preparation and execution", () => {
     await expect(
       assertMcpGenerationWorkerAccess(ctx.workspaceId, p.operation.id),
     ).rejects.toThrow("grant changed");
+  });
+});
+
+describe("MCP ElevenLabs video uses the shared video workflow", () => {
+  const videoRequest = {
+    kind: "video" as const,
+    maximumCostCents: 100,
+    video: {
+      modelId: "elevenlabs-veo-3.1-fast-generate-001",
+      title: "Private clip",
+      prompt: "A useful clip",
+      negativePrompt: "",
+      mode: "text_to_video" as const,
+      aspectRatio: "16:9" as const,
+      resolution: "720p" as const,
+      durationSeconds: 8,
+      audio: "none" as const,
+      seed: null,
+      fit: "contain" as const,
+      inputs: [],
+      target: { kind: "direct" as const },
+    },
+  };
+  function setup() {
+    ctx.grant.generationApprovalMode = "autonomous";
+    m.videoPlan.mockResolvedValue({
+      kind: "video",
+      provider: "elevenlabs",
+      model: "Veo Fast",
+      estimatedCostCents: 80,
+      request: videoRequest.video,
+    });
+    m.videoQuote.mockResolvedValue({ quoteContext: {} });
+    m.videoStart.mockResolvedValue({ id: mcpIds.operation, dispatched: true });
+    m.videoJob.mockResolvedValue(null);
+  }
+  it("reuses the shared reservation/dispatch service and ties the job to its exact MCP operation", async () => {
+    setup();
+    const p = await prepareMcpGeneration(
+      ctx,
+      "video-generation-key-001",
+      videoRequest,
+    );
+    expect(p.preview).toMatchObject({
+      kind: "video",
+      provider: "elevenlabs",
+      estimatedCostCents: 80,
+    });
+    await executeMcpGeneration(ctx, p.operation.id, "video-generation-key-001");
+    expect(m.videoStart).toHaveBeenCalledWith(
+      { workspaceId: ctx.workspaceId, userId: ctx.principal.userId },
+      expect.objectContaining({
+        request: videoRequest.video,
+        idempotencyKey: `mcp-video:${p.operation.id}`,
+      }),
+      p.operation.id,
+    );
+    expect(m.reserve).not.toHaveBeenCalled(); // no second standalone ledger reservation
+  });
+  it("refuses a changed video estimate before dispatch", async () => {
+    setup();
+    const p = await prepareMcpGeneration(
+      ctx,
+      "video-generation-key-002",
+      videoRequest,
+    );
+    m.videoPlan.mockResolvedValue({
+      kind: "video",
+      provider: "elevenlabs",
+      model: "changed",
+      estimatedCostCents: 90,
+      request: videoRequest.video,
+    });
+    await expect(
+      executeMcpGeneration(ctx, p.operation.id, "video-generation-key-002"),
+    ).rejects.toThrow(/changed/);
+    expect(m.videoStart).not.toHaveBeenCalled();
+  });
+  it("refuses a video owned by another MCP operation during status reads", async () => {
+    setup();
+    const p = await prepareMcpGeneration(
+      ctx,
+      "video-generation-key-003",
+      videoRequest,
+    );
+    m.videoJob.mockResolvedValue({
+      mcpOperationId: "another-operation",
+      requestedByUserId: ctx.principal.userId,
+    });
+    await expect(getMcpGenerationStatus(ctx, p.operation.id)).rejects.toThrow(
+      /authorization/,
+    );
+  });
+  it("refuses cost above the caller's explicit cap", async () => {
+    setup();
+    await expect(
+      prepareMcpGeneration(ctx, "video-generation-key-004", {
+        ...videoRequest,
+        maximumCostCents: 20,
+      }),
+    ).rejects.toThrow(/maximum cost/);
+    expect(m.videoStart).not.toHaveBeenCalled();
   });
 });

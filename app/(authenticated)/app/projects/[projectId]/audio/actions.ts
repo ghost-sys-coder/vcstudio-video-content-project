@@ -1,5 +1,11 @@
 "use server";
 
+import {
+  ElevenLabsPresetError,
+  ElevenLabsUnavailableError,
+  ElevenLabsApiError,
+} from "@/lib/elevenlabs/errors";
+import { validateElevenLabsPreset } from "@/lib/elevenlabs/voices";
 import { revalidatePath } from "next/cache";
 import {
   approveSceneAudioGeneration,
@@ -179,6 +185,7 @@ export async function createVoicePresetAction(
     .extend({ projectId: startBulkSceneAudioGenerationSchema.shape.projectId })
     .safeParse({
       projectId: formData.get("projectId"),
+      provider: formData.get("provider") ?? "openai",
       name: formData.get("name"),
       voice: formData.get("voice"),
       model: formData.get("model"),
@@ -193,9 +200,12 @@ export async function createVoicePresetAction(
   try {
     const { context } = await requireProjectAccess(parsed.data.projectId);
     requireCapability(context.activeMembership.role, "manageVoicePresets");
+    if (parsed.data.provider === "elevenlabs")
+      await validateElevenLabsPreset(parsed.data);
     await createVoicePreset({
       workspaceId: context.activeMembership.workspaceId,
       createdByUserId: context.user.id,
+      provider: parsed.data.provider,
       name: parsed.data.name,
       voice: parsed.data.voice,
       model: parsed.data.model,
@@ -206,7 +216,15 @@ export async function createVoicePresetAction(
     });
     revalidatePath(`/app/projects/${parsed.data.projectId}/audio`);
     return { success: true, error: null };
-  } catch {
-    return { success: false, error: "The voice preset could not be created." };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof ElevenLabsPresetError ||
+        error instanceof ElevenLabsUnavailableError ||
+        error instanceof ElevenLabsApiError
+          ? error.message
+          : "The voice preset could not be created.",
+    };
   }
 }

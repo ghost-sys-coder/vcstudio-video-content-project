@@ -1,3 +1,5 @@
+import { findSceneVisualSelection } from "@/db/repositories/scene-visual-selections.repository";
+import { sceneVideoSelectionView } from "@/lib/video-generation/scene-video-service";
 import { z } from "zod";
 import {
   mcpMutationInput,
@@ -222,8 +224,14 @@ export function registerContentTools(register: McpToolRegistrar) {
           sceneVersionId: current.version.id,
         }),
       ]);
+      const video = await findSceneVisualSelection({
+        ...p,
+        workspaceId: ctx.workspaceId,
+        sceneVersionId: current.version.id,
+      });
       return {
         ...current,
+        videoSelection: sceneVideoSelectionView(video),
         imageFramings,
         audio,
         images: images.map((i) => ({

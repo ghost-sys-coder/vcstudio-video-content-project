@@ -21,7 +21,7 @@ export type ImageGenerationProviderInput = SceneImageProviderConfiguration & {
 };
 
 export type ImageGenerationProviderResult = {
-  provider: "openai";
+  provider: "openai" | "elevenlabs";
   operation: "generate" | "edit";
   model: string;
   requestId: string | null;

@@ -31,19 +31,26 @@ export function McpUiHarness() {
                 : generationExpiry,
           }}
           preview={{
-            kind: "image",
+            kind: mode === "generation-video" ? "video" : "image",
             title: "Business image",
             text: "A calm professional studio with natural light.\nKeep the whole composition visible.",
-            model: "fixture-image",
-            provider: "openai",
+            model:
+              mode === "generation-video" ? "Veo 3.1 Fast" : "fixture-image",
+            provider: mode === "generation-video" ? "elevenlabs" : "openai",
             estimatedCostCents: 8,
             maximumCostCents: 20,
             projectId: null,
             sceneId: null,
-            settings: [
-              { label: "Size", value: "1024x1024" },
-              { label: "Quality", value: "low" },
-            ],
+            settings:
+              mode === "generation-video"
+                ? [
+                    { label: "Output", value: "16:9 · 720p · 8s" },
+                    { label: "Audio", value: "none" },
+                  ]
+                : [
+                    { label: "Size", value: "1024x1024" },
+                    { label: "Quality", value: "low" },
+                  ],
           }}
         />
       </main>

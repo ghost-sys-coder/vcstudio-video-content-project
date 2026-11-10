@@ -60,7 +60,7 @@ export function VoicePreviewPanel() {
   return (
     <section className="space-y-3 rounded-xl bg-card p-4 ring-1 ring-foreground/10">
       <div>
-        <h2 className="text-sm font-semibold">Preview voices</h2>
+        <h2 className="text-sm font-semibold">Preview OpenAI voices</h2>
         <p className="mt-1 text-xs text-muted-foreground">
           Pick a voice and hear it read the same sample line, so you can compare
           how each one sounds before you configure a voice preset.

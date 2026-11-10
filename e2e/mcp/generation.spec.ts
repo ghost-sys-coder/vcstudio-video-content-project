@@ -94,3 +94,20 @@ test("missing private proof disables embedded generation approval and preserves 
     frame.getByRole("link", { name: "Review in VCStudio" }),
   ).toHaveAttribute("href", /app\/mcp\/operations/);
 });
+
+test("ElevenLabs video review shows the exact video request and credit valuation", async ({
+  page,
+}) => {
+  await page.goto("/harness.html?mode=generation-video");
+  await expect(
+    page.getByRole("heading", { name: "Video prompt", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("16:9 · 720p · 8s", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/ElevenLabs estimates value subscription credits/),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Approve generation" }).click();
+  await expect(page.getByRole("status")).toContainText("Approval recorded");
+});

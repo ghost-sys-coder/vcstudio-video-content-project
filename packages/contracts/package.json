@@ -9,7 +9,8 @@
     "./publishing": "./src/publishing.ts",
     "./mcp-upload": "./src/mcp-upload.ts",
     "./mcp-generation": "./src/mcp-generation.ts",
-    "./scene-media": "./src/scene-media.ts"
+    "./scene-media": "./src/scene-media.ts",
+    "./voice-preset": "./src/voice-preset.ts"
   },
   "dependencies": {
     "zod": "4.6.6"

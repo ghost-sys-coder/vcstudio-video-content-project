@@ -32,6 +32,7 @@ export type VideoProviderState =
       requestId: string | null;
       code: string;
       safeMessage: string;
+      definitelyUnbilled?: boolean;
     };
 export interface VideoProvider {
   start(input: {

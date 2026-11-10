@@ -12,6 +12,7 @@ export type ReserveVideoInput = {
   workspaceId: string;
   userId: string;
   quoteId: string;
+  mcpOperationId?: string;
   idempotencyKey: string;
   fingerprint: string;
   request: VideoGenerationRequest;
@@ -64,8 +65,8 @@ export function buildVideoReservationSql(input: ReserveVideoInput) {
       ) then 'project_budget_or_revision'
       else 'allowed' end as reason from totals t
   ), inserted as (
-    insert into video_generations(id,workspace_id,project_id,scene_id,scene_version_id,requested_by_user_id,quote_id,idempotency_key,request_fingerprint,request,model_snapshot,pricing_snapshot,input_assets,final_prompt,prompt_template_version,estimated_cost_cents)
-    select ${input.id}::uuid,${input.workspaceId}::uuid,${projectId}::uuid,${sceneId}::uuid,${sceneVersionId}::uuid,${input.userId}::uuid,${input.quoteId}::uuid,${input.idempotencyKey},${input.fingerprint},${JSON.stringify(input.request)}::jsonb,${JSON.stringify(input.model)}::jsonb,${JSON.stringify(input.pricing)}::jsonb,${JSON.stringify(input.inputAssets)}::jsonb,${input.finalPrompt},${input.promptTemplateVersion},${input.estimatedCostCents}
+    insert into video_generations(id,workspace_id,project_id,scene_id,scene_version_id,requested_by_user_id,quote_id,mcp_operation_id,idempotency_key,request_fingerprint,request,model_snapshot,pricing_snapshot,input_assets,final_prompt,prompt_template_version,estimated_cost_cents)
+    select ${input.id}::uuid,${input.workspaceId}::uuid,${projectId}::uuid,${sceneId}::uuid,${sceneVersionId}::uuid,${input.userId}::uuid,${input.quoteId}::uuid,${input.mcpOperationId ?? null}::uuid,${input.idempotencyKey},${input.fingerprint},${JSON.stringify(input.request)}::jsonb,${JSON.stringify(input.model)}::jsonb,${JSON.stringify(input.pricing)}::jsonb,${JSON.stringify(input.inputAssets)}::jsonb,${input.finalPrompt},${input.promptTemplateVersion},${input.estimatedCostCents}
     from eligibility where reason='allowed' and not exists(select 1 from existing)
     returning id
   ), reservation as (

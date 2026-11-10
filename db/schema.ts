@@ -5188,6 +5188,7 @@ export const videoGenerations = pgTable(
     requestedByUserId: uuid("requested_by_user_id")
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
+    mcpOperationId: uuid("mcp_operation_id"),
     quoteId: uuid("quote_id").notNull(),
     idempotencyKey: text("idempotency_key").notNull(),
     requestFingerprint: text("request_fingerprint").notNull(),
@@ -5248,6 +5249,14 @@ export const videoGenerations = pgTable(
       .defaultNow(),
   },
   (table) => [
+    uniqueIndex("video_generations_mcp_operation_unique")
+      .on(table.mcpOperationId)
+      .where(sql`${table.mcpOperationId} is not null`),
+    foreignKey({
+      columns: [table.mcpOperationId, table.workspaceId],
+      foreignColumns: [mcpOperations.id, mcpOperations.workspaceId],
+      name: "video_generations_tenant_mcp_operation_fkey",
+    }).onDelete("restrict"),
     uniqueIndex("video_generations_id_workspace_unique").on(
       table.id,
       table.workspaceId,

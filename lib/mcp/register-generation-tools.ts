@@ -1,4 +1,7 @@
 import "server-only";
+import { videoCatalogView } from "@/lib/video-generation/video-generation-view";
+import { registerVoiceTools } from "./register-voice-tools";
+import { elevenLabsStatus } from "@/lib/elevenlabs/configuration";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
@@ -55,9 +58,10 @@ export function registerGenerationTools(
   register: McpToolRegistrar,
   principal: McpPrincipal,
 ) {
+  registerVoiceTools(register);
   register(
     "get_generation_options",
-    "Read configured image/audio models, sizes, qualities, voice presets and style preset versions. No generation or spending. Use the returned IDs; do not invent presets. Library audio supports OpenAI/Gemini catalogue presets; scene audio retains existing voice support.",
+    "Read configured image/audio/video models, sizes, qualities, voice presets and style preset versions. No generation or spending. Use the returned IDs; do not invent presets. Library audio supports OpenAI/Gemini/ElevenLabs account presets; scene audio retains existing voice support.",
     "vcstudio:generate",
     mcpGenerationOptionsInput,
     true,
@@ -75,7 +79,9 @@ export function registerGenerationTools(
       return {
         image: {
           enabled: image.ENABLE_SCENE_IMAGE_GENERATION,
-          provider: "openai",
+          provider: image.OPENAI_IMAGE_MODEL.startsWith("elevenlabs/")
+            ? "elevenlabs"
+            : "openai",
           model: image.OPENAI_IMAGE_MODEL,
           sizes: IMAGE_GENERATION_SIZES,
           qualities: IMAGE_GENERATION_QUALITIES,
@@ -84,6 +90,7 @@ export function registerGenerationTools(
           enabled: audio.ENABLE_SCENE_AUDIO_GENERATION,
           maximumStandaloneSegments: MAX_STANDALONE_AUDIO_SEGMENTS,
           maximumStandaloneCharacters: {
+            elevenlabs: Math.min(audio.MAX_NARRATION_CHARACTERS, 4000),
             openai: Math.min(
               audio.MAX_NARRATION_CHARACTERS,
               OPENAI_SPEECH_MAXIMUM_CHARACTERS,
@@ -100,9 +107,12 @@ export function registerGenerationTools(
             model: v.model,
             voice: v.voice,
             format: v.format,
+            instructionsSupported: v.provider !== "elevenlabs",
+            available:
+              v.provider !== "elevenlabs" || elevenLabsStatus().voice.available,
             standaloneSupported:
               !v.customVoiceId &&
-              ["openai", "gemini"].includes(v.provider) &&
+              ["openai", "gemini", "elevenlabs"].includes(v.provider) &&
               ["mp3", "wav", "opus"].includes(v.format),
           })),
         },
@@ -111,14 +121,20 @@ export function registerGenerationTools(
           versionId: s.version.id,
           name: s.version.name,
         })),
-        videoGeneration: "on_hold",
+        elevenlabs: elevenLabsStatus(),
+        videoGeneration: {
+          ...videoCatalogView(),
+          models: videoCatalogView().models.filter(
+            (v) => v.model.provider === "elevenlabs",
+          ),
+        },
         youtubeCommunityPublishing: "unsupported_by_public_api",
       };
     },
   );
   register(
     "execute_generation",
-    "Execute an exact prepared image/audio generation only with owner-enabled autonomous generation for this connection/workspace. Use its operationId and the SAME idempotencyKey as prepare_generation. This starts billable work within the saved estimate and existing budgets. Poll get_generation_status; never blindly retry a failed generation with a new key. Review scene results explicitly using review_scene_image or review_scene_audio.",
+    "Execute an exact prepared image/audio/video generation only with owner-enabled autonomous generation for this connection/workspace. Use its operationId and the SAME idempotencyKey as prepare_generation. This starts billable work within the saved estimate and existing budgets. Poll get_generation_status; never blindly retry a failed generation with a new key. Review scene results explicitly using review_scene_image or review_scene_audio.",
     "vcstudio:generate",
     mcpExecuteGenerationInput,
     false,
@@ -168,7 +184,7 @@ export function registerGenerationTools(
     "prepare_generation",
     {
       description:
-        "Prepare an exact image/audio cost preview without spending. kind image/audio creates a standalone library asset; scene_image/scene_audio uses the approved current project scene. Supply maximumCostCents explicitly. Preparation expires in ten minutes. Manual grants require the human review UI; autonomous grants let the assistant call execute_generation with the operation ID and SAME idempotency key, without asking the user again. Existing budget, feature, voice and scene checks remain mandatory. No video generation or YouTube Community publishing.",
+        "Prepare an exact image/audio cost preview without spending. kind image/audio creates a standalone library asset; scene_image/scene_audio uses the approved current project scene. Supply maximumCostCents explicitly. Preparation expires in ten minutes. Manual grants require the human review UI; autonomous grants let the assistant call execute_generation with the operation ID and SAME idempotency key, without asking the user again. Existing budget, feature, voice and scene checks remain mandatory. kind video uses the exact video request and the available ElevenLabs video catalog, for library assets or existing approved scenes. YouTube Community publishing remains unsupported.",
       inputSchema: mcpPrepareGenerationInput,
       annotations: {
         readOnlyHint: false,

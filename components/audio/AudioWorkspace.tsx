@@ -143,6 +143,15 @@ export function AudioWorkspace({
     data.voicePresets[0] ??
     null;
 
+  const selectedConfiguration = {
+    ...data.configuration,
+    enabled:
+      data.configuration.enabled && selectedVoicePreset?.available !== false,
+    costPerMillionCharactersCents:
+      selectedVoicePreset?.costPerMillionCharactersCents ??
+      data.configuration.costPerMillionCharactersCents,
+  };
+
   const toggleSelect = useCallback((sceneId: string, checked: boolean) => {
     setSelected((current) => {
       const next = new Set(current);
@@ -274,10 +283,12 @@ export function AudioWorkspace({
               onApproveSelected={handleApproveSelected}
             />
           ) : null}
-          {canGenerate && data.configuration.enabled && selectedVoicePreset ? (
+          {canGenerate &&
+          selectedConfiguration.enabled &&
+          selectedVoicePreset ? (
             <BulkGenerateAudioButton
               availableBudgetCents={data.availableBudgetCents}
-              configuration={data.configuration}
+              configuration={selectedConfiguration}
               disabled={selectionScenes.length === 0}
               onGenerate={handleGenerate}
               scenes={selectionScenes}
@@ -288,13 +299,24 @@ export function AudioWorkspace({
         </div>
       </div>
 
+      {selectedVoicePreset?.unavailableReason ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          {selectedVoicePreset.unavailableReason}
+        </p>
+      ) : null}
+      {selectedVoicePreset?.provider === "elevenlabs" ? (
+        <p className="text-sm text-muted-foreground">
+          ElevenLabs uses the selected voice and speed. Scene delivery
+          instructions are not supported.
+        </p>
+      ) : null}
       <SilenceAuditPanel scenes={data.scenes} />
 
       <SceneAudioList
         availableBudgetCents={data.availableBudgetCents}
-        canGenerate={canGenerate && data.configuration.enabled}
+        canGenerate={canGenerate && selectedConfiguration.enabled}
         canReview={canReview}
-        configuration={data.configuration}
+        configuration={selectedConfiguration}
         onApprove={(generationId) =>
           runReview(approveSceneAudioAction, generationId)
         }

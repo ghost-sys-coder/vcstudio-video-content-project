@@ -10,6 +10,10 @@ be copied to another runtime merely for convenience.
 | `.env.trigger` | Trigger.dev                     | Background tasks and scheduled workers. Synchronized during deployment. Never committed. |
 | `.env.example` | Repository                      | Key catalogue and safe defaults only; contains no real credentials.                      |
 
+## ElevenLabs provider
+
+The ElevenLabs key, master flag, internal/commercial guard, TTS model/rate, visual access flag and image provider/prices belong in both web and worker configuration. Defaults disable the service. See [all controls and licensing boundary](elevenlabs-integration.md). Do not copy the web-only Clerk allowlist to workers.
+
 ## Video generation configuration
 
 Video Studio uses `ENABLE_VIDEO_GENERATION` (default

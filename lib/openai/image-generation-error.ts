@@ -1,3 +1,5 @@
+import { ElevenLabsImageError } from "@/lib/elevenlabs/errors";
+import { ElevenLabsUnavailableError } from "@/lib/elevenlabs/errors";
 import OpenAI from "openai";
 import { ImageGenerationProviderResponseError } from "@/lib/openai/image-generation-provider";
 
@@ -19,6 +21,18 @@ export type ImageGenerationFailure = {
 export function classifyImageGenerationError(
   error: unknown,
 ): ImageGenerationFailure {
+  if (
+    error instanceof ElevenLabsImageError ||
+    error instanceof ElevenLabsUnavailableError
+  )
+    return {
+      category: "provider_error",
+      safeMessage: error.message,
+      retriable: false,
+      providerMayHaveAcceptedRequest:
+        error instanceof ElevenLabsImageError && !error.definitelyUnbilled,
+      requestId: error instanceof ElevenLabsImageError ? error.jobId : null,
+    };
   if (error instanceof ImageGenerationProviderResponseError)
     return {
       category: "invalid_provider_response",

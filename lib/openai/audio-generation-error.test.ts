@@ -49,3 +49,40 @@ describe("classifyAudioGenerationError for the speech seam", () => {
     expect(failure.retriable).toBe(false);
   });
 });
+
+describe("ElevenLabs billing uncertainty", () => {
+  it("never retries an uncertain ElevenLabs speech POST or labels it free", () => {
+    expect(
+      classifyAudioGenerationError(
+        new SpeechProviderRequestError({
+          code: "elevenlabs_uncertain",
+          message: "Inspect the existing operation",
+          status: null,
+          retriable: false,
+        }),
+      ),
+    ).toMatchObject({ retriable: false, providerMayHaveBilled: true });
+    expect(
+      classifyAudioGenerationError(
+        new SpeechProviderRequestError({
+          code: "elevenlabs_500",
+          message: "Inspect the existing operation",
+          status: 500,
+          retriable: false,
+        }),
+      ),
+    ).toMatchObject({ retriable: false, providerMayHaveBilled: true });
+  });
+  it("does not retain cost for an explicit ElevenLabs credential rejection", () => {
+    expect(
+      classifyAudioGenerationError(
+        new SpeechProviderRequestError({
+          code: "elevenlabs_401",
+          message: "Check permissions",
+          status: 401,
+          retriable: false,
+        }),
+      ),
+    ).toMatchObject({ retriable: false, providerMayHaveBilled: false });
+  });
+});

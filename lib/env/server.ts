@@ -1,4 +1,5 @@
 import "server-only";
+import { resolveImageEnvironment } from "@/lib/elevenlabs/image-configuration";
 import { videoEnvironmentSchema } from "@/lib/video-generation/video-environment";
 export function getVideoGenerationEnvironment() {
   return videoEnvironmentSchema.parse(process.env);
@@ -124,7 +125,7 @@ export function getSceneAnalysisEnvironment(): SceneAnalysisEnvironment {
 
 export function getSceneImageEnvironment(): SceneImageEnvironment {
   sceneImageEnvironment ??= sceneImageEnvironmentSchema.parse(process.env);
-  return sceneImageEnvironment;
+  return resolveImageEnvironment(sceneImageEnvironment);
 }
 
 export function getSceneVideoEnvironment(): SceneVideoEnvironment {

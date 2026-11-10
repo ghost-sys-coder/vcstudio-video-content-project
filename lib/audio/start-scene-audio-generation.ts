@@ -1,4 +1,5 @@
 import "server-only";
+import { speechCostRates } from "@/lib/speech/speech-cost-rates";
 
 import { createHash, randomUUID } from "node:crypto";
 import { tasks } from "@trigger.dev/sdk";
@@ -15,7 +16,10 @@ import {
   getWorkspaceCommittedCostCents,
   listCurrentScenes,
 } from "@/db/repositories/scenes.repository";
-import { estimateSceneAudioCostCents } from "@/lib/costs/scene-audio-cost";
+import {
+  estimateSceneAudioCostCents,
+  estimateSegmentedAudioCostCents,
+} from "@/lib/costs/scene-audio-cost";
 import { BudgetExceededError } from "@/lib/domain/errors";
 import {
   createRequestFingerprint,
@@ -205,19 +209,24 @@ export async function startSceneAudioGeneration(input: {
       row,
       text: narration.text,
       characterCount: narration.characterCount,
-      instructions: composeVoiceInstructions({
-        presetInstructions: voicePreset.instructions,
-        direction: row.version,
-        raisedPhrases: extractRaisedPhrases(row.version.narrationText),
-      }),
-      estimatedCostCents: estimateSceneAudioCostCents({
-        characterCount: narration.characterCount,
-        rates: {
-          costPerMillionCharactersCents:
-            environment.OPENAI_TTS_COST_PER_MILLION_CHARACTERS_CENTS,
-          minimumEstimateCents: environment.OPENAI_TTS_MINIMUM_ESTIMATE_CENTS,
-        },
-      }),
+      instructions:
+        voicePreset.provider === "elevenlabs"
+          ? ""
+          : composeVoiceInstructions({
+              presetInstructions: voicePreset.instructions,
+              direction: row.version,
+              raisedPhrases: extractRaisedPhrases(row.version.narrationText),
+            }),
+      estimatedCostCents:
+        voicePreset.provider === "elevenlabs"
+          ? estimateSegmentedAudioCostCents({
+              parts: narration.parts,
+              rates: speechCostRates(voicePreset.provider),
+            })
+          : estimateSceneAudioCostCents({
+              characterCount: narration.characterCount,
+              rates: speechCostRates(voicePreset.provider),
+            }),
     });
   }
   if (plans.length === 0)

@@ -1,3 +1,4 @@
+import { elevenLabsEnvironmentSchema } from "@/lib/elevenlabs/environment";
 import { z } from "zod";
 import { decodeEncryptionKey } from "@/lib/crypto/secret-box";
 
@@ -31,6 +32,7 @@ export const mcpEnvironmentSchema = z.object({
 });
 
 export const serverEnvironmentSchema = z.object({
+  ...elevenLabsEnvironmentSchema.shape,
   ...privateAccessEnvironmentSchema.shape,
   CLERK_SECRET_KEY: z.string().min(1, "CLERK_SECRET_KEY is required"),
   CLERK_WEBHOOK_SIGNING_SECRET: z

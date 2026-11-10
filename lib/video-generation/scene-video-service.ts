@@ -25,8 +25,14 @@ async function sceneContext(
   value: unknown,
   write = false,
 ) {
-  const context = await authorizeVideoWorkspace(workspaceId, write),
-    scope = scopeSchema.parse(value);
+  const context = await authorizeVideoWorkspace(workspaceId, write);
+  return authorizedSceneContext(context, value);
+}
+async function authorizedSceneContext(
+  context: { workspaceId: string; userId: string },
+  value: unknown,
+) {
+  const scope = scopeSchema.parse(value);
   const [project, current] = await Promise.all([
     findProject({ ...context, projectId: scope.projectId }),
     findCurrentScene({ ...context, ...scope }),
@@ -38,7 +44,9 @@ async function sceneContext(
     );
   return { ...context, ...scope, project, current };
 }
-function selectionView(selection: SceneVisualSelection | null) {
+export function sceneVideoSelectionView(
+  selection: SceneVisualSelection | null,
+) {
   return selection
     ? {
         id: selection.id,
@@ -57,6 +65,13 @@ function selectionView(selection: SceneVisualSelection | null) {
 }
 export async function loadSceneVideoView(workspaceId: unknown, value: unknown) {
   const context = await sceneContext(workspaceId, value);
+  return loadAuthorizedSceneVideoView(context, value);
+}
+export async function loadAuthorizedSceneVideoView(
+  auth: { workspaceId: string; userId: string },
+  value: unknown,
+) {
+  const context = await authorizedSceneContext(auth, value);
   const selection = await findSceneVisualSelection({
     ...context,
     sceneVersionId: context.current.version.id,
@@ -65,7 +80,7 @@ export async function loadSceneVideoView(workspaceId: unknown, value: unknown) {
     projectDefault: context.project.defaultVisualMedia,
     sceneVersionId: context.current.version.id,
     sceneVersion: context.current.scene.currentVersion,
-    selection: selectionView(selection),
+    selection: sceneVideoSelectionView(selection),
   };
 }
 export type SceneVideoView = Awaited<ReturnType<typeof loadSceneVideoView>>;
@@ -73,12 +88,20 @@ export async function saveSceneVideoSelection(
   workspaceId: unknown,
   value: unknown,
 ) {
-  const input = sceneVisualSelectionSchema.parse(value);
-  const context = await sceneContext(
-    workspaceId,
-    { projectId: input.projectId, sceneId: input.sceneId },
-    true,
+  return saveAuthorizedSceneVideoSelection(
+    await authorizeVideoWorkspace(workspaceId, true),
+    value,
   );
+}
+export async function saveAuthorizedSceneVideoSelection(
+  auth: { workspaceId: string; userId: string },
+  value: unknown,
+) {
+  const input = sceneVisualSelectionSchema.parse(value);
+  const context = await authorizedSceneContext(auth, {
+    projectId: input.projectId,
+    sceneId: input.sceneId,
+  });
   const id = randomUUID();
   let objectKey: string | null = null;
   let width: number | null = null,
@@ -155,7 +178,7 @@ export async function saveSceneVideoSelection(
       });
     throw error;
   }
-  return loadSceneVideoView(workspaceId, {
+  return loadAuthorizedSceneVideoView(context, {
     projectId: input.projectId,
     sceneId: input.sceneId,
   });
@@ -164,17 +187,25 @@ export async function reviewSceneVideoSelection(
   workspaceId: unknown,
   value: unknown,
 ) {
+  return reviewAuthorizedSceneVideoSelection(
+    await authorizeVideoWorkspace(workspaceId, true),
+    value,
+  );
+}
+export async function reviewAuthorizedSceneVideoSelection(
+  auth: { workspaceId: string; userId: string },
+  value: unknown,
+) {
   const input = scopeSchema
     .extend({
       expectedRevision: z.number().int().positive(),
       reviewStatus: z.enum(["approved", "rejected"]),
     })
     .parse(value);
-  const context = await sceneContext(
-    workspaceId,
-    { projectId: input.projectId, sceneId: input.sceneId },
-    true,
-  );
+  const context = await authorizedSceneContext(auth, {
+    projectId: input.projectId,
+    sceneId: input.sceneId,
+  });
   const current = await findSceneVisualSelection({
     ...context,
     sceneVersionId: context.current.version.id,
@@ -207,7 +238,7 @@ export async function reviewSceneVideoSelection(
       sourceAssetId: current.sourceAssetId,
     },
   });
-  return loadSceneVideoView(workspaceId, {
+  return loadAuthorizedSceneVideoView(context, {
     projectId: input.projectId,
     sceneId: input.sceneId,
   });

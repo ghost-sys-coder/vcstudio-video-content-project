@@ -41,7 +41,10 @@ export async function recoverMcpGenerations() {
                 sceneId: job.sceneId,
                 projectId: job.projectId,
                 actualCostCents: job.actualCostCents,
-                href: `/app/projects/${job.projectId}/scenes?sceneId=${job.sceneId}`,
+                href:
+                  job.kind === "video"
+                    ? "/app/video"
+                    : `/app/projects/${job.projectId}/scenes?sceneId=${job.sceneId}`,
               },
             },
           });

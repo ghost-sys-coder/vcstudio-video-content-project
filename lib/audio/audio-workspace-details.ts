@@ -1,4 +1,8 @@
 import "server-only";
+import {
+  elevenLabsStatus,
+  getElevenLabsEnvironment,
+} from "@/lib/elevenlabs/configuration";
 
 import type { Project, SceneAudioGeneration } from "@/db/schema";
 import { ensureDefaultVoicePreset } from "@/db/commands/voice-preset-commands";
@@ -223,6 +227,18 @@ export async function loadAudioWorkspace(input: {
       id: preset.id,
       name: preset.name,
       voice: preset.voice,
+      provider: preset.provider,
+      available:
+        preset.provider !== "elevenlabs" || elevenLabsStatus().voice.available,
+      unavailableReason:
+        preset.provider === "elevenlabs"
+          ? elevenLabsStatus().voice.reason
+          : null,
+      costPerMillionCharactersCents:
+        preset.provider === "elevenlabs"
+          ? getElevenLabsEnvironment()
+              .ELEVENLABS_TTS_COST_PER_MILLION_CHARACTERS_CENTS
+          : environment.OPENAI_TTS_COST_PER_MILLION_CHARACTERS_CENTS,
       model: preset.model,
       instructions: preset.instructions,
       speedScaledPercent: preset.speedScaledPercent,

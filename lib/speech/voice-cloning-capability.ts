@@ -15,7 +15,7 @@
  * the habits of whichever provider was configured when it was written.
  */
 
-export type SpeechProviderId = "openai" | "magpie" | "gemini";
+export type SpeechProviderId = "openai" | "magpie" | "gemini" | "elevenlabs";
 
 /** Reference-clip requirements a recorder must satisfy before enrolment. */
 export interface ZeroShotReferenceRequirements {

@@ -1,3 +1,7 @@
+import {
+  elevenLabsEnvironmentSchema,
+  elevenLabsUnavailableReason,
+} from "@/lib/elevenlabs/environment";
 import { z } from "zod";
 import { videoModelPricingSchema } from "@studio/contracts/video";
 
@@ -6,6 +10,7 @@ const optionalKey = z.preprocess(
   z.string().trim().min(1).optional(),
 );
 export const videoEnvironmentSchema = z.object({
+  ...elevenLabsEnvironmentSchema.shape,
   ENABLE_VIDEO_GENERATION: z
     .enum(["true", "false"])
     .default("false")
@@ -46,6 +51,8 @@ export function videoProviderConfigured(
   provider: string,
   environment: VideoEnvironment,
 ) {
+  if (provider === "elevenlabs")
+    return !elevenLabsUnavailableReason(environment, true);
   return provider === "google_gemini"
     ? Boolean(environment.GOOGLE_AI_VIDEO_GENERATION_API_KEY)
     : provider === "runway"

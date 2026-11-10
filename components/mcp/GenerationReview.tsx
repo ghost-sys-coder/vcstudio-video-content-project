@@ -58,17 +58,25 @@ export function GenerationReview({
       </dl>
       <div className="app-heading">
         <h3 className="font-medium">
-          {preview.kind.endsWith("audio") ? "Narration text" : "Image prompt"}
+          {preview.kind.endsWith("audio")
+            ? "Narration text"
+            : preview.kind === "video"
+              ? "Video prompt"
+              : "Image prompt"}
         </h3>
         <p className="max-h-80 overflow-auto whitespace-pre-wrap wrap-break-word rounded-xl bg-muted/45 p-4 text-sm">
           {preview.text}
         </p>
       </div>
       <p className="text-xs leading-relaxed text-muted-foreground">
-        Workspace and project budgets are enforced before submission. Actual
-        provider usage is recorded in Usage &amp; budgets and can differ from
-        the estimate. A failed or interrupted provider attempt may still incur a
-        charge. Generated scene media remains awaiting explicit review.
+        Workspace and project budgets are enforced before submission. Costs can
+        differ from the estimate. If the provider does not report usage, the
+        approved conservative estimate is retained. A failed or interrupted
+        attempt may still incur a charge. Generated scene media awaits explicit
+        review.
+        {preview.provider === "elevenlabs"
+          ? " ElevenLabs estimates value subscription credits; they do not necessarily represent a new cash charge."
+          : ""}
       </p>
       {actions}
     </section>

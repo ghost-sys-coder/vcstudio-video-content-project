@@ -21,6 +21,7 @@ const applicationCss = (
 ).css;
 for (const [name, entry] of [
   ["harness", "e2e/mcp/fixtures/entry.tsx"],
+  ["elevenlabs-voice", "e2e/mcp/fixtures/elevenlabs-voice-entry.tsx"],
   ["host", "e2e/mcp/fixtures/host.ts"],
   ["upload-host", "e2e/mcp/fixtures/upload-host.ts"],
   ["waitlist", "e2e/mcp/fixtures/waitlist-entry.tsx"],
@@ -147,7 +148,7 @@ for (const [name, entry] of [
   });
   await writeFile(
     path.join(out, `${name}.html`),
-    `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${name === "post-composer" || name === "tiktok-connect" || name === "project-creation" || name === "facebook-selection" || name === "video-media" || name === "media-upload" || name === "media-library" ? applicationCss : css}</style><style>body{margin:0;padding:16px;min-width:0}</style></head><body><div id="root"></div><script type="module">${bundle.outputFiles[0].text.replace(/<\/script/gi, "<\\/script")}</script></body></html>`,
+    `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${name === "post-composer" || name === "tiktok-connect" || name === "project-creation" || name === "facebook-selection" || name === "video-media" || name === "media-upload" || name === "media-library" || name === "elevenlabs-voice" ? applicationCss : css}</style><style>body{margin:0;padding:16px;min-width:0}</style></head><body><div id="root"></div><script type="module">${bundle.outputFiles[0].text.replace(/<\/script/gi, "<\\/script")}</script></body></html>`,
   );
 }
 const server = createServer(async (req, res) => {
@@ -190,6 +191,7 @@ const server = createServer(async (req, res) => {
     "/application-error.html": path.join(out, "application-error.html"),
     "/app/queue": path.join(out, "queue.html"),
     "/video.html": path.join(out, "video.html"),
+    "/elevenlabs-voice.html": path.join(out, "elevenlabs-voice.html"),
     "/tiktok-connect.html": path.join(out, "tiktok-connect.html"),
     "/project-creation.html": path.join(out, "project-creation.html"),
     "/facebook-selection.html": path.join(out, "facebook-selection.html"),

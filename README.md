@@ -6,6 +6,8 @@ This repository is the foundation for an internal production tool that converts 
 
 ## Current capabilities
 
+- **ElevenLabs in-house integration:** existing account voices join project/MCP narration; documented image and video APIs share private storage, budgets, revision checks and optional MCP autonomy. A deployment kill switch and internal/commercial guard apply to every modality. The supplied key is Creator: voice is eligible, while image/video remain disabled pending Pro API access and explicit visual pricing. See [setup and operating controls](docs/elevenlabs-integration.md).
+
 - **MCP image/audio generation live:** standalone library assets and existing project scenes use a separate Generate permission and per-connection generation approval mode. Owner-enabled autonomy lets the assistant prepare estimates, execute generation and explicitly review scene media itself; publishing autonomy remains separate. Existing budgets and feature flags apply. The generation release uses worker `20261110.1`; protocol update `1.2.1` declares per-tool OAuth requirements and incremental consent challenges. The existing ChatGPT/Claude owner connections have Generate plus autonomous generation and publishing; refresh each client's tool catalogue and reconnect once to authorize the new OAuth scope. New grants default to manual. See [generation setup](docs/mcp-generation.md). YouTube Community publishing remains on hold.
 
 - **Project creation and optional MCP publishing approval:** new projects choose Still images or Video footage as their default scene visuals; existing animated-character projects keep their behavior. Owners can opt a specific MCP connection/workspace into autonomous publishing while manual approval remains the default for every existing grant. Agents still prepare immutable previews, then use `execute_publication` with the same operation/idempotency key; internal content approval, scopes, budgets, private access and platform restrictions remain enforced. The `mcp_autonomous_publishing` migration is applied in production; both existing connections retain manual approval. See [approval settings](docs/mcp-setup.md#optional-autonomous-publishing).
@@ -133,7 +135,7 @@ The repository will move into the full `apps/` and `packages/` monorepo structur
 
 ## Technology stack
 
-Next.js 16, React 19, strict TypeScript, Tailwind CSS, shadcn/ui, sonner (toast notifications), Clerk, Neon PostgreSQL, Drizzle ORM, Trigger.dev 4.5.4, OpenAI Responses API, Vercel AI SDK 7 (`ai`, `@ai-sdk/openai`, `@ai-sdk/react` — streaming and tool calling for the Marketing Studio chat only; every other OpenAI call still uses the `openai` client directly), Cloudflare R2, Sharp, Remotion 4 (`remotion`, `@remotion/player`, `@remotion/bundler`, `@remotion/renderer`), Zod, Vitest, ESLint, and Prettier.
+Next.js 16, React 19, strict TypeScript, Tailwind CSS, shadcn/ui, sonner (toast notifications), Clerk, Neon PostgreSQL, Drizzle ORM, Trigger.dev 4.5.4, OpenAI Responses API, ElevenLabs SDK 2.77.0 (private media service), Vercel AI SDK 7 (`ai`, `@ai-sdk/openai`, `@ai-sdk/react` — streaming and tool calling for the Marketing Studio chat only; every other OpenAI call still uses the `openai` client directly), Cloudflare R2, Sharp, Remotion 4 (`remotion`, `@remotion/player`, `@remotion/bundler`, `@remotion/renderer`), Zod, Vitest, ESLint, and Prettier.
 
 ## Repository structure
 
@@ -147,6 +149,7 @@ lib/env/             Environment validation
 lib/policies/        Central workspace authorization rules
 lib/schemas/         External input validation
 lib/openai/          Narrow server-only OpenAI provider implementation
+lib/elevenlabs/      In-house speech/image/video adapters and deployment/licensing guard
 lib/subtitles/       Pure subtitle segmentation, track assembly, and SRT/WebVTT/Remotion serializers
 lib/timeline/        Deterministic scene and video timeline builders
 lib/render/          Render domain logic: presets, camera motion, cost, snapshot, provider, orchestration
@@ -169,6 +172,8 @@ docs/                Bootstrap and phase specifications
 5. Run `npm run dev` and open `http://localhost:3000`.
 
 ## Environment variables
+
+ElevenLabs uses server-only configuration in local, web and worker environments. `ENABLE_ELEVENLABS=false` is the master off switch; internal mode, private deployment assertion, visual access and conservative pricing are validated separately. See [the complete variable list and licensing boundary](docs/elevenlabs-integration.md#deployment-controls).
 
 | Variable                                            | Visibility  | Required    | Purpose                                                                                                                                        |
 | --------------------------------------------------- | ----------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -526,6 +531,8 @@ Video renders and exports are workspace-scoped by composite foreign keys and are
 
 ## Cost controls
 
+ElevenLabs consumes owner subscription credits. Conservative USD-cent valuations participate in existing budget reservations; this is not a live provider credit balance or a promise of an incremental cash charge. Speech segments are priced separately, reported charged characters are recorded when available, and visual outputs retain the approved estimate because their API response does not report measured credit cost. Uncertain ElevenLabs submissions never receive an automatic paid retry.
+
 Scene analysis and scene-image generation show a conservative estimate before confirmation. Their reservation commands serialize spending checks per workspace, enforce project plus daily and monthly workspace limits atomically, and append application-level ledger events. Image generation records each provider attempt and actual token usage, reconciles the reservation to actual cost, releases unused value, and uses a conservative reserved-cost fallback when usage is unavailable. Every explicit Generate action creates a new paid generation version; billable retries are bounded by `MAX_IMAGE_GENERATION_RETRIES` and never silently reuse an older image.
 
 Video rendering has no per-render provider invoice, so its cost is derived from output duration at `VIDEO_RENDER_COST_PER_MINUTE_CENTS` (rounded up to the minute, with a minimum floor) and shown before the render starts. Starting a render reserves that estimate through the same money-safe ledger under a per-workspace advisory lock and project/daily/monthly budget guard, then reconciles to the same figure on success or releases it on cancellation, expiry, or pre-compute failure. Renders longer than `MAX_RENDER_DURATION_SECONDS` are rejected before any compute, billable retries are bounded by `MAX_RENDER_ATTEMPTS`, and an identical timeline reuses its existing render rather than billing again.
@@ -536,7 +543,7 @@ The Marketing Studio spends through its **own** ledger (`marketing_generation_ru
 
 ## Current limitations
 
-- The MCP `1.2.0` image/audio extension is verified locally but awaits its production migration, Clerk Generate scope/client consent and deployment. Standalone custom voices, MCP rendering/video generation and YouTube Community publishing are outside this release; existing custom voices remain usable in project scenes. See [generation limits and rollout](docs/mcp-generation.md).
+- MCP `1.2.1` image/audio generation is live with Generate consent verified in ChatGPT and Claude. The `1.3.0` ElevenLabs extension is prepared locally and awaits its own production migration/release approval. The supplied Creator subscription supports voice; ElevenLabs image/video HTTP APIs require Pro or higher and configured visual prices. New voice enrolment/cloning, MCP rendering and YouTube Community publishing remain outside this change. See [ElevenLabs limits and controls](docs/elevenlabs-integration.md).
 
 - **Voice cloning is deferred by creator decision (2026-09-25).** Do not add a paid cloning provider or start cloning jobs before a YouTube channel generates income and the creator revisits the choice. The Money Made Clear trial can use the existing manual narration-recording flow. Other AI generation has separate explicit cost and budget controls; this decision does not change those controls.
 
@@ -605,6 +612,8 @@ The Marketing Studio spends through its **own** ledger (`marketing_generation_ru
 
 ## Implementation status
 
+The ElevenLabs in-house provider extension is implemented and verified locally. Production migration and deployment remain pending explicit release approval. Existing MCP connections and provider defaults are preserved; image/video access is disabled on the current Creator plan.
+
 The MCP image/audio follow-up is released as version `1.2.0`: cost preparation/execution/status, standalone private assets, shared scene pipelines, explicit agent review and owner-selectable autonomy. Migration `20261110001516_mcp_media_generation`, worker `20261110.1`, the web app and Clerk Generate scope are live. Both approved owner connections have autonomous generation and publishing; a one-time OAuth reconnection is required for their existing tokens to gain `vcstudio:generate`. Authenticated live reads, public/private route checks and initial runtime error inspection passed without paid generation or posting.
 
 The [version-two YouTube production plan](docs/version-two/README.md) defines the next improvements: revision safety, recoverable drafts, channel profiles and reusable formats, guided production, complete YouTube releases, editorial/media quality, and performance feedback. Its [build tracker](docs/version-two/build-tracker.md) records acceptance and delivery evidence for 20 slices. V2-00 is **In progress** with executable technical fixtures; Money Made Clear is the confirmed first channel; a measured creator walkthrough remains pending. V2-01 is **In progress** with local revisions, compatible media reuse, caption/framing preservation and save-impact feedback. Remaining work includes exact regeneration estimates, automatic Short rebasing and authenticated browser validation. V2-02 onward are **Not started**. Marketing Studio feature improvements are outside this plan.
@@ -612,6 +621,8 @@ The [version-two YouTube production plan](docs/version-two/README.md) defines th
 Phases 1–12 are implemented through authenticated workspaces, project/script versioning, durable AI scene planning, workspace character consistency references, cost-controlled media generation, deterministic subtitles, Remotion rendering, operational hardening, inspectable knowledge ingestion, and normalized publication-performance feedback. Marketing Studio includes Slice 13 orchestration: `social_media_manager` creates bounded, review-only weekly draft sets through the existing shared budget and capability controls, and the persisted weekly digest makes generation, human review, spend/refusal, scheduler, integration, Google Business sync, and acknowledgement outcomes measurable even in a zero-activity week. Slice 14 evidence-gated autonomous approval remains intentionally unbuilt.
 
 ## Recent major changes
+
+- **2026-11-10 — ElevenLabs integration prepared:** added official SDK `2.77.0`, shared voice/image/video provider adapters, on-demand account voice selection, conservative credit valuation, in-house/license controls and an all-modality disable switch. MCP adds voice discovery/preset creation and routes video preparation/execution/status through the existing video workflow. New nullable tenant-bound video/MCP ownership migration is generated but not applied to production. Visual APIs remain unavailable on the current Creator subscription; no paid test, subscription change, public post or extra scheduled worker was used. Full regression run: 3,353 passed/160 existing opt-in skips; final affected suites: 464 passed; 21 mocked browser journeys passed. Changed-file formatting, TypeScript and lint pass (three existing lint warnings). The full formatting check reports 1,486 existing files outside this change; the dependency audit reports 76 existing advisories and none on the two newly added packages. The final production build passed; migration/release remains pending owner approval. See [integration documentation](docs/elevenlabs-integration.md).
 
 - **2026-11-10 — ChatGPT MCP scope/discovery compatibility:** version `1.2.1` declares explicit OAuth metadata for every tool, including upload/review MCP Apps, and returns the documented incremental authorization challenge only when a permitted action lacks its OAuth token scope. Revocation, absent workspace grants and role denials remain ordinary refusals; reauthorization cannot override them. Scope upgrades retain existing known permissions, and the initial HTTP challenge advertises all six supported scopes. Connection diagnostics now distinguish granted/missing OAuth scopes from the current server version. Tool count stays 49 registered, including two UI-only confirmations (47 assistant-callable tools). ChatGPT must refresh the connector's tool catalogue before reconnecting; refreshing the conversation alone does not fetch updated tools. Verification passed 273 MCP tests, eight browser journeys, formatting, lint (three existing warnings), TypeScript, environment placement and the production build. No database, provider, environment, dependency or worker change is needed. After refreshing/reconnecting, the user confirmed Generate and all five new tools are available in ChatGPT; Claude was already confirmed. This accepts tool/permission visibility, without a paid generation test. See [ChatGPT reconnect steps](docs/mcp-generation.md#chatgpt-tool-discovery-and-scope-upgrades).
 

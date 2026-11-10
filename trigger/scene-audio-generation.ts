@@ -1,3 +1,4 @@
+import { speechCostRates } from "@/lib/speech/speech-cost-rates";
 import { randomUUID } from "node:crypto";
 import { assertMcpGenerationWorkerAccess } from "@/lib/mcp/generation-service";
 import { task } from "@trigger.dev/sdk";
@@ -106,12 +107,8 @@ export const sceneAudioGenerationTask = task({
       generationId: generation.id,
       format: generation.format,
     });
-    const rates = {
-      costPerMillionCharactersCents:
-        environment.OPENAI_TTS_COST_PER_MILLION_CHARACTERS_CENTS,
-      minimumEstimateCents: environment.OPENAI_TTS_MINIMUM_ESTIMATE_CENTS,
-    };
-    const actualCostCents = calculateActualSceneAudioCostCents({
+    const rates = speechCostRates(generation.provider ?? "openai");
+    let actualCostCents = calculateActualSceneAudioCostCents({
       characterCount: generation.inputCharacterCount,
       rates,
     });
@@ -174,7 +171,24 @@ export const sceneAudioGenerationTask = task({
     });
     if (!claim.claimed && claim.generation.status === "succeeded")
       return { generationId: generation.id, status: "succeeded" as const };
+    // A lost speech response has no safe provider polling API. A duplicate run
+    // may inspect the original attempt, but must never speak it a second time.
+    if (!claim.claimed && generation.provider === "elevenlabs") {
+      if (ctx.attempt.number > 1 && claim.generation.status === "running") {
+        await failSceneAudioGeneration({
+          ...scope,
+          category: "provider_outcome_uncertain",
+          safeErrorMessage:
+            "The previous ElevenLabs speech attempt did not finish. Its estimated cost was retained; no second paid request was made.",
+          providerBilled: true,
+          actualCostCents: generation.estimatedCostCents,
+        });
+        return { generationId: generation.id, status: "failed" as const };
+      }
+      return { generationId: generation.id, status: claim.generation.status };
+    }
 
+    let elevenLabsCostCents = 0;
     let result: {
       bytes: Buffer;
       contentType: string;
@@ -195,8 +209,14 @@ export const sceneAudioGenerationTask = task({
             input.workspaceId,
             generation.mcpOperationId,
           );
-        if (generation.provider === "gemini") {
-          const synthesized = await createSpeechProvider("gemini").synthesize({
+        if (
+          generation.provider === "gemini" ||
+          generation.provider === "elevenlabs"
+        ) {
+          const synthesized = await createSpeechProvider(
+            generation.provider,
+            generation.model,
+          ).synthesize({
             text,
             voice: generation.isCustomVoice
               ? { kind: "enrolled", providerVoiceId: generation.voice }
@@ -207,6 +227,11 @@ export const sceneAudioGenerationTask = task({
             instructions: generation.instructions,
             endUserId: generation.requestedByUserId,
           });
+          if (generation.provider === "elevenlabs")
+            elevenLabsCostCents += calculateActualSceneAudioCostCents({
+              characterCount: synthesized.characterCount,
+              rates,
+            });
           return {
             ...synthesized,
             requestId: synthesized.requestId ?? providerRequestId,
@@ -280,6 +305,8 @@ export const sceneAudioGenerationTask = task({
       return { generationId: generation.id, status: "failed" as const };
     }
 
+    if (generation.provider === "elevenlabs")
+      actualCostCents = elevenLabsCostCents;
     let stored;
     try {
       // Inspect duration first so it can be persisted with the object; a

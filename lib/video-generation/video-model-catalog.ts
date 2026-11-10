@@ -135,6 +135,63 @@ export const VIDEO_MODELS: VideoModelDescriptor[] = [
       "https://docs.agents.lumalabs.ai/guides/videos/generation/",
     verifiedAt,
   }),
+  ...["veo-3.1-fast-generate-001", "veo-3.1-generate-001"].map(
+    (providerModelId) =>
+      videoModelDescriptorSchema.parse({
+        id: `elevenlabs-${providerModelId}`,
+        provider: "elevenlabs",
+        providerModelId,
+        name: providerModelId.includes("fast")
+          ? "ElevenLabs · Veo 3.1 Fast"
+          : "ElevenLabs · Veo 3.1",
+        description:
+          "Private in-house service. Requires ElevenLabs Pro API access and explicit pricing. Optional native sound; project scenes retain narration.",
+        version: "2026-11-10.1",
+        modes: ["text_to_video", "image_to_video", "reference_to_video"],
+        outputs: [
+          {
+            resolution: "720p",
+            width: 1280,
+            height: 720,
+            durationsSeconds: [4, 6, 8],
+          },
+          {
+            resolution: "1080p",
+            width: 1920,
+            height: 1080,
+            durationsSeconds: [8],
+          },
+        ].flatMap((shape) => [
+          { ...shape, aspectRatio: "16:9" },
+          {
+            ...shape,
+            aspectRatio: "9:16",
+            width: shape.height,
+            height: shape.width,
+          },
+        ]),
+        inputRoles: [
+          "first_frame",
+          "last_frame",
+          "reference",
+          "character",
+          "product",
+          "style",
+        ],
+        maxInputs: 3,
+        referenceDurationsSeconds: [8],
+        audioModes: ["none", "native"],
+        audioGeneration: "optional",
+        durationControl: "strict",
+        supportsSeed: true,
+        supportsNegativePrompt: true,
+        supportsCancellation: false,
+        maxPromptCharacters: 4000,
+        documentationUrl:
+          "https://elevenlabs.io/docs/api-reference/flows/video/create",
+        verifiedAt: "2026-11-10",
+      }),
+  ),
 ];
 
 export const VIDEO_PRICES: VideoModelPricing[] = [

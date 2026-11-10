@@ -96,6 +96,25 @@ export function VideoStudioPage({
           {catalog.enabled ? "Generation available" : "Generation paused"}
         </Badge>
       </header>
+      {catalog.elevenlabs ? (
+        <div className="app-panel flex flex-wrap items-center justify-between gap-3 text-sm">
+          <div className="space-y-1">
+            <p className="font-semibold">ElevenLabs media service</p>
+            <p className="text-muted-foreground">
+              {catalog.elevenlabs.video.reason ??
+                "Video API configured. Existing estimates and credit limits apply."}
+            </p>
+          </div>
+          <Badge
+            variant="outline"
+            className="border-amber-300 bg-amber-100 text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
+          >
+            {catalog.elevenlabs.usageMode === "internal"
+              ? "In-house only"
+              : "Licensed service"}
+          </Badge>
+        </div>
+      ) : null}
       {target?.kind === "scene" ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-notice-ready-edge bg-notice-ready p-4 text-sm text-notice-ready-foreground">
           <span>

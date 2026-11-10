@@ -1,4 +1,5 @@
 import "server-only";
+import { ElevenLabsSpeechProvider } from "@/lib/elevenlabs/speech-provider";
 
 import {
   getSceneAudioEnvironment,
@@ -24,7 +25,11 @@ import type { SpeechProviderId } from "@/lib/speech/voice-cloning-capability";
  * OpenAI never builds the NVIDIA transport and so never needs its credentials,
  * which is what lets the two coexist in one configuration.
  */
-export function createSpeechProvider(id: SpeechProviderId): SpeechProvider {
+export function createSpeechProvider(
+  id: SpeechProviderId,
+  expectedModel?: string,
+): SpeechProvider {
+  if (id === "elevenlabs") return new ElevenLabsSpeechProvider(expectedModel);
   if (id === "openai") {
     const audio = getSceneAudioEnvironment();
     return new OpenAiSpeechProvider({

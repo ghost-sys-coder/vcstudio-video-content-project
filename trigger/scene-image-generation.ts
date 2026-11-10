@@ -33,7 +33,7 @@ import {
 } from "@/lib/openai/image-generation-error";
 import { ImageGenerationProviderResponseError } from "@/lib/openai/image-generation-provider";
 import { getOpenAiReferenceInputFidelitySnapshot } from "@/lib/openai/image-generation-request";
-import { OpenAiImageGenerationProvider } from "@/lib/openai/openai-image-generation-provider";
+import { createImageProvider } from "@/lib/elevenlabs/create-image-provider";
 import {
   completeStoredSceneImage,
   failSceneImageWithConservativeProviderOutcome,
@@ -355,7 +355,9 @@ export const sceneImageGenerationTask = task({
     const attempt = await startSceneImageProviderAttempt({
       ...scope,
       providerRequestId: randomUUID(),
-      provider: "openai",
+      provider: generation.model.startsWith("elevenlabs/")
+        ? "elevenlabs"
+        : "openai",
       model: generation.model,
       idempotencyKey: providerAttemptIdempotencyKey(
         generation.idempotencyKey,
@@ -428,9 +430,10 @@ export const sceneImageGenerationTask = task({
       return { generationId: generation.id, status: "failed" as const };
     }
 
-    const provider = new OpenAiImageGenerationProvider({
-      apiKey: environment.OPENAI_API_KEY,
-      timeoutMilliseconds: environment.OPENAI_REQUEST_TIMEOUT_SECONDS * 1_000,
+    const provider = createImageProvider(generation.model, {
+      kind: "scene",
+      workspaceId: generation.workspaceId,
+      generationId: generation.id,
     });
     let result: Awaited<ReturnType<typeof provider.generate>>;
     try {

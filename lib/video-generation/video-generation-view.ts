@@ -1,4 +1,5 @@
 import "server-only";
+import { elevenLabsStatus } from "@/lib/elevenlabs/configuration";
 import type { VideoGeneration } from "@/db/schema";
 import { listVideoGenerations } from "@/db/repositories/video-generations.repository";
 import { findMediaAsset } from "@/db/repositories/media-assets.repository";
@@ -47,6 +48,8 @@ export function videoCatalogView() {
   const environment = getVideoGenerationEnvironment();
   return {
     enabled: environment.ENABLE_VIDEO_GENERATION,
+    elevenlabs: elevenLabsStatus() as
+      ReturnType<typeof elevenLabsStatus> | undefined,
     maximumCostCents: environment.VIDEO_GENERATION_MAX_COST_CENTS,
     dailyBudgetCents: environment.VIDEO_GENERATION_DAILY_BUDGET_CENTS,
     lifetimeBudgetCents: environment.VIDEO_GENERATION_LIFETIME_BUDGET_CENTS,

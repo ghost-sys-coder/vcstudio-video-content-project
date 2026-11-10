@@ -1,3 +1,4 @@
+import { estimateSegmentedAudioCostCents } from "./scene-audio-cost";
 import { describe, expect, it } from "vitest";
 import { estimateSceneAudioCostCents } from "@/lib/costs/scene-audio-cost";
 
@@ -34,4 +35,17 @@ describe("estimateSceneAudioCostCents", () => {
       estimateSceneAudioCostCents({ characterCount: -1, rates }),
     ).toThrow();
   });
+});
+
+it("reserves each separately billed speech segment without charging silent pauses", () => {
+  expect(
+    estimateSegmentedAudioCostCents({
+      parts: [
+        { kind: "speech", text: "Hi" },
+        { kind: "pause" },
+        { kind: "speech", text: "Bye" },
+      ],
+      rates: { costPerMillionCharactersCents: 30000, minimumEstimateCents: 1 },
+    }),
+  ).toBe(2);
 });

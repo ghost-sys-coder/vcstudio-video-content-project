@@ -8,7 +8,7 @@ export const mcpImageGenerationTask = task({
   id: "mcp-image-generation",
   queue: { name: "image-generation", concurrencyLimit: 2 },
   retry: { maxAttempts: 1 },
-  maxDuration: 300,
+  maxDuration: 600,
   run: async (payload: unknown) =>
     runStandaloneMcpGeneration(mcpGenerationTaskInput.parse(payload)),
   onFailure: async ({ payload }) => {

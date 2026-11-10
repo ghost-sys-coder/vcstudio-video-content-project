@@ -39,3 +39,21 @@ export function calculateActualSceneAudioCostCents(input: {
 }): number {
   return estimateSceneAudioCostCents(input);
 }
+
+/** Each spoken segment is a separate provider request; silence is free. */
+export function estimateSegmentedAudioCostCents(input: {
+  parts: ReadonlyArray<{ kind: "speech"; text: string } | { kind: "pause" }>;
+  rates: SceneAudioCostRates;
+}): number {
+  return input.parts.reduce(
+    (sum, part) =>
+      sum +
+      (part.kind === "speech"
+        ? estimateSceneAudioCostCents({
+            characterCount: part.text.length,
+            rates: input.rates,
+          })
+        : 0),
+    0,
+  );
+}

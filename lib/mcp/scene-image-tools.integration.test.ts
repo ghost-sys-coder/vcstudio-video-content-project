@@ -1,3 +1,6 @@
+vi.mock("@/db/repositories/scene-visual-selections.repository", () => ({
+  findSceneVisualSelection: async () => null,
+}));
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import sharp from "sharp";
 import { Client } from "@modelcontextprotocol/client";

@@ -116,9 +116,9 @@ async function client() {
   return instance;
 }
 describe("real MCP SDK interoperability", () => {
-  it("publishes explicit OAuth metadata for all 49 tools without exposing UI approvals to the model", async () => {
+  it("publishes explicit OAuth metadata for all 53 tools without exposing UI approvals to the model", async () => {
     const tools = (await (await client()).listTools()).tools;
-    expect(tools).toHaveLength(49);
+    expect(tools).toHaveLength(53);
     expect(
       tools.filter(
         (tool) =>

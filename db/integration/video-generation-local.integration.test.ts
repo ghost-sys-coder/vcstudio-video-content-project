@@ -84,6 +84,16 @@ beforeAll(async () => {
     )
   ).split("--> statement-breakpoint"))
     if (statement.trim()) await pg.exec(statement);
+  await pg.exec(
+    "create table mcp_operations(id uuid primary key, workspace_id uuid not null references workspaces(id), unique(id,workspace_id));",
+  );
+  for (const statement of (
+    await readFile(
+      "migrations/20261110144100_elevenlabs_mcp_video/migration.sql",
+      "utf8",
+    )
+  ).split("--> statement-breakpoint"))
+    if (statement.trim()) await pg.exec(statement);
   for (const name of [
     "scene_variant_framings",
     "short_clips",
@@ -364,5 +374,54 @@ describe("video reservations on isolated PostgreSQL", () => {
       (await pg.query("select id from media_assets where id=$1", [original]))
         .rows,
     ).toHaveLength(1);
+  });
+});
+
+describe("video MCP tenant migration", () => {
+  it("preserves legacy jobs with no MCP owner", async () => {
+    expect(
+      (
+        await pg.query(
+          "select count(*)::int as n from video_generations where mcp_operation_id is null",
+        )
+      ).rows[0],
+    ).toMatchObject({ n: expect.any(Number) });
+  });
+  it("rejects cross-workspace operation ownership and duplicate operation jobs", async () => {
+    const op = randomUUID();
+    await pg.query(
+      "insert into mcp_operations(id,workspace_id) values($1,$2)",
+      [op, workspace],
+    );
+    const job = (
+      await pg.query<{ id: string }>(
+        "select id from video_generations where workspace_id=$1 limit 1",
+        [workspace],
+      )
+    ).rows[0]!;
+    await pg.query(
+      "update video_generations set mcp_operation_id=$1 where id=$2",
+      [op, job.id],
+    );
+    await expect(
+      pg.query("update video_generations set workspace_id=$1 where id=$2", [
+        otherWorkspace,
+        job.id,
+      ]),
+    ).rejects.toThrow();
+    const other = (
+      await pg.query<{ id: string }>(
+        "select id from video_generations where workspace_id=$1 and id<>$2 limit 1",
+        [workspace, job.id],
+      )
+    ).rows[0];
+    if (!other)
+      throw new Error("Expected two existing jobs to verify uniqueness.");
+    await expect(
+      pg.query("update video_generations set mcp_operation_id=$1 where id=$2", [
+        op,
+        other.id,
+      ]),
+    ).rejects.toThrow();
   });
 });

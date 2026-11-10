@@ -6,6 +6,7 @@ import {
   mcpOperations,
   sceneImageGenerations,
   sceneAudioGenerations,
+  videoGenerations,
 } from "@/db/schema";
 import type { McpContext } from "@/lib/mcp/context";
 
@@ -45,7 +46,7 @@ export async function listMcpGenerationJobs(
   workspaceId: string,
   operationId: string,
 ) {
-  const [images, audio] = await Promise.all([
+  const [images, audio, video] = await Promise.all([
     getDatabase()
       .select({
         id: sceneImageGenerations.id,
@@ -84,8 +85,31 @@ export async function listMcpGenerationJobs(
         ),
       )
       .limit(1),
+    getDatabase()
+      .select({
+        id: videoGenerations.id,
+        projectId: videoGenerations.projectId,
+        sceneId: videoGenerations.sceneId,
+        status: videoGenerations.status,
+        error: videoGenerations.safeErrorMessage,
+        actualCostCents: videoGenerations.actualCostCents,
+        triggerRunId: videoGenerations.triggerRunId,
+      })
+      .from(videoGenerations)
+      .where(
+        and(
+          eq(videoGenerations.workspaceId, workspaceId),
+          eq(videoGenerations.mcpOperationId, operationId),
+        ),
+      )
+      .limit(1),
   ]);
   return [
+    ...video.map((job) => ({
+      ...job,
+      kind: "video" as const,
+      reviewStatus: null,
+    })),
     ...images.map((job) => ({ ...job, kind: "scene_image" as const })),
     ...audio.map((job) => ({ ...job, kind: "scene_audio" as const })),
   ];

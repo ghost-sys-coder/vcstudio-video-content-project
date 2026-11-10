@@ -17,6 +17,7 @@ export type ProjectVisualMedia = z.infer<typeof projectVisualMediaSchema>;
 
 export const videoProviderIdSchema = z.enum([
   "google_gemini",
+  "elevenlabs",
   "google_vertex",
   "runway",
   "luma",

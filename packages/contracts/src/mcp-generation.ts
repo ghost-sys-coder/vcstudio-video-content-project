@@ -1,3 +1,4 @@
+import { videoGenerationRequestSchema } from "./video";
 import { z } from "zod";
 import { mcpMutationInput, mcpWorkspaceInput } from "./mcp";
 import { MAX_SHOTS_PER_SCENE } from "./scene-media";
@@ -32,6 +33,11 @@ const scene = z.object({
   expectedSceneVersion: z.number().int().positive(),
 });
 export const mcpGenerationRequestSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("video"),
+    video: videoGenerationRequestSchema,
+    maximumCostCents,
+  }),
   image.extend({
     kind: z.literal("image"),
     title: z.string().trim().max(200).default(""),
@@ -75,7 +81,7 @@ export const mcpGenerationOptionsInput = mcpWorkspaceInput.extend({
   projectId: z.uuid().optional(),
 });
 export const generationPreviewSchema = z.object({
-  kind: z.enum(["image", "audio", "scene_image", "scene_audio"]),
+  kind: z.enum(["image", "audio", "scene_image", "scene_audio", "video"]),
   title: z.string(),
   text: z.string(),
   model: z.string(),

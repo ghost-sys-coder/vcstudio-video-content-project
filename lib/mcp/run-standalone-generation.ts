@@ -1,3 +1,4 @@
+import { ElevenLabsImageError } from "@/lib/elevenlabs/errors";
 import "server-only";
 import sharp from "sharp";
 import { z } from "zod";
@@ -16,7 +17,7 @@ import {
   getMediaLibraryEnvironment,
   getSceneMediaUploadEnvironment,
 } from "@/lib/env/server";
-import { OpenAiImageGenerationProvider } from "@/lib/openai/openai-image-generation-provider";
+import { createImageProvider } from "@/lib/elevenlabs/create-image-provider";
 import { calculateActualSceneImageCostCents } from "@/lib/costs/scene-image-cost";
 import { calculateActualSceneAudioCostCents } from "@/lib/costs/scene-audio-cost";
 import { createSpeechProvider } from "@/lib/speech/create-speech-provider";
@@ -101,9 +102,10 @@ export async function runStandaloneMcpGeneration(
     };
     if (plan.kind === "image") {
       const env = getSceneImageEnvironment();
-      const provider = new OpenAiImageGenerationProvider({
-        apiKey: env.OPENAI_API_KEY,
-        timeoutMilliseconds: env.OPENAI_REQUEST_TIMEOUT_SECONDS * 1000,
+      const provider = createImageProvider(plan.configuration.model, {
+        kind: "mcp",
+        workspaceId: input.workspaceId,
+        generationId: input.operationId,
       });
       const references = await downloadSceneImageReferences({
         references: plan.references.map((r) => ({
@@ -122,7 +124,9 @@ export async function runStandaloneMcpGeneration(
       );
       result = {
         ...result,
-        provider: "openai",
+        provider: plan.configuration.model.startsWith("elevenlabs/")
+          ? "elevenlabs"
+          : "openai",
         model: plan.configuration.model,
         promptTemplateVersion: plan.promptTemplateVersion,
         providerSubmitted: true,
@@ -166,7 +170,7 @@ export async function runStandaloneMcpGeneration(
         costBasis: generated.usage ? "provider_usage" : "estimate_fallback",
       };
     } else {
-      const provider = createSpeechProvider(plan.provider);
+      const provider = createSpeechProvider(plan.provider, plan.model);
       await assertMcpGenerationWorkerAccess(
         input.workspaceId,
         input.operationId,
@@ -242,7 +246,10 @@ export async function runStandaloneMcpGeneration(
         providerRequestId: generated.requestId,
         providerRequestIds: requestIds,
         actualCostCents,
-        costBasis: "character_rate",
+        costBasis:
+          plan.provider === "elevenlabs"
+            ? "conservative_credit_valuation"
+            : "character_rate",
       };
     }
     await updateMcpOperation({
@@ -337,7 +344,8 @@ export async function runStandaloneMcpGeneration(
   } catch (error) {
     const imageFailure = classifyImageGenerationError(error);
     const failure =
-      result.provider === "openai" && String(result.model).includes("image")
+      ["openai", "elevenlabs"].includes(String(result.provider)) &&
+      String(result.model).includes("image")
         ? imageFailure
         : classifyAudioGenerationError(error);
     // A definite client-side refusal is not a billable unknown outcome.
@@ -352,6 +360,8 @@ export async function runStandaloneMcpGeneration(
           error.status >= 400 &&
           error.status < 500))
     )
+      actualCostCents = 0;
+    if (error instanceof ElevenLabsImageError && error.definitelyUnbilled)
       actualCostCents = 0;
     const safeMessage =
       error instanceof McpError ? error.message : failure.safeMessage;

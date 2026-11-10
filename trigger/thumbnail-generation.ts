@@ -1,4 +1,5 @@
 import { task } from "@trigger.dev/sdk";
+import { claimElevenLabsThumbnail } from "@/db/commands/image-provider-handle";
 import { z } from "zod";
 import {
   completeThumbnailGeneration,
@@ -19,7 +20,7 @@ import {
   getSceneImageEnvironment,
 } from "@/lib/env/server";
 import { classifyImageGenerationError } from "@/lib/openai/image-generation-error";
-import { OpenAiImageGenerationProvider } from "@/lib/openai/openai-image-generation-provider";
+import { createImageProvider } from "@/lib/elevenlabs/create-image-provider";
 import { createThumbnailObjectKey } from "@/lib/storage/object-key";
 import { putThumbnail } from "@/lib/storage/thumbnail-storage";
 import { describeThumbnailGenerationRequest } from "@/lib/thumbnails/thumbnail-source";
@@ -40,7 +41,7 @@ export const thumbnailGenerationTask = task({
     factor: 2,
     randomize: true,
   },
-  maxDuration: 300,
+  maxDuration: 600,
   run: async (
     payload: z.infer<typeof thumbnailGenerationTaskPayloadSchema>,
     { ctx },
@@ -119,16 +120,47 @@ export const thumbnailGenerationTask = task({
       };
     }
 
-    await markThumbnailGenerationRunning({
-      thumbnailGenerationId: generation.id,
-      attemptCount: ctx.attempt.number,
-    });
+    const elevenLabs = request.model.startsWith("elevenlabs/");
+    if (elevenLabs && !generation.providerRequestId) {
+      const claimed = await claimElevenLabsThumbnail({
+        workspaceId: generation.workspaceId,
+        projectId: generation.projectId,
+        generationId: generation.id,
+      });
+      if (!claimed) {
+        if (ctx.attempt.number > 1 && generation.attemptCount > 0) {
+          await failThumbnailGeneration({
+            thumbnailGenerationId: generation.id,
+            category: "provider_outcome_uncertain",
+            message:
+              "The previous ElevenLabs submission could not be confirmed. Its estimated cost was retained; no second paid request was made.",
+            chargedCostCents: reservation.reservedCostCents,
+          });
+          return {
+            thumbnailGenerationId: generation.id,
+            status: "failed" as const,
+          };
+        }
+        return {
+          thumbnailGenerationId: generation.id,
+          status: "running" as const,
+        };
+      }
+    } else if (!elevenLabs)
+      await markThumbnailGenerationRunning({
+        thumbnailGenerationId: generation.id,
+        attemptCount: ctx.attempt.number,
+      });
 
-    const provider = new OpenAiImageGenerationProvider({
-      apiKey: imageEnvironment.OPENAI_API_KEY,
-      timeoutMilliseconds:
-        imageEnvironment.OPENAI_REQUEST_TIMEOUT_SECONDS * 1_000,
-    });
+    const provider = createImageProvider(
+      request.model,
+      {
+        kind: "thumbnail",
+        workspaceId: generation.workspaceId,
+        generationId: generation.id,
+      },
+      elevenLabs ? (generation.providerRequestId ?? undefined) : undefined,
+    );
 
     let result: Awaited<ReturnType<typeof provider.generate>>;
     try {

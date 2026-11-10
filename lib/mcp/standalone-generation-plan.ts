@@ -1,4 +1,6 @@
 import "server-only";
+import { speechCostRates } from "@/lib/speech/speech-cost-rates";
+import { requireElevenLabs } from "@/lib/elevenlabs/configuration";
 import { z } from "zod";
 import {
   STANDALONE_IMAGE_PROMPT_VERSION,
@@ -58,7 +60,7 @@ export const standaloneGenerationPlanSchema = z.discriminatedUnion("kind", [
     kind: z.literal("audio"),
     segmentCount: z.number().int().min(1).max(MAX_STANDALONE_AUDIO_SEGMENTS),
     text: z.string(),
-    provider: z.enum(["openai", "gemini"]),
+    provider: z.enum(["openai", "gemini", "elevenlabs"]),
     model: z.string(),
     voice: z.string(),
     format: z.enum(["mp3", "wav", "opus"]),
@@ -179,11 +181,16 @@ export async function buildStandaloneGenerationPlan(
   requireMcp(
     preset &&
       !preset.customVoiceId &&
-      (preset.provider === "openai" || preset.provider === "gemini"),
+      ["openai", "gemini", "elevenlabs"].includes(preset.provider),
     "invalid_input",
-    "Choose an existing OpenAI or Gemini catalogue voice preset. Custom voices remain available in the scene pipeline.",
+    "Choose an existing OpenAI, Gemini or ElevenLabs account voice preset. Custom voices remain available in the scene pipeline.",
   );
-  const provider = preset.provider === "gemini" ? "gemini" : "openai";
+  const provider =
+    preset.provider === "gemini"
+      ? "gemini"
+      : preset.provider === "elevenlabs"
+        ? "elevenlabs"
+        : "openai";
   requireMcp(
     ["mp3", "wav", "opus"].includes(preset.format),
     "invalid_input",
@@ -192,7 +199,9 @@ export async function buildStandaloneGenerationPlan(
   const model =
     provider === "openai"
       ? env.OPENAI_TTS_MODEL
-      : getSpeechProviderEnvironment().GEMINI_TTS_MODEL;
+      : provider === "elevenlabs"
+        ? requireElevenLabs().ELEVENLABS_TTS_MODEL
+        : getSpeechProviderEnvironment().GEMINI_TTS_MODEL;
   requireMcp(
     preset.model === model,
     "invalid_input",
@@ -206,11 +215,7 @@ export async function buildStandaloneGenerationPlan(
       env.MAX_NARRATION_CHARACTERS,
     ),
   });
-  const rates = {
-    costPerMillionCharactersCents:
-      env.OPENAI_TTS_COST_PER_MILLION_CHARACTERS_CENTS,
-    minimumEstimateCents: env.OPENAI_TTS_MINIMUM_ESTIMATE_CENTS,
-  };
+  const rates = speechCostRates(provider);
   const speechParts = narration.parts.filter((part) => part.kind === "speech");
   requireMcp(
     speechParts.length <= MAX_STANDALONE_AUDIO_SEGMENTS,
@@ -227,11 +232,14 @@ export async function buildStandaloneGenerationPlan(
     voice: preset.voice,
     format: preset.format,
     speedScaledPercent: preset.speedScaledPercent,
-    instructions: composeVoiceInstructions({
-      presetInstructions: preset.instructions,
-      direction: EMPTY_VOICE_DIRECTION,
-      raisedPhrases: extractRaisedPhrases(narration.text),
-    }),
+    instructions:
+      provider === "elevenlabs"
+        ? ""
+        : composeVoiceInstructions({
+            presetInstructions: preset.instructions,
+            direction: EMPTY_VOICE_DIRECTION,
+            raisedPhrases: extractRaisedPhrases(narration.text),
+          }),
     language: request.language,
     voicePresetId: preset.id,
     voiceRevision: preset.updatedAt.toISOString(),

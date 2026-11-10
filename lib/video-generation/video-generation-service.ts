@@ -190,7 +190,7 @@ export async function sceneStarterVideoReference(
     title: `Scene ${current.scene.sceneNumber} approved image`,
   };
 }
-async function planAuthorizedRequest(
+export async function planAuthorizedVideoRequest(
   context: { workspaceId: string; userId: string },
   request: VideoGenerationRequest,
 ) {
@@ -238,7 +238,7 @@ export async function quoteVideoGeneration(
   value: unknown,
 ) {
   const context = await authorizeVideoWorkspace(workspaceId, true);
-  const planned = await planAuthorizedRequest(
+  const planned = await planAuthorizedVideoRequest(
     context,
     videoGenerationRequestSchema.parse(value),
   );
@@ -294,6 +294,14 @@ export async function startVideoGeneration(
   value: unknown,
 ) {
   const context = await authorizeVideoWorkspace(workspaceId, true);
+  return startAuthorizedVideoGeneration(context, value);
+}
+/** Internal entry point shared with MCP after its own scoped authorization. */
+export async function startAuthorizedVideoGeneration(
+  context: { workspaceId: string; userId: string },
+  value: unknown,
+  mcpOperationId?: string,
+) {
   const input = videoGenerationStartSchema.parse(value);
   const fingerprint = videoRequestDigest(input.request);
   const existing = await findVideoGenerationByKey({
@@ -309,9 +317,16 @@ export async function startVideoGeneration(
         "idempotency_conflict",
         "This request key belongs to a different request.",
       );
-    return { id: existing.id, dispatched: Boolean(existing.triggerRunId) };
+    if ((existing.mcpOperationId ?? undefined) !== mcpOperationId)
+      throw new VideoOperationError(
+        "idempotency_conflict",
+        "This request belongs to a different authorization.",
+      );
+    return existing.triggerRunId
+      ? { id: existing.id, dispatched: true }
+      : dispatchVideo(context.workspaceId, existing.id);
   }
-  const planned = await planAuthorizedRequest(context, input.request);
+  const planned = await planAuthorizedVideoRequest(context, input.request);
   const quote = verifyVideoQuote({
     ...planned.quoteContext,
     token: input.quoteToken,
@@ -337,6 +352,7 @@ export async function startVideoGeneration(
     reservationId: randomUUID(),
     ...context,
     quoteId: quote.quoteId,
+    mcpOperationId,
     idempotencyKey: input.idempotencyKey,
     fingerprint,
     request: planned.plan.request,

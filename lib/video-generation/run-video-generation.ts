@@ -1,4 +1,5 @@
 import "server-only";
+import { assertMcpGenerationWorkerAccess } from "@/lib/mcp/generation-service";
 import { storeVideoThumbnail } from "@/lib/media/store-video-thumbnail";
 import { createHash } from "node:crypto";
 import { prepareVideoReference } from "./prepare-video-reference";
@@ -181,6 +182,11 @@ export async function runVideoGeneration(
         12 * 1024 * 1024
       )
         throw new VideoProviderError("decoded_reference_size_limit", true);
+      if (job.mcpOperationId)
+        await assertMcpGenerationWorkerAccess(
+          job.workspaceId,
+          job.mcpOperationId,
+        );
       const claimed = await updateVideoGeneration({
         ...input,
         from: ["queued"],
@@ -223,7 +229,11 @@ export async function runVideoGeneration(
         state.requestId,
       );
     if (state.status === "failed")
-      throw new VideoProviderError(state.code, false, state.requestId);
+      throw new VideoProviderError(
+        state.code,
+        state.definitelyUnbilled ?? false,
+        state.requestId,
+      );
     // URI credentials are encrypted and never become task payloads or logs.
     await updateVideoGeneration({
       ...input,
@@ -302,7 +312,7 @@ export async function runVideoGeneration(
       !submitted ||
       (error instanceof VideoProviderError &&
         error.definitelyUnbilled &&
-        !accepted);
+        (!accepted || error.code.startsWith("elevenlabs_")));
     const code =
       error instanceof VideoProviderError
         ? error.code

@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { ElevenLabsUnavailableError } from "@/lib/elevenlabs/errors";
 import { AudioGenerationProviderResponseError } from "@/lib/openai/scene-audio-provider";
 import {
   SpeechProviderRequestError,
@@ -15,6 +16,30 @@ export interface AudioGenerationFailure {
 export function classifyAudioGenerationError(
   error: unknown,
 ): AudioGenerationFailure {
+  if (error instanceof ElevenLabsUnavailableError)
+    return {
+      category: "provider_disabled",
+      safeMessage: error.message,
+      retriable: false,
+      providerMayHaveBilled: false,
+    };
+  if (
+    error instanceof SpeechProviderRequestError &&
+    error.code.startsWith("elevenlabs_")
+  )
+    return {
+      category:
+        error.status && error.status >= 400 && error.status < 500
+          ? "provider_rejected"
+          : "provider_outcome_uncertain",
+      safeMessage: error.message,
+      retriable: false,
+      providerMayHaveBilled: !(
+        error.status &&
+        error.status >= 400 &&
+        error.status < 500
+      ),
+    };
   if (error instanceof OpenAI.APIConnectionTimeoutError)
     return {
       category: "provider_timeout",

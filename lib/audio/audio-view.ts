@@ -14,6 +14,10 @@ export type SceneAudioEligibility =
   | "noNarration";
 
 export interface VoicePresetView {
+  provider?: string;
+  available?: boolean;
+  unavailableReason?: string | null;
+  costPerMillionCharactersCents?: number;
   id: string;
   name: string;
   voice: string;

@@ -1,5 +1,6 @@
 "use client";
 
+import { ElevenLabsVoiceFields } from "@/components/audio/ElevenLabsVoiceFields";
 import { FormSelect } from "@/components/ui/FormSelect";
 import { SelectItem } from "@/components/ui/select";
 import { useState, useTransition } from "react";
@@ -48,9 +49,16 @@ export function VoicePresetForm({
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [provider, setProvider] = useState("openai");
   const [name, setName] = useState("");
   const [voice, setVoice] = useState(OPENAI_VOICES[0]!);
-  const [model, setModel] = useState(defaultModel);
+  const [model, setModel] = useState(
+    defaultModel.startsWith("eleven_")
+      ? "gpt-4o-mini-tts"
+      : defaultModel.startsWith("eleven_")
+        ? "gpt-4o-mini-tts"
+        : defaultModel,
+  );
   const [instructions, setInstructions] = useState("");
   const [format, setFormat] = useState<string>("mp3");
   const [speed, setSpeed] = useState(100);
@@ -76,21 +84,53 @@ export function VoicePresetForm({
               value={name}
             />
           </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="voice-provider">Provider</Label>
+            <FormSelect
+              id="voice-provider"
+              value={provider}
+              onValueChange={(value) => {
+                setProvider(value);
+                setVoice(value === "elevenlabs" ? "" : OPENAI_VOICES[0]!);
+                setModel(
+                  value === "elevenlabs"
+                    ? "eleven_multilingual_v2"
+                    : defaultModel.startsWith("eleven_")
+                      ? "gpt-4o-mini-tts"
+                      : defaultModel,
+                );
+                setInstructions("");
+                setSpeed(100);
+              }}
+            >
+              <SelectItem value="openai">OpenAI</SelectItem>
+              <SelectItem value="elevenlabs">ElevenLabs · in-house</SelectItem>
+            </FormSelect>
+          </div>
+          {provider === "elevenlabs" ? (
+            <ElevenLabsVoiceFields
+              voice={voice}
+              onVoiceChange={setVoice}
+              onModelChange={setModel}
+            />
+          ) : null}
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="voice-preset-voice">Voice</Label>
-              <FormSelect
-                id="voice-preset-voice"
-                onValueChange={(selectedValue) => setVoice(selectedValue)}
-                value={voice}
-              >
-                {OPENAI_VOICES.map((option) => (
-                  <SelectItem key={option} value={String(option)}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </FormSelect>
-            </div>
+            {provider !== "elevenlabs" ? (
+              <div className="space-y-1.5">
+                <Label htmlFor="voice-preset-voice">Voice</Label>
+                <FormSelect
+                  id="voice-preset-voice"
+                  onValueChange={(selectedValue) => setVoice(selectedValue)}
+                  value={voice}
+                >
+                  {OPENAI_VOICES.map((option) => (
+                    <SelectItem key={option} value={String(option)}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </FormSelect>
+              </div>
+            ) : null}
             <div className="space-y-1.5">
               <Label htmlFor="voice-preset-format">Format</Label>
               <FormSelect
@@ -98,7 +138,11 @@ export function VoicePresetForm({
                 onValueChange={(selectedValue) => setFormat(selectedValue)}
                 value={format}
               >
-                {AUDIO_FORMATS.map((option) => (
+                {AUDIO_FORMATS.filter(
+                  (value) =>
+                    provider !== "elevenlabs" ||
+                    ["mp3", "wav", "opus"].includes(value),
+                ).map((option) => (
                   <SelectItem key={option} value={String(option)}>
                     {option}
                   </SelectItem>
@@ -110,23 +154,26 @@ export function VoicePresetForm({
             <Label htmlFor="voice-preset-model">Model</Label>
             <Input
               id="voice-preset-model"
+              readOnly={provider === "elevenlabs"}
               onChange={(event) => setModel(event.target.value)}
               value={model}
             />
           </div>
-          <NarrationInstructionsField
-            id="voice-preset-instructions"
-            onChange={setInstructions}
-            value={instructions}
-          />
+          {provider !== "elevenlabs" ? (
+            <NarrationInstructionsField
+              id="voice-preset-instructions"
+              onChange={setInstructions}
+              value={instructions}
+            />
+          ) : null}
           <div className="flex items-center justify-between gap-3">
             <div className="flex-1 space-y-1.5">
               <Label htmlFor="voice-preset-speed">Speed ({speed}%)</Label>
               <input
                 className="w-full accent-primary"
                 id="voice-preset-speed"
-                max={400}
-                min={25}
+                max={provider === "elevenlabs" ? 120 : 400}
+                min={provider === "elevenlabs" ? 70 : 25}
                 onChange={(event) => setSpeed(Number(event.target.value))}
                 step={5}
                 type="range"
@@ -156,12 +203,13 @@ export function VoicePresetForm({
             Cancel
           </DialogClose>
           <Button
-            disabled={pending || name.trim().length === 0}
+            disabled={pending || name.trim().length === 0 || !voice}
             onClick={() =>
               startTransition(async () => {
                 setError(null);
                 const formData = new FormData();
                 formData.set("name", name);
+                formData.set("provider", provider);
                 formData.set("voice", voice);
                 formData.set("model", model);
                 formData.set("instructions", instructions);
