@@ -10,6 +10,8 @@ import { saveMcpGrantAction } from "@/app/(authenticated)/app/settings/mcp/actio
 import type { McpSettingsView } from "@/lib/mcp/settings-view";
 import { MCP_SCOPE_LABELS, MCP_SCOPE_TITLES } from "@/lib/mcp/scope-labels";
 import { McpPublicationApprovalField } from "./McpPublicationApprovalField";
+import { McpGenerationApprovalField } from "./McpGenerationApprovalField";
+import { canConfigureAutonomousGeneration } from "@/lib/mcp/generation-approval-policy";
 import { canConfigureAutonomousPublishing } from "@/lib/mcp/publication-approval-policy";
 export function McpGrantForm({
   connection,
@@ -34,6 +36,10 @@ export function McpGrantForm({
     useState<McpPublicationApprovalMode>(
       savedGrant?.publicationApprovalMode ?? "manual",
     );
+  const [generationApprovalMode, setGenerationApprovalMode] =
+    useState<McpPublicationApprovalMode>(
+      savedGrant?.generationApprovalMode ?? "manual",
+    );
   return (
     <form action={action} className="app-section">
       <input type="hidden" name="connectionId" value={connection.id} />
@@ -45,6 +51,10 @@ export function McpGrantForm({
           value={workspaceId}
           onValueChange={(id) => {
             setWorkspaceId(id);
+            setGenerationApprovalMode(
+              connection.grants.find((g) => g.workspaceId === id)
+                ?.generationApprovalMode ?? "manual",
+            );
             setPublicationApprovalMode(
               connection.grants.find((g) => g.workspaceId === id)
                 ?.publicationApprovalMode ?? "manual",
@@ -87,6 +97,13 @@ export function McpGrantForm({
           value={publicationApprovalMode}
           onChange={setPublicationApprovalMode}
           owner={canConfigureAutonomousPublishing(selected?.role)}
+          disabled={pending}
+        />
+        <McpGenerationApprovalField
+          id={`generation-approval-${connection.id}`}
+          value={generationApprovalMode}
+          onChange={setGenerationApprovalMode}
+          owner={canConfigureAutonomousGeneration(selected?.role)}
           disabled={pending}
         />
       </fieldset>

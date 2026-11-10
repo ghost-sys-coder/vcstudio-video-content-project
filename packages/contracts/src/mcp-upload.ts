@@ -5,7 +5,7 @@ export const MCP_UPLOAD_CHUNK_BYTES = 512 * 1024;
 export const MCP_UPLOAD_MAX_BYTES = 512 * 1024 * 1024;
 export const MCP_UPLOAD_MAX_CHUNKS =
   MCP_UPLOAD_MAX_BYTES / MCP_UPLOAD_CHUNK_BYTES;
-export const MCP_SERVER_VERSION = "1.1.0";
+export const MCP_SERVER_VERSION = "1.2.0";
 export const MCP_UPLOAD_RESOURCE = "ui://vcstudio/media-upload.html";
 export const mcpUploadContentType = z.enum([
   "image/jpeg",

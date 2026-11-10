@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { assertMcpGenerationWorkerAccess } from "@/lib/mcp/generation-service";
 import { task } from "@trigger.dev/sdk";
 import { z } from "zod";
 import {
@@ -136,6 +137,23 @@ export const sceneAudioGenerationTask = task({
       return { generationId: generation.id, status: "succeeded" as const };
     }
 
+    if (generation.mcpOperationId) {
+      try {
+        await assertMcpGenerationWorkerAccess(
+          input.workspaceId,
+          generation.mcpOperationId,
+        );
+      } catch {
+        await failSceneAudioGeneration({
+          ...scope,
+          category: "mcp_authorization_changed",
+          safeErrorMessage:
+            "The AI connection or scene authorization changed before generation.",
+        });
+        return { generationId: generation.id, status: "failed" as const };
+      }
+    }
+
     const maximumAttempts = environment.MAX_AUDIO_GENERATION_RETRIES + 1;
     const attemptNumber = generation.attemptCount + 1;
     if (attemptNumber > maximumAttempts) {
@@ -172,6 +190,11 @@ export const sceneAudioGenerationTask = task({
         text: string,
         format: SceneAudioFormat,
       ): Promise<SpokenClip> => {
+        if (generation.mcpOperationId)
+          await assertMcpGenerationWorkerAccess(
+            input.workspaceId,
+            generation.mcpOperationId,
+          );
         if (generation.provider === "gemini") {
           const synthesized = await createSpeechProvider("gemini").synthesize({
             text,

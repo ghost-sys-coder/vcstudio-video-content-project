@@ -75,6 +75,7 @@ export async function saveMcpGrant(input: {
   workspaceId: string;
   scopes: McpScope[];
   publicationApprovalMode: McpPublicationApprovalMode;
+  generationApprovalMode?: McpPublicationApprovalMode;
 }) {
   // Reconnection is an explicit signed-in action, never an effect of seeing a token.
   const owned = await findMcpConnection(input.connectionId, input.userId);
@@ -91,6 +92,7 @@ export async function saveMcpGrant(input: {
         set: {
           scopes: input.scopes,
           publicationApprovalMode: input.publicationApprovalMode,
+          generationApprovalMode: input.generationApprovalMode ?? "manual",
           updatedAt: new Date(),
         },
       }),
@@ -207,6 +209,7 @@ export async function updateMcpOperation(input: {
   operationId: string;
   workspaceId: string;
   from?: McpOperationStatus[];
+  expectedUpdatedAt?: Date;
   values: Partial<
     Pick<
       McpOperation,
@@ -216,6 +219,7 @@ export async function updateMcpOperation(input: {
       | "sealedSource"
       | "approvalHash"
       | "triggerRunId"
+      | "expiresAt"
     >
   >;
 }) {
@@ -227,6 +231,9 @@ export async function updateMcpOperation(input: {
         eq(mcpOperations.id, input.operationId),
         eq(mcpOperations.workspaceId, input.workspaceId),
         input.from ? inArray(mcpOperations.status, input.from) : undefined,
+        input.expectedUpdatedAt
+          ? sql`date_trunc('milliseconds',${mcpOperations.updatedAt})=${input.expectedUpdatedAt.toISOString()}::timestamptz`
+          : undefined,
       ),
     )
     .returning();

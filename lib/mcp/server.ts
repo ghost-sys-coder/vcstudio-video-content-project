@@ -41,6 +41,12 @@ import { roleAllowsScope } from "./policy";
 import { effectivePublicationApprovalMode } from "./publication-approval-policy";
 import { MCP_SERVER_VERSION } from "@studio/contracts/mcp-upload";
 import { registerUploadTools } from "./register-upload-tools";
+import { registerGenerationTools } from "./register-generation-tools";
+import { effectiveGenerationApprovalMode } from "./generation-approval-policy";
+import {
+  getSceneImageEnvironment,
+  getSceneAudioEnvironment,
+} from "@/lib/env/server";
 
 const REVIEW_URI = "ui://vcstudio/publication-review.html";
 export function createVcStudioMcpServer(principal: McpPrincipal) {
@@ -48,7 +54,7 @@ export function createVcStudioMcpServer(principal: McpPrincipal) {
     { name: "VCStudio", version: MCP_SERVER_VERSION },
     {
       instructions:
-        "Use get_connection first and an explicitly granted workspaceId on every action. Prefer MCP tools for application work; never replace available MCP upload, edit, publish or schedule actions with browser automation. For files use import_chat_file when a real native reference is available, import_asset for authorized HTTPS downloads, or open_media_upload for an in-chat picker; programmatic clients can use start_media_upload, append_media_upload, complete_media_upload. A remote server cannot read local/sandbox paths; do not fabricate file bytes or paste large base64 strings into reasoning. Imports never approve media or publish. Check get_capabilities for publicationApprovalMode. prepare_publication only prepares an immutable preview. Manual connections require human review; owner-authorized autonomous connections may call execute_publication with the prepared operation ID and the same idempotency key. If required tools are missing, refresh connector discovery rather than using Chrome. Internal approvals stay explicit. Marketing is paused. AI generation and administration are unavailable. Reuse idempotency keys when retrying the same action.",
+        "Use get_connection first and an explicitly granted workspaceId on every action. Prefer MCP tools for application work; never replace available MCP upload, edit, publish or schedule actions with browser automation. For files use import_chat_file when a real native reference is available, import_asset for authorized HTTPS downloads, or open_media_upload for an in-chat picker; programmatic clients can use start_media_upload, append_media_upload, complete_media_upload. A remote server cannot read local/sandbox paths; do not fabricate file bytes or paste large base64 strings into reasoning. Imports never approve media or publish. Check get_capabilities for publicationApprovalMode. prepare_publication only prepares an immutable preview. Manual connections require human review; owner-authorized autonomous connections may call execute_publication with the prepared operation ID and the same idempotency key. If required tools are missing, refresh connector discovery rather than using Chrome. For image/audio generation call get_generation_options then prepare_generation with an explicit maximumCostCents. Check generationApprovalMode: an owner-authorized autonomous connection may execute_generation itself with the same key and poll get_generation_status. With Review scope, approve_script_version, approve_scene, review_scene_image and review_scene_audio are agent-callable decisions; they need no human UI. Combine generation with existing Social tools and autonomous publishing for end-to-end work. Manual generation requires the review UI. Video generation and YouTube Community publishing remain on hold. Marketing is paused; administration is unavailable. Reuse idempotency keys when retrying the same action.",
     },
   );
   const register = createToolRegistrar(server, principal);
@@ -75,7 +81,7 @@ export function createVcStudioMcpServer(principal: McpPrincipal) {
           revoked: !!connection.revokedAt,
           setupUrl: `${mcpBaseUrl()}/app/settings/mcp`,
           marketing: "paused",
-          generation: "not_exposed",
+          generation: "image_and_audio_with_explicit_generate_permission",
           serverVersion: MCP_SERVER_VERSION,
           requiredTransferTools: [
             "import_chat_file",
@@ -87,6 +93,13 @@ export function createVcStudioMcpServer(principal: McpPrincipal) {
           requiredPublicationTools: [
             "prepare_publication",
             "execute_publication",
+          ],
+          requiredGenerationTools: [
+            "get_generation_options",
+            "prepare_generation",
+            "execute_generation",
+            "get_generation_status",
+            "review_scene_audio",
           ],
           discovery:
             "If these tools are missing from this client's tool list, refresh the connector and start a new conversation. Do not use browser automation as a substitute.",
@@ -167,7 +180,18 @@ export function createVcStudioMcpServer(principal: McpPrincipal) {
         socialPublishing: getPublishingEnvironment().ENABLE_SOCIAL_POSTING,
         marketing: false,
         linkedinPages: false,
-        generation: false,
+        generation:
+          ctx.grant.scopes.includes("vcstudio:generate") &&
+          principal.scopes.includes("vcstudio:generate") &&
+          roleAllowsScope(ctx.membership.role, "vcstudio:generate") &&
+          (getSceneImageEnvironment().ENABLE_SCENE_IMAGE_GENERATION ||
+            getSceneAudioEnvironment().ENABLE_SCENE_AUDIO_GENERATION),
+        generationDetails: {
+          image: getSceneImageEnvironment().ENABLE_SCENE_IMAGE_GENERATION,
+          audio: getSceneAudioEnvironment().ENABLE_SCENE_AUDIO_GENERATION,
+          standaloneAndScenes: true,
+        },
+        youtubeCommunityPublishing: false,
         administration: false,
         youtubeUploadMetadata: true,
         youtubeCustomThumbnails: true,
@@ -187,6 +211,10 @@ export function createVcStudioMcpServer(principal: McpPrincipal) {
       approval: ["mcp_app_when_supported", "signed_in_browser"],
       publicationApprovalMode: effectivePublicationApprovalMode({
         publicationApprovalMode: ctx.grant.publicationApprovalMode,
+        role: ctx.membership.role,
+      }),
+      generationApprovalMode: effectiveGenerationApprovalMode({
+        ...ctx.grant,
         role: ctx.membership.role,
       }),
       serverVersion: MCP_SERVER_VERSION,
@@ -316,5 +344,6 @@ export function createVcStudioMcpServer(principal: McpPrincipal) {
     }),
   );
   registerUploadTools(server, register, principal);
+  registerGenerationTools(server, register, principal);
   return server;
 }

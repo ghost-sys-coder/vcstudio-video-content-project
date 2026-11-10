@@ -16,11 +16,13 @@ import { dispatchApprovedPublication } from "./publishing-service";
 import { mediaContentTypeSchema } from "@/lib/schemas/media-asset";
 import { createMediaLibraryObjectKey } from "@/lib/storage/object-key";
 import { removeMcpChunks } from "./chunk-upload-storage";
+import { recoverMcpGenerations } from "./generation-recovery";
 export async function recoverMcpOperations() {
   if (!getMcpEnvironment().ENABLE_MCP) return { recovered: 0 };
   const rows = await listMcpRecoveryOperations();
-  let recovered = 0;
+  let recovered = await recoverMcpGenerations();
   for (const op of rows) {
+    if (op.kind === "generate_media") continue;
     if (op.status === "approved") {
       await dispatchApprovedPublication(op);
       recovered++;

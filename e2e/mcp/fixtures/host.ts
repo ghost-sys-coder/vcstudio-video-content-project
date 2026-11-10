@@ -12,6 +12,7 @@ import {
 const withMedia = new URLSearchParams(location.search).has("withMedia");
 const withYouTube = new URLSearchParams(location.search).has("youtube");
 const autonomous = new URLSearchParams(location.search).has("autonomous");
+const generation = new URLSearchParams(location.search).has("generation");
 const frame = document.createElement("iframe");
 frame.title = "VCStudio review";
 frame.style.cssText = "width:100%;height:1200px;border:0";
@@ -38,48 +39,64 @@ bridge.oninitialized = async () => {
           workspaceId,
           status: autonomous ? "prepared" : "requires_approval",
         },
-        preview: withYouTube
+        preview: generation
           ? {
-              ...preview,
-              destinations: [
-                {
-                  id: preview.destinations[0].id,
-                  platform: "youtube",
-                  name: "Fixture channel",
-                  text: "The approved YouTube description.",
-                  youtube: {
-                    title: "Exact YouTube title",
-                    description: "The approved YouTube description.",
-                    visibility: "unlisted",
-                    tags: ["VCStudio"],
-                    madeForKids: false,
-                    containsSyntheticMedia: true,
-                    thumbnail: {
-                      id: mediaId,
-                      name: "YouTube cover",
-                      contentType: "image/png",
-                      sizeBytes: 100,
-                      etag: "thumb-etag",
-                    },
-                  },
-                },
+              kind: "audio",
+              title: "Business narration",
+              text: "A useful business update.",
+              model: "fixture-tts",
+              provider: "openai",
+              estimatedCostCents: 2,
+              maximumCostCents: 10,
+              projectId: null,
+              sceneId: null,
+              settings: [
+                { label: "Voice", value: "alloy" },
+                { label: "Format", value: "mp3" },
               ],
             }
-          : withMedia
+          : withYouTube
             ? {
                 ...preview,
-                media: [
+                destinations: [
                   {
-                    id: mediaId,
-                    name: "Imported portrait",
-                    kind: "image",
-                    contentType: "image/png",
-                    sizeBytes: 100,
-                    etag: "etag",
+                    id: preview.destinations[0].id,
+                    platform: "youtube",
+                    name: "Fixture channel",
+                    text: "The approved YouTube description.",
+                    youtube: {
+                      title: "Exact YouTube title",
+                      description: "The approved YouTube description.",
+                      visibility: "unlisted",
+                      tags: ["VCStudio"],
+                      madeForKids: false,
+                      containsSyntheticMedia: true,
+                      thumbnail: {
+                        id: mediaId,
+                        name: "YouTube cover",
+                        contentType: "image/png",
+                        sizeBytes: 100,
+                        etag: "thumb-etag",
+                      },
+                    },
                   },
                 ],
               }
-            : preview,
+            : withMedia
+              ? {
+                  ...preview,
+                  media: [
+                    {
+                      id: mediaId,
+                      name: "Imported portrait",
+                      kind: "image",
+                      contentType: "image/png",
+                      sizeBytes: 100,
+                      etag: "etag",
+                    },
+                  ],
+                }
+              : preview,
         approvalUrl: `https://vcstudio.example/app/mcp/operations/${operationId}`,
       },
     },
@@ -103,7 +120,8 @@ bridge.oninitialized = async () => {
 };
 bridge.oncalltool = async (params) => {
   if (
-    params.name !== "confirm_publication" ||
+    params.name !==
+      (generation ? "confirm_generation" : "confirm_publication") ||
     params.arguments?.proof !== "private-user-interface-proof-123456789"
   )
     throw new Error("Invalid approval");
@@ -118,4 +136,4 @@ bridge.oncalltool = async (params) => {
 await bridge.connect(
   new PostMessageTransport(frame.contentWindow!, frame.contentWindow!),
 );
-frame.src = "/review.html";
+frame.src = generation ? "/generation.html" : "/review.html";

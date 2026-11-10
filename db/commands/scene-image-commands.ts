@@ -145,6 +145,7 @@ function generationMatchesRequest(
 
 export async function createSceneImageGenerationReservation(input: {
   generationId: string;
+  mcpOperationId?: string;
   reservationId: string;
   workspaceId: string;
   projectId: string;
@@ -384,7 +385,7 @@ export async function createSceneImageGenerationReservation(input: {
           request_fingerprint, model, quality, size, output_format,
           output_compression, background, input_fidelity, prompt_template_version,
           style_preset_version, final_prompt, estimated_cost_cents,
-          requested_by_user_id, batch_id
+          requested_by_user_id, batch_id, mcp_operation_id
         )
         select
           ${input.generationId}::uuid,
@@ -414,7 +415,8 @@ export async function createSceneImageGenerationReservation(input: {
           ${input.finalPrompt},
           ${input.estimatedCostCents},
           ${input.requestedByUserId}::uuid,
-          ${input.batchId ?? null}::uuid
+          ${input.batchId ?? null}::uuid,
+          ${input.mcpOperationId ?? null}::uuid
         from eligible
         returning id
       ),

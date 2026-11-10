@@ -7,7 +7,9 @@
     ".": "./src/mcp.ts",
     "./video": "./src/video.ts",
     "./publishing": "./src/publishing.ts",
-    "./mcp-upload": "./src/mcp-upload.ts"
+    "./mcp-upload": "./src/mcp-upload.ts",
+    "./mcp-generation": "./src/mcp-generation.ts",
+    "./scene-media": "./src/scene-media.ts"
   },
   "dependencies": {
     "zod": "4.6.6"

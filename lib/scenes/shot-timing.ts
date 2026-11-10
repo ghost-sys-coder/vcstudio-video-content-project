@@ -35,11 +35,10 @@ export const MINIMUM_SHOT_DURATION_MILLISECONDS = 1200;
  * than caption lines cannot place them all. This is generous rather than
  * restrictive: it bounds queries and form input, and is not a creative limit.
  *
- * Lives here, in a module with no server-only dependency, because both the
- * repository and the request schemas need it and the schemas are reachable
- * from client components.
+ * Declared in the shared contracts package so browser and MCP request schemas
+ * enforce the same limit. The re-export preserves existing callers.
  */
-export const MAX_SHOTS_PER_SCENE = 12;
+export { MAX_SHOTS_PER_SCENE } from "@studio/contracts/scene-media";
 
 export type ShotPlacement = {
   shotIndex: number;

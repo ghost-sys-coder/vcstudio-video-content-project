@@ -2,7 +2,11 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
-    "/mcp": ["./public/mcp/review.html", "./public/mcp/upload.html"],
+    "/mcp": [
+      "./public/mcp/review.html",
+      "./public/mcp/upload.html",
+      "./public/mcp/generation.html",
+    ],
   },
   // The Remotion server renderer and bundler run only inside the Trigger.dev
   // rendering worker (see trigger/video-render.ts). They ship native binaries

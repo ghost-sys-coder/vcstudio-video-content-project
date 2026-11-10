@@ -9,6 +9,7 @@ const capabilities: Record<McpScope, WorkspaceCapability | null> = {
   "vcstudio:media": "manageMediaLibrary",
   "vcstudio:review": "reviewSceneImages",
   "vcstudio:publish": "publishPosts",
+  "vcstudio:generate": "mutateWorkspaceData",
 };
 export function assertMcpAccess(input: {
   role: WorkspaceRole;

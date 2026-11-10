@@ -128,3 +128,7 @@ export {
   DIRECT_VIDEO_PROMPT_VERSION,
   renderDirectVideoPrompt,
 } from "./direct-video";
+export {
+  STANDALONE_IMAGE_PROMPT_VERSION,
+  renderStandaloneImagePrompt,
+} from "./standalone-image";

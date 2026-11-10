@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { assertMcpGenerationWorkerAccess } from "@/lib/mcp/generation-service";
+import { McpError } from "@/lib/mcp/errors";
 import { task } from "@trigger.dev/sdk";
 import { z } from "zod";
 import {
@@ -148,6 +150,24 @@ export const sceneImageGenerationTask = task({
     });
     if (recovered)
       return { generationId: generation.id, status: "succeeded" as const };
+
+    if (generation.mcpOperationId) {
+      try {
+        await assertMcpGenerationWorkerAccess(
+          input.workspaceId,
+          generation.mcpOperationId,
+        );
+      } catch {
+        await failSceneImageGeneration({
+          ...scope,
+          category: "mcp_authorization_changed",
+          safeErrorMessage:
+            "The AI connection or scene authorization changed before generation.",
+          actualCostCents: 0,
+        });
+        return { generationId: generation.id, status: "failed" as const };
+      }
+    }
 
     if (latestProviderRequest?.status === "succeeded") {
       await failSceneImageWithConservativeProviderOutcome({
@@ -380,20 +400,30 @@ export const sceneImageGenerationTask = task({
           }),
         );
       }
-    } catch {
+      if (generation.mcpOperationId)
+        await assertMcpGenerationWorkerAccess(
+          input.workspaceId,
+          generation.mcpOperationId,
+        );
+    } catch (error) {
+      const authorizationChanged = error instanceof McpError;
+      const category = authorizationChanged
+        ? "mcp_authorization_changed"
+        : "reference_download_failed";
+      const safeErrorMessage = authorizationChanged
+        ? "The AI connection or scene authorization changed before provider submission."
+        : "One or more selected reference images could not be loaded.";
       await failSceneImageProviderAttempt({
         ...scope,
         attemptNumber,
-        errorCode: "reference_download_failed",
-        safeErrorMessage:
-          "One or more selected reference images could not be loaded.",
+        errorCode: category,
+        safeErrorMessage,
       });
       await failSceneImageGeneration({
         ...scope,
         attemptNumber,
-        category: "reference_download_failed",
-        safeErrorMessage:
-          "One or more selected reference images could not be loaded.",
+        category,
+        safeErrorMessage,
       });
       return { generationId: generation.id, status: "failed" as const };
     }

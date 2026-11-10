@@ -10,6 +10,10 @@ const m = vi.hoisted(() => ({
   execute: vi.fn(),
   previewOrigin: vi.fn(),
   mediaPreviews: vi.fn(),
+  generationPrepare: vi.fn(),
+  generationExecute: vi.fn(),
+  generationConfirm: vi.fn(),
+  generationStatus: vi.fn(),
 }));
 vi.mock("@/lib/mcp/context", () => ({ authorizeMcp: m.authorize }));
 vi.mock("@/lib/mcp/rate-limit", () => ({ enforceMcpRateLimit: vi.fn() }));
@@ -19,6 +23,8 @@ vi.mock("@/lib/env/server", () => ({
     APP_BASE_URL: "https://vcstudio.example",
   }),
   getPublishingEnvironment: () => ({ ENABLE_SOCIAL_POSTING: true }),
+  getSceneImageEnvironment: () => ({ ENABLE_SCENE_IMAGE_GENERATION: true }),
+  getSceneAudioEnvironment: () => ({ ENABLE_SCENE_AUDIO_GENERATION: true }),
   getMediaLibraryEnvironment: () => ({
     MAX_MEDIA_IMAGE_BYTES: 25 * 1024 * 1024,
     MAX_MEDIA_VIDEO_BYTES: 512 * 1024 * 1024,
@@ -44,6 +50,12 @@ vi.mock("node:fs/promises", () => ({
   readFile: vi.fn().mockResolvedValue("<!doctype html><title>Review</title>"),
 }));
 vi.mock("@/lib/mcp/import-service", () => ({ startMcpImport: vi.fn() }));
+vi.mock("@/lib/mcp/generation-service", () => ({
+  prepareMcpGeneration: m.generationPrepare,
+  executeMcpGeneration: m.generationExecute,
+  approveMcpGeneration: m.generationConfirm,
+  getMcpGenerationStatus: m.generationStatus,
+}));
 import { Client } from "@modelcontextprotocol/client";
 import {
   createMcpHandler,
@@ -56,6 +68,7 @@ import {
   mcpOperationFixture,
 } from "@/lib/test-utils/mcp-fixtures";
 import { publicOperation } from "./operations";
+import { MCP_SERVER_VERSION } from "@studio/contracts/mcp-upload";
 const ctx = mcpContextFixture();
 const clients: Client[] = [];
 beforeEach(() => {
@@ -102,6 +115,75 @@ async function client() {
   return instance;
 }
 describe("real MCP SDK interoperability", () => {
+  it("advertises focused generation tools with UI-only confirmation and private proof metadata", async () => {
+    const api = await client();
+    const tools = await api.listTools();
+    expect(tools.tools.map((tool) => tool.name)).toEqual(
+      expect.arrayContaining([
+        "get_generation_options",
+        "prepare_generation",
+        "execute_generation",
+        "get_generation_status",
+        "review_scene_audio",
+      ]),
+    );
+    expect(
+      tools.tools.find((tool) => tool.name === "confirm_generation")?._meta,
+    ).toMatchObject({ ui: { visibility: ["app"] } });
+    m.generationPrepare.mockResolvedValue({
+      operation: publicOperation(
+        mcpOperationFixture({ kind: "generate_media" }),
+      ),
+      preview: { kind: "image", estimatedCostCents: 5 },
+      approvalMode: "manual",
+      uiProof: "private-generation-proof-1234567890123456",
+    });
+    const result = await api.callTool({
+      name: "prepare_generation",
+      arguments: {
+        workspaceId: mcpIds.workspace,
+        idempotencyKey: "prepare-generation-123",
+        request: {
+          kind: "image",
+          prompt: "A useful image",
+          size: "1024x1024",
+          quality: "low",
+          maximumCostCents: 20,
+        },
+      },
+    });
+    expect(result.structuredContent).toMatchObject({
+      ok: true,
+      data: { approvalMode: "manual" },
+    });
+    expect(result._meta?.approvalProof).toBe(
+      "private-generation-proof-1234567890123456",
+    );
+    expect(
+      JSON.stringify([result.structuredContent, result.content]),
+    ).not.toContain("private-generation-proof");
+    expect(m.authorize).toHaveBeenCalledWith(
+      ctx.principal,
+      mcpIds.workspace,
+      "vcstudio:generate",
+    );
+    const resource = await api.readResource({
+      uri: "ui://vcstudio/generation-review.html",
+    });
+    expect(resource.contents[0]._meta).toMatchObject({
+      ui: { csp: { connectDomains: [], resourceDomains: [] } },
+    });
+    const confirmation = await api.callTool({
+      name: "confirm_generation",
+      arguments: {
+        workspaceId: mcpIds.workspace,
+        operationId: mcpIds.operation,
+        confirmed: true,
+      },
+    });
+    expect(confirmation.isError).toBe(true);
+    expect(m.generationConfirm).not.toHaveBeenCalled();
+  });
   it("advertises the new transfer/version tools and serves an upload app with no network origins", async () => {
     const connection = await client(),
       tools = await connection.listTools();
@@ -136,7 +218,7 @@ describe("real MCP SDK interoperability", () => {
       ok: true,
       data: {
         workspaceId: mcpIds.workspace,
-        serverVersion: "1.1.0",
+        serverVersion: MCP_SERVER_VERSION,
         limits: { chunkBytes: 512 * 1024 },
       },
     });

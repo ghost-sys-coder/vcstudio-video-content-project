@@ -86,6 +86,7 @@ function generationMatchesRequest(
 
 export async function createSceneAudioGenerationReservation(input: {
   generationId: string;
+  mcpOperationId?: string;
   reservationId: string;
   workspaceId: string;
   projectId: string;
@@ -212,7 +213,7 @@ export async function createSceneAudioGenerationReservation(input: {
           voice_preset_id, generation_version, request_nonce, idempotency_key,
           request_fingerprint, provider, model, voice, is_custom_voice, format,
           speed_scaled_percent, instructions, sample_rate, input_text,
-          input_character_count, estimated_cost_cents, requested_by_user_id
+          input_character_count, estimated_cost_cents, requested_by_user_id, mcp_operation_id
         )
         select
           ${input.generationId}::uuid,
@@ -236,7 +237,8 @@ export async function createSceneAudioGenerationReservation(input: {
           ${input.inputText},
           ${input.inputCharacterCount},
           ${input.estimatedCostCents},
-          ${input.requestedByUserId}::uuid
+          ${input.requestedByUserId}::uuid,
+          ${input.mcpOperationId ?? null}::uuid
         from eligible
         returning id
       ),

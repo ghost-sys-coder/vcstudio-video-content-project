@@ -66,6 +66,7 @@ export const populatedSettings: McpSettingsView = {
           workspaceId,
           scopes: [...MCP_SCOPES],
           publicationApprovalMode: "manual",
+          generationApprovalMode: "manual",
           createdAt: new Date("2026-11-05T08:00:00Z"),
           updatedAt: new Date("2026-11-05T08:00:00Z"),
         },

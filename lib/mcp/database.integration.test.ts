@@ -82,6 +82,19 @@ beforeAll(async () => {
       "utf8",
     ),
   );
+  // This fixture tests MCP grants rather than media tables; apply the grant
+  // statements from the new migration here. The full migration has its own test.
+  await pg.exec(
+    (
+      await readFile(
+        "migrations/20261110001516_mcp_media_generation/migration.sql",
+        "utf8",
+      )
+    )
+      .split("--> statement-breakpoint")
+      .filter((statement) => statement.includes('"mcp_workspace_grants"'))
+      .join("\n"),
+  );
   shared.database = Object.assign(db, {
     batch: (queries: { toSQL(): { sql: string; params: unknown[] } }[]) =>
       pg.transaction(async (tx) => {

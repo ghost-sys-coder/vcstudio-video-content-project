@@ -1,6 +1,7 @@
 import { McpSettingsPage } from "@/components/mcp/McpSettingsPage";
 import { McpUploadPanel } from "@/components/mcp/McpUploadPanel";
 import { McpBrowserApproval } from "@/components/mcp/McpBrowserApproval";
+import { McpGenerationBrowserApproval } from "@/components/mcp/McpGenerationBrowserApproval";
 import {
   settings,
   populatedSettings,
@@ -8,8 +9,45 @@ import {
   workspaceId,
   operationId,
 } from "./data";
+const generationExpiry = new Date(Date.now() + 600000).toISOString();
 export function McpUiHarness() {
   const mode = new URLSearchParams(location.search).get("mode");
+  if (mode?.startsWith("generation"))
+    return (
+      <main className="app-page">
+        <McpGenerationBrowserApproval
+          operation={{
+            id: operationId,
+            workspaceId,
+            kind: "generate_media",
+            status:
+              mode === "generation-auto" ? "prepared" : "requires_approval",
+            result: null,
+            error: null,
+            href: `/app/mcp/operations/${operationId}`,
+            expiresAt:
+              mode === "generation-expired"
+                ? new Date(0).toISOString()
+                : generationExpiry,
+          }}
+          preview={{
+            kind: "image",
+            title: "Business image",
+            text: "A calm professional studio with natural light.\nKeep the whole composition visible.",
+            model: "fixture-image",
+            provider: "openai",
+            estimatedCostCents: 8,
+            maximumCostCents: 20,
+            projectId: null,
+            sceneId: null,
+            settings: [
+              { label: "Size", value: "1024x1024" },
+              { label: "Quality", value: "low" },
+            ],
+          }}
+        />
+      </main>
+    );
   if (mode === "upload")
     return (
       <main className="app-page">

@@ -1,5 +1,33 @@
 import { expect, test } from "@playwright/test";
 
+test("an owner explicitly saves generation autonomy independently of publishing", async ({
+  page,
+}) => {
+  await page.goto("/harness.html?mode=settings-populated");
+  const card = page.locator('[data-slot="card"][aria-labelledby]').filter({
+    has: page.getByRole("heading", { name: "ChatGPT", exact: true }),
+  });
+  await expect(
+    card.getByRole("combobox", { name: "Generation approval" }),
+  ).toContainText("Require my approval");
+  await card
+    .getByRole("checkbox", { name: /Generate images and audio/ })
+    .check();
+  await card.getByRole("combobox", { name: "Generation approval" }).click();
+  await page
+    .getByRole("option", { name: "Autonomous generation", exact: true })
+    .click();
+  await card
+    .getByRole("button", { name: "Save workspace permissions" })
+    .click();
+  const saved = await page.evaluate(() =>
+    JSON.parse(sessionStorage.getItem("saved-mcp-grant") ?? "{}"),
+  );
+  expect(saved.generationApprovalMode).toBe("autonomous");
+  expect(saved.publicationApprovalMode).toBe("manual");
+  expect(saved.scopes).toContain("vcstudio:generate");
+});
+
 for (const theme of ["light", "dark"]) {
   for (const width of [390, 768, 1440]) {
     test(`AI settings structure and controls in ${theme} at ${width}px`, async ({
@@ -53,7 +81,7 @@ for (const theme of ["light", "dark"]) {
         .filter({
           has: page.getByRole("heading", { name: "ChatGPT", exact: true }),
         });
-      await expect(chatgpt.getByRole("checkbox")).toHaveCount(5);
+      await expect(chatgpt.getByRole("checkbox")).toHaveCount(6);
       await expect(
         chatgpt.getByRole("checkbox", { name: /Publish and schedule/ }),
       ).toBeChecked();

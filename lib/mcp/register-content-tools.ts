@@ -36,6 +36,7 @@ import { requireMcpProject } from "./project-access";
 import type { McpToolRegistrar } from "./register-tool";
 import { requireMcp } from "./errors";
 import { mutateOnce } from "./operations";
+import { listMcpSceneAudio } from "@/db/repositories/mcp-generation.repository";
 
 export function registerContentTools(register: McpToolRegistrar) {
   const project = mcpWorkspaceInput.extend({ projectId: z.uuid() });
@@ -192,7 +193,7 @@ export function registerContentTools(register: McpToolRegistrar) {
   );
   register(
     "get_scene",
-    "Read a current scene, bounded image review history and saved imageFramings per output. Image canvas size can differ from output dimensions; match framing by sourceImageGenerationId. Missing saved framing uses the application's cover default. Images are not automatically approved.",
+    "Read a current scene, bounded image/audio review history and saved imageFramings per output. Image canvas size can differ from output dimensions; match framing by sourceImageGenerationId. Missing saved framing uses the application's cover default. Generated media is not automatically approved; agents with Review permission can explicitly review it themselves.",
     "vcstudio:read",
     project.extend({ sceneId: z.uuid() }),
     true,
@@ -203,7 +204,7 @@ export function registerContentTools(register: McpToolRegistrar) {
         workspaceId: ctx.workspaceId,
       });
       requireMcp(current, "not_found", "That scene is unavailable.");
-      const [images, imageFramings] = await Promise.all([
+      const [images, imageFramings, audio] = await Promise.all([
         listSceneImageGenerationSummaries({
           ...p,
           workspaceId: ctx.workspaceId,
@@ -215,10 +216,16 @@ export function registerContentTools(register: McpToolRegistrar) {
           workspaceId: ctx.workspaceId,
           sceneVersionId: current.version.id,
         }),
+        listMcpSceneAudio({
+          workspaceId: ctx.workspaceId,
+          projectId: p.projectId,
+          sceneVersionId: current.version.id,
+        }),
       ]);
       return {
         ...current,
         imageFramings,
+        audio,
         images: images.map((i) => ({
           id: i.generation.id,
           size: i.generation.size,

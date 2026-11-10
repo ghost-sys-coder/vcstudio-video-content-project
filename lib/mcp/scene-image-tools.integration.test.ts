@@ -4,6 +4,9 @@ import { Client } from "@modelcontextprotocol/client";
 import { InMemoryTransport, McpServer } from "@modelcontextprotocol/server";
 import { mcpContextFixture, mcpIds } from "@/lib/test-utils/mcp-fixtures";
 vi.mock("server-only", () => ({}));
+vi.mock("@/db/repositories/mcp-generation.repository", () => ({
+  listMcpSceneAudio: async () => [],
+}));
 const m = vi.hoisted(() => ({
   authorize: vi.fn(),
   project: vi.fn(),

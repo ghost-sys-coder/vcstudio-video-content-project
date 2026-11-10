@@ -1,12 +1,12 @@
 import { z } from "zod";
 import { MAX_SHOTS_PER_SCENE } from "@/lib/scenes/shot-timing";
+import {
+  IMAGE_GENERATION_SIZES,
+  IMAGE_GENERATION_QUALITIES,
+} from "@studio/contracts/mcp-generation";
 
-export const SCENE_IMAGE_API_SIZES = [
-  "1536x1024",
-  "1024x1536",
-  "1024x1024",
-] as const;
-export const SCENE_IMAGE_QUALITIES = ["low", "medium", "high"] as const;
+export const SCENE_IMAGE_API_SIZES = IMAGE_GENERATION_SIZES;
+export const SCENE_IMAGE_QUALITIES = IMAGE_GENERATION_QUALITIES;
 export const SCENE_IMAGE_OUTPUT_FORMATS = ["webp", "png", "jpeg"] as const;
 /**
  * `transparent` is only honored by the provider for `png`/`webp` output, so any

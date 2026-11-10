@@ -38,6 +38,7 @@ export function mcpContextFixture(): McpContext {
       connectionId: mcpIds.connection,
       workspaceId: mcpIds.workspace,
       publicationApprovalMode: "manual",
+      generationApprovalMode: "manual",
       scopes: [...MCP_SCOPES],
       createdAt: now,
       updatedAt: now,

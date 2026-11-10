@@ -183,6 +183,7 @@ const server = createServer(async (req, res) => {
     "/upload.html": path.resolve("public/mcp/upload.html"),
     "/harness.html": path.join(out, "harness.html"),
     "/review.html": path.resolve("public/mcp/review.html"),
+    "/generation.html": path.resolve("public/mcp/generation.html"),
     "/waitlist.html": path.join(out, "waitlist.html"),
     "/post-composer.html": path.join(out, "post-composer.html"),
     "/operations.html": path.join(out, "operations.html"),

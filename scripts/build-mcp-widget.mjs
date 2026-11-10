@@ -3,6 +3,11 @@ import { readFile, mkdir, writeFile } from "node:fs/promises";
 import postcss from "postcss";
 import tailwind from "@tailwindcss/postcss";
 const widgets = [
+  [
+    "generation",
+    "lib/mcp/generation-widget-entry.tsx",
+    "VCStudio generation review",
+  ],
   ["review", "lib/mcp/widget-entry.tsx", "VCStudio publication review"],
   ["upload", "lib/mcp/upload-widget-entry.tsx", "VCStudio media upload"],
 ];

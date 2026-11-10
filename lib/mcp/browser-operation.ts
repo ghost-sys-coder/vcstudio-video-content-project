@@ -21,9 +21,11 @@ export async function loadBrowserMcpOperation(
   const scope =
     operation.kind === "publish_post"
       ? "vcstudio:publish"
-      : operation.kind === "import_asset" || operation.kind === "assign_image"
-        ? "vcstudio:media"
-        : "vcstudio:read";
+      : operation.kind === "generate_media"
+        ? "vcstudio:generate"
+        : operation.kind === "import_asset" || operation.kind === "assign_image"
+          ? "vcstudio:media"
+          : "vcstudio:read";
   const context = await authorizeMcpBrowser(
     user.id,
     operation.connectionId,

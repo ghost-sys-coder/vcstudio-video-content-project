@@ -16,6 +16,7 @@ export const mcpScopeSchema = z.enum([
   "vcstudio:media",
   "vcstudio:review",
   "vcstudio:publish",
+  "vcstudio:generate",
 ]);
 export const MCP_SCOPES = mcpScopeSchema.options;
 export type McpScope = z.infer<typeof mcpScopeSchema>;
@@ -26,11 +27,16 @@ export const mcpPublicationApprovalModeSchema = z.enum([
 export type McpPublicationApprovalMode = z.infer<
   typeof mcpPublicationApprovalModeSchema
 >;
+export const mcpGenerationApprovalModeSchema = mcpPublicationApprovalModeSchema;
+export type McpGenerationApprovalMode = z.infer<
+  typeof mcpGenerationApprovalModeSchema
+>;
 export const mcpGrantInput = z.object({
   connectionId: z.uuid(),
   workspaceId: z.uuid(),
   scopes: z.array(mcpScopeSchema).max(MCP_SCOPES.length),
   publicationApprovalMode: mcpPublicationApprovalModeSchema.default("manual"),
+  generationApprovalMode: mcpGenerationApprovalModeSchema.default("manual"),
 });
 export const mcpWorkspaceInput = z.object({ workspaceId: z.uuid() });
 /** Persisted display framing, distinct from a scene image's storage canvas. */

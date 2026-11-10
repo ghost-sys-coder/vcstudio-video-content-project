@@ -1,5 +1,13 @@
 # VCStudio MCP v1 setup and verification
 
+## Image/audio extension prepared — 10 November 2026
+
+Version `1.2.0` is implemented and verified locally, with 47 model-facing tools and two app-only approvals. It adds `get_generation_options`, `prepare_generation`, `execute_generation`, `get_generation_status` and `review_scene_audio`. Standalone images/narration and approved project scenes use the existing providers, private storage, budgets and shared scene services. An owner-authorized autonomous generation grant lets the agent prepare and execute its own quote, then explicitly review content through MCP. Autonomous publishing is configured separately. There is no required browser or human review click for either operation once the relevant autonomy is granted; client-side tool permissions remain separate.
+
+The `mcp_media_generation` migration passed isolated PostgreSQL and temporary production-clone tests. The clone retained all 51 projects, 37 posts, 123 assets, 23 connected accounts, 566 reservations and both grants; both generation modes default to manual while publishing stays autonomous. The constraint probe rolled back all test inserts. Production schema, Clerk configuration and grants have not been changed for this extension.
+
+Before release, add and advertise **Generate images and audio** (`vcstudio:generate`), include it in the existing resource/client scope ceilings and default scope list, then reconnect clients once for consent. Preserve the existing five scopes, identity scopes, PKCE/audience checks and private access. New grants remain manual unless an owner explicitly chooses autonomy. The full local suite passed 3,314 tests with 163 existing opt-in skips; 31 browser journeys, formatting, lint, TypeScript, environment placement and build passed. No new dependency, environment variable, scheduled task or paid provider test was introduced. YouTube Community publishing and video generation remain on hold. See [generation setup and limitations](mcp-generation.md) for the release sequence and supported voices/formats.
+
 ## Browser-free upload release — 9 November 2026
 
 The deployed follow-up release adds an in-chat MCP upload panel and focused

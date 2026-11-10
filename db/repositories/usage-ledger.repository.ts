@@ -14,7 +14,9 @@ import {
   users,
   videoRenders,
   videoGenerations,
+  mcpOperations,
 } from "@/db/schema";
+import { generationPreviewSchema } from "@studio/contracts/mcp-generation";
 import { calculatePagination } from "@/lib/domain/pagination";
 import {
   USAGE_OPERATION_PROVIDERS,
@@ -86,7 +88,10 @@ export async function listUsageLedgerEntries(input: {
   const thumbnailIds: string[] = [];
   const chapterIds: string[] = [];
   const videoIds: string[] = [];
+  const mediaIds: string[] = [];
   for (const reservation of reservations) {
+    if (reservation.mediaGenerationOperationId)
+      mediaIds.push(reservation.mediaGenerationOperationId);
     if (reservation.videoGenerationId)
       videoIds.push(reservation.videoGenerationId);
     if (reservation.analysisRunId) analysisIds.push(reservation.analysisRunId);
@@ -108,6 +113,46 @@ export async function listUsageLedgerEntries(input: {
   const enrichment = new Map<string, Enrichment>();
   const database = getDatabase();
   await Promise.all([
+    mediaIds.length === 0
+      ? Promise.resolve()
+      : database
+          .select()
+          .from(mcpOperations)
+          .where(
+            and(
+              eq(mcpOperations.workspaceId, input.workspaceId),
+              inArray(mcpOperations.id, mediaIds),
+            ),
+          )
+          .then((rows) => {
+            for (const row of rows) {
+              const preview = generationPreviewSchema.safeParse(
+                row.input.preview,
+              );
+              const result = row.result;
+              enrichment.set(row.id, {
+                requestedByUserId: row.userId,
+                provider: preview.success ? preview.data.provider : null,
+                model: preview.success ? preview.data.model : null,
+                estimatedCostCents: preview.success
+                  ? preview.data.estimatedCostCents
+                  : 0,
+                inputUnits:
+                  typeof result?.inputUnits === "number"
+                    ? result.inputUnits
+                    : null,
+                outputUnits:
+                  typeof result?.outputUnits === "number"
+                    ? result.outputUnits
+                    : null,
+                providerRequestId:
+                  typeof result?.providerRequestId === "string"
+                    ? result.providerRequestId
+                    : null,
+                workflowRunId: row.triggerRunId,
+              });
+            }
+          }),
     videoIds.length === 0
       ? Promise.resolve()
       : database
@@ -409,6 +454,7 @@ export async function listUsageLedgerEntries(input: {
 
   const items: UsageLedgerEntry[] = reservations.map((reservation) => {
     const operationId =
+      reservation.mediaGenerationOperationId ??
       reservation.analysisRunId ??
       reservation.imageGenerationId ??
       reservation.audioGenerationId ??

@@ -14,6 +14,7 @@ import { recordAuditEvent } from "@/lib/audit/record-audit-event";
 import { requireMcpEnabled } from "@/lib/mcp/context";
 import { roleAllowsScope } from "@/lib/mcp/policy";
 import { assertPublicationApprovalGrant } from "@/lib/mcp/publication-approval-policy";
+import { assertGenerationApprovalGrant } from "@/lib/mcp/generation-approval-policy";
 import { McpError } from "@/lib/mcp/errors";
 export type McpFormState = { ok: boolean; message: string };
 export async function saveMcpGrantAction(
@@ -28,6 +29,7 @@ export async function saveMcpGrantAction(
       workspaceId: form.get("workspaceId"),
       scopes: form.getAll("scopes"),
       publicationApprovalMode: form.get("publicationApprovalMode") ?? "manual",
+      generationApprovalMode: form.get("generationApprovalMode") ?? "manual",
     });
     const membership = await requireWorkspaceMembership({
       userId: user.id,
@@ -39,6 +41,7 @@ export async function saveMcpGrantAction(
         message: "Your current role does not allow those permissions.",
       };
     assertPublicationApprovalGrant({ ...p, role: membership.role });
+    assertGenerationApprovalGrant({ ...p, role: membership.role });
     await saveMcpGrant({ ...p, userId: user.id });
     await recordAuditEvent({
       workspaceId: p.workspaceId,
@@ -50,6 +53,7 @@ export async function saveMcpGrantAction(
         event: "workspace_grant_saved",
         scopes: p.scopes,
         publicationApprovalMode: p.publicationApprovalMode,
+        generationApprovalMode: p.generationApprovalMode,
       },
     });
     revalidatePath("/app/settings/mcp");

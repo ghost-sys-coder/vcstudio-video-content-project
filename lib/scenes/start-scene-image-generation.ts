@@ -54,6 +54,7 @@ import {
   type StartSceneImageGenerationInput,
 } from "@/lib/schemas/scene-image";
 import type { sceneImageGenerationTask } from "@/trigger/scene-image-generation";
+import type { SceneImageGenerationPlan } from "@/lib/mcp/scene-generation-plan";
 
 const SCENE_IMAGE_PROMPT_TEMPLATE_KEY = "scene-image";
 
@@ -205,16 +206,20 @@ export async function startSceneImageGeneration(input: {
   requestedByUserId: string;
   project: Project;
   request: StartSceneImageGenerationInput;
+  mcpOperationId?: string;
+  previewOnly?: boolean;
+  inspectPlan?: (plan: SceneImageGenerationPlan) => void;
 }): Promise<StartSceneImageGenerationResult> {
   const environment = getSceneImageEnvironment();
   if (!environment.ENABLE_SCENE_IMAGE_GENERATION)
     throw new SceneImageGenerationRequestError(
       "Scene image generation is disabled.",
     );
-  await enforceRateLimit({
-    workspaceId: input.workspaceId,
-    operation: "scene_image_generation",
-  });
+  if (!input.previewOnly)
+    await enforceRateLimit({
+      workspaceId: input.workspaceId,
+      operation: "scene_image_generation",
+    });
   if (
     input.request.referenceAssetIds.length >
     environment.MAX_REFERENCE_ASSETS_PER_GENERATION
@@ -403,6 +408,25 @@ export async function startSceneImageGeneration(input: {
         environment.OPENAI_IMAGE_REFERENCE_RESERVE_CENTS_PER_ASSET,
       safetyMarginBasisPoints: 0,
     });
+    input.inspectPlan?.({
+      configuration: {
+        model: environment.OPENAI_IMAGE_MODEL,
+        prompt: finalPrompt,
+        quality: input.request.quality,
+        size,
+        outputFormat: environment.OPENAI_IMAGE_OUTPUT_FORMAT,
+        outputCompression,
+        background: environment.OPENAI_IMAGE_BACKGROUND,
+      },
+      estimatedCostCents: estimate.estimatedCostCents,
+      sceneVersionId: approvedScene.version.id,
+      promptTemplateVersion: SCENE_IMAGE_PROMPT_VERSION,
+      referenceAssetIds: input.request.referenceAssetIds,
+      referenceRevisions: selectedReferenceRows
+        .map(({ reference }) => ({ id: reference.id, etag: reference.etag }))
+        .sort((a, b) => a.id.localeCompare(b.id)),
+    });
+    if (input.previewOnly) continue;
     const { dailyWindowStart, monthlyWindowStart } = getUtcBudgetWindowStarts(
       new Date(),
     );
@@ -492,6 +516,7 @@ export async function startSceneImageGeneration(input: {
       try {
         reservation = await createSceneImageGenerationReservation({
           generationId,
+          mcpOperationId: input.mcpOperationId,
           reservationId,
           workspaceId: input.workspaceId,
           projectId: input.project.id,
@@ -590,7 +615,7 @@ export async function startSceneImageGeneration(input: {
     started.push({ size, generationId, created: true });
   }
 
-  if (started.length === 0) {
+  if (started.length === 0 && !input.previewOnly) {
     if (budgetConstraintReached)
       throw new SceneImageGenerationRequestError(
         budgetErrorMessage(budgetConstraintReached),

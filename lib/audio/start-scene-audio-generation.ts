@@ -8,6 +8,7 @@ import {
   findVoicePreset,
   getNextSceneAudioGenerationVersion,
   listSceneAudioGenerationsForSceneVersions,
+  findSceneAudioGenerationByRequestNonce,
 } from "@/db/repositories/scene-audio.repository";
 import {
   getProjectCommittedCostCents,
@@ -35,6 +36,8 @@ import { loadEffectiveWorkspaceBudget } from "@/lib/budgets/workspace-budget";
 import { loadEffectiveWorkspaceLimits } from "@/lib/budgets/current-settings";
 import { enforceRateLimit } from "@/lib/rate-limit/enforce-rate-limit";
 import type { sceneAudioGenerationTask } from "@/trigger/scene-audio-generation";
+import type { SceneAudioGenerationPlan } from "@/lib/mcp/scene-generation-plan";
+import { dispatchSceneAudioGeneration } from "./dispatch-scene-audio-generation";
 
 export class SceneAudioGenerationRequestError extends Error {
   constructor(message: string) {
@@ -85,17 +88,21 @@ export async function startSceneAudioGeneration(input: {
   sceneIds: string[];
   requestNonce: string;
   now?: Date;
+  mcpOperationId?: string;
+  previewOnly?: boolean;
+  inspectPlan?: (plan: SceneAudioGenerationPlan) => void;
 }): Promise<SceneAudioGenerationResult> {
   const environment = getSceneAudioEnvironment();
   if (!environment.ENABLE_SCENE_AUDIO_GENERATION)
     throw new SceneAudioGenerationRequestError(
       "Scene audio generation is disabled.",
     );
-  await enforceRateLimit({
-    workspaceId: input.workspaceId,
-    operation: "scene_audio_generation",
-    now: input.now,
-  });
+  if (!input.previewOnly)
+    await enforceRateLimit({
+      workspaceId: input.workspaceId,
+      operation: "scene_audio_generation",
+      now: input.now,
+    });
 
   const requestedSceneIds = [...new Set(input.sceneIds)];
   if (requestedSceneIds.length === 0)
@@ -120,6 +127,40 @@ export async function startSceneAudioGeneration(input: {
     throw new SceneAudioGenerationRequestError(
       "The selected voice preset is unavailable.",
     );
+
+  // A consumed MCP preparation names one immutable scene request. Re-dispatch
+  // its existing job after an ambiguous HTTP response without reserving again.
+  if (input.mcpOperationId && requestedSceneIds.length === 1) {
+    const existing = await findSceneAudioGenerationByRequestNonce({
+      ...scope,
+      requestNonce: deterministicSceneNonce(
+        input.requestNonce,
+        requestedSceneIds[0],
+      ),
+    });
+    if (existing) {
+      if (existing.mcpOperationId !== input.mcpOperationId)
+        throw new SceneAudioGenerationRequestError(
+          "This generation belongs to another request.",
+        );
+      const dispatched =
+        !["pending", "queued"].includes(existing.status) ||
+        !!existing.triggerRunId ||
+        (await dispatchSceneAudioGeneration({
+          ...scope,
+          generationId: existing.id,
+          idempotencyKey:
+            existing.idempotencyKey ?? `mcp-audio:${input.mcpOperationId}`,
+        }));
+      return {
+        reservedCount: 1,
+        requestedCount: 1,
+        skippedCount: 0,
+        dispatched,
+        budgetStopped: false,
+      };
+    }
+  }
 
   const sceneById = new Map(
     currentScenes.map((row) => [row.scene.id, row] as const),
@@ -183,6 +224,29 @@ export async function startSceneAudioGeneration(input: {
     throw new SceneAudioGenerationRequestError(
       "None of the selected scenes are ready for narration right now.",
     );
+
+  for (const plan of plans)
+    input.inspectPlan?.({
+      sceneId: plan.row.scene.id,
+      sceneVersionId: plan.row.version.id,
+      sceneVersion: plan.row.scene.currentVersion,
+      text: plan.text,
+      instructions: plan.instructions,
+      provider: voicePreset.provider,
+      model: voicePreset.model,
+      voice: voicePreset.voice,
+      format: voicePreset.format,
+      speedScaledPercent: voicePreset.speedScaledPercent,
+      estimatedCostCents: plan.estimatedCostCents,
+    });
+  if (input.previewOnly)
+    return {
+      reservedCount: 0,
+      requestedCount: plans.length,
+      skippedCount: requestedSceneIds.length - plans.length,
+      dispatched: false,
+      budgetStopped: false,
+    };
 
   const now = input.now ?? new Date();
   const { dailyWindowStart, monthlyWindowStart } =
@@ -269,6 +333,7 @@ export async function startSceneAudioGeneration(input: {
       try {
         const reservation = await createSceneAudioGenerationReservation({
           generationId,
+          mcpOperationId: input.mcpOperationId,
           reservationId,
           workspaceId: input.workspaceId,
           projectId: input.project.id,
@@ -329,7 +394,13 @@ export async function startSceneAudioGeneration(input: {
   }
 
   let dispatched = false;
-  if (items.length > 0) {
+  if (input.mcpOperationId && items.length === 1) {
+    const item = items[0];
+    dispatched = await dispatchSceneAudioGeneration({
+      ...item.payload,
+      idempotencyKey: item.idempotencyKey,
+    });
+  } else if (items.length > 0) {
     try {
       await tasks.batchTrigger<typeof sceneAudioGenerationTask>(
         "scene-audio-generation",

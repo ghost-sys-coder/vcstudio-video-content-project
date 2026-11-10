@@ -13,6 +13,7 @@ type SceneImageReservation = {
   workspaceId: string;
   projectId: string | null;
   operationType:
+    | "media_generation"
     | "video_generation"
     | "scene_analysis"
     | "scene_image_generation"
