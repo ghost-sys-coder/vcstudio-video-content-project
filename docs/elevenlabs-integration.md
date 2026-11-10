@@ -113,6 +113,11 @@ none involve either newly installed package (ElevenLabs SDK and command-exists).
 The generated migration passed isolated PostgreSQL tenant/uniqueness tests and a
 production-clone check. Existing records are unchanged: 51 projects, 37 Social
 posts, 123 assets, 23 connections, 566 usage reservations and one existing video.
-Production migration, environment publication and worker/web deployment require
-release approval. Temporary Neon test branch `br-floral-voice-aibsc8np` must be
-removed through the approved migration-completion workflow.
+The owner approved the production release. Migration
+`20261110144100_elevenlabs_mcp_video` is applied, with SHA-256
+`1475bd9097078689fb529774ddf9cf79cf8b6c76dabda158f0cd0ca9c24e4bce`
+recorded in the migration journal. The temporary Neon test branch
+`br-floral-voice-aibsc8np` was removed through migration completion. Post-migration
+counts match the clone baseline above, and the tenant constraint and unique index
+are validated. Vercel production/preview settings are synchronized for internal
+voice access with visuals disabled; matching worker `20261110.2` is deployed with synchronized settings; web deployment is in progress.

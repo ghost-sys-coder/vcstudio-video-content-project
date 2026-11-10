@@ -1,8 +1,8 @@
 # VCStudio MCP v1 setup and verification
 
-## ElevenLabs extension — prepared, awaiting release approval
+## ElevenLabs extension — approved production rollout
 
-The 1.3.0 implementation adds voice discovery/preset creation and scene-video assignment/review: 53 registered tools, 51 assistant-callable. Generation keeps the existing Generate scope and manual/autonomous modes. Image/video API access remains disabled on the current Creator plan. Apply the tested nullable video/MCP ownership migration before matching worker/web deployment; production stays on the prior release until approved. See [ElevenLabs controls](elevenlabs-integration.md).
+The 1.3.0 implementation adds voice discovery/preset creation and scene-video assignment/review: 53 registered tools, 51 assistant-callable. Generation keeps the existing Generate scope and manual/autonomous modes. Image/video API access remains disabled on the current Creator plan. The owner-approved nullable video/MCP ownership migration is applied in production with its hash recorded. Existing records are unchanged and the temporary migration branch is removed. Matching worker `20261110.2` is deployed with synchronized settings; web deployment is in progress. See [ElevenLabs controls](elevenlabs-integration.md).
 
 ## ChatGPT incremental consent compatibility — 10 November 2026
 
