@@ -120,4 +120,16 @@ recorded in the migration journal. The temporary Neon test branch
 `br-floral-voice-aibsc8np` was removed through migration completion. Post-migration
 counts match the clone baseline above, and the tenant constraint and unique index
 are validated. Vercel production/preview settings are synchronized for internal
-voice access with visuals disabled; matching worker `20261110.2` is deployed with synchronized settings; web deployment is in progress.
+voice access with visuals disabled. Matching Trigger.dev worker `20261110.2` is
+deployed with synchronized settings. Web deployment
+`dpl_2hc815f77Bi6RydGKKvZa7Yf8zdA` is READY on the canonical domain, from
+release commit `8b547da` (implementation `124f9a3`). Ten production HTTP checks
+passed: public landing/waitlist, private settings/voice API, OAuth metadata,
+MCP authentication challenge, supported preflight and rejection of untrusted origins.
+Authenticated MCP reads confirmed version `1.3.0`, six scopes, existing autonomous
+generation/publishing and ElevenLabs voice availability, with ElevenLabs visuals
+unavailable. The initial deployment-scoped error scan returned no entries.
+Read-only verification created no content or usage reservation and sent no
+generation/publication request. Refresh the connector tools; existing Generate
+consent remains valid. The documentation-only release record follows this deployed
+implementation without changing the worker.
