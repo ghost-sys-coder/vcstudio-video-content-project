@@ -5,10 +5,11 @@ vi.mock("./context", () => ({
   authorizeMcp: vi.fn(async () => mcpContextFixture()),
 }));
 vi.mock("./rate-limit", () => ({ enforceMcpRateLimit: vi.fn() }));
+vi.mock("./config", () => ({ mcpBaseUrl: () => "https://vcstudio.example" }));
 import { Client } from "@modelcontextprotocol/client";
 import { InMemoryTransport, McpServer } from "@modelcontextprotocol/server";
 import { createToolRegistrar, toolError } from "./register-tool";
-import { McpError } from "./errors";
+import { McpError, McpScopeError } from "./errors";
 import { mcpContextFixture, mcpIds } from "@/lib/test-utils/mcp-fixtures";
 
 const clients: Client[] = [];
@@ -17,6 +18,25 @@ afterEach(async () => {
 });
 
 describe("MCP tool validation", () => {
+  it("returns the documented OAuth challenge only for a missing token scope", () => {
+    const result = toolError(
+      new McpScopeError("vcstudio:generate", ["vcstudio:read"]),
+    );
+    expect(result).toMatchObject({
+      isError: true,
+      structuredContent: { code: "insufficient_scope" },
+      _meta: {
+        "mcp/www_authenticate": [
+          'Bearer resource_metadata="https://vcstudio.example/.well-known/oauth-protected-resource/mcp", scope="vcstudio:read vcstudio:generate", error="insufficient_scope", error_description="Reconnect VCStudio to authorize the required OAuth permission."',
+        ],
+      },
+    });
+    expect(
+      toolError(new McpError("permission_denied", "Workspace grant denied."))
+        ._meta,
+    ).toBeUndefined();
+    expect(toolError(new Error("private failure"))._meta).toBeUndefined();
+  });
   it("passes the SDK's transformed output to the handler without parsing it again", async () => {
     const [a, b] = InMemoryTransport.createLinkedPair();
     const server = new McpServer({ name: "Validation test", version: "1" });

@@ -1,7 +1,7 @@
-import type { McpScope } from "@studio/contracts";
+import { MCP_SCOPES, type McpScope } from "@studio/contracts";
 import type { WorkspaceRole } from "@/db/schema";
 import { can, type WorkspaceCapability } from "@/lib/policies/workspace-policy";
-import { McpError } from "./errors";
+import { McpError, McpScopeError } from "./errors";
 
 const capabilities: Record<McpScope, WorkspaceCapability | null> = {
   "vcstudio:read": null,
@@ -18,11 +18,7 @@ export function assertMcpAccess(input: {
   scope: McpScope;
   revoked: boolean;
 }) {
-  if (
-    input.revoked ||
-    !input.tokenScopes.includes(input.scope) ||
-    !input.grantedScopes.includes(input.scope)
-  )
+  if (input.revoked || !input.grantedScopes.includes(input.scope))
     throw new McpError(
       "permission_denied",
       "This connection does not have permission for that action. Review its workspace grants.",
@@ -32,6 +28,13 @@ export function assertMcpAccess(input: {
     throw new McpError(
       "permission_denied",
       "Your current workspace role does not permit that action.",
+    );
+  // Reauthorization can fix a token scope, but cannot repair a revoked grant
+  // or role denial. Never invite OAuth to override those application policies.
+  if (!input.tokenScopes.includes(input.scope))
+    throw new McpScopeError(
+      input.scope,
+      MCP_SCOPES.filter((scope) => input.tokenScopes.includes(scope)),
     );
 }
 export function roleAllowsScope(role: WorkspaceRole, scope: McpScope) {

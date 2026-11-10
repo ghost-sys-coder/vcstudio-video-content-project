@@ -4,6 +4,8 @@ import { createVcStudioMcpServer } from "@/lib/mcp/server";
 import { getMcpEnvironment } from "@/lib/env/server";
 import { mcpBaseUrl } from "@/lib/mcp/config";
 import { McpError } from "@/lib/mcp/errors";
+import { MCP_SCOPES } from "@studio/contracts";
+import { mcpAuthChallenge } from "@/lib/mcp/auth-metadata";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export function OPTIONS(request: Request) {
@@ -76,7 +78,14 @@ export async function POST(request: Request) {
               }
             : {}),
           "Cache-Control": "no-store",
-          "WWW-Authenticate": `Bearer resource_metadata="${mcpBaseUrl()}/.well-known/oauth-protected-resource/mcp"`,
+          ...(unauthenticated
+            ? {
+                "WWW-Authenticate": mcpAuthChallenge({
+                  baseUrl: mcpBaseUrl(),
+                  scopes: MCP_SCOPES,
+                }),
+              }
+            : {}),
         },
       },
     );

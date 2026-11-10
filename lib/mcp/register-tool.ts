@@ -6,8 +6,10 @@ import type {
 } from "@modelcontextprotocol/server";
 import type { McpPrincipal, McpScope } from "@studio/contracts";
 import { authorizeMcp, type McpContext } from "./context";
-import { McpError } from "./errors";
+import { McpError, McpScopeError } from "./errors";
 import { enforceMcpRateLimit } from "./rate-limit";
+import { mcpAuthChallenge, mcpToolAuthMetadata } from "./auth-metadata";
+import { mcpBaseUrl } from "./config";
 export type McpToolRegistrar = ReturnType<typeof createToolRegistrar>;
 export function toolResult(data: unknown): CallToolResult {
   const structured = {
@@ -46,6 +48,19 @@ export function toolError(error: unknown): CallToolResult {
     isError: true,
     content: [{ type: "text", text: JSON.stringify(result) }],
     structuredContent: result,
+    ...(error instanceof McpScopeError
+      ? {
+          _meta: {
+            "mcp/www_authenticate": [
+              mcpAuthChallenge({
+                baseUrl: mcpBaseUrl(),
+                scopes: error.scopes,
+                insufficientScope: true,
+              }),
+            ],
+          },
+        }
+      : {}),
   };
 }
 export function createToolRegistrar(
@@ -66,10 +81,12 @@ export function createToolRegistrar(
       {
         description,
         inputSchema: wireSchema,
-        _meta:
-          name === "import_chat_file"
+        _meta: {
+          ...mcpToolAuthMetadata([scope]),
+          ...(name === "import_chat_file"
             ? { "openai/fileParams": ["file"] }
-            : undefined,
+            : {}),
+        },
         annotations: {
           readOnlyHint: readOnly,
           destructiveHint:

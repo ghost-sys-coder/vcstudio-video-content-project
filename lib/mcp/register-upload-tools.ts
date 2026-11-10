@@ -20,6 +20,7 @@ import {
 import { authorizeMcp } from "./context";
 import { enforceMcpRateLimit } from "./rate-limit";
 import { toolResult, toolError, type McpToolRegistrar } from "./register-tool";
+import { mcpToolAuthMetadata } from "./auth-metadata";
 import {
   startMcpChunkUpload,
   appendMcpUpload,
@@ -94,7 +95,10 @@ export function registerUploadTools(
         destructiveHint: false,
         openWorldHint: false,
       },
-      _meta: { ui: { resourceUri: MCP_UPLOAD_RESOURCE } },
+      _meta: {
+        ...mcpToolAuthMetadata(["vcstudio:media"]),
+        ui: { resourceUri: MCP_UPLOAD_RESOURCE },
+      },
     },
     async (args) => {
       try {

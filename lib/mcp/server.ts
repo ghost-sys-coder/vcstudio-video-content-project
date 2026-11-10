@@ -43,6 +43,7 @@ import { MCP_SERVER_VERSION } from "@studio/contracts/mcp-upload";
 import { registerUploadTools } from "./register-upload-tools";
 import { registerGenerationTools } from "./register-generation-tools";
 import { effectiveGenerationApprovalMode } from "./generation-approval-policy";
+import { mcpToolAuthMetadata } from "./auth-metadata";
 import {
   getSceneImageEnvironment,
   getSceneAudioEnvironment,
@@ -64,6 +65,7 @@ export function createVcStudioMcpServer(principal: McpPrincipal) {
       description:
         "Inspect your VCStudio AI connection and get the signed-in setup link. This grants no workspace access.",
       inputSchema: z.object({}),
+      _meta: mcpToolAuthMetadata([]),
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -83,6 +85,12 @@ export function createVcStudioMcpServer(principal: McpPrincipal) {
           marketing: "paused",
           generation: "image_and_audio_with_explicit_generate_permission",
           serverVersion: MCP_SERVER_VERSION,
+          oauthScopes: MCP_SCOPES.filter((scope) =>
+            principal.scopes.includes(scope),
+          ),
+          missingOAuthScopes: MCP_SCOPES.filter(
+            (scope) => !principal.scopes.includes(scope),
+          ),
           requiredTransferTools: [
             "import_chat_file",
             "open_media_upload",
@@ -102,7 +110,7 @@ export function createVcStudioMcpServer(principal: McpPrincipal) {
             "review_scene_audio",
           ],
           discovery:
-            "If these tools are missing from this client's tool list, refresh the connector and start a new conversation. Do not use browser automation as a substitute.",
+            "If required tools are missing, refresh the tool catalogue on the connector's management page, then reconnect for missing OAuth scopes and start a new conversation. Reconnecting alone may retain an older tool catalogue. Do not use browser automation as a substitute.",
         });
       } catch (e) {
         return toolError(e);
@@ -115,6 +123,7 @@ export function createVcStudioMcpServer(principal: McpPrincipal) {
       description:
         "List only currently granted workspaces, their roles and effective scopes. Does not grant access.",
       inputSchema: z.object({}),
+      _meta: mcpToolAuthMetadata(["vcstudio:read"]),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     async () => {
@@ -244,7 +253,10 @@ export function createVcStudioMcpServer(principal: McpPrincipal) {
         destructiveHint: false,
         openWorldHint: false,
       },
-      _meta: { ui: { resourceUri: REVIEW_URI } },
+      _meta: {
+        ...mcpToolAuthMetadata(["vcstudio:publish"]),
+        ui: { resourceUri: REVIEW_URI },
+      },
     },
     async (args) => {
       try {
@@ -293,7 +305,10 @@ export function createVcStudioMcpServer(principal: McpPrincipal) {
         destructiveHint: true,
         openWorldHint: true,
       },
-      _meta: { ui: { visibility: ["app"] } },
+      _meta: {
+        ...mcpToolAuthMetadata(["vcstudio:publish"]),
+        ui: { visibility: ["app"] },
+      },
     },
     async (args) => {
       try {

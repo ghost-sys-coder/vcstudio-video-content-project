@@ -47,6 +47,7 @@ import { requireMcp } from "./errors";
 import { mutateOnce } from "./operations";
 import { mcpBaseUrl } from "./config";
 import { enforceMcpRateLimit } from "./rate-limit";
+import { mcpToolAuthMetadata } from "./auth-metadata";
 
 const GENERATION_URI = "ui://vcstudio/generation-review.html";
 export function registerGenerationTools(
@@ -174,7 +175,10 @@ export function registerGenerationTools(
         destructiveHint: false,
         openWorldHint: false,
       },
-      _meta: { ui: { resourceUri: GENERATION_URI } },
+      _meta: {
+        ...mcpToolAuthMetadata(["vcstudio:generate"]),
+        ui: { resourceUri: GENERATION_URI },
+      },
     },
     async (args) => {
       try {
@@ -220,7 +224,10 @@ export function registerGenerationTools(
         destructiveHint: true,
         openWorldHint: true,
       },
-      _meta: { ui: { visibility: ["app"] } },
+      _meta: {
+        ...mcpToolAuthMetadata(["vcstudio:generate"]),
+        ui: { visibility: ["app"] },
+      },
     },
     async (args) => {
       try {

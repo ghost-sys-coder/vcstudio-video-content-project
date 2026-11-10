@@ -69,6 +69,7 @@ import {
 } from "@/lib/test-utils/mcp-fixtures";
 import { publicOperation } from "./operations";
 import { MCP_SERVER_VERSION } from "@studio/contracts/mcp-upload";
+import { McpError, McpScopeError } from "./errors";
 const ctx = mcpContextFixture();
 const clients: Client[] = [];
 beforeEach(() => {
@@ -115,6 +116,101 @@ async function client() {
   return instance;
 }
 describe("real MCP SDK interoperability", () => {
+  it("publishes explicit OAuth metadata for all 49 tools without exposing UI approvals to the model", async () => {
+    const tools = (await (await client()).listTools()).tools;
+    expect(tools).toHaveLength(49);
+    expect(
+      tools.filter(
+        (tool) =>
+          tool._meta?.ui &&
+          typeof tool._meta.ui === "object" &&
+          "visibility" in tool._meta.ui,
+      ),
+    ).toHaveLength(2);
+    for (const tool of tools) {
+      expect(tool._meta?.securitySchemes).toEqual([
+        { type: "oauth2", scopes: expect.any(Array) },
+      ]);
+    }
+    for (const name of [
+      "get_generation_options",
+      "prepare_generation",
+      "execute_generation",
+      "confirm_generation",
+    ])
+      expect(
+        tools.find((tool) => tool.name === name)?._meta?.securitySchemes,
+      ).toEqual([{ type: "oauth2", scopes: ["vcstudio:generate"] }]);
+    for (const name of [
+      "prepare_publication",
+      "execute_publication",
+      "confirm_publication",
+    ])
+      expect(
+        tools.find((tool) => tool.name === name)?._meta?.securitySchemes,
+      ).toEqual([{ type: "oauth2", scopes: ["vcstudio:publish"] }]);
+    expect(
+      tools.find((tool) => tool.name === "open_media_upload")?._meta
+        ?.securitySchemes,
+    ).toEqual([{ type: "oauth2", scopes: ["vcstudio:media"] }]);
+    expect(
+      tools.find((tool) => tool.name === "review_scene_audio")?._meta
+        ?.securitySchemes,
+    ).toEqual([{ type: "oauth2", scopes: ["vcstudio:review"] }]);
+    expect(
+      tools.find((tool) => tool.name === "get_generation_status")?._meta
+        ?.securitySchemes,
+    ).toEqual([{ type: "oauth2", scopes: ["vcstudio:read"] }]);
+  });
+  it("keeps generation tools discoverable with an old token and prompts consent without starting work", async () => {
+    const [a, b] = InMemoryTransport.createLinkedPair();
+    const principal = { ...ctx.principal, scopes: ["vcstudio:read"] };
+    const server = createVcStudioMcpServer(principal);
+    await server.connect(b);
+    const api = new Client({ name: "Old OAuth client", version: "1" });
+    clients.push(api);
+    await api.connect(a);
+    expect((await api.listTools()).tools.map((tool) => tool.name)).toContain(
+      "execute_generation",
+    );
+    const connection = await api.callTool({
+      name: "get_connection",
+      arguments: {},
+    });
+    expect(connection.structuredContent).toMatchObject({
+      data: {
+        oauthScopes: ["vcstudio:read"],
+        missingOAuthScopes: expect.arrayContaining(["vcstudio:generate"]),
+      },
+    });
+    m.authorize.mockRejectedValueOnce(
+      new McpScopeError("vcstudio:generate", ["vcstudio:read"]),
+    );
+    const args = {
+      workspaceId: mcpIds.workspace,
+      operationId: mcpIds.operation,
+      idempotencyKey: "old-client-consent-123",
+    };
+    const result = await api.callTool({
+      name: "execute_generation",
+      arguments: args,
+    });
+    expect(result.isError).toBe(true);
+    expect(result._meta?.["mcp/www_authenticate"]).toEqual([
+      expect.stringContaining('error="insufficient_scope"'),
+    ]);
+    expect(m.generationExecute).not.toHaveBeenCalled();
+    m.authorize.mockRejectedValueOnce(
+      new McpError("permission_denied", "Workspace access was revoked."),
+    );
+    const denied = await api.callTool({
+      name: "execute_generation",
+      arguments: args,
+    });
+    expect(denied.isError).toBe(true);
+    expect(denied._meta?.["mcp/www_authenticate"]).toBeUndefined();
+    expect(m.generationExecute).not.toHaveBeenCalled();
+  });
   it("advertises focused generation tools with UI-only confirmation and private proof metadata", async () => {
     const api = await client();
     const tools = await api.listTools();
