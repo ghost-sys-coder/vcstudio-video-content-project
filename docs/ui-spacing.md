@@ -108,3 +108,12 @@ Recovery lists keep every warning, blocker and outstanding review visible.
 Use theme notice colors for shared production badges and review lists. Disable
 link prefetch on these production navigation controls; styling must not add
 queries, asset probes or background work.
+
+### Selects with adjacent actions
+
+Use a flex column with `gap-*` for a label and a shadcn select. The select also
+renders a visually hidden form input; `space-y-*` can give the visible trigger a
+trailing margin and push an adjacent action out of alignment. Match adjacent
+buttons to the 40px trigger height and align the controls at the bottom of their
+row. Keep the voice-picker add button 40px square. Settings rows stack with
+full-width actions on phones and share a row from the `sm` breakpoint.

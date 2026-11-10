@@ -30,13 +30,13 @@ export function VoicePresetSelector({
   const [formOpen, setFormOpen] = useState(false);
 
   return (
-    <div className="flex items-end gap-2">
-      <div className="space-y-1.5">
+    <div className="flex w-full min-w-0 items-end gap-2 sm:w-auto">
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <Label className="text-xs" htmlFor="audio-voice-preset">
           Voice preset
         </Label>
         <FormSelect
-          className="min-w-52"
+          className="sm:min-w-52"
           id="audio-voice-preset"
           onValueChange={(selectedValue) => onSelect(selectedValue)}
           value={selectedVoicePresetId}
@@ -52,7 +52,7 @@ export function VoicePresetSelector({
       {canManage ? (
         <>
           <Button
-            className="shrink-0"
+            className="size-10 shrink-0"
             onClick={() => setFormOpen(true)}
             size="icon-lg"
             title="New voice preset"

@@ -1,5 +1,11 @@
 # Project memory
 
+## Latest update — project form alignment and channel verification (10 November 2026)
+
+- Aligned voice preset/add, default scene visuals/save and production channel/save controls using 40px heights and flex/gap field spacing. Base UI selects render a hidden form input, which can leave a trailing trigger margin under `space-y-*`. Settings action rows stack on phones; the channel panel uses shared spacing. Existing shadcn controls and business actions are unchanged.
+- Read-only production query for VeilCode Studio found exactly one active channel profile: Clear Work Channel (YouTube). Project settings correctly list active workspace production profiles, independent of Social OAuth connections; leave the repository/selection logic unchanged. Additional production identities are created under Workspace settings → Production channels → Add channel. No production record, environment variable or worker schedule was changed.
+- Seven mocked Playwright journeys passed at 390/768/1440px in Light/Dark, including matching control bounds, long names, channel selection and viewer access. Forty-eight relevant unit/isolated integration tests, TypeScript, changed-file formatting and environment placement passed. The production build passed; full lint passed with only the three existing warnings. The owner clarified that the screenshots show the live site. The tested fix therefore needs the normal master/web release, with no worker deployment, migration or environment change.
+
 ## Latest update — ElevenLabs in-house integration (10 November 2026; production release verified)
 
 - User supplied `ELEVEN_LABS_API_KEY` and requested voice, image and video across the application/MCP, restricted to internal use with a service-wide disable switch. Non-billable API reads confirm an active Creator subscription and account voice “Frank’s Voice”. Official HTTP image/video APIs require Pro or higher; do not upgrade or run paid tests. Voice is eligible; keep visuals off and existing Google billing hold unchanged.

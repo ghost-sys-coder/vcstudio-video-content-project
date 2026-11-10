@@ -18,7 +18,7 @@ export function VideoSelectField({
   disabled?: boolean;
 }) {
   return (
-    <div className="min-w-0 space-y-2">
+    <div className="flex min-w-0 flex-col gap-2">
       <Label htmlFor={id}>{label}</Label>
       <FormSelect
         id={id}

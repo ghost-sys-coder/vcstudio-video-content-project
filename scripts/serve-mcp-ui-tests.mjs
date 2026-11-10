@@ -32,6 +32,10 @@ for (const [name, entry] of [
   ["video", "e2e/mcp/fixtures/video-entry.tsx"],
   ["tiktok-connect", "e2e/mcp/fixtures/tiktok-connect-entry.tsx"],
   ["project-creation", "e2e/mcp/fixtures/project-creation-entry.tsx"],
+  [
+    "project-form-alignment",
+    "e2e/mcp/fixtures/project-form-alignment-entry.tsx",
+  ],
   ["facebook-selection", "e2e/mcp/fixtures/facebook-selection-entry.tsx"],
   ["video-media", "e2e/mcp/fixtures/video-media-entry.tsx"],
   ["media-upload", "e2e/mcp/fixtures/media-upload-entry.tsx"],
@@ -46,6 +50,18 @@ for (const [name, entry] of [
     target: "es2022",
     define: { "process.env.NODE_ENV": '"production"' },
     alias: {
+      ...(name === "project-form-alignment"
+        ? {
+            "next/navigation": path.resolve(
+              "e2e/mcp/fixtures/MockOperationsNavigation.ts",
+            ),
+            "@/app/(authenticated)/app/video/actions": path.resolve(
+              "e2e/mcp/fixtures/MockVideoActions.ts",
+            ),
+            "@/app/(authenticated)/app/settings/workspace/channel-actions":
+              path.resolve("e2e/mcp/fixtures/MockProjectChannelActions.ts"),
+          }
+        : {}),
       ...(name === "media-library"
         ? {
             "@/app/(authenticated)/app/social/inspection-actions": path.resolve(
@@ -148,7 +164,7 @@ for (const [name, entry] of [
   });
   await writeFile(
     path.join(out, `${name}.html`),
-    `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${name === "post-composer" || name === "tiktok-connect" || name === "project-creation" || name === "facebook-selection" || name === "video-media" || name === "media-upload" || name === "media-library" || name === "elevenlabs-voice" ? applicationCss : css}</style><style>body{margin:0;padding:16px;min-width:0}</style></head><body><div id="root"></div><script type="module">${bundle.outputFiles[0].text.replace(/<\/script/gi, "<\\/script")}</script></body></html>`,
+    `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${name === "post-composer" || name === "tiktok-connect" || name === "project-creation" || name === "project-form-alignment" || name === "facebook-selection" || name === "video-media" || name === "media-upload" || name === "media-library" || name === "elevenlabs-voice" ? applicationCss : css}</style><style>body{margin:0;padding:16px;min-width:0}</style></head><body><div id="root"></div><script type="module">${bundle.outputFiles[0].text.replace(/<\/script/gi, "<\\/script")}</script></body></html>`,
   );
 }
 const server = createServer(async (req, res) => {
@@ -194,6 +210,10 @@ const server = createServer(async (req, res) => {
     "/elevenlabs-voice.html": path.join(out, "elevenlabs-voice.html"),
     "/tiktok-connect.html": path.join(out, "tiktok-connect.html"),
     "/project-creation.html": path.join(out, "project-creation.html"),
+    "/project-form-alignment.html": path.join(
+      out,
+      "project-form-alignment.html",
+    ),
     "/facebook-selection.html": path.join(out, "facebook-selection.html"),
     "/video-media.html": path.join(out, "video-media.html"),
     "/media-upload.html": path.join(out, "media-upload.html"),

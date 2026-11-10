@@ -56,8 +56,8 @@ export function ProjectVisualDefault({
           narration.
         </p>
       </div>
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="min-w-0 flex-1">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="min-w-0 sm:flex-1">
           <VideoSelectField
             id="project-visual-default"
             label="Use by default"
@@ -72,7 +72,11 @@ export function ProjectVisualDefault({
             }}
           />
         </div>
-        <Button disabled={!canEdit || pending} onClick={() => void save()}>
+        <Button
+          className="h-10 w-full sm:w-auto"
+          disabled={!canEdit || pending}
+          onClick={() => void save()}
+        >
           {pending ? <LoaderCircle className="size-4 animate-spin" /> : null}
           {pending ? "Saving…" : "Save visual default"}
         </Button>

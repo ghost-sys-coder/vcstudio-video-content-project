@@ -62,7 +62,7 @@ export function ProjectChannelSection({
   return (
     <section
       aria-labelledby="project-channel-heading"
-      className="rounded-2xl border bg-background p-6 shadow-sm sm:p-8"
+      className="app-panel rounded-2xl border bg-background shadow-sm"
     >
       <h2 className="text-lg font-semibold" id="project-channel-heading">
         Production channel
@@ -72,8 +72,8 @@ export function ProjectChannelSection({
         which connected account a finished video is published to.
       </p>
 
-      <div className="mt-4 flex flex-wrap items-end gap-3">
-        <div className="min-w-56 max-w-sm flex-1 space-y-1.5">
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="flex min-w-0 flex-col gap-1.5 sm:max-w-sm sm:flex-1">
           <Label className="text-xs" htmlFor="project-channel-select">
             Channel
           </Label>
@@ -96,7 +96,7 @@ export function ProjectChannelSection({
         </div>
         {canEdit ? (
           <Button
-            className="h-10 shrink-0"
+            className="h-10 w-full shrink-0 sm:w-auto"
             disabled={!dirty || isPending}
             onClick={save}
             type="button"
