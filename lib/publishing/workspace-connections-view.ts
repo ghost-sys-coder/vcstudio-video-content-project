@@ -2,6 +2,7 @@ import "server-only";
 
 import type { ContentPlatform } from "@/db/schema";
 import { platformConnectionLabel } from "@/lib/publishing/connection-label";
+import { getReconnectAuthorizePath } from "@/lib/publishing/connection-reconnect";
 import {
   listPlatformConnections,
   type PlatformConnectionSummary,
@@ -23,6 +24,8 @@ export type WorkspaceChannelView = {
   lastError: string | null;
   updatedAtLabel: string;
   postingRequirement: string;
+  /** OAuth start route that re-authorizes this account; null when not offered. */
+  reconnectPath: string | null;
 };
 
 export type WorkspaceChannelPlatformView = {
@@ -75,6 +78,10 @@ export function buildWorkspaceChannelsView(input: {
         postingRequirement: isSocialPostPlatform(connection.platform)
           ? getPlatformPostCapability(connection.platform).mediaRequirement
           : "This account is used for video publishing only.",
+        reconnectPath: getReconnectAuthorizePath(connection, {
+          videoPublishingEnabled: input.enabled,
+          socialPostingEnabled: input.socialPostingEnabled,
+        }),
       })),
     platforms: PLATFORM_ORDER.map((platform) => ({
       platform,

@@ -11,6 +11,7 @@ import {
   DisconnectChannelDialog,
   type DisconnectChannelResult,
 } from "@/components/publish/DisconnectChannelDialog";
+import { ReconnectChannelButton } from "@/components/publish/ReconnectChannelButton";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { PLATFORM_BRAND_BACKGROUND_CLASS } from "@/lib/platforms/platform-brand";
 import type { WorkspaceChannelView } from "@/lib/publishing/workspace-connections-view";
@@ -31,6 +32,7 @@ export function WorkspaceChannelCard({
   onDisconnect: (connectionId: string) => Promise<DisconnectChannelResult>;
 }) {
   const active = channel.status === "active";
+  const needsAttention = !active || channel.lastError !== null;
 
   return (
     <li className="min-w-0">
@@ -78,6 +80,14 @@ export function WorkspaceChannelCard({
                   {channel.lastError}
                 </p>
               ) : null}
+              {canManageConnections &&
+              needsAttention &&
+              channel.reconnectPath ? (
+                <p className="mt-1 text-xs text-muted-foreground [overflow-wrap:anywhere]">
+                  Reconnect and choose {channel.accountName} when{" "}
+                  {channel.platformLabel} asks, to restore this connection.
+                </p>
+              ) : null}
               {channel.accountUrl ? (
                 <a
                   className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline"
@@ -94,7 +104,15 @@ export function WorkspaceChannelCard({
         </CardContent>
 
         {canManageConnections && channel.status !== "revoked" ? (
-          <CardFooter className="mt-auto justify-end bg-transparent">
+          <CardFooter className="mt-auto flex-wrap justify-end gap-2 bg-transparent">
+            {channel.reconnectPath ? (
+              <ReconnectChannelButton
+                accountName={channel.accountName}
+                emphasized={needsAttention}
+                href={channel.reconnectPath}
+                platformLabel={channel.platformLabel}
+              />
+            ) : null}
             <DisconnectChannelDialog
               accountName={channel.accountName}
               connectionId={channel.id}

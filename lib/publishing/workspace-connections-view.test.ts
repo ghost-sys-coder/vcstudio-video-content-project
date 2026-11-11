@@ -37,9 +37,60 @@ describe("workspace channels view", () => {
         lastError: null,
         updatedAtLabel: "2026-07-22 UTC",
         postingRequirement: "Needs one video.",
+        reconnectPath: "/api/youtube/authorize",
       },
     ]);
     expect(view.channels[0]).not.toHaveProperty("accessTokenSealed");
+  });
+
+  it("offers reconnect only where the platform's authorize route is enabled", () => {
+    const base = {
+      workspaceId: "workspace-1",
+      externalAccountUrl: null,
+      status: "expired" as const,
+      lastError: "Authorization expired.",
+      accessTokenExpiresAt: null,
+      createdAt: new Date("2026-08-01T00:00:00.000Z"),
+      updatedAt: new Date("2026-08-11T00:00:00.000Z"),
+    };
+    const view = buildWorkspaceChannelsView({
+      enabled: false,
+      socialPostingEnabled: true,
+      connections: [
+        {
+          ...base,
+          id: "youtube",
+          platform: "youtube",
+          externalAccountId: "channel-1",
+          externalAccountName: "Channel",
+        },
+        {
+          ...base,
+          id: "page",
+          platform: "linkedin",
+          externalAccountId: "urn:li:organization:7",
+          externalAccountName: "Studio Page",
+        },
+        {
+          ...base,
+          id: "sandbox",
+          platform: "tiktok",
+          isSandbox: true,
+          externalAccountId: "open-id",
+          externalAccountName: "Sandbox creator",
+        },
+      ],
+    });
+
+    expect(
+      Object.fromEntries(
+        view.channels.map(({ id, reconnectPath }) => [id, reconnectPath]),
+      ),
+    ).toEqual({
+      youtube: null,
+      page: "/api/linkedin/pages/authorize",
+      sandbox: null,
+    });
   });
 
   it("exposes implemented platforms as connectable", () => {

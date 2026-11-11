@@ -45,6 +45,7 @@ import {
 } from "@/lib/platforms/video-content-platforms";
 import { CONTENT_PLATFORM_LABELS } from "@/lib/titles/title-view";
 import { platformConnectionLabel } from "@/lib/publishing/connection-label";
+import { getReconnectAuthorizePath } from "@/lib/publishing/connection-reconnect";
 import { isSocialPostPlatform } from "@/lib/social/platform-post-capabilities";
 import type { PostConnectionView } from "@/lib/social/social-post-view";
 
@@ -60,6 +61,8 @@ export type ConnectionView = {
   accountUrl: string | null;
   status: "active" | "expired" | "revoked";
   lastError: string | null;
+  /** OAuth start route that re-authorizes this account; null when not offered. */
+  reconnectPath: string | null;
 };
 
 export type PublishableRenderView = {
@@ -270,6 +273,10 @@ export async function loadPublishingView(input: {
         accountUrl: connection.externalAccountUrl,
         status: connection.status,
         lastError: connection.lastError,
+        reconnectPath: getReconnectAuthorizePath(connection, {
+          videoPublishingEnabled: environment.ENABLE_VIDEO_PUBLISHING,
+          socialPostingEnabled: environment.ENABLE_SOCIAL_POSTING,
+        }),
       })),
     // Only finished renders with a stored asset can be published. Shorts and
     // repurposed variants surface here alongside the full-length export, each

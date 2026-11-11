@@ -5,6 +5,7 @@ import {
   DisconnectChannelDialog,
   type DisconnectChannelResult,
 } from "@/components/publish/DisconnectChannelDialog";
+import { ReconnectChannelButton } from "@/components/publish/ReconnectChannelButton";
 import type { ConnectionView } from "@/lib/publishing/publishing-view";
 
 export function PlatformConnectionRow({
@@ -55,13 +56,24 @@ export function PlatformConnectionRow({
       </div>
 
       {canManage && connection.status !== "revoked" ? (
-        <DisconnectChannelDialog
-          accountName={connection.accountName}
-          connectionId={connection.id}
-          disabled={busy}
-          onDisconnect={onDisconnect}
-          platformLabel={connection.platformLabel}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          {connection.reconnectPath ? (
+            <ReconnectChannelButton
+              accountName={connection.accountName}
+              disabled={busy}
+              emphasized={!isActive || connection.lastError !== null}
+              href={connection.reconnectPath}
+              platformLabel={connection.platformLabel}
+            />
+          ) : null}
+          <DisconnectChannelDialog
+            accountName={connection.accountName}
+            connectionId={connection.id}
+            disabled={busy}
+            onDisconnect={onDisconnect}
+            platformLabel={connection.platformLabel}
+          />
+        </div>
       ) : null}
     </li>
   );

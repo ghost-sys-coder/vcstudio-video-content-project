@@ -38,6 +38,7 @@ beforeEach(() => {
     {
       id: "connection-1",
       platform: "linkedin",
+      externalAccountId: "urn:li:person:studio",
       externalAccountName: "Studio LinkedIn",
       externalAccountUrl: null,
       status: "active",
@@ -77,9 +78,13 @@ describe("shared accounts page", () => {
           "TikTok opens its own sign-in and authorization page",
         );
         expect(markup).toContain("Disconnect</button>");
+        expect(markup).toContain(
+          'aria-label="Reconnect Studio LinkedIn (LinkedIn profile)"',
+        );
       } else {
         expect(markup).not.toContain("/authorize");
         expect(markup).not.toContain("Disconnect</button>");
+        expect(markup).not.toContain("Reconnect");
         expect(markup).not.toContain("/app/settings/workspace");
         expect(markup).toContain("Only workspace owners");
       }
