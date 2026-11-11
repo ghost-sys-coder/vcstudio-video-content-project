@@ -1,7 +1,11 @@
 import { notFound } from "next/navigation";
 import { ProjectOverviewPageContent } from "@/components/projects/ProjectOverviewPageContent";
 import { loadProjectProductionReadiness } from "@/db/repositories/production-queue.repository";
+import { findProject } from "@/db/repositories/projects.repository";
+import { listVoicePresets } from "@/db/repositories/scene-audio.repository";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
+import { can } from "@/lib/policies/workspace-policy";
+import { loadProductionRunPanel } from "@/lib/production-runs/production-run-view";
 
 /**
  * The project overview.
@@ -19,12 +23,26 @@ export default async function ProjectPage({
   const context = await getAuthenticatedWorkspaceContext();
   if (!context) return null;
   const { projectId } = await params;
-  const readiness = await loadProjectProductionReadiness({
-    workspaceId: context.activeMembership.workspaceId,
-    projectId,
-  });
-  if (!readiness) notFound();
+  const workspaceId = context.activeMembership.workspaceId;
+  const [readiness, project, panel, voicePresets] = await Promise.all([
+    loadProjectProductionReadiness({ workspaceId, projectId }),
+    findProject({ workspaceId, projectId }),
+    loadProductionRunPanel({ workspaceId, projectId }),
+    listVoicePresets({ workspaceId }),
+  ]);
+  if (!readiness || !project) notFound();
   return (
-    <ProjectOverviewPageContent projectId={projectId} readiness={readiness} />
+    <ProjectOverviewPageContent
+      canRunProduction={can(context.activeMembership.role, "runProduction")}
+      productionRun={panel}
+      projectBudgetCents={project.maximumBudgetCents}
+      projectId={projectId}
+      readiness={readiness}
+      voicePresets={voicePresets.map((preset) => ({
+        id: preset.id,
+        name: preset.name,
+        isDefault: preset.isDefault,
+      }))}
+    />
   );
 }

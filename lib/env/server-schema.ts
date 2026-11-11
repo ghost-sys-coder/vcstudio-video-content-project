@@ -1007,6 +1007,25 @@ export const storageReconciliationEnvironmentSchema = z.object({
     .default(24),
 });
 
+/**
+ * Unattended production runs. Off by default and off in production until the
+ * `production-run` worker task is deployed: with the flag on and no worker,
+ * a run would sit queued with its first reservation idle until expiry.
+ */
+export const productionRunEnvironmentSchema = z.object({
+  ENABLE_PRODUCTION_RUNS: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
+  /** The default per-run spending ceiling offered in the start dialog. */
+  PRODUCTION_RUN_DEFAULT_MAX_COST_CENTS: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(10_000)
+    .default(500),
+});
+
 export const securityEnvironmentSchema = z.object({
   SECURITY_CSP_MODE: z.enum(["report-only", "enforce"]).default("report-only"),
 });
@@ -1018,6 +1037,9 @@ export const readinessEnvironmentSchema = z.object({
 });
 
 export type ServerEnvironment = z.infer<typeof serverEnvironmentSchema>;
+export type ProductionRunEnvironment = z.infer<
+  typeof productionRunEnvironmentSchema
+>;
 export type DatabaseEnvironment = z.infer<typeof databaseEnvironmentSchema>;
 export type ClerkWebhookEnvironment = z.infer<
   typeof clerkWebhookEnvironmentSchema

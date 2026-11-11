@@ -58,6 +58,15 @@ const rules = {
     required: [".env.example", ".env", ".env.vercel", ".env.trigger"],
     forbidden: [],
   },
+  // Read by the web app (start dialog) and the worker (every step).
+  ENABLE_PRODUCTION_RUNS: {
+    required: [".env.example", ".env", ".env.vercel", ".env.trigger"],
+    forbidden: [],
+  },
+  PRODUCTION_RUN_DEFAULT_MAX_COST_CENTS: {
+    required: [".env.example", ".env", ".env.vercel", ".env.trigger"],
+    forbidden: [],
+  },
   LINKEDIN_API_VERSION: {
     required: [".env.example", ".env", ".env.vercel", ".env.trigger"],
     forbidden: [],

@@ -6,7 +6,6 @@ import {
 } from "@/lib/scenes/scene-editor-input";
 import { estimateSceneRevision } from "@/lib/scenes/scene-revision-estimate";
 import { revalidatePath } from "next/cache";
-import { tasks } from "@trigger.dev/sdk";
 import {
   assignSceneCharacters,
   setSceneCharacterStaging,
@@ -22,20 +21,11 @@ import {
   setSceneCharacterStagingSchema,
   projectCastMemberSchema,
 } from "@/lib/schemas/character";
-import type { sceneAnalysisTask } from "@/trigger/scene-analysis";
 import { findProject } from "@/db/repositories/projects.repository";
-import {
-  findApprovedScriptVersion,
-  getProjectCommittedCostCents,
-  getWorkspaceCommittedCostCents,
-} from "@/db/repositories/scenes.repository";
 import {
   approveAllScenes,
   approveScene,
   approveScriptVersion,
-  attachTriggerRun,
-  createSceneAnalysisReservation,
-  failSceneAnalysis,
   updateScene,
 } from "@/db/commands/scene-commands";
 import { getAuthenticatedWorkspaceContext } from "@/lib/auth/workspace-context";
@@ -50,25 +40,15 @@ import {
   reconcileSceneAnalysisSchema,
   startSceneAnalysisSchema,
 } from "@/lib/schemas/scene";
-import { getSceneAnalysisEnvironment } from "@/lib/env/server";
-import { loadEffectiveWorkspaceBudget } from "@/lib/budgets/workspace-budget";
-import { readScriptForAnalysis } from "@/lib/scenes/script-segment-hints";
-import {
-  renderSceneAnalysisPrompt,
-  SCENE_ANALYSIS_PROMPT_VERSION,
-} from "@studio/prompts";
-import { estimateSceneAnalysisCost } from "@/lib/costs/scene-analysis-cost";
-import {
-  createRequestFingerprint,
-  createSceneAnalysisIdempotencyKey,
-} from "@/lib/domain/idempotency";
-import { resolveSceneAnalysisIdempotency } from "@/lib/workflows/scene-analysis-idempotency";
 import { reconcileSceneAnalysisRun } from "@/lib/trigger/reconcile-scene-analysis";
+import {
+  SceneAnalysisRequestError,
+  startApprovedSceneAnalysis,
+} from "@/lib/scenes/start-approved-scene-analysis";
 import {
   BudgetExceededError,
   RateLimitExceededError,
 } from "@/lib/domain/errors";
-import { enforceRateLimit } from "@/lib/rate-limit/enforce-rate-limit";
 import { recordAuditEvent } from "@/lib/audit/record-audit-event";
 import { parsePastedScenes } from "@/lib/scenes/parse-pasted-scenes";
 import { SceneNotFoundError } from "@/db/commands/scene-delete-commands";
@@ -429,143 +409,17 @@ export async function startSceneAnalysisAction(
       parsed.data.projectId,
       "analyzeScenes",
     );
-    const workspaceId = context.activeMembership.workspaceId;
-    await enforceRateLimit({ workspaceId, operation: "scene_analysis" });
-    const environment = getSceneAnalysisEnvironment();
-    const version = await findApprovedScriptVersion({
-      workspaceId,
-      ...parsed.data,
+    await startApprovedSceneAnalysis({
+      workspaceId: context.activeMembership.workspaceId,
+      project,
+      requestedByUserId: context.user.id,
+      scriptVersionId: parsed.data.scriptVersionId,
     });
-    if (!version)
-      return {
-        success: false,
-        error: "Approve this script version before analysis.",
-      };
-    // Same reading as the analysis starter, so the quoted estimate matches the
-    // prompt that is actually sent.
-    const script = readScriptForAnalysis(version.content);
-    const prompt = renderSceneAnalysisPrompt({
-      script: script.narration,
-      maximumScenes: environment.MAX_SCENES_PER_PROJECT,
-      aspectRatio: project.aspectRatio,
-      language: project.language,
-      segments: script.segments,
-    });
-    const estimate = estimateSceneAnalysisCost({
-      prompt,
-      inputCostPerMillionCents:
-        environment.OPENAI_TEXT_INPUT_COST_PER_MILLION_CENTS,
-      outputCostPerMillionCents:
-        environment.OPENAI_TEXT_OUTPUT_COST_PER_MILLION_CENTS,
-    });
-    const now = new Date();
-    const startOfDay = new Date(
-      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-    );
-    const startOfMonth = new Date(
-      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
-    );
-    const [committed, dailyCommitted, monthlyCommitted, effectiveBudget] =
-      await Promise.all([
-        getProjectCommittedCostCents({ workspaceId, projectId: project.id }),
-        getWorkspaceCommittedCostCents({ workspaceId, since: startOfDay }),
-        getWorkspaceCommittedCostCents({ workspaceId, since: startOfMonth }),
-        loadEffectiveWorkspaceBudget({ workspaceId }),
-      ]);
-    if (committed + estimate.estimatedCostCents > project.maximumBudgetCents)
-      return {
-        success: false,
-        error: "This analysis would exceed the project budget.",
-      };
-    if (
-      dailyCommitted + estimate.estimatedCostCents >
-      effectiveBudget.dailyBudgetCents
-    )
-      return {
-        success: false,
-        error: "This analysis would exceed the workspace daily budget.",
-      };
-    if (
-      monthlyCommitted + estimate.estimatedCostCents >
-      effectiveBudget.monthlyBudgetCents
-    )
-      return {
-        success: false,
-        error: "This analysis would exceed the workspace monthly budget.",
-      };
-    const initialIdempotencyKey = createSceneAnalysisIdempotencyKey({
-      secret: environment.IDEMPOTENCY_HASH_SECRET,
-      workspaceId,
-      projectId: project.id,
-      scriptVersionId: version.id,
-      model: environment.OPENAI_TEXT_MODEL,
-      promptVersion: SCENE_ANALYSIS_PROMPT_VERSION,
-    });
-    const idempotency = await resolveSceneAnalysisIdempotency({
-      workspaceId,
-      projectId: project.id,
-      initialIdempotencyKey,
-      secret: environment.IDEMPOTENCY_HASH_SECRET,
-    });
-    if (idempotency.action === "reuse") return { success: true, error: null };
-    const idempotencyKey = idempotency.idempotencyKey;
-    const analysisRunId = crypto.randomUUID();
-    await createSceneAnalysisReservation({
-      id: analysisRunId,
-      reservationId: crypto.randomUUID(),
-      workspaceId,
-      projectId: project.id,
-      scriptVersionId: version.id,
-      userId: context.user.id,
-      idempotencyKey,
-      requestFingerprint: createRequestFingerprint(
-        environment.REQUEST_FINGERPRINT_SECRET,
-        prompt,
-      ),
-      model: environment.OPENAI_TEXT_MODEL,
-      promptVersion: SCENE_ANALYSIS_PROMPT_VERSION,
-      finalPrompt: prompt,
-      // Frozen beside the prompt, so the worker validates against the same
-      // text rather than extracting it a second time in another deployment.
-      scriptSnapshot: {
-        narration: script.narration,
-        segments: script.segments,
-      },
-      estimatedCostCents: estimate.estimatedCostCents,
-      expiresAt: new Date(
-        Date.now() + environment.GENERATION_RESERVATION_EXPIRY_MINUTES * 60_000,
-      ),
-      budget: {
-        workspaceDailyLimitCents: effectiveBudget.dailyBudgetCents,
-        workspaceMonthlyLimitCents: effectiveBudget.monthlyBudgetCents,
-        dailyWindowStart: startOfDay,
-        monthlyWindowStart: startOfMonth,
-      },
-    });
-    try {
-      const handle = await tasks.trigger<typeof sceneAnalysisTask>(
-        "scene-analysis",
-        {
-          analysisRunId,
-          workspaceId,
-          projectId: project.id,
-          scriptVersionId: version.id,
-          userId: context.user.id,
-        },
-        { idempotencyKey },
-      );
-      await attachTriggerRun({ analysisRunId, triggerRunId: handle.id });
-    } catch (error) {
-      await failSceneAnalysis({
-        analysisRunId,
-        category: "trigger_error",
-        message: "Scene analysis could not be queued.",
-      });
-      throw error;
-    }
     revalidatePath(`/app/projects/${project.id}/scenes`);
     return { success: true, error: null };
   } catch (error) {
+    if (error instanceof SceneAnalysisRequestError)
+      return { success: false, error: error.message };
     if (error instanceof RateLimitExceededError)
       return { success: false, error: error.message };
     if (error instanceof BudgetExceededError) {

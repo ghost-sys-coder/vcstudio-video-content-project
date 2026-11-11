@@ -50,6 +50,11 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   style_preset_created: "Visual style created",
   style_preset_updated: "Visual style updated",
   style_preset_archived: "Visual style archived",
+  production_run_started: "Production run started",
+  production_run_held: "Production run stopped for review",
+  production_run_ready: "Production run reached release review",
+  production_run_failed: "Production run failed",
+  production_run_cancelled: "Production run cancelled",
 };
 
 // Keys whose values are genuinely sensitive and must never be persisted to the

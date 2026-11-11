@@ -1,3 +1,5 @@
+import { ProductionRunPanel } from "@/components/production-runs/ProductionRunPanel";
+import type { VoicePresetOption } from "@/components/production-runs/StartProductionRunDialog";
 import { ProductionBlockerList } from "@/components/production/ProductionBlockerList";
 import { ProductionReleaseBadge } from "@/components/production/ProductionReleaseBadge";
 import { ProductionReviewList } from "@/components/production/ProductionReviewList";
@@ -6,17 +8,27 @@ import { ProjectResourceLinks } from "@/components/projects/ProjectResourceLinks
 import { ProjectStageProgress } from "@/components/projects/ProjectStageProgress";
 import type { ProductionReadiness } from "@/lib/production/production-readiness";
 import { describeStageProgress } from "@/lib/production/production-stages";
+import type { ProductionRunPanelView } from "@/lib/production-runs/production-run-view";
 
 /**
  * The project's starting point: where it stands, what is holding it up, and
- * the one next step. Everything on it is read-only navigation.
+ * the one next step. The readiness section is read-only navigation; the only
+ * thing on this page that can spend is the explicit, cost-stated run dialog.
  */
 export function ProjectOverviewPageContent({
+  canRunProduction,
+  productionRun,
+  projectBudgetCents,
   projectId,
   readiness,
+  voicePresets,
 }: {
+  canRunProduction: boolean;
+  productionRun: ProductionRunPanelView;
+  projectBudgetCents: number;
   projectId: string;
   readiness: ProductionReadiness;
+  voicePresets: VoicePresetOption[];
 }) {
   const outstanding =
     readiness.blockers.length > 0 || readiness.reviews.length > 0;
@@ -36,6 +48,14 @@ export function ProjectOverviewPageContent({
       />
 
       <ProjectPrimaryAction projectId={projectId} readiness={readiness} />
+
+      <ProductionRunPanel
+        canRun={canRunProduction}
+        panel={productionRun}
+        projectBudgetCents={projectBudgetCents}
+        projectId={projectId}
+        voicePresets={voicePresets}
+      />
 
       {outstanding ? (
         <section aria-labelledby="project-outstanding-heading">

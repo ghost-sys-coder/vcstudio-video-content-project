@@ -37,6 +37,9 @@ import type { VerifiedMediaMetadata } from "@/lib/media/media-inspection";
 import type { ClaimReviewState } from "@/lib/editorial/editorial-review";
 import type { CaptionCue } from "@/lib/subtitles/cue-editing";
 import type { ScriptVersionEvidenceRecord } from "@/lib/editorial/version-evidence";
+import type { ProductionRunPolicy } from "@/lib/production-runs/production-run-policy";
+import type { ProductionRunReferences } from "@/lib/production-runs/production-run-references";
+import type { ProductionRunStage } from "@/lib/production-runs/production-run-state";
 
 export const workspaceRoleEnum = pgEnum("workspace_role", [
   "owner",
@@ -777,6 +780,11 @@ export const auditActionEnum = pgEnum("audit_action", [
   "style_preset_created",
   "style_preset_updated",
   "style_preset_archived",
+  "production_run_started",
+  "production_run_held",
+  "production_run_ready",
+  "production_run_failed",
+  "production_run_cancelled",
 ]);
 
 export const userThemePreferenceEnum = pgEnum("user_theme_preference", [
@@ -8770,3 +8778,192 @@ export const sceneCaptionCues = pgTable(
 );
 
 export type SceneCaptionCues = typeof sceneCaptionCues.$inferSelect;
+
+export const productionRunStatusEnum = pgEnum("production_run_status", [
+  "queued",
+  "running",
+  "held",
+  "ready_for_review",
+  "failed",
+  "cancelled",
+]);
+
+export const productionRunStageEnum = pgEnum("production_run_stage", [
+  "script",
+  "scenes",
+  "images",
+  "audio",
+  "render",
+  "release",
+]);
+
+/**
+ * One unattended attempt to carry a project to a release package.
+ *
+ * The run owns no production state of its own: scripts, scenes, images,
+ * narration, renders and packages all live in their existing tables, created
+ * through the same services a creator uses. What the run keeps is its cursor
+ * (which stage, how many paid attempts), its frozen policy, and the ids of the
+ * rows it created, so a replacement worker can resume from PostgreSQL alone.
+ */
+export const productionRuns = pgTable(
+  "production_runs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").notNull(),
+    status: productionRunStatusEnum("status").notNull().default("queued"),
+    stage: productionRunStageEnum("stage").notNull().default("script"),
+    /** Frozen when the run starts; later default changes cannot alter it. */
+    policy: jsonb("policy").$type<ProductionRunPolicy>().notNull(),
+    /** Paid attempts per stage, so retries are bounded by the policy. */
+    attempts: jsonb("attempts")
+      .$type<Partial<Record<ProductionRunStage, number>>>()
+      .notNull()
+      .default({}),
+    stageReferences: jsonb("stage_references")
+      .$type<ProductionRunReferences>()
+      .notNull()
+      .default({}),
+    /** Sum of the estimates this run has caused, in cents. */
+    spentCostCents: integer("spent_cost_cents").notNull().default(0),
+    /** Why the run stopped for a person, written for that person. */
+    holdReason: text("hold_reason"),
+    safeErrorMessage: text("safe_error_message"),
+    triggerRunId: text("trigger_run_id"),
+    requestedByUserId: uuid("requested_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("production_runs_id_workspace_unique").on(
+      table.id,
+      table.workspaceId,
+    ),
+    // One live run per project. A held run still counts: it owns decisions a
+    // second run would contradict, so it must be resumed or cancelled first.
+    uniqueIndex("production_runs_active_unique")
+      .on(table.projectId)
+      .where(sql`status in ('queued', 'running', 'held')`),
+    index("production_runs_workspace_project_index").on(
+      table.workspaceId,
+      table.projectId,
+      table.createdAt,
+    ),
+    index("production_runs_status_updated_index").on(
+      table.status,
+      table.updatedAt,
+    ),
+    check(
+      "production_runs_spent_nonnegative",
+      sql`${table.spentCostCents} >= 0`,
+    ),
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [projects.id, projects.workspaceId],
+      name: "production_runs_tenant_project_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
+/** Append-only history of what a run did and why. */
+export const productionRunEvents = pgTable(
+  "production_run_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    runId: uuid("run_id").notNull(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    stage: productionRunStageEnum("stage").notNull(),
+    kind: text("kind").notNull(),
+    message: text("message").notNull(),
+    metadata: jsonb("metadata")
+      .$type<Record<string, string | number | boolean | null>>()
+      .notNull()
+      .default({}),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("production_run_events_run_index").on(table.runId, table.createdAt),
+    check(
+      "production_run_events_kind_valid",
+      sql`${table.kind} in ('run_started','stage_started','stage_waiting','stage_completed','stage_retried','gate_passed','gate_failed','budget_refused','held','resumed','ready_for_review','failed','cancelled')`,
+    ),
+    foreignKey({
+      columns: [table.runId, table.workspaceId],
+      foreignColumns: [productionRuns.id, productionRuns.workspaceId],
+      name: "production_run_events_tenant_run_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
+/**
+ * What each gate measured, kept whether or not the run acted on it.
+ *
+ * This is the evidence the roadmap asks for before autonomy widens: every
+ * automatic acceptance points at the numbers that justified it, and every
+ * hold points at the numbers that stopped it.
+ */
+export const productionRunGateResults = pgTable(
+  "production_run_gate_results",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    runId: uuid("run_id").notNull(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    stage: productionRunStageEnum("stage").notNull(),
+    subject: text("subject").notNull(),
+    subjectId: text("subject_id").notNull(),
+    label: text("label").notNull(),
+    verdict: text("verdict").notNull(),
+    score: integer("score"),
+    reasons: jsonb("reasons").$type<string[]>().notNull().default([]),
+    /** True when the run accepted the subject on the strength of this result. */
+    accepted: boolean("accepted").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("production_run_gate_results_run_index").on(
+      table.runId,
+      table.createdAt,
+    ),
+    check(
+      "production_run_gate_results_subject_valid",
+      sql`${table.subject} in ('script','scene_plan','scene_image','scene_audio','render')`,
+    ),
+    check(
+      "production_run_gate_results_verdict_valid",
+      sql`${table.verdict} in ('pass','warn','fail')`,
+    ),
+    check(
+      "production_run_gate_results_score_range",
+      sql`${table.score} is null or ${table.score} between 0 and 100`,
+    ),
+    foreignKey({
+      columns: [table.runId, table.workspaceId],
+      foreignColumns: [productionRuns.id, productionRuns.workspaceId],
+      name: "production_run_gate_results_tenant_run_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
+export type ProductionRun = typeof productionRuns.$inferSelect;
+export type ProductionRunEvent = typeof productionRunEvents.$inferSelect;
+export type ProductionRunGateResult =
+  typeof productionRunGateResults.$inferSelect;

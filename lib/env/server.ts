@@ -180,3 +180,15 @@ export function getUsageEnvironment(): UsageEnvironment {
   usageEnvironment ??= usageEnvironmentSchema.parse(process.env);
   return usageEnvironment;
 }
+
+import {
+  productionRunEnvironmentSchema,
+  type ProductionRunEnvironment,
+} from "@/lib/env/server-schema";
+let productionRunEnvironment: ProductionRunEnvironment | null = null;
+export function getProductionRunEnvironment(): ProductionRunEnvironment {
+  productionRunEnvironment ??= productionRunEnvironmentSchema.parse(
+    process.env,
+  );
+  return productionRunEnvironment;
+}

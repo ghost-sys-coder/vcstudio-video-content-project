@@ -24,6 +24,7 @@ const workspaceCapabilities = {
     manageChannelProfiles: true,
     manageSubtitles: true,
     renderVideo: true,
+    runProduction: true,
     manageUsage: true,
     viewOperationalReadiness: true,
     manageMediaLibrary: true,
@@ -61,6 +62,9 @@ const workspaceCapabilities = {
     manageChannelProfiles: false,
     manageSubtitles: true,
     renderVideo: true,
+    // Editors may run production: a run spends only what each stage already
+    // lets an editor spend, inside the same budgets.
+    runProduction: true,
     manageUsage: true,
     viewOperationalReadiness: false,
     manageMediaLibrary: true,
@@ -98,6 +102,7 @@ const workspaceCapabilities = {
     manageChannelProfiles: false,
     manageSubtitles: false,
     renderVideo: false,
+    runProduction: false,
     manageUsage: false,
     viewOperationalReadiness: false,
     manageMediaLibrary: false,
