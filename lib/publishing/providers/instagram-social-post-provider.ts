@@ -1,4 +1,4 @@
-import "server-only";
+﻿import "server-only";
 
 import { z } from "zod";
 import type { ContentPlatform } from "@/db/schema";
@@ -17,6 +17,26 @@ import {
 
 const idSchema = z.object({ id: z.string().min(1) });
 const permalinkSchema = z.object({ permalink: z.string().min(1).optional() });
+const containerStatusSchema = z.object({
+  status_code: z.enum([
+    "EXPIRED",
+    "ERROR",
+    "FINISHED",
+    "IN_PROGRESS",
+    "PUBLISHED",
+  ]),
+});
+
+/**
+ * Image containers are processed asynchronously too, usually within seconds.
+ * Publishing before `FINISHED` is rejected with "media not ready", so the
+ * container is polled first, bounded at roughly two minutes.
+ */
+const CONTAINER_POLL_INTERVAL_MS = 3000;
+const MAX_CONTAINER_POLLS = 40;
+/** Graph API "media not ready for publishing" (code 9007, subcode 2207027). */
+const MEDIA_NOT_READY_CODE = 9007;
+const MEDIA_NOT_READY_SUBCODE = 2207027;
 const graphErrorSchema = z.object({
   error: z
     .object({
@@ -38,6 +58,19 @@ function failureForResponse(
 ): PublishFailure {
   const parsed = graphErrorSchema.safeParse(payload);
   const error = parsed.success ? parsed.data.error : undefined;
+  // A definite refusal: Instagram published nothing, and the same container
+  // can be published once processing finishes.
+  if (
+    error?.code === MEDIA_NOT_READY_CODE ||
+    error?.error_subcode === MEDIA_NOT_READY_SUBCODE
+  )
+    return {
+      category: "provider_server_error",
+      safeMessage:
+        "Instagram was still processing the media. The post was not published; it will be retried.",
+      retriable: true,
+      mayHavePublished: false,
+    };
   if (response.status === 401 || error?.code === 190)
     return {
       category: "authorization_expired",
@@ -140,6 +173,128 @@ export class InstagramSocialPostProvider implements SocialPostProvider {
     return parsed.data.id;
   }
 
+  /** Builds the single-image or carousel container that will be published. */
+  private async createContainer(
+    request: PublishPostRequest,
+    images: PublishPostRequest["media"],
+  ): Promise<string> {
+    const mediaUrl = this.graphUrl(
+      `${encodeURIComponent(request.account.externalAccountId)}/media`,
+    );
+    const accessToken = request.tokens.accessToken;
+    if (images.length === 1)
+      return this.post(
+        mediaUrl,
+        accessToken,
+        new URLSearchParams({
+          image_url: images[0].sourceUrl,
+          caption: request.text,
+          ...(images[0].altText ? { alt_text: images[0].altText } : {}),
+        }),
+      );
+
+    const children: string[] = [];
+    for (const [index, image] of images.entries()) {
+      children.push(
+        await this.post(
+          mediaUrl,
+          accessToken,
+          new URLSearchParams({
+            image_url: image.sourceUrl,
+            is_carousel_item: "true",
+            ...(image.altText ? { alt_text: image.altText } : {}),
+          }),
+        ),
+      );
+      await request.onProgress?.(
+        Math.floor(((index + 1) / images.length) * 60),
+      );
+    }
+    return this.post(
+      mediaUrl,
+      accessToken,
+      new URLSearchParams({
+        media_type: "CAROUSEL",
+        children: children.join(","),
+        caption: request.text,
+      }),
+    );
+  }
+
+  private async readContainerStatus(
+    containerId: string,
+    accessToken: string,
+  ): Promise<z.infer<typeof containerStatusSchema>["status_code"]> {
+    const url = this.graphUrl(encodeURIComponent(containerId));
+    url.searchParams.set("fields", "status_code");
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+    } catch {
+      // Nothing has been published yet; a status read is safe to repeat.
+      fail({
+        category: "network_unreachable",
+        safeMessage:
+          "Could not reach Instagram. The post was not published; it will be retried.",
+        retriable: true,
+        mayHavePublished: false,
+      });
+    }
+    const payload = await response.json().catch(() => ({}));
+    const status = containerStatusSchema.safeParse(payload);
+    if (!response.ok || !status.success)
+      fail(failureForResponse(response, payload));
+    return status.data.status_code;
+  }
+
+  /**
+   * Waits until Instagram has fetched and processed the container's images.
+   * Publishing earlier is refused with "media not ready", which previously
+   * surfaced as an unconfirmed post even though nothing had been published.
+   */
+  private async waitForContainer(
+    request: PublishPostRequest,
+    containerId: string,
+  ): Promise<void> {
+    for (let poll = 0; poll < MAX_CONTAINER_POLLS; poll += 1) {
+      if (poll > 0)
+        await request.waitForProcessing?.(CONTAINER_POLL_INTERVAL_MS);
+      const status = await this.readContainerStatus(
+        containerId,
+        request.tokens.accessToken,
+      );
+      if (status === "FINISHED") return;
+      if (status === "PUBLISHED")
+        fail({
+          category: "transport_ambiguous",
+          safeMessage:
+            "Instagram already published this post but its media id was not confirmed. Check the account before retrying.",
+          retriable: false,
+          mayHavePublished: true,
+        });
+      if (status === "ERROR" || status === "EXPIRED")
+        fail({
+          category: "provider_error",
+          safeMessage:
+            "Instagram could not process the images. Check that they are JPEGs within its aspect-ratio rules.",
+          retriable: false,
+          mayHavePublished: false,
+        });
+      await request.onProgress?.(
+        Math.min(80, 60 + Math.floor((poll / MAX_CONTAINER_POLLS) * 20)),
+      );
+    }
+    fail({
+      category: "provider_server_error",
+      safeMessage:
+        "Instagram is still processing the images. The post was not published; it will be retried.",
+      retriable: true,
+      mayHavePublished: false,
+    });
+  }
+
   async publishPost(request: PublishPostRequest): Promise<PublishPostResult> {
     const accountId = request.account.externalAccountId;
     const accessToken = request.tokens.accessToken;
@@ -164,49 +319,21 @@ export class InstagramSocialPostProvider implements SocialPostProvider {
         mayHavePublished: false,
       });
 
-    let containerId: string;
-    if (images.length === 1) {
-      containerId = await this.post(
-        this.graphUrl(`${encodeURIComponent(accountId)}/media`),
-        accessToken,
-        new URLSearchParams({
-          image_url: images[0].sourceUrl,
-          caption: request.text,
-          ...(images[0].altText ? { alt_text: images[0].altText } : {}),
-        }),
-      );
-    } else {
-      const children: string[] = [];
-      for (const [index, image] of images.entries()) {
-        children.push(
-          await this.post(
-            this.graphUrl(`${encodeURIComponent(accountId)}/media`),
-            accessToken,
-            new URLSearchParams({
-              image_url: image.sourceUrl,
-              is_carousel_item: "true",
-              ...(image.altText ? { alt_text: image.altText } : {}),
-            }),
-          ),
-        );
-        await request.onProgress?.(
-          Math.floor(((index + 1) / images.length) * 70),
-        );
-      }
-      containerId = await this.post(
-        this.graphUrl(`${encodeURIComponent(accountId)}/media`),
-        accessToken,
-        new URLSearchParams({
-          media_type: "CAROUSEL",
-          children: children.join(","),
-          caption: request.text,
-        }),
-      );
-    }
+    // Resume a previous attempt's container rather than building a second one.
+    // An expired container was never published, so it is safe to rebuild.
+    const previous = request.providerOperationId;
+    const reusable =
+      previous !== null &&
+      (await this.readContainerStatus(previous, accessToken)) !== "EXPIRED";
+    const containerId = reusable
+      ? previous
+      : await this.createContainer(request, images);
+    if (!reusable)
+      // Recorded before publishing so a retry resumes from this container
+      // instead of posting twice.
+      await request.onProviderOperationCreated?.(containerId);
 
-    // Recorded before publishing so a retry can resume from the container
-    // instead of building a second one and posting twice.
-    await request.onProviderOperationCreated?.(containerId);
+    await this.waitForContainer(request, containerId);
     await request.onProgress?.(85);
 
     let publishResponse: Response;
