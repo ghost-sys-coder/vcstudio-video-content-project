@@ -32,22 +32,33 @@ export function ReconnectChannelButton({
     return () => window.removeEventListener("pageshow", reset);
   }, []);
 
-  const inactive = disabled || pending;
-
   return (
     <Button
       aria-busy={pending}
       aria-label={`Reconnect ${accountName} (${platformLabel})`}
-      disabled={inactive}
+      disabled={disabled}
       nativeButton={false}
       onClick={(event) => {
-        if (inactive) {
+        if (disabled || pending) {
           event.preventDefault();
           return;
         }
+        // Modified clicks open a new tab; leave those to the browser.
+        if (
+          event.button !== 0 ||
+          event.metaKey ||
+          event.ctrlKey ||
+          event.shiftKey ||
+          event.altKey
+        )
+          return;
+        // Navigate explicitly: the pending re-render happens before the
+        // browser's default link action, which could otherwise be cancelled.
+        event.preventDefault();
         setPending(true);
+        window.location.assign(href);
       }}
-      render={<a href={inactive ? undefined : href} />}
+      render={<a href={disabled ? undefined : href} />}
       role="link"
       size="sm"
       variant={emphasized ? "default" : "outline"}
